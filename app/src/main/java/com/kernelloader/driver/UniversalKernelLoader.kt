@@ -218,6 +218,29 @@ object UniversalKernelLoader {
 
         // ---------- 7. insmod with auto-fix retry ladder ----------
         val baselineMods = SafetyGuard.loadedModuleNames()
+
+        // A module lives in kernel memory: once loaded it stays loaded until a
+        // reboot or an explicit rmmod. Re-insmod'ing is not just wasteful, it
+        // is the "File exists" error path that can end up force-unloading a
+        // live driver. So check FIRST and report success if it is already in.
+        val alreadyLoaded = vm.knownDriverModules().firstOrNull { it in baselineMods }
+        if (alreadyLoaded != null) {
+            vm.tstep("Checking module...")
+            vm.tlog("STATUS: driver '$alreadyLoaded' is ALREADY loaded - nothing to do", "OK")
+            vm.setLoadedModule(alreadyLoaded)
+            vm.tlog(
+                "INFO: a kernel module survives until reboot or rmmod, so you only " +
+                        "load it once per boot. Use UNLOAD to remove it.",
+                "INFO"
+            )
+            // Still refresh the node permissions - a game client may have been
+            // the one that reset them, and the node is what it opens.
+            Shell.cmd("chmod 666 /dev/$devNode 2>/dev/null").exec()
+            verifyLoad(vm, sourceName, devNode, alreadyLoaded)
+            finish(vm, true, "Already loaded: $alreadyLoaded")
+            return
+        }
+
         vm.tstep("Loading module (insmod)...")
         vm.tlog("CMD: insmod $TMP_KO devname=$devNode", "CMD")
         var res = Shell.cmd("insmod $TMP_KO devname=$devNode").exec()
@@ -237,6 +260,15 @@ object UniversalKernelLoader {
         }
 
         // ---------- 8. Verify + post-load stability (rescue if unsafe) ----------
+        // The module's lsmod name is whatever KBUILD_MODNAME / .modinfo said
+        // at build time (kmem_337, kmem_337_qx, entryi, 5.10_A12, ...) and has
+        // NOTHING to do with the .ko file name. So discover it: whatever
+        // appeared in /proc/modules between the two snapshots IS our driver.
+        val loadedNow = SafetyGuard.newlyLoaded(baselineMods)
+        if (loadedNow.isNotEmpty()) {
+            vm.setLoadedModule(loadedNow.first())
+        }
+        vm.tstep("Verifying module...")
         // Wait a beat so dmesg can show an oops, then check stability.
         // If the just-loaded module made the kernel sick, rmmod it at once
         // so the phone does NOT restart.
@@ -246,10 +278,11 @@ object UniversalKernelLoader {
         if (SafetyGuard.kernelLooksUnstable()) {
             vm.tlog("SAFETY: kernel unstable after load (panic/oops signature caught)", "ERR")
             var rescued = false
-            SafetyGuard.newlyLoaded(beforeMods).forEach { mod ->
+            (loadedNow.ifEmpty { SafetyGuard.newlyLoaded(beforeMods) }).forEach { mod ->
                 vm.tlog("RESCUE: rmmod $mod (preventing phone restart)", "FIX")
                 if (SafetyGuard.rescueUnload(mod)) {
                     rescued = true
+                    vm.setLoadedModule("")
                     vm.tlog("RESCUE: $mod unloaded - kernel stable, phone will not restart", "OK")
                 } else {
                     vm.tlog("RESCUE: rmmod $mod failed - module is still loaded", "WARN")
@@ -258,13 +291,20 @@ object UniversalKernelLoader {
             finish(vm, false, if (rescued) "Unsafe loader removed (no restart)" else "Loader unstable - contact support")
             return
         }
-        val ok = verifyLoad(vm, sourceName, devNode) &&
+        val ok = verifyLoad(vm, sourceName, devNode, vm.loadedModuleName.value) &&
                 abiCheck(context, vm, devNode, baselineMods)
         if (ok) {
             vm.tlog("==============================================", "OK")
             vm.tlog(" RESULT: DRIVER LOADED & VERIFIED", "OK")
+            vm.tlog(" module name in lsmod: ${vm.loadedModuleName.value.ifBlank { "(unknown)" }}", "OK")
             vm.tlog("==============================================", "OK")
             finish(vm, true, "Loaded OK: $sourceName")
+            // A reboot wipes kernel memory, so the driver has to be loaded
+            // again every time the phone restarts. Stage the EXACT bytes that
+            // were insmod'ed (already vermagic-patched, so the copy is
+            // byte-identical to what the kernel just accepted) and install a
+            // Magisk service.d script that loads it at every boot.
+            stageForBoot(vm, context, variant, devNode)
         } else {
             vm.tlog("==============================================", "ERR")
             vm.tlog(" RESULT: LOAD FAILED - details in the terminal log", "ERR")
@@ -296,16 +336,26 @@ object UniversalKernelLoader {
         // If it is STILL stuck, only a normal user reboot clears kernel
         // state - the app never reboots by itself.
         if (lastErr.contains("File exists", true) || lastErr.contains("already loaded", true)) {
-            vm.tlog("DIAGNOSE: module name already present in kernel - cleaning stale state", "WARN")
+            // Unload whichever of OUR driver modules the kernel is holding.
+            // Hardcoding one name is wrong: the same bug arrives under
+            // kmem_337, kmem_337_qx, entryi, 5.10_A12, ... depending on which
+            // .ko was loaded, and the name is not the .ko file name.
+            val stuck = vm.knownDriverModules().filter { SafetyGuard.isLoaded(it) }
+            if (stuck.isEmpty()) {
+                vm.tlog("DIAGNOSE: kernel says the name is taken, but no known driver module is in lsmod", "WARN")
+                vm.tlog("ACTION: reboot the phone ONCE normally, then tap LOAD again", "FIX")
+                return res
+            }
+            vm.tlog("DIAGNOSE: module name already present - clearing ${stuck.joinToString(", ")}", "WARN")
             // Plain rmmod ONLY: forced unload of a stuck module can panic
             // the kernel (instant reboot). If plain fails, a normal user
             // reboot clears it - the app never forces anything.
             val unload = Shell.cmd(
-                "rmmod kmem_337 2>&1",
-                "sleep 2",
-                "lsmod 2>/dev/null | grep -i kmem || echo KLMEM_NONE"
+                stuck.joinToString("; ") { "rmmod $it 2>&1" },
+                "sleep 2"
             ).exec()
             unload.out.forEach { if (it.isNotBlank()) vm.tlog("UNLOAD: $it", "INFO") }
+            vm.setLoadedModule("")
             res = insmodRetry(devNode)
             vm.tlog("RETRY: insmod (after stale cleanup) -> exit ${res.code}", "CMD")
             res.err.forEach { if (it.isNotBlank()) vm.tlog(it, "ERR") }
@@ -497,22 +547,27 @@ object UniversalKernelLoader {
     }
 
     /** Post-load verification: lsmod + any /dev node from the module + dmesg */
-    private fun verifyLoad(vm: DriverViewModel, sourceName: String, expectedNode: String = ""): Boolean {
+    private fun verifyLoad(
+        vm: DriverViewModel,
+        sourceName: String,
+        expectedNode: String = "",
+        moduleName: String = ""
+    ): Boolean {
         vm.tstep("Verifying module...")
         val lsmod = Shell.cmd("lsmod").exec()
-        // Find the module in lsmod by tokens of the source file name (a module's
-        // internal name can differ from the file name) - any driver / any device.
-        val sourceTokens = sourceName.removeSuffix(".ko").split('_', '-', '.')
-            .filter { it.length >= 3 && it.any { c -> !c.isDigit() } }
+        // Use the name discovered from the lsmod diff (exact), or the one
+        // recorded from a previous load. Token guessing off the .ko FILE name
+        // is not used: the file name is only a label and the real module name
+        // is whatever the build baked in (kmem_337 / entryi / 5.10_A12 / ...).
+        val candidates = (listOf(moduleName) + vm.knownDriverModules())
+            .filter { it.isNotBlank() }.distinct()
         val loadedLine = lsmod.out.drop(1).firstOrNull { line ->
             val n = line.trim().split(Regex("\\s+")).firstOrNull() ?: ""
-            sourceTokens.any { n.contains(it, true) }
-        } ?: lsmod.out.firstOrNull { line ->
-            // Our kmem driver registers exactly as kmem_337 whatever the file is called.
-            (line.trim().split(Regex("\\s+")).firstOrNull() ?: "").equals("kmem_337", true)
+            n.isNotBlank() && n != "Module" && n in candidates
         }
         val moduleLoaded = loadedLine != null
         val loadedName = loadedLine?.trim()?.split(Regex("\\s+"))?.firstOrNull() ?: ""
+        if (loadedName.isNotBlank()) vm.setLoadedModule(loadedName)
         // The module itself chooses its /dev node name - match it, then fall back
         // to the tags our bundled drivers use. The per-load random devname
         // (new kmem driver) is checked explicitly first.
@@ -555,8 +610,43 @@ object UniversalKernelLoader {
         return moduleLoaded || devExists
     }
 
-    private fun finish(vm: DriverViewModel, ok: Boolean, msg: String) {
-        vm.autoLoadOk.value = ok
+    /**
+     * Make the just-loaded driver survive reboots.
+     *
+     * The staged copy is the file that was really insmod'ed, so it already
+     * carries any vermagic patch this device needed. The boot script re-checks
+     * /proc/modules before loading, so a manual load followed by a reboot can
+     * never produce a double insmod ("File exists").
+     */
+    private fun stageForBoot(
+        vm: DriverViewModel,
+        context: Context,
+        variant: String,
+        devNode: String
+    ) {
+        val modName = vm.loadedModuleName.value
+        if (modName.isBlank()) {
+            vm.tlog("AUTOLOAD: skipped - the loaded module name is unknown, so no safe boot script", "WARN")
+            return
+        }
+        val ko = File(TMP_KO)
+        if (!ko.exists()) {
+            vm.tlog("AUTOLOAD: skipped - $TMP_KO is gone", "WARN")
+            return
+        }
+        if (!DriverAutoload.hasBootRunner()) {
+            vm.tlog("AUTOLOAD: no /data/adb/service.d runner found (Magisk/KernelSU?)", "WARN")
+            vm.tlog("AUTOLOAD: the driver will NOT auto-load after a reboot - tap LOAD again", "INFO")
+            return
+        }
+        vm.tlog("AUTOLOAD: staging so the driver comes back by itself after a reboot...", "INFO")
+        val ok = DriverAutoload.enable(context, ko, modName, variant, devNode) { m, t ->
+            vm.tlog(m, t)
+        }
+        vm.autoloadEnabled.value = ok
+    }
+
+    private fun finish(vm: DriverViewModel, ok: Boolean, msg: String) {        vm.autoLoadOk.value = ok
         vm.autoLoadStatus.value = msg
         if (!ok) {
             vm.tlog("SUPPORT: no exact loader found for this kernel, or the load failed.", "WARN")

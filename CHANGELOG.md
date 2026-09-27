@@ -6,6 +6,48 @@ semantic-ish version tags (`<major>.<minor>-<flavour>`).
 
 ---
 
+## [4.1-universal] — 2026-09-27 (versionCode 26)
+
+### Added
+* **Load at every boot** (Magisk / KernelSU / APatch `service.d`). The kernel
+  module lives in kernel memory, so a reboot always wiped it and the user had
+  to tap LOAD again. A successful load now stages the *exact* bytes that were
+  `insmod`'ed (already vermagic-patched) and installs
+  `/data/adb/service.d/90-kloder.sh`, so the driver comes back by itself.
+  A switch on the home screen turns it off and removes the script.
+* **UNLOAD button on the home screen.** It only unloads — it never installs,
+  never patches a vermagic and never reboots.
+
+### Fixed
+* **"Already loaded" is now detected correctly.** The module's name in `lsmod`
+  is baked in at build time (`KBUILD_MODNAME` / `.modinfo name=`) and has
+  nothing to do with the `.ko` file name:
+
+  | asset | real module name |
+  |---|---|
+  | `rt_4.9.337-DaisyForGaming.ko` | `kmem_337` |
+  | `qx_4.9.337-DaisyForGaming.ko` | `kmem_337_qx` |
+  | `rt_4.14.117.ko` | `5.10_A12` |
+  | `qx_4.14.117.ko` | `entryi` |
+
+  The old code guessed the name from the file name, which produced no usable
+  token for most drivers, and then hardcoded `kmem_337`. The name is now
+  discovered by diffing `/proc/modules` around the `insmod`, which is exact for
+  every driver. Tapping a load button with the driver already present is now a
+  no-op that reports success instead of falling into the force-unload path.
+* **UNLOAD can no longer remove an unrelated module.** It used to fall back to
+  `entries.lastOrNull()` — the *last* entry in `lsmod` — which would `rmmod` an
+  unrelated driver (camera, touch, wifi, …) if the guessed name did not match.
+  It now only ever unloads a name this app actually loaded.
+* The "File exists" recovery step unloads whichever known driver module the
+  kernel is really holding, instead of only `kmem_337`.
+* The generated boot script refuses to install if any placeholder is left
+  unsubstituted, instead of writing a silently broken script.
+* The boot script does not `insmod` twice: it checks `/proc/modules` first, so
+  a manual load followed by a reboot cannot produce a double load.
+
+---
+
 ## [4.0-universal] — 2026-09-27 (versionCode 25)
 
 ### Added

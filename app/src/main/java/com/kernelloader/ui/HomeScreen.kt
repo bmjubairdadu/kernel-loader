@@ -48,6 +48,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Switch
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -122,6 +124,9 @@ fun HomeScreen(
     LaunchedEffect(Unit) {
         viewModel.refreshManifest()
         viewModel.checkForAppUpdate()
+        // A module loaded by the boot script (or left over from last session)
+        // must be reflected in the UI without the user pressing anything.
+        viewModel.refreshDriverState(context)
     }
     LaunchedEffect(terminalLines.size) {
         if (terminalLines.isNotEmpty()) listState.animateScrollToItem(terminalLines.size - 1)
@@ -437,6 +442,88 @@ fun HomeScreen(
                 }
             }
             Spacer(Modifier.height(6.dp))
+
+            // ---------------- loaded state + unload ----------------
+            // A module stays in kernel memory until reboot or rmmod, so this
+            // row is normally just a status readout; UNLOAD is the one action
+            // that removes it and nothing else.
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        text = if (viewModel.driverLoaded.value) {
+                            "LOADED: ${viewModel.driverModule.value.ifBlank { viewModel.loadedModuleName.value }}"
+                        } else {
+                            "NOT LOADED"
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        fontFamily = FontFamily.Monospace,
+                        color = if (viewModel.driverLoaded.value) Color(0xFF4CAF50) else Color(0xFFEF9A9A)
+                    )
+                    Text(
+                        text = "survives until reboot or UNLOAD",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontFamily = FontFamily.Monospace,
+                        color = Color(0xFF78909C)
+                    )
+                }
+                OutlinedButton(
+                    onClick = { viewModel.unloadModule(context) },
+                    enabled = !busy && rootAvailable && viewModel.driverLoaded.value,
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = Color(0xFFFF8A65),
+                        disabledContentColor = Color(0xFFFF8A65).copy(alpha = 0.35f)
+                    ),
+                    border = androidx.compose.foundation.BorderStroke(
+                        1.dp, Color(0xFFFF8A65).copy(alpha = if (viewModel.driverLoaded.value) 0.7f else 0.25f)
+                    )
+                ) {
+                    Text("UNLOAD", fontWeight = FontWeight.Bold)
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+
+            // ---------------- boot auto-load ----------------
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = Color(0xFF16202A)
+                )
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            text = "Load at every boot",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color(0xFFE0E0E0)
+                        )
+                        Text(
+                            text = if (viewModel.autoloadEnabled.value)
+                                "ON - after a restart the driver loads by itself"
+                            else "OFF - you must tap a load button after a restart",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontFamily = FontFamily.Monospace,
+                            color = if (viewModel.autoloadEnabled.value) Color(0xFF69F0AE) else Color(0xFF78909C)
+                        )
+                    }
+                    Switch(
+                        checked = viewModel.autoloadEnabled.value,
+                        onCheckedChange = { on -> viewModel.setBootAutoload(context, on) },
+                        enabled = !busy && rootAvailable
+                    )
+                }
+            }
+            Spacer(Modifier.height(6.dp))
+
             Text(
                 text = when {
                     busyStep.isNotBlank() -> busyStep

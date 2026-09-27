@@ -202,7 +202,7 @@ fun ConsoleScreen(
                     Text("VERIFY")
                 }
                 TextButton(
-                    onClick = { viewModel.unloadModule() },
+                    onClick = { viewModel.unloadModule(context) },
                     enabled = !viewModel.isBusy.value && rootAvailable,
                     colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
                         contentColor = Color(0xFFFF8A65),

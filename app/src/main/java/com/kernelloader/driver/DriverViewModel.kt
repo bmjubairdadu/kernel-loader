@@ -171,6 +171,22 @@ class DriverViewModel : ViewModel() {
     var remoteManifest = mutableStateOf<OtaDriverStore.Manifest?>(null)
     var manifestStatus = mutableStateOf("IDLE")   // IDLE / LOADING / OK / EMPTY / OFFLINE
 
+    // ---- Driver runtime state ----
+    /** The real lsmod name of the driver we loaded ("", "kmem_337", "entryi", ...). */
+    var loadedModuleName = mutableStateOf("")
+    /** True when a memory driver is present in /proc/modules. */
+    var driverLoaded = mutableStateOf(false)
+    /** Human-readable module list, for the home screen. */
+    var driverModule = mutableStateOf("")
+    /** Boot auto-load (Magisk service.d) is installed. */
+    var autoloadEnabled = mutableStateOf(false)
+
+    /** Remember the module name discovered after a load (and after an unload). */
+    fun setLoadedModule(name: String) {
+        if (loadedModuleName.value != name) loadedModuleName.value = name
+        driverLoaded.value = name.isNotBlank()
+    }
+
     // ---- In-app auto-update (GitHub Releases database) state ----
     var appUpdate = mutableStateOf<AppUpdateChecker.UpdateInfo?>(null)
     var updateStatus = mutableStateOf("IDLE")     // IDLE / CHECKING / NONE / AVAILABLE / DOWNLOADING / DONE / ERROR
@@ -705,45 +721,135 @@ class DriverViewModel : ViewModel() {
         addLog("File picked: ${pickedFileName.value}", emptyList(), emptyList(), 0)
     }
 
-    fun unloadModule() {
+    /**
+     * Module names this app is allowed to touch. A kernel module's lsmod name
+     * is baked in at BUILD time (KBUILD_MODNAME / .modinfo "name=") and is
+     * unrelated to the .ko file name:
+     *
+     *   rt_4.9.337-DaisyForGaming.ko  -> kmem_337
+     *   qx_4.9.337-DaisyForGaming.ko  -> kmem_337_qx
+     *   rt_4.14.117.ko                -> 5.10_A12
+     *   qx_4.14.117.ko                -> entryi
+     *
+     * The list is seeded with the names seen in this driver's own builds; the
+     * authoritative one is whatever the lsmod diff reports at load time, which
+     * is what [loadedModuleName] holds. UNLOAD only ever rmmods a name from
+     * this set - never "the last module in lsmod", which could be an unrelated
+     * driver (touching that can take the phone's camera, touch, wifi, ... down).
+     */
+    private val KNOWN_DRIVER_MODULES = listOf(
+        "kmem_337", "kmem_337_qx", "kmem", "entryi", "kloader",
+        "5.10_A12", "wanbai", "daisy"
+    )
+
+    /** Every driver module name we may inspect or unload. */
+    fun knownDriverModules(): List<String> =
+        (KNOWN_DRIVER_MODULES + loadedModuleName.value).filter { it.isNotBlank() }.distinct()
+
+    /**
+     * Unload the memory driver. ONLY unloads - it never installs, never
+     * patches a vermagic and never reboots. Returns the module it removed.
+     */
+    fun unloadModule(context: Context) {
+        if (isBusy.value) return
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
                 try {
-                    // Find the actual loaded module name from lsmod (module name != file name)
-                    val lsmodRes = Shell.cmd("lsmod").exec()
-                    val pickedName = pickedFileName.value?.removeSuffix(".ko") ?: ""
-                    val entries = lsmodRes.out.drop(1).mapNotNull { line ->
-                        line.trim().split(Regex("\\s+")).firstOrNull()?.takeIf { it.isNotBlank() && it != "Module" }
-                    }
-                    val tokens = nameTokens(pickedFileName.value)
-                    val loadedLine = lsmodRes.out.firstOrNull { line ->
-                        val modName = line.trim().split(Regex("\\s+")).firstOrNull() ?: ""
-                        tokens.any { modName.contains(it, ignoreCase = true) }
-                    }
-                    val moduleName = loadedLine?.trim()?.split(Regex("\\s+"))?.firstOrNull()
-                            ?: pickedName.takeIf { it.isNotEmpty() }
-                            ?: entries.lastOrNull()
-                    if (moduleName.isNullOrEmpty()) {
-                        tlog("UNLOAD: no module is loaded - nothing to unload", "WARN")
-                        return@withContext
+                    val loaded = SafetyGuard.loadedModuleNames()
+                    // 1. prefer the name this app actually loaded
+                    val remembered = loadedModuleName.value
+                    // 2. otherwise any known driver module the kernel holds
+                    val known = knownDriverModules().filter { it in loaded }
+                    // NEVER fall back to "some other module" - unloading a
+                    // module we did not install can disable an unrelated driver.
+                    val target = when {
+                        remembered.isNotBlank() && remembered in loaded -> remembered
+                        known.isNotEmpty() -> known.first()
+                        else -> {
+                            tlog("UNLOAD: no memory driver is loaded - nothing to unload", "WARN")
+                            DriverAutoload.state(context)
+                            if (DriverAutoload.enabled) {
+                                tlog("UNLOAD: boot auto-load is ON, so it will load again at next boot", "INFO")
+                            }
+                            driverLoaded.value = false
+                            return@withContext
+                        }
                     }
 
-                    tlog("UNLOAD: trying rmmod '$moduleName'", "INFO")
-                    var res = Shell.cmd("rmmod $moduleName").exec()
+                    tlog("UNLOAD: rmmod '$target'", "INFO")
+                    var res = Shell.cmd("rmmod $target").exec()
                     if (!res.isSuccess) {
-                        // busybox fallback (some ROMs ship broken rmmod)
-                        val forceRes = Shell.cmd(
-                            "BB=\$(command -v busybox); [ -z \"\$BB\" ] && BB=/data/adb/magisk/busybox; \$BB rmmod $moduleName"
+                        // busybox fallback (some ROMs ship a broken rmmod)
+                        res = Shell.cmd(
+                            "BB=\$(command -v busybox); [ -z \"\$BB\" ] && BB=/data/adb/magisk/busybox; \$BB rmmod $target"
                         ).exec()
-                        res = forceRes
                     }
-                    tlog("UNLOAD: rmmod $moduleName -> exit ${res.code}", if (res.isSuccess) "OK" else "ERR")
-                    res.err.forEach { tlog(it, "WARN") }
-                    addLog("rmmod $moduleName", res.out, res.err, res.code)
+                    tlog("UNLOAD: rmmod $target -> exit ${res.code}", if (res.isSuccess) "OK" else "ERR")
+                    res.err.forEach { if (it.isNotBlank()) tlog("UNLOAD: $it", "WARN") }
+                    addLog("rmmod $target", res.out, res.err, res.code)
+
+                    if (res.isSuccess) {
+                        tlog("UNLOAD: driver removed", "OK")
+                        DriverAutoload.state(context)
+                        if (DriverAutoload.enabled) {
+                            tlog("UNLOAD: boot auto-load is still ON - it will load again at next boot", "WARN")
+                            tlog("UNLOAD: turn the auto-load switch off to keep it unloaded", "INFO")
+                        }
+                    } else {
+                        tlog("UNLOAD: FAILED - if the module is busy, a normal reboot clears it", "WARN")
+                    }
+                    setLoadedModule("")
+                    refreshDriverState(context)
                 } catch (e: Exception) {
                     tlog("UNLOAD ERROR: ${e.message}", "ERR")
                 }
             }
+        }
+    }
+
+    /** Turn boot auto-load on/off. The .ko was staged by the last successful load. */
+    fun setBootAutoload(context: Context, on: Boolean) {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                try {
+                    DriverAutoload.state(context)
+                    if (on) {
+                        val staged = DriverAutoload.stagedKo
+                        if (staged.isBlank()) {
+                            tlog("AUTOLOAD: load the driver once first, then switch this on", "WARN")
+                            autoloadEnabled.value = false
+                            return@withContext
+                        }
+                        val ok = DriverAutoload.enable(
+                            context,
+                            File(staged),
+                            loadedModuleName.value.ifBlank { DriverAutoload.moduleName },
+                            DriverAutoload.variant,
+                            DriverAutoload.devNode
+                        ) { m, t -> tlog(m, t) }
+                        autoloadEnabled.value = ok
+                    } else {
+                        DriverAutoload.disable(context) { m, t -> tlog(m, t) }
+                        autoloadEnabled.value = false
+                    }
+                } catch (e: Exception) {
+                    tlog("AUTOLOAD ERROR: ${e.message}", "ERR")
+                    autoloadEnabled.value = false
+                }
+            }
+        }
+    }
+
+    /** Re-read the real driver state from the kernel (called at screen open). */
+    fun refreshDriverState(context: Context) {
+        viewModelScope.launch(Dispatchers.IO) {
+            DriverAutoload.state(context)
+            autoloadEnabled.value = DriverAutoload.enabled
+            val loaded = SafetyGuard.loadedModuleNames()
+            val hit = knownDriverModules().filter { it in loaded }
+            if (hit.isNotEmpty()) setLoadedModule(hit.first())
+            driverLoaded.value = hit.isNotEmpty()
+            driverModule.value = hit.joinToString(", ")
         }
     }
 

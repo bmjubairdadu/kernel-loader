@@ -65,6 +65,12 @@ object SafetyGuard {
     fun newlyLoaded(before: Set<String>): Set<String> =
         loadedModuleNames().filter { it.isNotBlank() && it !in before }.toSet()
 
+    /** Is this exact module name currently in /proc/modules? */
+    fun isLoaded(moduleName: String): Boolean {
+        if (moduleName.isBlank() || moduleName == "Module") return false
+        return moduleName in loadedModuleNames()
+    }
+
     /**
      * RESCUE: unload a module that loaded but behaves badly, so the kernel does
      * not panic (=> phone does not reboot). Plain rmmod only - a forced unload
