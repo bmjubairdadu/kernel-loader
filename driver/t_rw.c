@@ -1,7 +1,16 @@
 /* t_rw - freestanding ioctl test for kmem_337 (aarch64, -nostdlib -static)
  * usage: t_rw /dev/<node>   ; exit code = number of failed checks (0 = all pass)
- * RT return conventions: read/write ok=-5 fail=0, modbase ok=0,
- * bad ptr=-14, unknown cmd=-22
+ *
+ * RT return conventions (verified against the original RT binary and against
+ * the game-mod client, which tests the return with "cmp w0, #0"):
+ *      read/write   ok = 0        fail = -5
+ *      modbase      ok = 0        (base is returned through the struct)
+ *      bad pointer  -14
+ *      unknown cmd  -22
+ * NOTE: an earlier revision of this tester asserted ok == -5, which is the
+ * INVERTED convention. Every read and write then reported FAIL even though the
+ * driver had read and written the correct bytes, and the app's ABI self-check
+ * rmmod'ed a perfectly good driver.
  */
 typedef unsigned long u64;
 typedef long s64;
@@ -68,6 +77,54 @@ static void puthex(u64 v)
 	sc3(SYS_write, 1, (long)b, 19);
 }
 
+/* "<label> 0x<16 hex digits>\n" emitted as ONE write, so the line can never be
+ * split or interleaved with another check's output. Without this the raw
+ * return value was sometimes lost from the log and a failing check gave no
+ * clue what the kernel had actually returned. */
+static void putkv(const char *label, u64 v)
+{
+	char b[64];
+	u64 n = 0, i;
+	while (label[n] && n < 40) {
+		b[n] = label[n];
+		n++;
+	}
+	b[n++] = ' ';
+	b[n++] = '0';
+	b[n++] = 'x';
+	for (i = 0; i < 16; i++) {
+		int nyb = (int)((v >> (60 - i * 4)) & 0xf);
+		b[n + i] = nyb < 10 ? '0' + nyb : 'a' + nyb - 10;
+	}
+	b[n + 16] = '\n';
+	sc3(SYS_write, 1, (long)b, n + 17);
+}
+
+/* ---- ABI family detection -------------------------------------------------
+ * The two families the game-mod clients speak differ in exactly this way:
+ *
+ *            0x805            0x804            read/write ok   failure
+ *   RT   :   -22              -22                 0              -5
+ *   QX   :    0                2                 0              -1
+ *
+ * so the two "undefined command" probes identify the family, and read/write
+ * are 0-on-success in BOTH. A single tester can therefore check either.
+ * (Before this, the tester only knew the RT expectations, so loading a QX
+ * driver reported a false ABI MISMATCH and the app rmmod'ed it.)
+ */
+#define FAM_UNKNOWN 0
+#define FAM_RT      1
+#define FAM_QX      2
+
+static const char *famname(int f)
+{
+	if (f == FAM_RT)
+		return "rt";
+	if (f == FAM_QX)
+		return "qx";
+	return "unknown";
+}
+
 struct proc_rw { s32 pid; u32 pad; u64 addr; u64 buf; u64 size; };
 struct modbase { s32 pid; u32 pad; u64 name_ptr; u64 base; };
 
@@ -113,28 +170,35 @@ long tmain(long argc, char **argv)
 	putstr("open ok\n");
 	pid = sc1(SYS_getpid, 0);
 
-	/* 0x805 undefined on RT ABI -> -22 */
+	/* Identify the ABI family from the two commands whose behaviour differs
+	 * between RT and QX. Neither is required to "fail" - each is simply
+	 * recognised. */
 	{
 		int i;
+		int fam = FAM_UNKNOWN;
+		long r805, r804;
+
 		for (i = 0; i < 32; i++)
 			tmpbuf[i] = 0;
-		r = sc3(SYS_ioctl, fd, 0x805, (long)tmpbuf);
-		if (r == (long)-22)
-			putstr("PASS invalid-cmd\n");
-		else {
-			putstr("FAIL invalid-cmd ret=");
-			puthex((u64)r);
-			fails++;
-		}
-	}
+		r805 = sc3(SYS_ioctl, fd, 0x805, (long)tmpbuf);
+		r804 = sc3(SYS_ioctl, fd, 0x804, 0);
+		putkv("probe 0x805 ret", (u64)r805);
+		putkv("probe 0x804 ret", (u64)r804);
 
-	/* 0x804 undefined on RT ABI -> -22 */
-	r = sc3(SYS_ioctl, fd, 0x804, 0);
-	if (r == (long)-22)
-		putstr("PASS invalid-cmd2\n");
-	else {
-		putstr("FAIL invalid-cmd2\n");
-		fails++;
+		if (r805 == (long)-22 && r804 == (long)-22)
+			fam = FAM_RT;
+		else if (r805 == 0 && r804 == 2)
+			fam = FAM_QX;
+
+		if (fam == FAM_UNKNOWN) {
+			putstr("FAIL abi-probe (not an RT or QX driver)\n");
+			fails++;
+		} else {
+			putstr("PASS abi-probe ");
+			putstr(famname(fam));
+			putstr("\n");
+		}
+		putkv("ABI", (u64)fam);
 	}
 
 	/* 0x803 modbase of self: discover own basename via /proc/self/exe
@@ -170,7 +234,7 @@ long tmain(long argc, char **argv)
 		}
 	}
 
-	/* 0x801 read own marker */
+	/* 0x801 read own marker - RT success is 0, failure is -5 */
 	pr.pid = (s32)pid;
 	pr.pad = 0;
 	pr.addr = (u64)&marker;
@@ -178,11 +242,11 @@ long tmain(long argc, char **argv)
 	pr.size = 4;
 	tmpbuf[0] = tmpbuf[1] = tmpbuf[2] = tmpbuf[3] = 0;
 	r = sc3(SYS_ioctl, fd, 0x801, (long)&pr);
-	if (r == (long)-5 && *(u32 *)tmpbuf == 0x12345678)
+	putkv("read ret", (u64)r);
+	if (r == 0 && *(u32 *)tmpbuf == 0x12345678) {
 		putstr("PASS read\n");
-	else {
-		putstr("FAIL read got=");
-		puthex(*(u32 *)tmpbuf);
+	} else {
+		putkv("FAIL read got", (u64)*(u32 *)tmpbuf);
 		fails++;
 	}
 
@@ -190,11 +254,11 @@ long tmain(long argc, char **argv)
 	*(u32 *)tmpbuf = 0xAABBCCDD;
 	pr.buf = (u64)tmpbuf;
 	r = sc3(SYS_ioctl, fd, 0x802, (long)&pr);
-	if (r == (long)-5 && marker == 0xAABBCCDD)
+	putkv("write ret", (u64)r);
+	if (r == 0 && marker == 0xAABBCCDD) {
 		putstr("PASS write\n");
-	else {
-		putstr("FAIL write marker=");
-		puthex(marker);
+	} else {
+		putkv("FAIL write marker", (u64)marker);
 		fails++;
 	}
 
@@ -207,12 +271,14 @@ long tmain(long argc, char **argv)
 		pr.buf = (u64)tmpbuf;
 		pr.size = 4;
 		r = sc3(SYS_ioctl, fd, 0x801, (long)&pr);
-		if (r != (long)-5) {
+		putkv("xread ret", (u64)r);
+		if (r != 0) {
 			putstr("FAIL xread\n");
 			fails++;
 		} else {
 			r = sc3(SYS_ioctl, fd, 0x802, (long)&pr);
-			if (r == (long)-5)
+			putkv("xwrite ret", (u64)r);
+			if (r == 0)
 				putstr("PASS xwrite\n");
 			else {
 				putstr("FAIL xwrite\n");

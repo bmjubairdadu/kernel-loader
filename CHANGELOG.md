@@ -6,6 +6,43 @@ semantic-ish version tags (`<major>.<minor>-<flavour>`).
 
 ---
 
+## [4.2-universal] — 2026-09-27 (versionCode 27)
+
+### Fixed
+* **The ABI self-test asserted the inverted return convention and was removing
+  a perfectly good driver.** `driver/t_rw.c` treated `ret == -5` as success,
+  but the RT driver returns `0` on success and `-5` on failure — the client
+  tests the return with `cmp w0, #0`, which is exactly why it must not be
+  `-5`. Every load therefore ended in `ABI: MISMATCH` and the app `rmmod`'ed
+  the driver it had just installed:
+
+  ```
+  kprobe: FAIL read  got=0x00000000123445678   <- the read was CORRECT
+  kprobe: FAIL write marker=0x00000000aabbccdd <- the write was CORRECT
+  ABI: MISMATCH - loaded driver is stale/wrong, removing it
+  ```
+
+  The values came back right; only the expected return code was wrong.
+* **The self-test only knew the RT ABI, so a QX driver always failed it.**
+  RT answers `0x805 -> -22` and `0x804 -> -22`; QX answers `0x805 -> 0` and
+  `0x804 -> 2`. Pressing QX therefore reported a false mismatch and removed
+  the QX driver too. The probe now *identifies* the family from those two
+  commands and reports `PASS abi-probe rt|qx`; the app compares that with the
+  family the user asked for and warns when they differ instead of silently
+  loading the wrong one.
+* Self-test output now prints the raw ioctl return value for every check (as
+  one write, so a line can no longer be lost from the log), and the failure
+  text says "self-test failed" rather than blaming a "stale driver".
+* Renamed "ABI MISMATCH" handling: a driver that answers with the other
+  family's convention is now the only case that is called a mismatch.
+
+### Verified
+The rebuilt probe is a static aarch64 ELF; disassembly shows the success test
+is `cbnz` against the ioctl return (i.e. `r == 0` required) and there is no
+`-5` comparison anywhere in the binary.
+
+---
+
 ## [4.1-universal] — 2026-09-27 (versionCode 26)
 
 ### Added

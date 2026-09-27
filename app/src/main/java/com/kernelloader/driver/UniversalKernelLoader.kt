@@ -292,7 +292,7 @@ object UniversalKernelLoader {
             return
         }
         val ok = verifyLoad(vm, sourceName, devNode, vm.loadedModuleName.value) &&
-                abiCheck(context, vm, devNode, baselineMods)
+                abiCheck(context, vm, devNode, baselineMods, variant)
         if (ok) {
             vm.tlog("==============================================", "OK")
             vm.tlog(" RESULT: DRIVER LOADED & VERIFIED", "OK")
@@ -499,16 +499,25 @@ object UniversalKernelLoader {
         return r
     }
 
-    /** Post-load ABI self-check: run the bundled kprobe against the new
-     * /dev node and require ALL PASS (RT protocol: -5/-5/0/-22). A stale
-     * or wrong driver from an older install fails here and is removed, so
-     * game tools never talk to a mismatched driver. True = ABI verified
-     * (or probe unavailable, treated as pass). */
+    /**
+     * Post-load ABI self-check: run the bundled kprobe against the new /dev node
+     * and require ALL PASS.
+     *
+     * RT protocol: read/write 0 on success, -5 on failure; 0x804/0x805 -> -22.
+     * QX protocol: read/write 0 on success, -1 on failure; 0x804 -> 2, 0x805 -> 0.
+     *
+     * The probe reports which family it detected, so a driver that answers with
+     * the WRONG family's convention is rejected - that is the whole point: a
+     * mismatched driver insmods cleanly and then silently returns wrong data to
+     * the game client. A probe that cannot run at all is treated as a pass
+     * (never unload a good driver because a self-test could not execute).
+     */
     fun abiCheck(
         context: Context,
         vm: DriverViewModel,
         devNode: String,
-        baselineMods: Set<String>
+        baselineMods: Set<String>,
+        wantVariant: String = ""
     ): Boolean {
         vm.tstep("Verifying driver ABI...")
         return try {
@@ -524,17 +533,37 @@ object UniversalKernelLoader {
             val dst = "/data/local/tmp/kprobe_$devNode"
             Shell.cmd("cp \"${cache.absolutePath}\" $dst", "chmod 755 $dst").exec()
             val res = Shell.cmd("$dst /dev/$devNode").exec()
+            var detected = ""
             res.out.forEach {
-                if (it.isNotBlank())
+                if (it.isNotBlank()) {
                     vm.tlog("kprobe: $it", if (it.startsWith("PASS") || it == "ALL PASS") "OK" else "INFO")
+                    // "PASS abi-probe rt|qx" -> remember which family answered
+                    val m = Regex("^PASS abi-probe (\\w+)$").find(it.trim())
+                    if (m != null) detected = m.groupValues[1].lowercase()
+                }
             }
             val pass = res.isSuccess && res.out.any { it.trim() == "ALL PASS" }
             if (pass) {
-                vm.tlog("ABI: driver speaks RT protocol (self-test ALL PASS)", "OK")
+                if (detected.isNotEmpty()) {
+                    val want = wantVariant.trim().lowercase()
+                    if (want.isNotEmpty() && want != detected) {
+                        vm.tlog(
+                            "ABI: driver speaks the $detected protocol but you asked for " +
+                                    "${OtaDriverStore.variantLabel(want)} - game tools built for " +
+                                    "${OtaDriverStore.variantLabel(want)} will not read correctly",
+                            "WARN"
+                        )
+                    } else {
+                        vm.tlog("ABI: verified - driver speaks the $detected protocol", "OK")
+                    }
+                } else {
+                    vm.tlog("ABI: driver protocol verified (self-test ALL PASS)", "OK")
+                }
             } else {
-                vm.tlog("ABI: MISMATCH - loaded driver is stale/wrong, removing it", "ERR")
+                vm.tlog("ABI: SELF-TEST FAILED - the driver did not answer correctly", "ERR")
+                vm.tlog("ABI: removing it so game tools never talk to a broken driver", "FIX")
                 SafetyGuard.newlyLoaded(baselineMods).forEach { mod ->
-                    vm.tlog("RESCUE: rmmod $mod (wrong ABI)", "FIX")
+                    vm.tlog("RESCUE: rmmod $mod (failed self-test)", "FIX")
                     Shell.cmd("rmmod $mod 2>/dev/null").exec()
                 }
             }
