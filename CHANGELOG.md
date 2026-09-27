@@ -6,6 +6,56 @@ semantic-ish version tags (`<major>.<minor>-<flavour>`).
 
 ---
 
+## [4.3-universal] — 2026-09-27 (versionCode 28)
+
+### Fixed
+* **The app asked the driver for a random `/dev` name, which deleted
+  `/dev/wanbai` — the one path the game-mod clients open.** This is why
+  "load করলেও কাজ হয় না" even though the driver was loading perfectly.
+
+  ```
+  VERIFY: /dev node -> FOUND (/dev/eudwahxj, per-load name)   <- "success"
+  dmesg: kmem: /dev/wanbai removed
+  dmesg: kmem: /dev/eudwahxj created (major 216). ready.
+  ```
+
+  Aincrad 3.7 and Angry Mod V1 build the path `/dev/wanbai` from the strings
+  `/dev` + `wanbai` and open it with no discovery step. Passing
+  `devname=<random>` makes the driver unlink its own `/dev/wanbai` and
+  register the random node instead, so the game apps had nothing to open. The
+  rationale in the old comment — "static node names are fingerprinted by
+  anti-cheat, random is safer" — is only a valid trade when the client is
+  told the name, and these clients are not.
+
+  Both load paths (OTA and embedded) now always request `devname=wanbai`.
+
+* **A fuzzy node check hid the failure.** `verifyLoad` accepted *any* new `/dev`
+  entry containing "kmem"/"kloader"/"entryi"/the module name, so a load that
+  registered the wrong node was reported as `FOUND`. It now requires the exact
+  path, names any stray nodes, and a load counts as successful only when the
+  module is in `lsmod` **and** `/dev/wanbai` exists.
+
+### Added
+* **Cross-process read test.** Every previous check read the probe's own
+  address space, so it would still have passed if the page-table walk only ever
+  looked at the calling process — i.e. it never proved the one thing a game mod
+  needs. The probe now reads the ELF magic (`7f 45 4c 46`) out of `/init`
+  (pid 1) using the same `0x803` module-base lookup the game clients use.
+  It is reported as `PASS xread-init` / `WARN xread-init` but deliberately does
+  **not** gate the result: `/init`'s exact base varies by ROM, and an
+  ambiguous self-test must never be able to `rmmod` a working driver.
+
+### Answer to "did you verify read/write?"
+No — not through this app. Read/write was verified on the device in an earlier
+round using standalone testers against a driver loaded from a shell script,
+which is why the defect below went unnoticed: the app's own load path had never
+been exercised end to end, and its self-test was asserting the inverted return
+convention (fixed in 4.2).
+
+Also updated: CHANGELOG, versionCode 28 / versionName 4.3-universal.
+
+---
+
 ## [4.2-universal] — 2026-09-27 (versionCode 27)
 
 ### Fixed

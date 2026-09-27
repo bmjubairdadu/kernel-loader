@@ -234,6 +234,59 @@ long tmain(long argc, char **argv)
 		}
 	}
 
+	/* ---- CROSS-PROCESS read: the only test that proves the driver can do
+	 * what a game mod actually needs. Everything above reads the probe's OWN
+	 * address space, so it would still pass if the page-table walk only ever
+	 * looked at the calling process.
+	 *
+	 * Read the ELF magic out of a DIFFERENT process: /init (pid 1). Its load
+	 * base comes from the same 0x803 lookup the game clients use, and every
+	 * loaded ELF starts with 7f 45 4c 46.
+	 *
+	 * This one is REPORTED but deliberately NOT counted as a failure: the
+	 * exact base of /init varies with the ROM (it can be /init or
+	 * /system/bin/init, and a VMA may precede the header), so a miss here
+	 * would be ambiguous. Counting it would let an uncertain self-test
+	 * rmmod a driver that is working perfectly - which is exactly the class
+	 * of bug this tester already caused once.
+	 */
+	{
+		u64 base;
+		/* namebuf holds "init" */
+		namebuf[0] = 'i';
+		namebuf[1] = 'n';
+		namebuf[2] = 'i';
+		namebuf[3] = 't';
+		namebuf[4] = 0;
+		mb.pid = 1;
+		mb.pad = 0;
+		mb.name_ptr = (u64)namebuf;
+		mb.base = 0;
+		r = sc3(SYS_ioctl, fd, 0x803, (long)&mb);
+		base = mb.base;
+		putkv("xproc modbase ret", (u64)r);
+		putkv("xproc base", base);
+		if (r != 0 || base == 0) {
+			putstr("WARN xread-init: no base for pid 1 (informational)\n");
+		} else {
+			tmpbuf[0] = tmpbuf[1] = tmpbuf[2] = tmpbuf[3] = 0;
+			pr.pid = 1;
+			pr.pad = 0;
+			pr.addr = base;
+			pr.buf = (u64)tmpbuf;
+			pr.size = 4;
+			r = sc3(SYS_ioctl, fd, 0x801, (long)&pr);
+			putkv("xread-init ret", (u64)r);
+			putkv("xread-init got", (u64)*(u32 *)tmpbuf);
+			if (r == 0 && tmpbuf[0] == 0x7f && tmpbuf[1] == 'E' &&
+			    tmpbuf[2] == 'L' && tmpbuf[3] == 'F') {
+				putstr("PASS xread-init (read another process)\n");
+			} else {
+				putstr("WARN xread-init: no ELF magic from pid 1 (informational)\n");
+			}
+		}
+	}
+
 	/* 0x801 read own marker - RT success is 0, failure is -5 */
 	pr.pid = (s32)pid;
 	pr.pad = 0;

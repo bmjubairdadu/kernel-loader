@@ -199,11 +199,18 @@ object UniversalKernelLoader {
         }
         vm.tlog("COPY: $TMP_KO OK", "OK")
 
-        // Per-load random /dev node (new kmem driver honors `devname=`;
-        // legacy drivers ignore it - we retry without the parameter then).
-        // Static node names are fingerprinted by anti-cheat, random is safer.
-        val devNode = (1..8).map { ('a'..'z').random() }.joinToString("")
-        vm.tlog("DEVNAME: /dev/$devNode (passed as devname=, fallback to driver default)", "INFO")
+        // The game-mod clients (Aincrad, Angry Mod) open a FIXED path: they try
+        // /dev/wanbai and give up if it is not there. Passing a random
+        // devname= made the driver UNLINK /dev/wanbai and register the random
+        // node instead, so the driver loaded cleanly, lsmod showed it, the
+        // self-test even saw a working /dev node - and the game app still
+        // could not read or write anything:
+        //     dmesg: kmem: /dev/wanbai removed
+        //     dmesg: kmem: /dev/eudwahxj created (major 216). ready.
+        // "a random name is safer against anti-cheat" is only a valid trade
+        // when the client is told the name; these clients are not.
+        val devNode = vm.preferredDevNode()
+        vm.tlog("DEVNAME: /dev/$devNode (fixed name - this is the path the game client opens)", "INFO")
 
         // If vermagic mismatch, patch BEFORE first attempt (old kernels always reject mismatched vermagic)
         if (needPatch) {
@@ -536,7 +543,12 @@ object UniversalKernelLoader {
             var detected = ""
             res.out.forEach {
                 if (it.isNotBlank()) {
-                    vm.tlog("kprobe: $it", if (it.startsWith("PASS") || it == "ALL PASS") "OK" else "INFO")
+                    val t = when {
+                        it.startsWith("PASS") || it == "ALL PASS" -> "OK"
+                        it.startsWith("WARN") -> "WARN"
+                        else -> "INFO"
+                    }
+                    vm.tlog("kprobe: $it", t)
                     // "PASS abi-probe rt|qx" -> remember which family answered
                     val m = Regex("^PASS abi-probe (\\w+)$").find(it.trim())
                     if (m != null) detected = m.groupValues[1].lowercase()
@@ -607,7 +619,8 @@ object UniversalKernelLoader {
             Shell.cmd("chmod 666 /dev/$expectedNode 2>/dev/null").exec()
         }
         if (expectedNode.isNotEmpty() && devList.any { it.trim() == expectedNode }) {
-            vm.tlog("VERIFY: /dev node -> FOUND (/dev/$expectedNode, per-load name)", "OK")
+            vm.tlog("VERIFY: /dev node -> FOUND (/dev/$expectedNode, the path the game client opens)", "OK")
+            vm.rememberDevNode(expectedNode)
         }
         val devMatches = devList.filter { node ->
             (loadedName.isNotEmpty() && node.contains(loadedName, true)) ||
@@ -615,17 +628,33 @@ object UniversalKernelLoader {
                     node.contains("kloader", true) || node.contains("daisy", true) ||
                     node.contains("entryi", true) || node.contains("kmem", true)
         }
-        val devExists = devMatches.isNotEmpty()
+        // The ONLY node that matters is the one the game client opens. A driver
+        // that registered some other node passes a fuzzy "some node appeared"
+        // test while the game apps can still read nothing, which is how a
+        // random /dev name shipped unnoticed. So require the exact path, and
+        // name the stray nodes explicitly if there are any.
+        val exactNode = expectedNode.isNotEmpty() && devList.any { it.trim() == expectedNode }
+        val devExists = exactNode
         val dmesg = Shell.cmd("dmesg | grep -i -E 'kmem|kloader|entryi|vermagic|insmod' | tail -n 15").exec()
 
         vm.tlog(
             "VERIFY: lsmod -> ${if (moduleLoaded) "LOADED (${loadedLine!!.trim().split(Regex("\\s+")).first()})" else "module not visible in lsmod"}",
             if (moduleLoaded) "OK" else "WARN"
         )
-        vm.tlog(
-            "VERIFY: /dev node -> ${if (devExists) "FOUND (${devMatches.joinToString(", ")})" else "NOT FOUND"}",
-            if (devExists) "OK" else "WARN"
-        )
+        if (exactNode) {
+            vm.tlog("VERIFY: /dev/$expectedNode -> EXISTS (game apps can open it)", "OK")
+            if (devMatches.size > 1) {
+                vm.tlog("VERIFY: extra nodes present: ${devMatches.joinToString(", ")}", "INFO")
+            }
+        } else {
+            vm.tlog("VERIFY: /dev/$expectedNode -> MISSING", "ERR")
+            vm.tlog(
+                "VERIFY: the driver registered ${devMatches.joinToString(", ").ifEmpty { "nothing" }} instead. " +
+                        "The game apps open /dev/$expectedNode, so they cannot use this load.",
+                "ERR"
+            )
+            vm.tlog("VERIFY: dmesg says the driver REMOVED the node it used to own - see the lines below", "ERR")
+        }
         dmesg.out.takeLast(6).forEach { if (it.isNotBlank()) vm.tlog("dmesg: $it", "INFO") }
 
         vm.setVerification(
@@ -636,7 +665,11 @@ object UniversalKernelLoader {
                 timestamp = vm.nowString()
             )
         )
-        return moduleLoaded || devExists
+        // The module being in lsmod is NOT enough: a load is only useful to the
+        // user if the /dev node their game app opens actually exists. A driver
+        // that is loaded but registered a different node name is a failure, not
+        // a partial success.
+        return moduleLoaded && (expectedNode.isBlank() || devExists)
     }
 
     /**

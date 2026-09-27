@@ -155,6 +155,10 @@ data class TerminalLine(
 )
 
 class DriverViewModel : ViewModel() {
+    /** /dev node the game-mod clients hardcode. See [preferredDevNode]. */
+    val DEFAULT_DEV_NODE = "wanbai"
+    var devNodeOverride = mutableStateOf("")
+
     var pickedFileUri = mutableStateOf<Uri?>(null)
     var pickedFileName = mutableStateOf<String?>(null)
     val logs = mutableStateListOf<LogEntry>()
@@ -457,7 +461,10 @@ class DriverViewModel : ViewModel() {
             // on many ROMs ("No such file or directory" even though the file
             // exists). Stage to /data/local/tmp like the embedded path. ------
             val staged = File("/data/local/tmp/kloader_ota.ko")
-            val devNode = (1..8).map { ('a'..'z').random() }.joinToString("")
+            // MUST be the fixed /dev/wanbai, never a random name: the game-mod
+            // clients hardcode that path, and a devname= parameter makes the
+            // driver remove /dev/wanbai. See preferredDevNode().
+            val devNode = preferredDevNode()
             Shell.cmd(
                 "cp \"${downloaded.absolutePath}\" ${staged.absolutePath}",
                 "chmod 644 ${staged.absolutePath}",
@@ -750,6 +757,30 @@ class DriverViewModel : ViewModel() {
      * Unload the memory driver. ONLY unloads - it never installs, never
      * patches a vermagic and never reboots. Returns the module it removed.
      */
+    /**
+     * The /dev node to ask the driver to register.
+     *
+     * The game-mod clients (Aincrad 3.7, Angry Mod V1) open a hardcoded path.
+     * Reversing them showed the string `/dev` immediately followed by
+     * `wanbai` and a `%s/%s` format, i.e. they build `/dev/wanbai` and open
+     * that - with no discovery step and no way to be told a different name.
+     *
+     * So this must stay "wanbai". It was previously a random 8-letter string
+     * "so anti-cheat cannot fingerprint it", which made the driver unlink
+     * /dev/wanbai and create the random node instead: the load appeared to
+     * succeed while the game apps could not open anything at all.
+     */
+    fun preferredDevNode(): String = if (devNodeOverride.value.isNotBlank()) {
+        devNodeOverride.value.trim()
+    } else {
+        DEFAULT_DEV_NODE
+    }
+
+    /** Remember the last node we actually verified on /dev, for the next load. */
+    fun rememberDevNode(node: String) {
+        if (node.isNotBlank() && node != DEFAULT_DEV_NODE) devNodeOverride.value = node.trim()
+    }
+
     fun unloadModule(context: Context) {
         if (isBusy.value) return
         viewModelScope.launch {
