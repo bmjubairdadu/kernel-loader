@@ -6,6 +6,43 @@ semantic-ish version tags (`<major>.<minor>-<flavour>`).
 
 ---
 
+## [4.0-universal] — 2026-09-27 (versionCode 25)
+
+### Added
+* **Two load buttons: RT and QX.** The game-mod clients (Aincrad, Angry Mod)
+  speak two *different* driver ABIs — RT uses ioctl `0x801/0x802/0x803` and
+  returns `0` on success, QX uses `0x801/0x802` plus a `0x804/0x805` handshake
+  and returns `-1` on failure. Loading the wrong family still `insmod`s cleanly
+  and then silently returns wrong data, so the family is now an explicit choice.
+* **ABI family (`variant`) throughout the OTA pipeline.** `drivers.json` entries
+  are tagged `"rt"` or `"qx"`, and the RT button will only ever be served an RT
+  driver (family-agnostic entries remain acceptable to both).
+* **17 RT + 23 QX drivers** bundled in `assets/drivers/` and published to the
+  `drivers` branch, covering kernel 4.9.186 … 6.6.57.
+* Per-button driver list and a family-aware "Ready:" status line.
+
+### Changed
+* **Driver database wiped.** The 110 legacy `uni_*` universal builds were
+  removed; the database is now exactly the 40 RT/QX drivers.
+* Embedded driver naming is `<family>_<version>.ko` (`rt_…`, `qx_…`) so the
+  scanner derives the family from the file name. The binary's own `vermagic`
+  still decides kernel compatibility — the name is only a label.
+* The stale `kmem_4.9.337-DaisyForGaming.ko` build was replaced by
+  `rt_4.9.337-DaisyForGaming.ko`, compiled with `CONFIG_MODVERSIONS` CRCs taken
+  from this kernel's `Module.symvers`.
+
+### Fixed
+* The RT button can no longer be handed a QX driver (or the reverse) by the
+  OTA resolver, the embedded scanner, or the supported-kernels list.
+
+### Note
+* `app/src/main/java/com/kernelloader/kernel/KernelProfiler.kt` is untracked WIP
+  that does **not** compile (it calls `RootChecker.getArch()`, which does not
+  exist, and nothing references the class). It is excluded from the build; fix
+  or delete it before it breaks a release.
+
+---
+
 ## [2.4-universal] — 2026-09-22 (versionCode 9)
 
 ### Fixed

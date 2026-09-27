@@ -54,13 +54,23 @@ object EmbeddedDrivers {
             if (!name.endsWith(".ko")) continue
             val base = name.removeSuffix(".ko")
             val idx = base.indexOf('_')
-            val type = if (idx == -1) "KERNEL" else base.substring(0, idx).uppercase(Locale.US)
+            val prefix = if (idx == -1) "" else base.substring(0, idx).uppercase(Locale.US)
+            val type = if (idx == -1) "KERNEL" else prefix
             val version = if (idx == -1) base else base.substring(idx + 1)
+            // RT_ / rt- / QX_ / qx- all map onto the two driver families the
+            // game-mod clients actually speak.
+            val variant = when {
+                prefix.startsWith("RT") -> OtaDriverStore.RT
+                prefix.startsWith("QX") -> OtaDriverStore.QX
+                base.startsWith("rt-", true) -> OtaDriverStore.RT
+                base.startsWith("qx-", true) -> OtaDriverStore.QX
+                else -> ""
+            }
             val description = when (type) {
                 "UNI" -> "Universal build for kernel $version (any device)"
                 "NATIVE", "DAISY" -> "Daisy device build for kernel $version (DaisyForGaming tree)"
-                "QX" -> "Legacy QX build for $version"
-                "RT" -> "Legacy RT build for $version"
+                "QX" -> "QX driver for $version (QX ABI - ioctl 0x801/0x802/0x804)"
+                "RT" -> "RT driver for $version (RT ABI - ioctl 0x801/0x802/0x803)"
                 else -> "Kernel module build for $version"
             }
             drivers.add(DriverInfo(
@@ -68,7 +78,8 @@ object EmbeddedDrivers {
                 version = version,
                 filename = "drivers/$name",
                 displayName = "$type $version",
-                description = description
+                description = description,
+                variant = variant
             ))
         }
         return drivers.sortedWith(compareBy(
@@ -115,7 +126,9 @@ data class DriverInfo(
     val version: String,
     val filename: String,
     val displayName: String,
-    val description: String
+    val description: String,
+    /** "" (any), "rt" or "qx" - which game-mod client ABI this driver speaks. */
+    val variant: String = ""
 )
 
 data class LogEntry(
@@ -340,10 +353,15 @@ class DriverViewModel : ViewModel() {
 
     /**
      * OTA auto-load: try to fetch an exact-match .ko from the OTA manifest first.
+     * [variant] selects the ABI family ("rt" / "qx") so the RT button never
+     * installs a QX driver (they would load but every read would fail).
      * Returns true if a driver was downloaded and loaded.
      */
-    private suspend fun runOtaLoad(context: Context): Boolean {
+    private suspend fun runOtaLoad(context: Context, variant: String = ""): Boolean {
         tlog("OTA: checking manifest...", "INFO")
+        if (variant.isNotBlank()) {
+            tlog("OTA: looking for a ${OtaDriverStore.variantLabel(variant)} driver", "INFO")
+        }
         val manifest = OtaDriverStore.fetchManifest() ?: run {
             tlog("OTA: manifest unavailable - see DB error above, then tap refresh", "WARN")
             return false
@@ -352,8 +370,17 @@ class DriverViewModel : ViewModel() {
             tlog("OTA: manifest has no drivers", "WARN")
             return false
         }
+        val pool = OtaDriverStore.variantsFor(manifest, variant)
+        if (pool.isEmpty()) {
+            tlog(
+                "OTA: database has no ${OtaDriverStore.variantLabel(variant)} driver " +
+                        "(${manifest.drivers.size} other family entries available)",
+                "WARN"
+            )
+            return false
+        }
         val kernel = RootChecker.getKernelRelease() ?: return false
-        val resolved = OtaDriverStore.resolve(manifest, kernel)
+        val resolved = OtaDriverStore.resolve(manifest, kernel, variant)
         when (resolved) {
             is OtaDriverStore.ResolveResult.Exact -> {
                 tlog("OTA: exact match found for $kernel", "OK")
@@ -580,7 +607,7 @@ class DriverViewModel : ViewModel() {
      * - Auto-picks best embedded driver if no file is picked
      * - Streams every step into the terminal
      */
-    fun autoLoadUniversal(context: Context, preferOta: Boolean = true) {
+    fun autoLoadUniversal(context: Context, preferOta: Boolean = true, variant: String = "") {
         if (isBusy.value) return
         isBusy.value = true
         busyStep.value = "Starting..."
@@ -589,7 +616,7 @@ class DriverViewModel : ViewModel() {
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 if (preferOta) {
-                    val handled = runOtaLoad(context)
+                    val handled = runOtaLoad(context, variant)
                     if (handled) {
                         isBusy.value = false
                         busyStep.value = ""
@@ -598,7 +625,7 @@ class DriverViewModel : ViewModel() {
                     tlog("OTA: no OTA driver; falling back to embedded", "INFO")
                 }
                 withContext(Dispatchers.Main) {
-                    UniversalKernelLoader.autoLoad(context, this@DriverViewModel)
+                    UniversalKernelLoader.autoLoad(context, this@DriverViewModel, variant)
                 }
             } catch (e: Exception) {
                 tlog("FATAL: ${e.message}", "ERR")

@@ -59,7 +59,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -125,8 +127,12 @@ fun HomeScreen(
         if (terminalLines.isNotEmpty()) listState.animateScrollToItem(terminalLines.size - 1)
     }
 
-    val exact = manifest?.let { OtaDriverStore.exactFor(it, kernelRelease) }
-    val supported = manifest?.let { OtaDriverStore.supportedEntries(it) } ?: emptyList()
+    // Which ABI family the RT / QX button last targeted. The game-mod clients
+    // (Aincrad, Angry Mod) speak two DIFFERENT driver ABIs, so the whole screen -
+    // the driver list and the "Ready:" line - follows the selected family.
+    var family by remember { mutableStateOf(OtaDriverStore.RT) }
+    val exact = manifest?.let { OtaDriverStore.exactFor(it, kernelRelease, family) }
+    val supported = manifest?.let { OtaDriverStore.supportedEntries(it, family) } ?: emptyList()
 
     AppBackground {
     Column(
@@ -322,63 +328,112 @@ fun HomeScreen(
             modifier = Modifier.fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Box(modifier = Modifier.size(216.dp), contentAlignment = Alignment.Center) {
-                Canvas(modifier = Modifier.fillMaxSize()) {
-                    val stroke = Stroke(width = 7.dp.toPx(), cap = StrokeCap.Round)
-                    val diameter = size.minDimension - stroke.width
-                    val topLeft = androidx.compose.ui.geometry.Offset(
-                        (size.width - diameter) / 2f, (size.height - diameter) / 2f
-                    )
-                    val arcSize = androidx.compose.ui.geometry.Size(diameter, diameter)
-                    rotate(angle) {
-                        drawArc(
-                            color = ringColor.copy(alpha = 0.9f),
-                            startAngle = 0f, sweepAngle = 130f, useCenter = false,
-                            topLeft = topLeft, size = arcSize, style = stroke
-                        )
-                        drawArc(
-                            color = ringColor.copy(alpha = 0.35f),
-                            startAngle = 180f, sweepAngle = 100f, useCenter = false,
-                            topLeft = topLeft, size = arcSize, style = stroke
-                        )
-                    }
-                }
-                Button(
-                    onClick = { viewModel.autoLoadUniversal(context, preferOta = true) },
-                    enabled = !busy && rootAvailable,
-                    shape = CircleShape,
-                    border = androidx.compose.foundation.BorderStroke(
-                        2.dp, Color.White.copy(alpha = 0.35f)
-                    ),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF1E7A46),
-                        contentColor = Color.White,
-                        disabledContainerColor = Color(0xFF1E7A46).copy(alpha = 0.35f),
-                        disabledContentColor = Color.White.copy(alpha = 0.6f)
-                    ),
-                    modifier = Modifier.size(152.dp).scale(pulse)
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        if (busy) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(34.dp),
-                                color = Color.White
+            // Two separate load buttons: RT and QX are different ioctl ABIs, so
+            // the user must pick the one their game-mod client expects.
+            @Composable
+            fun FamilyButton(
+                label: String,
+                tag: String,
+                container: Color,
+                onPick: () -> Unit
+            ) {
+                val selected = family == tag
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Box(modifier = Modifier.size(150.dp), contentAlignment = Alignment.Center) {
+                        Canvas(modifier = Modifier.fillMaxSize()) {
+                            val stroke = Stroke(width = 6.dp.toPx(), cap = StrokeCap.Round)
+                            val diameter = size.minDimension - stroke.width
+                            val topLeft = androidx.compose.ui.geometry.Offset(
+                                (size.width - diameter) / 2f, (size.height - diameter) / 2f
                             )
-                        } else {
-                            Icon(
-                                Icons.Default.Bolt,
-                                contentDescription = null,
-                                modifier = Modifier.size(44.dp)
-                            )
+                            val arcSize = androidx.compose.ui.geometry.Size(diameter, diameter)
+                            rotate(if (selected) angle else angle + 180f) {
+                                drawArc(
+                                    color = ringColor.copy(alpha = 0.9f),
+                                    startAngle = 0f, sweepAngle = 130f, useCenter = false,
+                                    topLeft = topLeft, size = arcSize, style = stroke
+                                )
+                                drawArc(
+                                    color = ringColor.copy(alpha = 0.35f),
+                                    startAngle = 180f, sweepAngle = 100f, useCenter = false,
+                                    topLeft = topLeft, size = arcSize, style = stroke
+                                )
+                            }
                         }
-                        Spacer(Modifier.height(6.dp))
-                        Text(
-                            text = if (busy) "WORKING" else "LOAD\nKERNEL",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                            textAlign = TextAlign.Center
-                        )
+                        Button(
+                            onClick = {
+                                family = tag
+                                onPick()
+                            },
+                            enabled = !busy && rootAvailable,
+                            shape = CircleShape,
+                            border = androidx.compose.foundation.BorderStroke(
+                                if (selected) 3.dp else 1.5.dp,
+                                if (selected) Color.White.copy(alpha = 0.9f)
+                                else Color.White.copy(alpha = 0.3f)
+                            ),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = container,
+                                contentColor = Color.White,
+                                disabledContainerColor = container.copy(alpha = 0.3f),
+                                disabledContentColor = Color.White.copy(alpha = 0.55f)
+                            ),
+                            contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
+                            modifier = Modifier
+                                .size(112.dp)
+                                .scale(if (selected) pulse else 0.97f)
+                        ) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier.padding(horizontal = 2.dp)
+                            ) {
+                                if (busy && selected) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(30.dp),
+                                        color = Color.White,
+                                        strokeWidth = 2.5.dp
+                                    )
+                                } else {
+                                    Icon(
+                                        Icons.Default.Bolt,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(30.dp)
+                                    )
+                                }
+                                Spacer(Modifier.height(4.dp))
+                                Text(
+                                    text = label,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    textAlign = TextAlign.Center,
+                                    maxLines = 1
+                                )
+                            }
+                        }
                     }
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        text = when (tag) {
+                            OtaDriverStore.RT -> "ioctl 801/802/803"
+                            else -> "ioctl 801/802/804"
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (selected) Color(0xFF69F0AE) else Color(0xFF78909C),
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                FamilyButton("RT", OtaDriverStore.RT, Color(0xFF1E7A46)) {
+                    viewModel.autoLoadUniversal(context, preferOta = true, variant = OtaDriverStore.RT)
+                }
+                FamilyButton("QX", OtaDriverStore.QX, Color(0xFF8A4B1E)) {
+                    viewModel.autoLoadUniversal(context, preferOta = true, variant = OtaDriverStore.QX)
                 }
             }
             Spacer(Modifier.height(6.dp))
@@ -386,8 +441,9 @@ fun HomeScreen(
                 text = when {
                     busyStep.isNotBlank() -> busyStep
                     autoStatus.isNotBlank() -> autoStatus
-                    exact != null -> "Ready: ${exact.version} loader on GitHub"
-                    else -> "Tap to detect kernel + download loader"
+                    exact != null ->
+                        "Ready: ${exact.version} ${OtaDriverStore.variantLabel(family)} loader on GitHub"
+                    else -> "Tap ${OtaDriverStore.variantLabel(family)} - detect kernel + download loader"
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = Color(0xFFE0E0E0),

@@ -32,13 +32,54 @@ object OtaDriverStore {
         "https://github.com/bmjubairdadu/kernel-loder/releases/latest/download/drivers.json"
     )
 
+    /**
+     * Driver ABI family. The RT and QX clients use DIFFERENT ioctl codes and
+     * different return conventions, so the wrong family silently "works" but
+     * never returns real data. The manifest therefore tags every driver:
+     *   "rt"  -> RT  ioctl set (0x801/0x802/0x803, returns 0 on success)
+     *   "qx"  -> QX  ioctl set (0x801/0x802, 0x804/0x805 handshake, -1 on failure)
+     *   ""    -> family-agnostic, acceptable for both
+     */
+    const val RT = "rt"
+    const val QX = "qx"
+
     data class DriverEntry(
         val version: String,
         val file: String,
         val sha256: String = "",
         val size: Long = 0L,
-        val buildDate: String = ""
+        val buildDate: String = "",
+        /** "" (any), "rt" or "qx" - see [RT] / [QX]. */
+        val variant: String = ""
     )
+
+    /** Label a variant for the console ("RT", "QX", "any"). */
+    fun variantLabel(variant: String): String = when (variant.lowercase()) {
+        RT -> "RT"
+        QX -> "QX"
+        else -> "ANY"
+    }
+
+    /**
+     * Does [entry] serve the requested [variant]?
+     * A blank variant means "any" (no preference) and always matches.
+     * An entry with a blank family is generic and matches every variant.
+     */
+    fun variantMatches(entry: DriverEntry, variant: String): Boolean {
+        val want = variant.trim().lowercase()
+        if (want.isEmpty()) return true
+        val have = entry.variant.trim().lowercase()
+        if (have.isEmpty()) return true
+        return have == want
+    }
+
+    /** All drivers that can serve [variant], best (most specific) family first. */
+    fun variantsFor(manifest: Manifest, variant: String): List<DriverEntry> {
+        val want = variant.trim().lowercase()
+        val exact = manifest.drivers.filter { it.variant.trim().lowercase() == want }
+        val generic = manifest.drivers.filter { it.variant.isBlank() }
+        return exact + generic
+    }
 
     data class Manifest(
         val updated: String = "",
@@ -68,14 +109,16 @@ object OtaDriverStore {
         return kotlin.math.abs(pa.third - pb.third)
     }
 
-    fun resolve(manifest: Manifest, kernelRelease: String): ResolveResult {
+    fun resolve(manifest: Manifest, kernelRelease: String, variant: String = ""): ResolveResult {
+        val pool = variantsFor(manifest, variant)
+        if (pool.isEmpty()) return ResolveResult.None
         val short = RootChecker.kernelShortVersion(kernelRelease)
-        manifest.drivers.firstOrNull {
+        pool.firstOrNull {
             RootChecker.kernelShortVersion(it.version) == short
         }?.let { return ResolveResult.Exact(it) }
         var best: DriverEntry? = null
         var bestD = Int.MAX_VALUE
-        for (e in manifest.drivers) {
+        for (e in pool) {
             val d = distance(short, RootChecker.kernelShortVersion(e.version))
             if (d < bestD) { bestD = d; best = e }
         }
@@ -88,18 +131,19 @@ object OtaDriverStore {
     }
 
     /** All driver versions available in the GitHub database, NEWEST BUILD FIRST. */
-    fun supportedVersions(manifest: Manifest): List<String> =
-        supportedEntries(manifest).map { it.version }
+    fun supportedVersions(manifest: Manifest, variant: String = ""): List<String> =
+        supportedEntries(manifest, variant).map { it.version }
 
     /**
      * All drivers sorted by build date, NEWEST FIRST - so a freshly published
      * loader always appears at the top of the app's supported-kernels list.
      * Entries without a build date go last, sorted by version number descending.
      */
-    fun supportedEntries(manifest: Manifest): List<DriverEntry> {
-        val withDate = manifest.drivers.filter { it.buildDate.isNotBlank() }
+    fun supportedEntries(manifest: Manifest, variant: String = ""): List<DriverEntry> {
+        val pool = variantsFor(manifest, variant)
+        val withDate = pool.filter { it.buildDate.isNotBlank() }
             .sortedByDescending { it.buildDate }
-        val withoutDate = manifest.drivers.filter { it.buildDate.isBlank() }
+        val withoutDate = pool.filter { it.buildDate.isBlank() }
             .sortedByDescending { e ->
                 verParts(e.version)?.let { it.first * 1000000 + it.second * 1000 + it.third } ?: -1
             }
@@ -107,9 +151,9 @@ object OtaDriverStore {
     }
 
     /** The entry that exactly matches the given kernel release, if any. */
-    fun exactFor(manifest: Manifest, kernelRelease: String): DriverEntry? {
+    fun exactFor(manifest: Manifest, kernelRelease: String, variant: String = ""): DriverEntry? {
         val short = RootChecker.kernelShortVersion(kernelRelease)
-        return manifest.drivers.firstOrNull {
+        return variantsFor(manifest, variant).firstOrNull {
             RootChecker.kernelShortVersion(it.version) == short
         }
     }
@@ -186,7 +230,8 @@ object OtaDriverStore {
                         file = file,
                         sha256 = d.optString("sha256", ""),
                         size = d.optLong("size", 0L),
-                        buildDate = d.optString("buildDate", "")
+                        buildDate = d.optString("buildDate", ""),
+                        variant = d.optString("variant", "").trim().lowercase()
                     )
                 )
             }

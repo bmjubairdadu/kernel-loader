@@ -45,10 +45,13 @@ object UniversalKernelLoader {
 
     private const val TMP_KO = "/data/local/tmp/kloader_auto.ko"
 
-    fun autoLoad(context: Context, vm: DriverViewModel) {
+    fun autoLoad(context: Context, vm: DriverViewModel, variant: String = "") {
         vm.tstep("Checking superuser...")
         vm.tlog("==============================================", "INFO")
         vm.tlog(" KERNEL LODER - UNIVERSAL AUTO-LOAD", "INFO")
+        if (variant.isNotBlank()) {
+            vm.tlog(" requested driver family: ${OtaDriverStore.variantLabel(variant)}", "INFO")
+        }
         vm.tlog(" any device - any model - old & new kernels", "INFO")
         vm.tlog("==============================================", "INFO")
 
@@ -123,7 +126,7 @@ object UniversalKernelLoader {
                 return
             }
         } else {
-            val best = findBestEmbeddedDriver(context, kernel)
+            val best = findBestEmbeddedDriver(context, kernel, variant)
             if (best == null) {
                 vm.tlog("ERROR: no file picked AND no embedded driver found", "ERR")
                 finish(vm, false, "No .ko found - pick a file")
@@ -669,11 +672,24 @@ object UniversalKernelLoader {
     /**
      * Pick the embedded driver that best matches the running kernel:
      * exact version match > kernel-starts-with-version > same major.minor > none.
-     * Native build (real kernel build) wins, then QX over RT on ties.
+     * Device build (real kernel build) wins, then the requested ABI family.
+     *
+     * [variant] ("rt" / "qx" / "") selects the ABI family. A driver explicitly
+     * tagged with the OTHER family is never returned - it would insmod cleanly
+     * and then every game-mod read/write would return wrong data, which is far
+     * worse than reporting "no driver found".
      */
-    fun findBestEmbeddedDriver(context: Context, kernelRelease: String): DriverInfo? {
+    fun findBestEmbeddedDriver(
+        context: Context,
+        kernelRelease: String,
+        variant: String = ""
+    ): DriverInfo? {
         val all = EmbeddedDrivers.getAvailableDrivers(context)
         if (all.isEmpty()) return null
+        val want = variant.trim().lowercase()
+        val pool = if (want.isEmpty()) all
+                   else all.filter { it.variant.isBlank() || it.variant == want }
+        if (pool.isEmpty()) return null
 
         val ver = Regex("""(\d+)\.(\d+)\.(\d+)""")
         val km = ver.find(kernelRelease)
@@ -740,12 +756,20 @@ object UniversalKernelLoader {
                 if ((d.type == "NATIVE" || d.type == "KERNEL" || d.type == "DAISY") && daisyPair) {
                     s += 200
                 }
-                if (d.type == "QX") s += 5   // tie-break: QX over RT
+                // Requested ABI family first, then a family-agnostic module,
+                // and finally the other family (only reachable when the caller
+                // asked for no particular family).
+                if (want.isNotEmpty()) {
+                    if (d.variant == want) s += 40
+                    else if (d.variant.isBlank()) s += 10
+                } else {
+                    if (d.variant == OtaDriverStore.QX) s += 5   // tie-break: QX over RT
+                }
             }
             return s
         }
 
-        return all.map { it to score(it) }.filter { it.second > 0 }
+        return pool.map { it to score(it) }.filter { it.second > 0 }
                 .maxByOrNull { it.second }?.first
     }
 }
