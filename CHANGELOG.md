@@ -36,6 +36,13 @@ semantic-ish version tags (`<major>.<minor>-<flavour>`).
 * Renamed "ABI MISMATCH" handling: a driver that answers with the other
   family's convention is now the only case that is called a mismatch.
 
+### Removed
+* `app/src/main/java/com/kernelloader/kernel/KernelProfiler.kt` — untracked WIP
+  that never compiled (it called `RootChecker.getArch()`, which does not exist,
+  and `Flushable.flush()` on a non-flushable chain) and that nothing in the app
+  referenced. It broke every `assembleRelease`, so the build could not be
+  verified at all until it was deleted.
+
 ### Verified
 The rebuilt probe is a static aarch64 ELF; disassembly shows the success test
 is `cbnz` against the ioctl return (i.e. `r == 0` required) and there is no
