@@ -6,6 +6,42 @@ semantic-ish version tags (`<major>.<minor>-<flavour>`).
 
 ---
 
+## [4.4-universal] — 2026-09-27 (versionCode 29)
+
+### Fixed
+* **The OTA path never made `/dev/wanbai` world-readable.** The embedded path
+  did `chmod 666` inside `verifyLoad()`, but the GitHub/OTA path skipped
+  `verifyLoad()` entirely, so a driver downloaded from the database left the
+  node at devtmpfs's default `0600 root`. The self-test still passed because
+  it runs as root, while a game app — a different uid — would be refused
+  access. The OTA path now checks the exact node, `chmod 666`s it, logs the
+  resulting mode, and fails the load if `/dev/wanbai` is absent.
+* **The build reported a stale version.** `versionCode` was bumped *after*
+  `assembleRelease`, so the APK shipped with the previous `BuildConfig` and
+  the console said "current v27 4.2-universal" while actually running the 4.3
+  code. The version is now bumped before building, and the generated
+  `BuildConfig.java` is verified to match.
+
+### Changed
+* The cross-process probe now resolves **real pids** by walking `/proc` and
+  matching `/proc/<pid>/comm` (raw `getdents64`, no libc). The driver's
+  `get_module_base()` calls `pid_task(find_vpid(pid), …)`, so asking for
+  "any process called init" does not work — `find_vpid(0)` is NULL and the
+  lookup returns 0. The previous probe hardcoded pid 1, read the wrong base,
+  and produced a misleading warning.
+* The cross-process probe now tries `init`, `surfaceflinger`, `system_server`
+  and `zygote`, printing the pid, base, raw return and the 4 bytes read for
+  each, plus a control read of a known-good address. That separates "the base
+  lookup returned something odd" from "the page-table walk does not work for
+  another process", which are very different bugs.
+
+### Verified
+`getdents64` (0x3d), `read` (0x3f), `close` (0x39) and `openat` (0x38) are
+all present in the rebuilt probe's disassembly, `/proc` and the `comm` path
+are built at runtime, and the stale `-5` comparison remains absent.
+
+---
+
 ## [4.3-universal] — 2026-09-27 (versionCode 28)
 
 ### Fixed

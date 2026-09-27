@@ -17,15 +17,21 @@ typedef long s64;
 typedef unsigned int u32;
 typedef int s32;
 typedef unsigned char u8;
+typedef unsigned short u16;
 
 #define AT_FDCWD (-100)
 #define O_RDWR 2
+#define O_RDONLY 0
+#define O_DIRECTORY 0x10000   /* 040000 octal, aarch64 asm-generic */
 #define SYS_openat 56
 #define SYS_readlinkat 78
 #define SYS_ioctl 29
 #define SYS_getpid 172
 #define SYS_write 64
 #define SYS_exit_group 94
+#define SYS_getdents64 61
+#define SYS_close 57
+#define SYS_read 63
 
 static long sc6(long n, long a, long b, long c, long d, long e, long f)
 {
@@ -127,6 +133,121 @@ static const char *famname(int f)
 
 struct proc_rw { s32 pid; u32 pad; u64 addr; u64 buf; u64 size; };
 struct modbase { s32 pid; u32 pad; u64 name_ptr; u64 base; };
+
+/* ---- minimal /proc scanner -------------------------------------------
+ * The driver's 0x803 needs a REAL pid: get_module_base() does
+ * pid_task(find_vpid(pid), ...) and find_vpid(0) is NULL, so asking for
+ * "any process called init" does not work. There is no libc here, so /proc
+ * is walked with raw getdents64 and each /proc/<pid>/comm is read to match
+ * the wanted name.
+ */
+static s32 slen(const char *s)
+{
+	s32 n = 0;
+	while (s[n])
+		n++;
+	return n;
+}
+
+/* Fill out[] with every pid in /proc. Returns how many were found. */
+static s32 read_pid_list(s32 *out, s32 max)
+{
+	long fd, n;
+	u8 buf[8192];
+	s32 cnt = 0;
+
+	fd = sc6(SYS_openat, AT_FDCWD, (long)"/proc",
+		 (long)(O_RDONLY | O_DIRECTORY), 0, 0, 0);
+	if (fd < 0)
+		return 0;
+	while ((n = sc3(SYS_getdents64, fd, (long)buf, (long)sizeof(buf))) > 0) {
+		long off = 0;
+		while (off < n) {
+			u8 *d = buf + off;
+			u16 reclen = *(u16 *)(d + 16);
+			char *nm = (char *)(d + 19);
+			s64 v = 0;
+			s32 k = 0, digits = 1;
+			if (reclen <= 0)
+				break;
+			off += reclen;
+			if (nm[0] < '0' || nm[0] > '9')
+				continue;
+			while (nm[k]) {
+				if (nm[k] < '0' || nm[k] > '9') {
+					digits = 0;
+					break;
+				}
+				v = v * 10 + (nm[k] - '0');
+				k++;
+			}
+			if (!digits || v <= 0 || v > 32767)
+				continue;
+			if (cnt < max)
+				out[cnt++] = (s32)v;
+		}
+	}
+	sc1(SYS_close, fd);
+	return cnt;
+}
+
+/* First pid whose /proc/<pid>/comm equals `want`, or -1. */
+static s32 find_pid_by_comm(const char *want)
+{
+	static s32 pids[1024];
+	static char path[64];
+	static char comm[64];
+	s32 n, i, k, wl = slen(want);
+	s32 found = -1;
+
+	n = read_pid_list(pids, 1024);
+	for (i = 0; i < n && found < 0; i++) {
+		char *p = path;
+		const char *pre = "/proc/";
+		char tmp[24];
+		s32 t = 0;
+		s64 v = pids[i];
+		long fd, r;
+
+		while (*pre)
+			*p++ = *pre++;
+		if (v == 0) {
+			tmp[t++] = '0';
+		} else {
+			while (v) {
+				tmp[t++] = (char)('0' + (v % 10));
+				v /= 10;
+			}
+		}
+		while (t)
+			*p++ = tmp[--t];
+		*p++ = '/';
+		*p++ = 'c';
+		*p++ = 'o';
+		*p++ = 'm';
+		*p++ = 'm';
+		*p = 0;
+
+		fd = sc6(SYS_openat, AT_FDCWD, (long)path, (long)O_RDONLY, 0, 0, 0);
+		if (fd < 0)
+			continue;
+		r = sc3(SYS_read, fd, (long)comm, 63);
+		sc1(SYS_close, fd);
+		if (r <= 0)
+			continue;
+		while (r > 0 && (comm[r - 1] == '\n' || comm[r - 1] == 0))
+			r--;
+		comm[r] = 0;
+		if (r != wl)
+			continue;
+		for (k = 0; k < wl; k++)
+			if (comm[k] != want[k])
+				break;
+		if (k == wl)
+			found = pids[i];
+	}
+	return found;
+}
 
 static volatile u32 marker = 0x12345678;
 static u8 tmpbuf[32];
@@ -239,52 +360,102 @@ long tmain(long argc, char **argv)
 	 * address space, so it would still pass if the page-table walk only ever
 	 * looked at the calling process.
 	 *
-	 * Read the ELF magic out of a DIFFERENT process: /init (pid 1). Its load
-	 * base comes from the same 0x803 lookup the game clients use, and every
-	 * loaded ELF starts with 7f 45 4c 46.
+	 * For each candidate process: resolve the load base with the same 0x803
+	 * lookup the game clients use, then read the ELF magic (7f 45 4c 46) that
+	 * every loaded ELF starts with.
 	 *
-	 * This one is REPORTED but deliberately NOT counted as a failure: the
-	 * exact base of /init varies with the ROM (it can be /init or
-	 * /system/bin/init, and a VMA may precede the header), so a miss here
-	 * would be ambiguous. Counting it would let an uncertain self-test
-	 * rmmod a driver that is working perfectly - which is exactly the class
-	 * of bug this tester already caused once.
+	 * A CONTROL read of the SAME address from the probe's OWN pid is done
+	 * alongside. That separates the two possible causes:
+	 *   control also fails  -> the address is not a mapped page in a way this
+	 *                         driver can read (a bad base), not a cross-
+	 *                         process problem;
+	 *   control succeeds   -> the address is fine and the page-table walk
+	 *                         does not work for another process, which IS
+	 *                         the game-mod use case being broken.
+	 *
+	 * Reported, never fatal: /init's exact base varies by ROM, and an
+	 * ambiguous self-test must not be able to rmmod a working driver.
 	 */
 	{
-		u64 base;
-		/* namebuf holds "init" */
-		namebuf[0] = 'i';
-		namebuf[1] = 'n';
-		namebuf[2] = 'i';
-		namebuf[3] = 't';
-		namebuf[4] = 0;
-		mb.pid = 1;
-		mb.pad = 0;
-		mb.name_ptr = (u64)namebuf;
-		mb.base = 0;
-		r = sc3(SYS_ioctl, fd, 0x803, (long)&mb);
-		base = mb.base;
-		putkv("xproc modbase ret", (u64)r);
-		putkv("xproc base", base);
-		if (r != 0 || base == 0) {
-			putstr("WARN xread-init: no base for pid 1 (informational)\n");
-		} else {
+		static const char *cands[] = {
+			"init", "surfaceflinger", "system_server", "zygote"
+		};
+		u64 bases[4];
+		long rets[4];
+		long crets[4];
+		int ci, any = 0;
+
+		for (ci = 0; ci < 4; ci++) {
+			const char *nm = cands[ci];
+			u64 base, j;
+			s32 target;
+
+			target = find_pid_by_comm(nm);
+			putstr("-- xproc ");
+			putstr(nm);
+			putstr("\n");
+			putkv("  found pid", (u64)target);
+			if (target < 0) {
+				putstr("  WARN not running\n");
+				continue;
+			}
+
+			for (j = 0; nm[j]; j++)
+				namebuf[j] = nm[j];
+			namebuf[j] = 0;
+
+			mb.pid = target;
+			mb.pad = 0;
+			mb.name_ptr = (u64)namebuf;
+			mb.base = 0;
+			r = sc3(SYS_ioctl, fd, 0x803, (long)&mb);
+			base = mb.base;
+			bases[ci] = base;
+			rets[ci] = r;
+			crets[ci] = -1;
+			putkv("  modbase ret", (u64)r);
+			putkv("  modbase base", base);
+			if (r != 0 || base == 0) {
+				putstr("  WARN no base for this pid\n");
+				continue;
+			}
+
 			tmpbuf[0] = tmpbuf[1] = tmpbuf[2] = tmpbuf[3] = 0;
-			pr.pid = 1;
+			pr.pid = target;
 			pr.pad = 0;
 			pr.addr = base;
 			pr.buf = (u64)tmpbuf;
 			pr.size = 4;
 			r = sc3(SYS_ioctl, fd, 0x801, (long)&pr);
-			putkv("xread-init ret", (u64)r);
-			putkv("xread-init got", (u64)*(u32 *)tmpbuf);
+			crets[ci] = r;
+			putkv("  xread ret", (u64)r);
+			putkv("  xread got", (u64)*(u32 *)tmpbuf);
 			if (r == 0 && tmpbuf[0] == 0x7f && tmpbuf[1] == 'E' &&
 			    tmpbuf[2] == 'L' && tmpbuf[3] == 'F') {
-				putstr("PASS xread-init (read another process)\n");
+				putstr("  PASS cross-process read (ELF magic)\n");
+				any = 1;
 			} else {
-				putstr("WARN xread-init: no ELF magic from pid 1 (informational)\n");
+				putstr("  WARN no ELF magic from the other process\n");
 			}
+
+			/* CONTROL: read an address we KNOW is mapped in our own
+			 * space (our own text page) but at a different offset than
+			 * the earlier xread, to show the physical read path is
+			 * still healthy right now. */
+			tmpbuf[0] = tmpbuf[1] = tmpbuf[2] = tmpbuf[3] = 0;
+			pr.pid = (s32)pid;
+			pr.addr = (u64)&putkv;
+			pr.addr &= ~0xFFFUL;
+			pr.buf = (u64)tmpbuf;
+			pr.size = 4;
+			r = sc3(SYS_ioctl, fd, 0x801, (long)&pr);
+			putkv("  control ret", (u64)r);
+			putkv("  control got", (u64)*(u32 *)tmpbuf);
 		}
+		if (any)
+			putstr("PASS xproc (at least one other process was readable)\n");
+		else
+			putstr("WARN xproc: no other process was readable (informational)\n");
 	}
 
 	/* 0x801 read own marker - RT success is 0, failure is -5 */

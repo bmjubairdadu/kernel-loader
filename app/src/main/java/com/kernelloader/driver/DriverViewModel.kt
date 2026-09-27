@@ -606,6 +606,33 @@ class DriverViewModel : ViewModel() {
                 }
                 return false
             }
+
+            // The node the game client opens must exist AND be world R/W. The
+            // embedded path already did this in verifyLoad(); the OTA path did
+            // not, so a driver loaded from GitHub left /dev/wanbai at devtmpfs's
+            // default 0600 root - readable by the self-test (which runs as root)
+            // and invisible to a game app running as its own uid.
+            tstep("Checking /dev/$devNode...")
+            val nodes = Shell.cmd("ls /dev 2>/dev/null").exec().out.map { it.trim() }
+            if (nodes.any { it == devNode }) {
+                Shell.cmd("chmod 666 /dev/$devNode 2>/dev/null").exec()
+                val mode = Shell.cmd("ls -l /dev/$devNode 2>/dev/null").exec().out.firstOrNull()?.trim().orEmpty()
+                tlog("NODE: /dev/$devNode exists -> $mode", "OK")
+                if (!mode.contains("rw-rw-rw-")) {
+                    tlog("NODE: WARN not 666 - the game app may be refused access", "WARN")
+                }
+                tlog("NODE: this is the exact path Aincrad / Angry Mod open", "INFO")
+            } else {
+                tlog("NODE: /dev/$devNode is MISSING - the game apps cannot use this load", "ERR")
+                tlog("NODE: present instead: ${nodes.filter { it.contains("kmem") || it.contains("kloader") || it.contains("entryi") || it.contains("wanbai") }}", "ERR")
+                withContext(Dispatchers.Main) {
+                    autoLoadOk.value = false
+                    autoLoadStatus.value = "/dev/$devNode missing"
+                    tstep("")
+                }
+                return false
+            }
+            rememberDevNode(devNode)
             return true
             } finally {
                 Shell.cmd("rm -f ${staged.absolutePath} 2>/dev/null").exec()
