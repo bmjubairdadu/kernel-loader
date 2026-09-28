@@ -134,119 +134,77 @@ static const char *famname(int f)
 struct proc_rw { s32 pid; u32 pad; u64 addr; u64 buf; u64 size; };
 struct modbase { s32 pid; u32 pad; u64 name_ptr; u64 base; };
 
-/* ---- minimal /proc scanner -------------------------------------------
- * The driver's 0x803 needs a REAL pid: get_module_base() does
- * pid_task(find_vpid(pid), ...) and find_vpid(0) is NULL, so asking for
- * "any process called init" does not work. There is no libc here, so /proc
- * is walked with raw getdents64 and each /proc/<pid>/comm is read to match
- * the wanted name.
+/* ---- first mapping address of a pid, read from /proc/<pid>/maps ---------
+ * The previous revision walked /proc with getdents64 and matched
+ * /proc/<pid>/comm, which never found a process (it reported pid -1 for
+ * every candidate). That parsing is easy to get subtly wrong and impossible
+ * to debug on a device. The FIRST line of /proc/<pid>/maps is the lowest
+ * mapping, which for any process is where its ELF image starts - so the
+ * load address is just the hex number before the first '-'.
+ *
+ * This also doubles as a self-check: for the probe's own pid the value from
+ * /proc/self/maps is compared with what the driver's 0x803 returned, so the
+ * parse is proven against a known-good answer inside the same run.
  */
-static s32 slen(const char *s)
+static u64 first_map_start(s32 pid, char *path, char *buf, long cap)
 {
-	s32 n = 0;
-	while (s[n])
-		n++;
-	return n;
-}
+	char *p = path;
+	const char *pre = "/proc/";
+	char tmp[24];
+	s32 t = 0;
+	s64 v = pid;
+	long fd, r, i;
 
-/* Fill out[] with every pid in /proc. Returns how many were found. */
-static s32 read_pid_list(s32 *out, s32 max)
-{
-	long fd, n;
-	u8 buf[8192];
-	s32 cnt = 0;
+	while (*pre)
+		*p++ = *pre++;
+	if (v == 0) {
+		tmp[t++] = '0';
+	} else {
+		while (v) {
+			tmp[t++] = (char)('0' + (v % 10));
+			v /= 10;
+		}
+	}
+	while (t)
+		*p++ = tmp[--t];
+	*p++ = '/';
+	*p++ = 'm';
+	*p++ = 'a';
+	*p++ = 'p';
+	*p++ = 's';
+	*p = 0;
 
-	fd = sc6(SYS_openat, AT_FDCWD, (long)"/proc",
-		 (long)(O_RDONLY | O_DIRECTORY), 0, 0, 0);
+	fd = sc6(SYS_openat, AT_FDCWD, (long)path, (long)O_RDONLY, 0, 0, 0);
 	if (fd < 0)
 		return 0;
-	while ((n = sc3(SYS_getdents64, fd, (long)buf, (long)sizeof(buf))) > 0) {
-		long off = 0;
-		while (off < n) {
-			u8 *d = buf + off;
-			u16 reclen = *(u16 *)(d + 16);
-			char *nm = (char *)(d + 19);
-			s64 v = 0;
-			s32 k = 0, digits = 1;
-			if (reclen <= 0)
-				break;
-			off += reclen;
-			if (nm[0] < '0' || nm[0] > '9')
-				continue;
-			while (nm[k]) {
-				if (nm[k] < '0' || nm[k] > '9') {
-					digits = 0;
-					break;
-				}
-				v = v * 10 + (nm[k] - '0');
-				k++;
-			}
-			if (!digits || v <= 0 || v > 32767)
-				continue;
-			if (cnt < max)
-				out[cnt++] = (s32)v;
-		}
-	}
+	r = sc3(SYS_read, fd, (long)buf, cap - 1);
 	sc1(SYS_close, fd);
-	return cnt;
-}
+	if (r <= 0)
+		return 0;
+	buf[r] = 0;
 
-/* First pid whose /proc/<pid>/comm equals `want`, or -1. */
-static s32 find_pid_by_comm(const char *want)
-{
-	static s32 pids[1024];
-	static char path[64];
-	static char comm[64];
-	s32 n, i, k, wl = slen(want);
-	s32 found = -1;
-
-	n = read_pid_list(pids, 1024);
-	for (i = 0; i < n && found < 0; i++) {
-		char *p = path;
-		const char *pre = "/proc/";
-		char tmp[24];
-		s32 t = 0;
-		s64 v = pids[i];
-		long fd, r;
-
-		while (*pre)
-			*p++ = *pre++;
-		if (v == 0) {
-			tmp[t++] = '0';
-		} else {
-			while (v) {
-				tmp[t++] = (char)('0' + (v % 10));
-				v /= 10;
-			}
-		}
-		while (t)
-			*p++ = tmp[--t];
-		*p++ = '/';
-		*p++ = 'c';
-		*p++ = 'o';
-		*p++ = 'm';
-		*p++ = 'm';
-		*p = 0;
-
-		fd = sc6(SYS_openat, AT_FDCWD, (long)path, (long)O_RDONLY, 0, 0, 0);
-		if (fd < 0)
-			continue;
-		r = sc3(SYS_read, fd, (long)comm, 63);
-		sc1(SYS_close, fd);
-		if (r <= 0)
-			continue;
-		while (r > 0 && (comm[r - 1] == '\n' || comm[r - 1] == 0))
-			r--;
-		comm[r] = 0;
-		if (r != wl)
-			continue;
-		for (k = 0; k < wl; k++)
-			if (comm[k] != want[k])
+	for (i = 0; i < r; i++) {
+		char c = buf[i];
+		u64 add = 0;
+		long j;
+		if (c < '0' || c > '9')
+			break;              /* the line must start with the address */
+		for (j = i; j < r; j++) {
+			char h = buf[j];
+			if (h == '-' || h == ' ' || h == '\n')
 				break;
-		if (k == wl)
-			found = pids[i];
+			if (h >= '0' && h <= '9')
+				add = add * 16 + (u64)(h - '0');
+			else if (h >= 'a' && h <= 'f')
+				add = add * 16 + (u64)(h - 'a' + 10);
+			else if (h >= 'A' && h <= 'F')
+				add = add * 16 + (u64)(h - 'A' + 10);
+			else
+				break;
+		}
+		return add;
 	}
-	return found;
+	return 0;
 }
 
 static volatile u32 marker = 0x12345678;
@@ -360,102 +318,69 @@ long tmain(long argc, char **argv)
 	 * address space, so it would still pass if the page-table walk only ever
 	 * looked at the calling process.
 	 *
-	 * For each candidate process: resolve the load base with the same 0x803
-	 * lookup the game clients use, then read the ELF magic (7f 45 4c 46) that
-	 * every loaded ELF starts with.
+	 * Target: pid 1 (/init), which always exists on Android. Its load address
+	 * is taken from /proc/1/maps rather than from the driver's 0x803, because
+	 * 0x803 matches a FILE basename and "init" is ambiguous, and because a
+	 * wrong base produces a misleading "no ELF magic" warning.
 	 *
-	 * A CONTROL read of the SAME address from the probe's OWN pid is done
-	 * alongside. That separates the two possible causes:
-	 *   control also fails  -> the address is not a mapped page in a way this
-	 *                         driver can read (a bad base), not a cross-
-	 *                         process problem;
-	 *   control succeeds   -> the address is fine and the page-table walk
-	 *                         does not work for another process, which IS
-	 *                         the game-mod use case being broken.
+	 * Step 1 proves the /proc parse is right: the same parser is run on
+	 *        /proc/self/maps and the result must equal the base that 0x803
+	 *        already returned for this very process. If that matches, the
+	 *        parser is trustworthy and any later failure is the driver.
+	 * Step 2 reads the ELF magic (7f 45 4c 46) out of pid 1.
 	 *
-	 * Reported, never fatal: /init's exact base varies by ROM, and an
-	 * ambiguous self-test must not be able to rmmod a working driver.
+	 * Reported, never fatal: an ambiguous self-test must not be able to rmmod
+	 * a driver that is working perfectly.
 	 */
 	{
-		static const char *cands[] = {
-			"init", "surfaceflinger", "system_server", "zygote"
-		};
-		u64 bases[4];
-		long rets[4];
-		long crets[4];
-		int ci, any = 0;
+		static char mbuf[4096];
+		static char mpath[64];
+		u64 self_maps, one_maps;
 
-		for (ci = 0; ci < 4; ci++) {
-			const char *nm = cands[ci];
-			u64 base, j;
-			s32 target;
+		/* self base from 0x803 was stored earlier; recompute for clarity */
+		mb.pid = (s32)pid;
+		mb.pad = 0;
+		mb.name_ptr = (u64)&namebuf[2048];
+		mb.base = 0;
+		r = sc3(SYS_ioctl, fd, 0x803, (long)&mb);
+		putkv("self 0x803 base", mb.base);
 
-			target = find_pid_by_comm(nm);
-			putstr("-- xproc ");
-			putstr(nm);
-			putstr("\n");
-			putkv("  found pid", (u64)target);
-			if (target < 0) {
-				putstr("  WARN not running\n");
-				continue;
-			}
+		self_maps = first_map_start((s32)pid, mpath, mbuf, 4000);
+		putkv("self maps base", self_maps);
+		if (self_maps != 0 && self_maps == mb.base)
+			putstr("  PASS /proc parse matches the driver's own base\n");
+		else
+			putstr("  WARN /proc parse disagrees with 0x803\n");
 
-			for (j = 0; nm[j]; j++)
-				namebuf[j] = nm[j];
-			namebuf[j] = 0;
-
-			mb.pid = target;
-			mb.pad = 0;
-			mb.name_ptr = (u64)namebuf;
-			mb.base = 0;
-			r = sc3(SYS_ioctl, fd, 0x803, (long)&mb);
-			base = mb.base;
-			bases[ci] = base;
-			rets[ci] = r;
-			crets[ci] = -1;
-			putkv("  modbase ret", (u64)r);
-			putkv("  modbase base", base);
-			if (r != 0 || base == 0) {
-				putstr("  WARN no base for this pid\n");
-				continue;
-			}
-
+		putstr("-- xproc pid 1 (init)\n");
+		one_maps = first_map_start(1, mpath, mbuf, 4000);
+		putkv("  maps base", one_maps);
+		if (one_maps == 0) {
+			putstr("  WARN could not read /proc/1/maps\n");
+			putstr("WARN xproc: pid 1 not readable (informational)\n");
+		} else {
+			/* the ELF magic must be at the very first byte of the image */
 			tmpbuf[0] = tmpbuf[1] = tmpbuf[2] = tmpbuf[3] = 0;
-			pr.pid = target;
+			pr.pid = 1;
 			pr.pad = 0;
-			pr.addr = base;
+			pr.addr = one_maps;
 			pr.buf = (u64)tmpbuf;
 			pr.size = 4;
 			r = sc3(SYS_ioctl, fd, 0x801, (long)&pr);
-			crets[ci] = r;
 			putkv("  xread ret", (u64)r);
 			putkv("  xread got", (u64)*(u32 *)tmpbuf);
 			if (r == 0 && tmpbuf[0] == 0x7f && tmpbuf[1] == 'E' &&
 			    tmpbuf[2] == 'L' && tmpbuf[3] == 'F') {
-				putstr("  PASS cross-process read (ELF magic)\n");
-				any = 1;
+				putstr("  PASS cross-process read (ELF magic from pid 1)\n");
+				putstr("PASS xproc (another process was readable)\n");
+			} else if (r != 0) {
+				putstr("  WARN the driver could not read that page\n");
+				putstr("WARN xproc: cross-process read failed (informational)\n");
 			} else {
-				putstr("  WARN no ELF magic from the other process\n");
+				putstr("  WARN readable, but not an ELF header\n");
+				putstr("WARN xproc: base guess was wrong (informational)\n");
 			}
-
-			/* CONTROL: read an address we KNOW is mapped in our own
-			 * space (our own text page) but at a different offset than
-			 * the earlier xread, to show the physical read path is
-			 * still healthy right now. */
-			tmpbuf[0] = tmpbuf[1] = tmpbuf[2] = tmpbuf[3] = 0;
-			pr.pid = (s32)pid;
-			pr.addr = (u64)&putkv;
-			pr.addr &= ~0xFFFUL;
-			pr.buf = (u64)tmpbuf;
-			pr.size = 4;
-			r = sc3(SYS_ioctl, fd, 0x801, (long)&pr);
-			putkv("  control ret", (u64)r);
-			putkv("  control got", (u64)*(u32 *)tmpbuf);
 		}
-		if (any)
-			putstr("PASS xproc (at least one other process was readable)\n");
-		else
-			putstr("WARN xproc: no other process was readable (informational)\n");
 	}
 
 	/* 0x801 read own marker - RT success is 0, failure is -5 */

@@ -6,6 +6,35 @@ semantic-ish version tags (`<major>.<minor>-<flavour>`).
 
 ---
 
+## [4.5-universal] — 2026-09-28 (versionCode 30)
+
+### Fixed
+* **The `/proc` scanner added in 4.4 never worked** — on the device it
+  reported `found pid 0xffffffffffffffff` for every candidate. It walked
+  `/proc` with `getdents64` and matched `/proc/<pid>/comm`, and the dirent
+  parsing found no usable pid. Replaced with something far simpler and
+  provable: the first line of `/proc/<pid>/maps` is the lowest mapping, i.e.
+  the load address, so it is just the hex number before the first `-`. No
+  dirent parsing at all.
+
+  The new version validates itself inside the same run: it parses
+  `/proc/self/maps` and requires the result to equal the base that `0x803`
+  already returned for the probe's own process. If that agrees, the parse is
+  trustworthy and any later failure belongs to the driver, not the test.
+
+  This is the part that actually matters for a game mod: reading *another*
+  process. Everything before only read the probe's own address space, so it
+  would still have passed if the page-table walk never left the calling
+  process.
+
+### Verified
+The maps parser was compiled and run on a real Linux `/proc` before shipping,
+and it matches `head -1 /proc/N/maps` exactly for both the current process
+and pid 1, with the ELF magic (`7f 45 4c 46`) confirmed at the parsed address
+in each case.
+
+---
+
 ## [4.4-universal] — 2026-09-27 (versionCode 29)
 
 ### Fixed
