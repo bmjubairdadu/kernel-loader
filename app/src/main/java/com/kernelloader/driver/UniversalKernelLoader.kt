@@ -440,6 +440,7 @@ object UniversalKernelLoader {
                     vm.tlog("ABI: rmmod $mod", "FIX")
                     Shell.cmd("rmmod $mod 2>/dev/null").exec()
                 }
+                vm.setLoadedModule("")
             }
             
             vm.setVerification(
