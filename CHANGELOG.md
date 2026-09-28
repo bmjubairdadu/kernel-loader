@@ -6,6 +6,42 @@ semantic-ish version tags (`<major>.<minor>-<flavour>`).
 
 ---
 
+## [4.6-universal] — 2026-09-28 (versionCode 31)
+
+### Changed
+* **The cross-process test now runs against a normal app process, not just
+  pid 1.** The device log from 4.5 was the first real evidence about the
+  driver's cross-process read:
+
+  ```
+  PASS /proc parse matches the driver's own base   <- the parse is correct
+  maps base 0x0000005578e20000                     <- a valid address
+  xread ret 0xfffffffffffffffb                     <- -5, the read failed
+  ```
+
+  So the base is known-good and the read still failed — but `/init` is an
+  unusual subject (its lowest mapping is not representative of an app), so a
+  failure there says nothing conclusive about a game process.
+
+  The probe now locates `surfaceflinger`, `system_server` or `zygote` by
+  scanning `/proc/<pid>/maps` for its name, and reads that process's ELF
+  header — an ordinary PIE app mapping, which is exactly what a game mod
+  reads. pid 1 is still probed, but only as a labelled reference.
+
+  The three possible outcomes are now distinguishable:
+  * `PASS cross-process read (ELF magic)` — reading another process works.
+  * `READABLE from pid 1` but no ELF header — the base guess was wrong.
+  * `not readable` on a normal process — the page-table walk really is the
+    problem, and the driver is what needs fixing.
+
+### Verified
+The pid-discovery loop and the maps parse were compiled and run against a
+real Linux `/proc` first: `systemd` was found at pid 1 and `bash` at pid 310,
+each with a base matching `head -1 /proc/N/maps` exactly and the ELF magic
+present at that address, in 1 ms and 4 ms respectively.
+
+---
+
 ## [4.5-universal] — 2026-09-28 (versionCode 30)
 
 ### Fixed

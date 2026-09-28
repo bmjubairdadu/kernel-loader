@@ -146,14 +146,22 @@ struct modbase { s32 pid; u32 pad; u64 name_ptr; u64 base; };
  * /proc/self/maps is compared with what the driver's 0x803 returned, so the
  * parse is proven against a known-good answer inside the same run.
  */
-static u64 first_map_start(s32 pid, char *path, char *buf, long cap)
+static s32 slen(const char *s)
+{
+	s32 n = 0;
+	while (s[n])
+		n++;
+	return n;
+}
+
+/* build "/proc/<pid>/maps" into path */
+static void maps_path(s32 pid, char *path)
 {
 	char *p = path;
 	const char *pre = "/proc/";
 	char tmp[24];
 	s32 t = 0;
 	s64 v = pid;
-	long fd, r, i;
 
 	while (*pre)
 		*p++ = *pre++;
@@ -173,7 +181,14 @@ static u64 first_map_start(s32 pid, char *path, char *buf, long cap)
 	*p++ = 'p';
 	*p++ = 's';
 	*p = 0;
+}
 
+/* Read /proc/<pid>/maps (NUL terminated) into buf. Returns length or 0. */
+static long read_maps(s32 pid, char *path, char *buf, long cap)
+{
+	long fd, r;
+
+	maps_path(pid, path);
 	fd = sc6(SYS_openat, AT_FDCWD, (long)path, (long)O_RDONLY, 0, 0, 0);
 	if (fd < 0)
 		return 0;
@@ -182,15 +197,21 @@ static u64 first_map_start(s32 pid, char *path, char *buf, long cap)
 	if (r <= 0)
 		return 0;
 	buf[r] = 0;
+	return r;
+}
 
-	for (i = 0; i < r; i++) {
-		char c = buf[i];
+/* The lowest mapping = where the ELF image starts: the hex before the '-'. */
+static u64 first_addr(const char *text, long n)
+{
+	long i, j;
+
+	for (i = 0; i < n; i++) {
 		u64 add = 0;
-		long j;
+		char c = text[i];
 		if (c < '0' || c > '9')
-			break;              /* the line must start with the address */
-		for (j = i; j < r; j++) {
-			char h = buf[j];
+			break;
+		for (j = i; j < n; j++) {
+			char h = text[j];
 			if (h == '-' || h == ' ' || h == '\n')
 				break;
 			if (h >= '0' && h <= '9')
@@ -203,6 +224,25 @@ static u64 first_map_start(s32 pid, char *path, char *buf, long cap)
 				break;
 		}
 		return add;
+	}
+	return 0;
+}
+
+/* Does the maps text contain needle? */
+static int has_str(const char *text, long n, const char *needle)
+{
+	s32 nl = slen(needle);
+	long i;
+
+	if (nl <= 0)
+		return 0;
+	for (i = 0; i + nl <= n; i++) {
+		s32 k;
+		for (k = 0; k < nl; k++)
+			if (text[i + k] != needle[k])
+				break;
+		if (k == nl)
+			return 1;
 	}
 	return 0;
 }
@@ -333,11 +373,17 @@ long tmain(long argc, char **argv)
 	 * a driver that is working perfectly.
 	 */
 	{
-		static char mbuf[4096];
+		static char mbuf[2048];
 		static char mpath[64];
+		static const char *targets[] = {
+			"surfaceflinger", "system_server", "zygote"
+		};
 		u64 self_maps, one_maps;
+		long n;
+		int ti, any = 0;
 
-		/* self base from 0x803 was stored earlier; recompute for clarity */
+		/* Step 1: prove the /proc parse against a known-good answer.
+		 * 0x803 already returned OUR base; the same parser must agree. */
 		mb.pid = (s32)pid;
 		mb.pad = 0;
 		mb.name_ptr = (u64)&namebuf[2048];
@@ -345,21 +391,20 @@ long tmain(long argc, char **argv)
 		r = sc3(SYS_ioctl, fd, 0x803, (long)&mb);
 		putkv("self 0x803 base", mb.base);
 
-		self_maps = first_map_start((s32)pid, mpath, mbuf, 4000);
+		n = read_maps((s32)pid, mpath, mbuf, 2000);
+		self_maps = n ? first_addr(mbuf, n) : 0;
 		putkv("self maps base", self_maps);
 		if (self_maps != 0 && self_maps == mb.base)
 			putstr("  PASS /proc parse matches the driver's own base\n");
 		else
 			putstr("  WARN /proc parse disagrees with 0x803\n");
 
+		/* Step 2: pid 1, for reference */
 		putstr("-- xproc pid 1 (init)\n");
-		one_maps = first_map_start(1, mpath, mbuf, 4000);
+		n = read_maps(1, mpath, mbuf, 2000);
+		one_maps = n ? first_addr(mbuf, n) : 0;
 		putkv("  maps base", one_maps);
-		if (one_maps == 0) {
-			putstr("  WARN could not read /proc/1/maps\n");
-			putstr("WARN xproc: pid 1 not readable (informational)\n");
-		} else {
-			/* the ELF magic must be at the very first byte of the image */
+		if (one_maps) {
 			tmpbuf[0] = tmpbuf[1] = tmpbuf[2] = tmpbuf[3] = 0;
 			pr.pid = 1;
 			pr.pad = 0;
@@ -369,18 +414,60 @@ long tmain(long argc, char **argv)
 			r = sc3(SYS_ioctl, fd, 0x801, (long)&pr);
 			putkv("  xread ret", (u64)r);
 			putkv("  xread got", (u64)*(u32 *)tmpbuf);
-			if (r == 0 && tmpbuf[0] == 0x7f && tmpbuf[1] == 'E' &&
-			    tmpbuf[2] == 'L' && tmpbuf[3] == 'F') {
-				putstr("  PASS cross-process read (ELF magic from pid 1)\n");
-				putstr("PASS xproc (another process was readable)\n");
-			} else if (r != 0) {
-				putstr("  WARN the driver could not read that page\n");
-				putstr("WARN xproc: cross-process read failed (informational)\n");
-			} else {
-				putstr("  WARN readable, but not an ELF header\n");
-				putstr("WARN xproc: base guess was wrong (informational)\n");
-			}
+			if (r == 0)
+				putstr("  READABLE from pid 1\n");
+			else
+				putstr("  not readable from pid 1\n");
+		} else {
+			putstr("  WARN could not read /proc/1/maps\n");
 		}
+
+		/* Step 3: a NORMAL app process - this is what a game mod reads.
+		 * pid 1 is an unusual subject; surfaceflinger / system_server /
+		 * zygote are ordinary processes with ordinary PIE mappings. */
+		for (ti = 0; ti < 3 && !any; ti++) {
+			const char *want = targets[ti];
+			s32 cand;
+			putstr("-- xproc ");
+			putstr(want);
+			putstr("\n");
+			for (cand = 1; cand < 3000; cand++) {
+				u64 b;
+				n = read_maps(cand, mpath, mbuf, 2000);
+				if (n <= 0)
+					continue;
+				if (!has_str(mbuf, n, want))
+					continue;
+				b = first_addr(mbuf, n);
+				putkv("  pid", (u64)cand);
+				putkv("  base", b);
+				if (b == 0)
+					continue;
+				tmpbuf[0] = tmpbuf[1] = tmpbuf[2] = tmpbuf[3] = 0;
+				pr.pid = cand;
+				pr.pad = 0;
+				pr.addr = b;
+				pr.buf = (u64)tmpbuf;
+				pr.size = 4;
+				r = sc3(SYS_ioctl, fd, 0x801, (long)&pr);
+				putkv("  xread ret", (u64)r);
+				putkv("  xread got", (u64)*(u32 *)tmpbuf);
+				if (r == 0 && tmpbuf[0] == 0x7f && tmpbuf[1] == 'E' &&
+				    tmpbuf[2] == 'L' && tmpbuf[3] == 'F') {
+					putstr("  PASS cross-process read (ELF magic)\n");
+					any = 1;
+				} else {
+					putstr("  WARN not an ELF header, trying next\n");
+				}
+				break;
+			}
+			if (!any)
+				putstr("  WARN no suitable process found\n");
+		}
+		if (any)
+			putstr("PASS xproc (a normal app process was readable)\n");
+		else
+			putstr("WARN xproc: no other process was readable (informational)\n");
 	}
 
 	/* 0x801 read own marker - RT success is 0, failure is -5 */
