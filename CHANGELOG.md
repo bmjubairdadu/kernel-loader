@@ -6,6 +6,28 @@ semantic-ish version tags (`<major>.<minor>-<flavour>`).
 
 ---
 
+## [Unreleased] — database + quiet console (no APK yet)
+
+### Fixed (driver database, live immediately)
+* Rebuilt `rt_4.9.337-DaisyForGaming.ko` and `qx_4.9.337-DaisyForGaming.ko`
+  for the rebuilt kernel. The new kernel changed `struct module`, so the
+  old drivers failed every load with `disagrees about version of symbol
+  module_layout` (old CRC `0x78d772a5`, new kernel wants `0x2415a1ea`). Both
+  drivers now carry `0x2415a1ea` with unchanged sources. The existing v5.0
+  app picks them up over OTA, no new APK needed for this fix.
+
+### Changed (app code, ships with the next APK build)
+* Shorter console. Download progress lines are gone (one
+  `OTA: downloaded` line per file). Failed loads show at most 2 `TRY:`
+  lines plus a count, and `DIAG:` output is deduplicated to the last 4
+  unique lines. `verifyModule()` prints one `VERIFY:` line instead of three
+  command echoes. The embedded-path dmesg dump is deduplicated to 3 lines.
+* Removed the database link block (`DB updated` line and the
+  `open driver database` row) from the home screen. The driver list itself
+  is unchanged.
+
+---
+
 ## [4.6-universal] — 2026-09-28 (versionCode 31)
 
 ### Changed

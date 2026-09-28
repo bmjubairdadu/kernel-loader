@@ -508,7 +508,8 @@ object UniversalKernelLoader {
                     "ERR"
                 )
             }
-            dmesg.out.takeLast(6).forEach { if (it.isNotBlank()) vm.tlog("dmesg: $it", "INFO") }
+            dmesg.out.filter { it.isNotBlank() }.distinct().takeLast(3)
+                .forEach { vm.tlog("dmesg: $it", "INFO") }
         }
 
         vm.setVerification(

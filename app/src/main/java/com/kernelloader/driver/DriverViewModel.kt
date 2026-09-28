@@ -470,17 +470,19 @@ class DriverViewModel : ViewModel() {
             }
 
             if (!res.isSuccess) {
-                tried.forEach { tlog("TRY: $it", "INFO") }
+                tried.take(2).forEach { tlog("TRY: $it", "INFO") }
+                if (tried.size > 2) tlog("TRY: ... (+${tried.size - 2} more, same error)", "INFO")
                 tlog("OTA: insmod failed (exit ${res.code})", "ERR")
                 val errText = (res.out + res.err).joinToString("\n")
-                
+
                 Shell.cmd(
                     "ls -l /system/bin/insmod /vendor/bin/insmod 2>&1",
                     "for b in /system/bin/insmod /vendor/bin/insmod; do echo \"== \$b\"; \$b 2>&1 | head -n 3; done",
                     "cat ${staged.absolutePath} > /dev/null 2>&1 && echo READ_OK || echo READ_FAIL",
                     "od -An -tx1 ${staged.absolutePath} 2>/dev/null | head -n 1",
                     "dmesg 2>/dev/null | tail -n 10"
-                ).exec().out.forEach { if (it.isNotBlank()) tlog("DIAG: $it", "INFO") }
+                ).exec().out.filter { it.isNotBlank() }.distinct().takeLast(4)
+                    .forEach { tlog("DIAG: $it", "INFO") }
                 if (errText.contains("Invalid module format", true) ||
                     errText.contains("vermagic", true) ||
                     errText.contains("Exec format error", true)
@@ -669,13 +671,11 @@ class DriverViewModel : ViewModel() {
             if (ours.isNotEmpty()) {
                 setLoadedModule(ours.first())
                 driverModule.value = ours.joinToString(", ")
+                tlog("VERIFY: ${ours.first()} loaded", "OK")
             } else {
                 setLoadedModule("")
+                tlog("VERIFY: no driver loaded", "WARN")
             }
-
-            addLog("lsmod", lsmodRes.out, lsmodRes.err, lsmodRes.code)
-            addLog("ls /dev/<matching module nodes>", devRes.out, devRes.err, devRes.code)
-            addLog("dmesg | grep module", dmesgRes.out, dmesgRes.err, dmesgRes.code)
         }
     }
 

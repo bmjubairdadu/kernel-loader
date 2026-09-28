@@ -715,38 +715,6 @@ fun HomeScreen(
             style = MaterialTheme.typography.titleSmall,
             color = AccentGreen
         )
-        Text(
-            text = "DB updated: ${manifest?.updated?.take(10) ?: "-"}  ·  " +
-                    "github.com/bmjubairdadu/kernel-loder (drivers branch)",
-            style = MonoTiny,
-            color = TextMuted,
-            modifier = Modifier.padding(top = 2.dp)
-        )
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable {
-                    try {
-                        context.startActivity(
-                            Intent(Intent.ACTION_VIEW, Uri.parse(OtaDriverStore.manifestUrl))
-                        )
-                    } catch (_: Exception) {  }
-                },
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "open driver database ↗",
-                style = MaterialTheme.typography.labelMedium,
-                color = AccentBlue,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.weight(1f)
-            )
-            Text(
-                text = "raw drivers.json",
-                style = MonoTiny,
-                color = TextMuted
-            )
-        }
         Card(
             modifier = Modifier.fillMaxWidth().padding(top = 6.dp, bottom = 16.dp),
             colors = CardDefaults.cardColors(containerColor = Surface1),

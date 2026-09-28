@@ -235,9 +235,6 @@ object OtaDriverStore {
                 onLog("OTA: HTTP ${conn.responseCode} for ${entry.file}", "ERR")
                 return null
             }
-            val total = conn.contentLengthLong
-            var done = 0L
-            var lastPct = -1
             out.outputStream().use { o ->
                 conn.inputStream.use { i ->
                     val buf = ByteArray(32 * 1024)
@@ -245,19 +242,11 @@ object OtaDriverStore {
                         val n = i.read(buf)
                         if (n <= 0) break
                         o.write(buf, 0, n)
-                        done += n
-                        if (total > 0) {
-                            val pct = (done * 100 / total).toInt()
-                            if (pct != lastPct && pct % 10 == 0) {
-                                lastPct = pct
-                                onLog("OTA: ${entry.file} $pct% ($done/$total)", "INFO")
-                            }
-                        }
                     }
                 }
             }
             conn.disconnect()
-            onLog("OTA: saved ${out.name} (${out.length()} bytes)", "OK")
+            onLog("OTA: downloaded ${out.name} (${out.length()} bytes)", "OK")
             out
         } catch (e: Exception) {
             onLog("OTA: download failed: ${e.message}", "ERR")
