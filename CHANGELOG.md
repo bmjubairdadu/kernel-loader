@@ -6,7 +6,7 @@ semantic-ish version tags (`<major>.<minor>-<flavour>`).
 
 ---
 
-## [Unreleased] — database + quiet console (no APK yet)
+## [5.1-universal] — 2026-09-28 (versionCode 33)
 
 ### Fixed (driver database, live immediately)
 * Rebuilt `rt_4.9.337-DaisyForGaming.ko` and `qx_4.9.337-DaisyForGaming.ko`
