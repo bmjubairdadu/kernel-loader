@@ -1,6 +1,4 @@
 #!/bin/bash
-# Build kloader_driver.ko for Mi A2 Lite (daisy) 4.9.337
-# Run on Ubuntu 20.04/22.04
 set -e
 
 KERNEL_DIR=${1:-$HOME/android_kernel_xiaomi_daisy}
@@ -13,7 +11,7 @@ echo "KERNEL_DIR=$KERNEL_DIR"
 if [ ! -d "$KERNEL_DIR" ]; then
   echo "[!] Kernel source not found. Cloning..."
   mkdir -p $(dirname $KERNEL_DIR)
-  # Xtended daisy kernel (4.9, daisy_defconfig) - closest public base
+
   git clone --depth=1 https://github.com/Xtended-Devices/kernel_xiaomi_daisy "$KERNEL_DIR"
 fi
 
@@ -21,7 +19,6 @@ cd "$KERNEL_DIR"
 export ARCH=arm64
 export CROSS_COMPILE="$TOOLCHAIN"
 
-# Check toolchain
 if ! command -v ${CROSS_COMPILE}gcc >/dev/null 2>&1; then
   echo "[!] Toolchain not found at $TOOLCHAIN"
   echo "    Download: gcc-4.9 aarch64-linux-android (Google NDK r17c or LOS prebuilts)"

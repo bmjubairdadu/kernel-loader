@@ -15,10 +15,9 @@ android {
         applicationId = "com.kernelloader"
         minSdk = 28
         targetSdk = 34
-        versionCode = 31
-        versionName = "4.6-universal"
+        versionCode = 32
+        versionName = "5.0-universal"
 
-        // In-app auto-update sources (GitHub Releases database)
         buildConfigField(
             "String",
             "UPDATE_API_URL",
@@ -33,9 +32,7 @@ android {
 
     buildTypes {
         release {
-            // R8 code shrinking + resource shrinking - keeps the APK tiny
-            // (AGP 9 DSL: isShrinkResources lives on the build type,
-            //  the optimization block only toggles R8 itself)
+            
             isShrinkResources = true
             optimization {
                 enable = true
@@ -44,8 +41,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            // Side-load distribution: sign with the debug keystore so the same
-            // signature can install newer builds in-place (self auto-update).
+            
             signingConfig = signingConfigs.getByName("debug")
         }
     }

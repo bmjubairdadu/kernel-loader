@@ -1,5 +1,4 @@
 #!/bin/bash
-# Diagnostic: retry the 4.9.337 module build in the previously working dir with V=1
 PROJ=/mnt/c/Users/Administrator/Downloads/DaisyDiverLoder
 LOG=$PROJ/_chk3.txt
 TC=/home/jubair/daisy-build/toolchain/proton-clang/bin

@@ -15,6 +15,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
 
 import com.kernelloader.R
+import com.kernelloader.ui.theme.BorderSubtle
+import com.kernelloader.ui.theme.FamilyRt
+import com.kernelloader.ui.theme.Surface1
+import com.kernelloader.ui.theme.TextSecondary
 
 @Composable
 fun SafetyWarningDialog(
@@ -23,9 +27,9 @@ fun SafetyWarningDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = androidx.compose.ui.graphics.Color(0xFF111C26),
+        containerColor = Surface1,
         titleContentColor = androidx.compose.ui.graphics.Color.White,
-        textContentColor = androidx.compose.ui.graphics.Color(0xFFB0BEC5),
+        textContentColor = TextSecondary,
         icon = {
             Image(
                 painter = painterResource(id = R.drawable.app_logo),
@@ -44,7 +48,7 @@ fun SafetyWarningDialog(
             Button(
                 onClick = onConfirm,
                 colors = androidx.compose.material3.ButtonDefaults.buttonColors(
-                    containerColor = androidx.compose.ui.graphics.Color(0xFF1E7A46),
+                    containerColor = FamilyRt,
                     contentColor = androidx.compose.ui.graphics.Color.White
                 )
             ) {
@@ -55,7 +59,7 @@ fun SafetyWarningDialog(
             Button(
                 onClick = onDismiss,
                 colors = androidx.compose.material3.ButtonDefaults.buttonColors(
-                    containerColor = androidx.compose.ui.graphics.Color(0xFF37474F),
+                    containerColor = BorderSubtle,
                     contentColor = androidx.compose.ui.graphics.Color.White
                 )
             ) {

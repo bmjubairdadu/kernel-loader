@@ -1,6 +1,6 @@
 #!/bin/bash
 exec > /mnt/c/Users/Administrator/Downloads/DaisyDiverLoder/driver/b307.log 2>&1
-# Build kloader_driver.ko for BOTH 4.9.337 and 4.9.307 (DaisyForGaming) in WSL
+
 set -e
 SRC=~/daisy-build/kernel_source
 T307=~/daisy-build/kernel_307

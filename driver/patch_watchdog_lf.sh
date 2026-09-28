@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# One-time patch: add auto-publish to the watchdog when the build queue empties.
 set -euo pipefail
 F=/root/build_watchdog.sh
 [ -f "$F" ] || { echo "ERROR: $F missing"; exit 1; }

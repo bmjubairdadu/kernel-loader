@@ -5,7 +5,7 @@ import java.io.BufferedReader
 import java.io.InputStreamReader
 
 object RootChecker {
-    // Device is irrelevant - the loader is universal. We only parse the kernel.
+    
     private val KERNEL_RE = Regex("""(\d+)\.(\d+)\.(\d+)""")
 
     fun isRootAvailable(): Boolean {
@@ -38,7 +38,6 @@ object RootChecker {
         }
     }
 
-    /** Full `uname -r` release string, or null when it cannot be read. */
     fun getKernelRelease(): String? {
         return try {
             getKernelVersionRoot()
@@ -48,25 +47,18 @@ object RootChecker {
         }
     }
 
-    /** Extract "X.Y.Z" from any kernel release string (e.g. "4.9.337-custom-kernel"). */
     fun kernelShortVersion(kernelRelease: String = getKernelVersion()): String {
         val m = KERNEL_RE.find(kernelRelease) ?: return kernelRelease.trim()
         return "${m.groupValues[1]}.${m.groupValues[2]}.${m.groupValues[3]}"
     }
 
-    /** Major.minor of the running kernel, e.g. 4.9 -> "4.9". */
     fun kernelMajorMinor(kernelRelease: String = getKernelVersion()): String {
         val m = KERNEL_RE.find(kernelRelease) ?: return ""
         return "${m.groupValues[1]}.${m.groupValues[2]}"
     }
 
-    // Device-agnostic: any kernel is accepted (the loader adapts).
     fun isKernelCompatible(): Boolean = getKernelVersion().isNotBlank()
 
-    /**
-     * Universal status line. `driverCount` = how many drivers are bundled/scanned,
-     * `exactMatch` = whether one of them matches this exact kernel release.
-     */
     fun getCompatibilityMessage(driverCount: Int = -1, exactMatch: Boolean? = null): String {
         val v = getKernelVersion()
         val short = kernelShortVersion(v)
@@ -78,10 +70,8 @@ object RootChecker {
         }
     }
 
-    /** True when one of the scanned/bundled drivers matches this exact kernel release. */
     fun hasExactDriver(driverVersions: List<String>, kernelRelease: String = getKernelVersion()): Boolean {
         val short = kernelShortVersion(kernelRelease)
         return driverVersions.any { kernelShortVersion(it) == short }
     }
 }
-

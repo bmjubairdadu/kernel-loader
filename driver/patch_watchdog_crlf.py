@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-# Patch watchdogs: run publish_drivers through tr (CRLF-safe)
 import sys
 
 NEW = '''      tr -d "\\r" < "$PROJ/driver/publish_drivers.sh" > /tmp/pub_lf.sh

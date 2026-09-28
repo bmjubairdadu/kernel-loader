@@ -3,17 +3,6 @@ package com.kernelloader.mem
 import com.kernelloader.driver.DriverViewModel
 import com.topjohnwu.superuser.Shell
 
-/**
- * DRIVERLESS memory engine (no .ko, no insmod, no reboot risk - ever).
- * Uses root + /proc/<pid>/maps + /proc/<pid>/mem, proven live on-device:
- * read pid-1 .text, write+read-back a scratch mapping.
- *
- * Scope: process virtual memory read/write + module base lookup.
- * Physical memory still needs the kmem driver (rare edge cases only).
- *
- * Performance: one root-shell round-trip per call (~30-80ms). Fine for
- * patches and scans; NOT for 60fps loops (batch addresses per call).
- */
 object MemDirect {
 
     data class MemRegion(
@@ -26,12 +15,11 @@ object MemDirect {
     const val MAX_READ = 16 * 1024L
     const val MAX_WRITE = 4 * 1024
 
-    /** All mappings of [pid], empty list on failure. */
     fun readMaps(pid: Int): List<MemRegion> {
         val out = Shell.cmd("cat /proc/$pid/maps 2>&1").exec().out
         val list = mutableListOf<MemRegion>()
         for (line in out) {
-            // 556a5f8000-556a6c7000 r-xp 0002e000 103:18 1474  /system/bin/init
+            
             val m = Regex("""^([0-9a-f]+)-([0-9a-f]+)\s+(\S+)\s+\S+\s+\S+\s+\S+\s*(.*)$""")
                 .find(line.trim()) ?: continue
             try {
@@ -43,15 +31,11 @@ object MemDirect {
                         path = m.groupValues[4].trim()
                     )
                 )
-            } catch (_: Exception) { /* skip bad line */ }
+            } catch (_: Exception) {  }
         }
         return list
     }
 
-    /**
-     * Read [size] bytes at virtual [addr] of [pid]. Hex transport (od)
-     * keeps binary data intact through the text shell. Null on failure.
-     */
     fun readMem(pid: Int, addr: Long, size: Long): ByteArray? {
         if (size <= 0 || size > MAX_READ || addr < 0) return null
         val res = Shell.cmd(
@@ -70,10 +54,6 @@ object MemDirect {
         return bytes.toByteArray()
     }
 
-    /**
-     * Write [data] at virtual [addr] of [pid]. True when the kernel
-     * accepted every byte (dd exit 0). Caller should read-back to verify.
-     */
     fun writeMem(pid: Int, addr: Long, data: ByteArray): Boolean {
         if (data.isEmpty() || data.size > MAX_WRITE || addr < 0) return false
         val hex = buildString {
@@ -88,7 +68,6 @@ object MemDirect {
         return res.isSuccess
     }
 
-    /** Base address of the mapping whose file basename equals [name]. */
     fun moduleBase(pid: Int, name: String): Long? {
         for (r in readMaps(pid)) {
             if (r.path.isEmpty()) continue
@@ -98,7 +77,6 @@ object MemDirect {
         return null
     }
 
-    /** Safe read-only self-test (pid 1 maps + 16 bytes). Returns log lines. */
     fun selfTest(): List<Pair<String, String>> {
         val lines = mutableListOf<Pair<String, String>>()
         fun log(t: String, k: String) { lines.add(t to k) }

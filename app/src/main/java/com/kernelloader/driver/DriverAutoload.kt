@@ -4,33 +4,8 @@ import android.content.Context
 import com.topjohnwu.superuser.Shell
 import java.io.File
 
-/**
- * BOOT AUTO-LOAD
- * ==============
- * A kernel module lives in kernel memory only. Every reboot wipes it, so the
- * user had to tap LOAD again after each restart - and the game-mod client
- * (Aincrad / Angry Mod) could not read game memory until they did.
- *
- * Android has no "modules-load" service, so the supported way to run something
- * as root at boot is a Magisk/KernelSU/APatch `service.d` script:
- *
- *     /data/adb/service.d/90-kloder.sh
- *
- * This class owns that script plus the state it needs:
- *
- *   - which ABI family was loaded (rt / qx)
- *   - the EXACT bytes that were insmod'ed (already vermagic-patched, so the
- *     staged copy is byte-identical to what the kernel accepted)
- *   - the real module name in lsmod (kmem_337, kmem_337_qx, entryi, ... -
- *     never the .ko file name, which is only a label)
- *   - the /dev node the client opens (/dev/wanbai)
- *
- * The script is IDEMPOTENT: it checks /proc/modules first and exits when the
- * driver is already there, so a manual LOAD followed by a reboot is harmless.
- */
 object DriverAutoload {
 
-    /** Where the staged .ko + log live. Magisk dir when available, else /data/local/tmp. */
     private const val STAGE_PRIMARY = "/data/adb/kloder"
     private const val STAGE_FALLBACK = "/data/local/tmp/kloder"
 
@@ -38,8 +13,6 @@ object DriverAutoload {
     private const val SCRIPT_FALLBACK = "/data/local/tmp/kloder-autoload.sh"
 
     private const val PREFS = "kloder_autoload"
-
-    // ---------------- persisted state ----------------
 
     private fun prefs(ctx: Context) =
         ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -50,23 +23,18 @@ object DriverAutoload {
 
     private var _enabled = false
 
-    /** Driver file that was staged for boot (absolute path), or "". */
     var stagedKo: String = ""
         private set
 
-    /** Real lsmod name of the loaded driver, e.g. "kmem_337". */
     var moduleName: String = ""
         private set
 
-    /** "rt" or "qx". */
     var variant: String = ""
         private set
 
-    /** /dev node the client opens, e.g. "wanbai". */
     var devNode: String = "wanbai"
         private set
 
-    /** Last boot-script run result, shown in the console. */
     var lastBootLog: String = ""
         private set
 
@@ -90,8 +58,6 @@ object DriverAutoload {
             .apply()
     }
 
-    // ---------------- where things live ----------------
-
     private fun hasMagisk(): Boolean =
         try { Shell.cmd("ls -d /data/adb 2>/dev/null").exec().isSuccess } catch (e: Exception) { false }
 
@@ -99,13 +65,6 @@ object DriverAutoload {
 
     fun scriptPath(): String = if (hasMagisk()) SCRIPT_PRIMARY else SCRIPT_FALLBACK
 
-    /**
-     * Is there anything that will actually RUN a boot script?
-     * Magisk / KernelSU / APatch all execute the shell scripts in
-     * /data/adb/service.d at boot. Without that directory the "auto-load at
-     * boot" promise cannot be kept, so the app says so instead of silently
-     * pretending it will work.
-     */
     fun hasBootRunner(): Boolean = try {
         Shell.cmd(
             "ls -d /data/adb/service.d 2>/dev/null || " +
@@ -116,19 +75,8 @@ object DriverAutoload {
         false
     }
 
-    // ---------------- the boot script ----------------
-
-    /**
-     * Written to service.d. Deliberately defensive: service.d scripts run with
-     * no ordering guarantees and race the rest of boot, so every step waits
-     * for what it needs and every failure is logged instead of aborting.
-     */
     private fun buildScript(): String {
-        // The shell script is written with '@' standing in for '$' and the
-        // marker is swapped at the end. A Kotlin raw string would need every
-        // shell '$' escaped, and one missed escape silently produces a broken
-        // boot script; this way each character is written exactly once and
-        // there is nothing to misread. The script contains no real '@'.
+        
         val dir = stageDir()
         val ko = stagedKo
         val mod = moduleName
@@ -218,9 +166,7 @@ else
 fi
 say "boot auto-load finished"
 """.trimIndent() + "\n"
-        // Every @NAME@ token used in the template MUST appear in this list -
-        // an unknown token would survive the first pass and then have its '@'
-        // turned into a stray '$', silently corrupting the script.
+        
         val out = shell
             .replace("@MODNAME@", mod)
             .replace("@FAMILY@", fam)
@@ -228,12 +174,10 @@ say "boot auto-load finished"
             .replace("@KO@", ko)
             .replace("@DIR@", dir)
             .replace("@LOG@", "$dir/boot.log")
-            // literal "$ENF" - the shell variable, not the text "ENF"
+            
             .replace("@ENF@", "\$ENF")
             .replace("@", "$")
-        // Guard: a leftover '@' means the template grew a token that is not in
-        // the list above. Shipping that would write a broken boot script that
-        // fails silently at every boot, so fail loudly here instead.
+        
         if (out.contains('@')) {
             val bad = Regex("@[A-Za-z0-9_]*").findAll(out).map { it.value }.distinct()
             throw IllegalStateException("boot script template has unknown placeholders: ${bad.joinToString()}")
@@ -241,13 +185,6 @@ say "boot auto-load finished"
         return out
     }
 
-    // ---------------- enable / disable / status ----------------
-
-    /**
-     * Install the boot script. [koFile] must be the EXACT file that was
-     * insmod'ed (post vermagic-patch), so the staged copy is byte-identical to
-     * what the kernel already accepted.
-     */
     fun enable(ctx: Context, koFile: File, modName: String, family: String, node: String, log: (String, String) -> Unit): Boolean {
         if (modName.isBlank() || modName == "Module") {
             log("AUTOLOAD: refusing - the loaded module name is unknown", "ERR")
@@ -288,7 +225,7 @@ say "boot auto-load finished"
         }
         val scriptPath = scriptPath()
         val w = try {
-            // service.d may not exist on a non-Magisk root setup.
+            
             Shell.cmd("mkdir -p \$(dirname $scriptPath)").exec()
             File("/data/local/tmp/kloder-boot.sh").apply {
                 writeText(script)
@@ -331,7 +268,6 @@ say "boot auto-load finished"
         )
     }
 
-    /** One-line status for the home screen. */
     fun statusLine(ctx: Context): String {
         state(ctx)
         if (!_enabled) return "Auto-load at boot: OFF"
@@ -339,7 +275,6 @@ say "boot auto-load finished"
         return "Auto-load at boot: ON  ($m at every boot)"
     }
 
-    /** Read the boot log the script wrote, if it ran. */
     fun readBootLog(): String = try {
         Shell.cmd("cat ${stageDir()}/boot.log 2>/dev/null | tail -n 20").exec().out
             .filter { it.isNotBlank() }.joinToString("\n")

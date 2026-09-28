@@ -26,6 +26,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.kernelloader.R
+import com.kernelloader.ui.theme.FamilyRt
+import com.kernelloader.ui.theme.TextPrimary
 
 @Composable
 fun CreditsScreen(onBack: () -> Unit) {
@@ -68,7 +70,7 @@ fun CreditsScreen(onBack: () -> Unit) {
                 text = stringResource(R.string.credits_universal),
                 style = MaterialTheme.typography.bodyLarge,
                 textAlign = TextAlign.Center,
-                color = androidx.compose.ui.graphics.Color(0xFFE0E0E0)
+                color = TextPrimary
             )
             
             Spacer(modifier = Modifier.height(48.dp))
@@ -76,7 +78,7 @@ fun CreditsScreen(onBack: () -> Unit) {
             Button(
                 onClick = onBack,
                 colors = androidx.compose.material3.ButtonDefaults.buttonColors(
-                    containerColor = androidx.compose.ui.graphics.Color(0xFF1E7A46),
+                    containerColor = FamilyRt,
                     contentColor = androidx.compose.ui.graphics.Color.White
                 )
             ) {

@@ -1,5 +1,4 @@
 #!/bin/bash
-# Launch the native (universal) kernel driver build in the background inside WSL
 PROJ=/mnt/c/Users/Administrator/Downloads/DaisyDiverLoder
 tr -d '\r' < $PROJ/driver/build_native_wsl.sh > /home/jubair/build_native.sh
 chmod +x /home/jubair/build_native.sh

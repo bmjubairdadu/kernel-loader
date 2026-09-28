@@ -11,26 +11,23 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import com.kernelloader.R
+import com.kernelloader.ui.theme.AccentGreen
+import com.kernelloader.ui.theme.Surface0
+import com.kernelloader.ui.theme.Surface1
+import com.kernelloader.ui.theme.Surface2
 
-// Brand palette: deep navy -> dark green (opaque, never transparent).
-val BrandBgTop = Color(0xFF0B1220)
-val BrandBgMid = Color(0xFF0C1A17)
-val BrandBgBottom = Color(0xFF0E2418)
-val BrandAccent = Color(0xFF4CAF50)
+val BrandBgTop = Surface0
+val BrandBgMid = Surface1
+val BrandBgBottom = Surface2
+val BrandAccent = AccentGreen
 
-/**
- * Shared opaque app background: vertical brand gradient + one faint
- * centered logo watermark (barely visible, alpha ~0.06).
- * Content draws on top and must add its own window-inset padding.
- */
 @Composable
 fun AppBackground(
-    watermarkAlpha: Float = 0.045f,
+    watermarkAlpha: Float = 0.035f,
     content: @Composable BoxScope.() -> Unit
 ) {
     Box(
@@ -38,7 +35,9 @@ fun AppBackground(
             .fillMaxSize()
             .background(
                 Brush.verticalGradient(
-                    listOf(BrandBgTop, BrandBgMid, BrandBgBottom)
+                    0.0f to Surface0,
+                    0.55f to Surface1,
+                    1.0f to Surface0
                 )
             )
     ) {

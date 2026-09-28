@@ -1,5 +1,4 @@
 #!/bin/bash
-# Probe WSL environment for the universal .ko build pipeline
 {
   echo "=== DISK ==="; df -h /
   echo "=== CPU/RAM ==="; nproc; free -g | head -2

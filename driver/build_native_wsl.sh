@@ -1,7 +1,4 @@
 #!/bin/bash
-# Build the UNIVERSAL Kernel Loder driver for BOTH 4.9.337 and 4.9.307
-# Outputs: driver/out/native_4.9.337.ko , driver/out/native_4.9.307.ko
-#          app/src/main/assets/drivers/native_4.9.337.ko (+ 307)
 set -e
 SRC=~/daisy-build/kernel_source
 T307=~/daisy-build/kernel_307

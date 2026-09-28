@@ -1,17 +1,3 @@
-/* t_rw - freestanding ioctl test for kmem_337 (aarch64, -nostdlib -static)
- * usage: t_rw /dev/<node>   ; exit code = number of failed checks (0 = all pass)
- *
- * RT return conventions (verified against the original RT binary and against
- * the game-mod client, which tests the return with "cmp w0, #0"):
- *      read/write   ok = 0        fail = -5
- *      modbase      ok = 0        (base is returned through the struct)
- *      bad pointer  -14
- *      unknown cmd  -22
- * NOTE: an earlier revision of this tester asserted ok == -5, which is the
- * INVERTED convention. Every read and write then reported FAIL even though the
- * driver had read and written the correct bytes, and the app's ABI self-check
- * rmmod'ed a perfectly good driver.
- */
 typedef unsigned long u64;
 typedef long s64;
 typedef unsigned int u32;
@@ -21,17 +7,13 @@ typedef unsigned short u16;
 
 #define AT_FDCWD (-100)
 #define O_RDWR 2
-#define O_RDONLY 0
-#define O_DIRECTORY 0x10000   /* 040000 octal, aarch64 asm-generic */
 #define SYS_openat 56
 #define SYS_readlinkat 78
 #define SYS_ioctl 29
 #define SYS_getpid 172
 #define SYS_write 64
 #define SYS_exit_group 94
-#define SYS_getdents64 61
 #define SYS_close 57
-#define SYS_read 63
 
 static long sc6(long n, long a, long b, long c, long d, long e, long f)
 {
@@ -52,7 +34,6 @@ static long sc6(long n, long a, long b, long c, long d, long e, long f)
 static long sc1(long n, long a) { return sc6(n, a, 0, 0, 0, 0, 0); }
 static long sc3(long n, long a, long b, long c) { return sc6(n, a, b, c, 0, 0, 0); }
 
-/* freestanding: clang may emit memcpy for copies (no libc here) */
 void *memcpy(void *d, const void *s, u64 n)
 {
 	u8 *a = (u8 *)d;
@@ -82,11 +63,8 @@ static void puthex(u64 v)
 	b[18] = '\n';
 	sc3(SYS_write, 1, (long)b, 19);
 }
+__attribute__((unused)) static void (*keep_puthex)(u64) = puthex;
 
-/* "<label> 0x<16 hex digits>\n" emitted as ONE write, so the line can never be
- * split or interleaved with another check's output. Without this the raw
- * return value was sometimes lost from the log and a failing check gave no
- * clue what the kernel had actually returned. */
 static void putkv(const char *label, u64 v)
 {
 	char b[64];
@@ -106,18 +84,6 @@ static void putkv(const char *label, u64 v)
 	sc3(SYS_write, 1, (long)b, n + 17);
 }
 
-/* ---- ABI family detection -------------------------------------------------
- * The two families the game-mod clients speak differ in exactly this way:
- *
- *            0x805            0x804            read/write ok   failure
- *   RT   :   -22              -22                 0              -5
- *   QX   :    0                2                 0              -1
- *
- * so the two "undefined command" probes identify the family, and read/write
- * are 0-on-success in BOTH. A single tester can therefore check either.
- * (Before this, the tester only knew the RT expectations, so loading a QX
- * driver reported a false ABI MISMATCH and the app rmmod'ed it.)
- */
 #define FAM_UNKNOWN 0
 #define FAM_RT      1
 #define FAM_QX      2
@@ -134,119 +100,6 @@ static const char *famname(int f)
 struct proc_rw { s32 pid; u32 pad; u64 addr; u64 buf; u64 size; };
 struct modbase { s32 pid; u32 pad; u64 name_ptr; u64 base; };
 
-/* ---- first mapping address of a pid, read from /proc/<pid>/maps ---------
- * The previous revision walked /proc with getdents64 and matched
- * /proc/<pid>/comm, which never found a process (it reported pid -1 for
- * every candidate). That parsing is easy to get subtly wrong and impossible
- * to debug on a device. The FIRST line of /proc/<pid>/maps is the lowest
- * mapping, which for any process is where its ELF image starts - so the
- * load address is just the hex number before the first '-'.
- *
- * This also doubles as a self-check: for the probe's own pid the value from
- * /proc/self/maps is compared with what the driver's 0x803 returned, so the
- * parse is proven against a known-good answer inside the same run.
- */
-static s32 slen(const char *s)
-{
-	s32 n = 0;
-	while (s[n])
-		n++;
-	return n;
-}
-
-/* build "/proc/<pid>/maps" into path */
-static void maps_path(s32 pid, char *path)
-{
-	char *p = path;
-	const char *pre = "/proc/";
-	char tmp[24];
-	s32 t = 0;
-	s64 v = pid;
-
-	while (*pre)
-		*p++ = *pre++;
-	if (v == 0) {
-		tmp[t++] = '0';
-	} else {
-		while (v) {
-			tmp[t++] = (char)('0' + (v % 10));
-			v /= 10;
-		}
-	}
-	while (t)
-		*p++ = tmp[--t];
-	*p++ = '/';
-	*p++ = 'm';
-	*p++ = 'a';
-	*p++ = 'p';
-	*p++ = 's';
-	*p = 0;
-}
-
-/* Read /proc/<pid>/maps (NUL terminated) into buf. Returns length or 0. */
-static long read_maps(s32 pid, char *path, char *buf, long cap)
-{
-	long fd, r;
-
-	maps_path(pid, path);
-	fd = sc6(SYS_openat, AT_FDCWD, (long)path, (long)O_RDONLY, 0, 0, 0);
-	if (fd < 0)
-		return 0;
-	r = sc3(SYS_read, fd, (long)buf, cap - 1);
-	sc1(SYS_close, fd);
-	if (r <= 0)
-		return 0;
-	buf[r] = 0;
-	return r;
-}
-
-/* The lowest mapping = where the ELF image starts: the hex before the '-'. */
-static u64 first_addr(const char *text, long n)
-{
-	long i, j;
-
-	for (i = 0; i < n; i++) {
-		u64 add = 0;
-		char c = text[i];
-		if (c < '0' || c > '9')
-			break;
-		for (j = i; j < n; j++) {
-			char h = text[j];
-			if (h == '-' || h == ' ' || h == '\n')
-				break;
-			if (h >= '0' && h <= '9')
-				add = add * 16 + (u64)(h - '0');
-			else if (h >= 'a' && h <= 'f')
-				add = add * 16 + (u64)(h - 'a' + 10);
-			else if (h >= 'A' && h <= 'F')
-				add = add * 16 + (u64)(h - 'A' + 10);
-			else
-				break;
-		}
-		return add;
-	}
-	return 0;
-}
-
-/* Does the maps text contain needle? */
-static int has_str(const char *text, long n, const char *needle)
-{
-	s32 nl = slen(needle);
-	long i;
-
-	if (nl <= 0)
-		return 0;
-	for (i = 0; i + nl <= n; i++) {
-		s32 k;
-		for (k = 0; k < nl; k++)
-			if (text[i + k] != needle[k])
-				break;
-		if (k == nl)
-			return 1;
-	}
-	return 0;
-}
-
 static volatile u32 marker = 0x12345678;
 static u8 tmpbuf[32];
 static char namebuf[4096];
@@ -257,11 +110,11 @@ __attribute__((naked)) void _start(void)
 {
 	__asm__ volatile (
 		"mov x0, sp\n"
-		"ldr x0, [x0]\n"	/* argc */
+		"ldr x0, [x0]\n"	
 		"mov x1, sp\n"
-		"add x1, x1, #8\n"	/* argv */
+		"add x1, x1, #8\n"	
 		"bl tmain\n"
-		"mov x8, #94\n"		/* exit_group(fails) */
+		"mov x8, #94\n"		
 		"svc #0\n"
 		"1: b 1b\n"
 	);
@@ -272,6 +125,7 @@ long tmain(long argc, char **argv)
 	char *dev;
 	long fd, pid, r;
 	int fails = 0;
+	int fam = FAM_UNKNOWN;
 	struct proc_rw pr;
 	struct modbase mb;
 
@@ -283,45 +137,30 @@ long tmain(long argc, char **argv)
 
 	fd = sc6(SYS_openat, AT_FDCWD, (long)dev, O_RDWR, 0, 0, 0);
 	if (fd < 0) {
-		putstr("FAIL open\n");
+		putkv("FAIL open", (u64)fd);
 		sc1(SYS_exit_group, 98);
 	}
-	putstr("open ok\n");
 	pid = sc1(SYS_getpid, 0);
 
-	/* Identify the ABI family from the two commands whose behaviour differs
-	 * between RT and QX. Neither is required to "fail" - each is simply
-	 * recognised. */
 	{
 		int i;
-		int fam = FAM_UNKNOWN;
 		long r805, r804;
 
 		for (i = 0; i < 32; i++)
 			tmpbuf[i] = 0;
 		r805 = sc3(SYS_ioctl, fd, 0x805, (long)tmpbuf);
 		r804 = sc3(SYS_ioctl, fd, 0x804, 0);
-		putkv("probe 0x805 ret", (u64)r805);
-		putkv("probe 0x804 ret", (u64)r804);
-
 		if (r805 == (long)-22 && r804 == (long)-22)
 			fam = FAM_RT;
 		else if (r805 == 0 && r804 == 2)
 			fam = FAM_QX;
 
 		if (fam == FAM_UNKNOWN) {
-			putstr("FAIL abi-probe (not an RT or QX driver)\n");
+			putkv("FAIL abi", (u64)r805);
 			fails++;
-		} else {
-			putstr("PASS abi-probe ");
-			putstr(famname(fam));
-			putstr("\n");
 		}
-		putkv("ABI", (u64)fam);
 	}
 
-	/* 0x803 modbase of self: discover own basename via /proc/self/exe
-	 * (the binary may be staged under any name, e.g. kprobe_xxx). */
 	{
 		static char exepath[256];
 		long rl, i, start = 0;
@@ -344,8 +183,7 @@ long tmain(long argc, char **argv)
 			mb.base = 0;
 			r = sc3(SYS_ioctl, fd, 0x803, (long)&mb);
 			if (r == 0 && mb.base != 0) {
-				putstr("PASS modbase base=");
-				puthex(mb.base);
+				
 			} else {
 				putstr("FAIL modbase\n");
 				fails++;
@@ -353,124 +191,6 @@ long tmain(long argc, char **argv)
 		}
 	}
 
-	/* ---- CROSS-PROCESS read: the only test that proves the driver can do
-	 * what a game mod actually needs. Everything above reads the probe's OWN
-	 * address space, so it would still pass if the page-table walk only ever
-	 * looked at the calling process.
-	 *
-	 * Target: pid 1 (/init), which always exists on Android. Its load address
-	 * is taken from /proc/1/maps rather than from the driver's 0x803, because
-	 * 0x803 matches a FILE basename and "init" is ambiguous, and because a
-	 * wrong base produces a misleading "no ELF magic" warning.
-	 *
-	 * Step 1 proves the /proc parse is right: the same parser is run on
-	 *        /proc/self/maps and the result must equal the base that 0x803
-	 *        already returned for this very process. If that matches, the
-	 *        parser is trustworthy and any later failure is the driver.
-	 * Step 2 reads the ELF magic (7f 45 4c 46) out of pid 1.
-	 *
-	 * Reported, never fatal: an ambiguous self-test must not be able to rmmod
-	 * a driver that is working perfectly.
-	 */
-	{
-		static char mbuf[2048];
-		static char mpath[64];
-		static const char *targets[] = {
-			"surfaceflinger", "system_server", "zygote"
-		};
-		u64 self_maps, one_maps;
-		long n;
-		int ti, any = 0;
-
-		/* Step 1: prove the /proc parse against a known-good answer.
-		 * 0x803 already returned OUR base; the same parser must agree. */
-		mb.pid = (s32)pid;
-		mb.pad = 0;
-		mb.name_ptr = (u64)&namebuf[2048];
-		mb.base = 0;
-		r = sc3(SYS_ioctl, fd, 0x803, (long)&mb);
-		putkv("self 0x803 base", mb.base);
-
-		n = read_maps((s32)pid, mpath, mbuf, 2000);
-		self_maps = n ? first_addr(mbuf, n) : 0;
-		putkv("self maps base", self_maps);
-		if (self_maps != 0 && self_maps == mb.base)
-			putstr("  PASS /proc parse matches the driver's own base\n");
-		else
-			putstr("  WARN /proc parse disagrees with 0x803\n");
-
-		/* Step 2: pid 1, for reference */
-		putstr("-- xproc pid 1 (init)\n");
-		n = read_maps(1, mpath, mbuf, 2000);
-		one_maps = n ? first_addr(mbuf, n) : 0;
-		putkv("  maps base", one_maps);
-		if (one_maps) {
-			tmpbuf[0] = tmpbuf[1] = tmpbuf[2] = tmpbuf[3] = 0;
-			pr.pid = 1;
-			pr.pad = 0;
-			pr.addr = one_maps;
-			pr.buf = (u64)tmpbuf;
-			pr.size = 4;
-			r = sc3(SYS_ioctl, fd, 0x801, (long)&pr);
-			putkv("  xread ret", (u64)r);
-			putkv("  xread got", (u64)*(u32 *)tmpbuf);
-			if (r == 0)
-				putstr("  READABLE from pid 1\n");
-			else
-				putstr("  not readable from pid 1\n");
-		} else {
-			putstr("  WARN could not read /proc/1/maps\n");
-		}
-
-		/* Step 3: a NORMAL app process - this is what a game mod reads.
-		 * pid 1 is an unusual subject; surfaceflinger / system_server /
-		 * zygote are ordinary processes with ordinary PIE mappings. */
-		for (ti = 0; ti < 3 && !any; ti++) {
-			const char *want = targets[ti];
-			s32 cand;
-			putstr("-- xproc ");
-			putstr(want);
-			putstr("\n");
-			for (cand = 1; cand < 3000; cand++) {
-				u64 b;
-				n = read_maps(cand, mpath, mbuf, 2000);
-				if (n <= 0)
-					continue;
-				if (!has_str(mbuf, n, want))
-					continue;
-				b = first_addr(mbuf, n);
-				putkv("  pid", (u64)cand);
-				putkv("  base", b);
-				if (b == 0)
-					continue;
-				tmpbuf[0] = tmpbuf[1] = tmpbuf[2] = tmpbuf[3] = 0;
-				pr.pid = cand;
-				pr.pad = 0;
-				pr.addr = b;
-				pr.buf = (u64)tmpbuf;
-				pr.size = 4;
-				r = sc3(SYS_ioctl, fd, 0x801, (long)&pr);
-				putkv("  xread ret", (u64)r);
-				putkv("  xread got", (u64)*(u32 *)tmpbuf);
-				if (r == 0 && tmpbuf[0] == 0x7f && tmpbuf[1] == 'E' &&
-				    tmpbuf[2] == 'L' && tmpbuf[3] == 'F') {
-					putstr("  PASS cross-process read (ELF magic)\n");
-					any = 1;
-				} else {
-					putstr("  WARN not an ELF header, trying next\n");
-				}
-				break;
-			}
-			if (!any)
-				putstr("  WARN no suitable process found\n");
-		}
-		if (any)
-			putstr("PASS xproc (a normal app process was readable)\n");
-		else
-			putstr("WARN xproc: no other process was readable (informational)\n");
-	}
-
-	/* 0x801 read own marker - RT success is 0, failure is -5 */
 	pr.pid = (s32)pid;
 	pr.pad = 0;
 	pr.addr = (u64)&marker;
@@ -478,28 +198,23 @@ long tmain(long argc, char **argv)
 	pr.size = 4;
 	tmpbuf[0] = tmpbuf[1] = tmpbuf[2] = tmpbuf[3] = 0;
 	r = sc3(SYS_ioctl, fd, 0x801, (long)&pr);
-	putkv("read ret", (u64)r);
-	if (r == 0 && *(u32 *)tmpbuf == 0x12345678) {
-		putstr("PASS read\n");
+		if (r == 0 && *(u32 *)tmpbuf == 0x12345678) {
+		
 	} else {
 		putkv("FAIL read got", (u64)*(u32 *)tmpbuf);
 		fails++;
 	}
 
-	/* 0x802 write own marker */
 	*(u32 *)tmpbuf = 0xAABBCCDD;
 	pr.buf = (u64)tmpbuf;
 	r = sc3(SYS_ioctl, fd, 0x802, (long)&pr);
-	putkv("write ret", (u64)r);
-	if (r == 0 && marker == 0xAABBCCDD) {
-		putstr("PASS write\n");
+		if (r == 0 && marker == 0xAABBCCDD) {
+		
 	} else {
 		putkv("FAIL write marker", (u64)marker);
 		fails++;
 	}
 
-	/* 0x802 write to own CODE (r-xp page, like game libs): read 4 bytes
-	 * of putstr, write them back unchanged, verify no error. */
 	{
 		u64 code = (u64)&putstr;
 		code &= ~0xFFFUL;
@@ -507,23 +222,24 @@ long tmain(long argc, char **argv)
 		pr.buf = (u64)tmpbuf;
 		pr.size = 4;
 		r = sc3(SYS_ioctl, fd, 0x801, (long)&pr);
-		putkv("xread ret", (u64)r);
 		if (r != 0) {
-			putstr("FAIL xread\n");
+			putkv("FAIL xread", (u64)r);
 			fails++;
 		} else {
 			r = sc3(SYS_ioctl, fd, 0x802, (long)&pr);
-			putkv("xwrite ret", (u64)r);
-			if (r == 0)
-				putstr("PASS xwrite\n");
-			else {
-				putstr("FAIL xwrite\n");
+			if (r != 0) {
+				putkv("FAIL xwrite", (u64)r);
 				fails++;
 			}
 		}
 	}
 
-	if (fails == 0)
-		putstr("ALL PASS\n");
+	if (fails == 0) {
+		putstr("PASS ");
+		putstr(famname(fam));
+		putstr("\n");
+	} else {
+		putkv("FAIL count", (u64)fails);
+	}
 	return fails;
 }

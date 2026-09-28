@@ -12,16 +12,6 @@ import java.io.FileOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
 
-/**
- * In-app auto-update
- * ==================
- * The app looks for its own newer version in the GitHub Releases database,
- * downloads the APK and hands it to the system installer.
- *
- * Release format (drivers branch pipeline / manual):
- *   tag:     "v8-2.3-universal"   -> versionCode = 8
- *   asset:   app-release.apk
- */
 object AppUpdateChecker {
 
     data class UpdateInfo(
@@ -41,7 +31,6 @@ object AppUpdateChecker {
 
     private const val UA = "KernelLoder-Updater/1.0"
 
-    /** Check the GitHub Releases database for a newer build than this one. */
     fun check(apiUrl: String, currentVersionCode: Int): UpdateCheck {
         val text = try {
             val conn = (URL(apiUrl).openConnection() as HttpURLConnection).apply {
@@ -62,7 +51,7 @@ object AppUpdateChecker {
         return try {
             val rel = JSONObject(text)
             val tag = rel.optString("tag_name", "")
-            // versionCode lives in the tag: "v8-2.3-universal" -> 8
+            
             val code = Regex("""v?(\d+)""").find(tag)?.groupValues?.last()?.toIntOrNull()
                 ?: rel.optInt("id", 0)
             if (code <= currentVersionCode) return UpdateCheck.UpToDate
@@ -74,7 +63,7 @@ object AppUpdateChecker {
                 val a = assets.getJSONObject(i)
                 val name = a.optString("name", "")
                 if (name.endsWith(".apk", true)) {
-                    // prefer the release APK over any debug build asset
+                    
                     if (name.contains("release", true) || apkUrl.isBlank()) {
                         apkUrl = a.optString("browser_download_url", "")
                         apkSize = a.optLong("size", 0L)
@@ -100,10 +89,6 @@ object AppUpdateChecker {
         }
     }
 
-    /**
-     * Download the newer APK into cache/updates/ and hand it to the system
-     * installer. Returns a human-readable status message for the console.
-     */
     fun downloadAndInstall(context: Context, info: UpdateInfo, onProgress: (Int) -> Unit = {}): String {
         return try {
             val dir = File(context.cacheDir, "updates").apply { mkdirs() }
@@ -148,7 +133,6 @@ object AppUpdateChecker {
         }
     }
 
-    /** Open the system package installer for the given APK via FileProvider. */
     fun installApk(context: Context, apk: File) {
         val uri = FileProvider.getUriForFile(
             context, "${context.packageName}.fileprovider", apk
@@ -160,13 +144,11 @@ object AppUpdateChecker {
         context.startActivity(intent)
     }
 
-    /** true if the user has granted "install unknown apps" for this app. */
     fun canInstall(context: Context): Boolean =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
             context.packageManager.canRequestPackageInstalls()
         else true
 
-    /** Open the system settings page that grants install permission. */
     fun requestInstallPermission(context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             context.startActivity(

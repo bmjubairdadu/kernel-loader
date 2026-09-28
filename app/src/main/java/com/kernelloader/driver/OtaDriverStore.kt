@@ -7,39 +7,17 @@ import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
 
-/**
- * OTA DRIVER STORE
- * Tiny APK: ships with ZERO (or few fallback) .ko files.
- * Load flow: detect X.Y.Z -> fetch drivers.json -> EXACT download+load,
- * else tell the user "no loader" and offer the nearest same-major force-load.
- * Single-load guard (lsmod check + lock file) prevents double-insmod reboot.
- */
 object OtaDriverStore {
 
-    /**
-     * GitHub driver database.
-     * Primary  : 'drivers' branch of the repo (raw.githubusercontent) - auto-pushed
-     *            by driver/publish_drivers.sh after every build.
-     * Fallback : latest GitHub Release asset (drivers.json).
-     */
     var manifestUrl: String =
         "https://raw.githubusercontent.com/bmjubairdadu/kernel-loder/drivers/drivers.json"
 
     val fallbackManifestUrls: List<String> = listOf(
-        // Fast CDN mirror of the same drivers branch (used when
-        // raw.githubusercontent.com is unreachable on a network).
+        
         "https://cdn.jsdelivr.net/gh/bmjubairdadu/kernel-loder@drivers/drivers.json",
         "https://github.com/bmjubairdadu/kernel-loder/releases/latest/download/drivers.json"
     )
 
-    /**
-     * Driver ABI family. The RT and QX clients use DIFFERENT ioctl codes and
-     * different return conventions, so the wrong family silently "works" but
-     * never returns real data. The manifest therefore tags every driver:
-     *   "rt"  -> RT  ioctl set (0x801/0x802/0x803, returns 0 on success)
-     *   "qx"  -> QX  ioctl set (0x801/0x802, 0x804/0x805 handshake, -1 on failure)
-     *   ""    -> family-agnostic, acceptable for both
-     */
     const val RT = "rt"
     const val QX = "qx"
 
@@ -49,22 +27,16 @@ object OtaDriverStore {
         val sha256: String = "",
         val size: Long = 0L,
         val buildDate: String = "",
-        /** "" (any), "rt" or "qx" - see [RT] / [QX]. */
+        
         val variant: String = ""
     )
 
-    /** Label a variant for the console ("RT", "QX", "any"). */
     fun variantLabel(variant: String): String = when (variant.lowercase()) {
         RT -> "RT"
         QX -> "QX"
         else -> "ANY"
     }
 
-    /**
-     * Does [entry] serve the requested [variant]?
-     * A blank variant means "any" (no preference) and always matches.
-     * An entry with a blank family is generic and matches every variant.
-     */
     fun variantMatches(entry: DriverEntry, variant: String): Boolean {
         val want = variant.trim().lowercase()
         if (want.isEmpty()) return true
@@ -73,7 +45,6 @@ object OtaDriverStore {
         return have == want
     }
 
-    /** All drivers that can serve [variant], best (most specific) family first. */
     fun variantsFor(manifest: Manifest, variant: String): List<DriverEntry> {
         val want = variant.trim().lowercase()
         val exact = manifest.drivers.filter { it.variant.trim().lowercase() == want }
@@ -130,15 +101,9 @@ object OtaDriverStore {
         return ResolveResult.Near(b, bestD)
     }
 
-    /** All driver versions available in the GitHub database, NEWEST BUILD FIRST. */
     fun supportedVersions(manifest: Manifest, variant: String = ""): List<String> =
         supportedEntries(manifest, variant).map { it.version }
 
-    /**
-     * All drivers sorted by build date, NEWEST FIRST - so a freshly published
-     * loader always appears at the top of the app's supported-kernels list.
-     * Entries without a build date go last, sorted by version number descending.
-     */
     fun supportedEntries(manifest: Manifest, variant: String = ""): List<DriverEntry> {
         val pool = variantsFor(manifest, variant)
         val withDate = pool.filter { it.buildDate.isNotBlank() }
@@ -150,7 +115,6 @@ object OtaDriverStore {
         return withDate + withoutDate
     }
 
-    /** The entry that exactly matches the given kernel release, if any. */
     fun exactFor(manifest: Manifest, kernelRelease: String, variant: String = ""): DriverEntry? {
         val short = RootChecker.kernelShortVersion(kernelRelease)
         return variantsFor(manifest, variant).firstOrNull {
@@ -162,11 +126,6 @@ object OtaDriverStore {
         return fetchDetailed(url).first
     }
 
-    /**
-     * Same as [fetchManifest] but also returns a human-readable failure reason
-     * (shown in the console) instead of failing silently, so a connection
-     * problem can actually be diagnosed on the device.
-     */
     fun fetchDetailed(url: String = manifestUrl): Pair<Manifest?, String?> {
         val urls = listOf(url) + fallbackManifestUrls.filter { it != url }
         var lastError = "unknown error"
@@ -182,7 +141,6 @@ object OtaDriverStore {
         return fetchOneDetailed(url).first
     }
 
-    /** Fetch + parse one manifest URL, keeping the exact failure reason. */
     private fun fetchOneDetailed(url: String): Pair<Manifest?, String?> {
         return try {
             val conn = (URL(url).openConnection() as HttpURLConnection).apply {
@@ -211,15 +169,13 @@ object OtaDriverStore {
         }
     }
 
-    /** Parse drivers.json (org.json is built into Android - no extra dependency). */
     private fun parseManifest(text: String): Manifest? {
         return try {
             val obj = JSONObject(text)
             val arr = obj.optJSONArray("drivers") ?: return null
             val drivers = mutableListOf<DriverEntry>()
             for (i in 0 until arr.length()) {
-                // Skip malformed entries instead of killing the whole
-                // database (one bad entry used to break all 90+ drivers).
+                
                 val d = arr.optJSONObject(i) ?: continue
                 val version = d.optString("version", "")
                 val file = d.optString("file", "")

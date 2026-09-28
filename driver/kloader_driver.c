@@ -1,11 +1,3 @@
-/*
- * Kernel Loder - universal kernel driver (any device / any model / any kernel)
- * ---------------------------------------------------------------------------
- * Creates a misc device node + accepts read/write/ioctl so a userspace loader
- * (Kernel Loder app) can confirm the module is alive. The kernel release in the
- * description is replaced at build time for each kernel we ship a build for.
- */
-
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
@@ -61,12 +53,6 @@ static ssize_t kloader_write(struct file *file, const char __user *buf,
 	return count;
 }
 
-/*
- * Universal ioctl shim:
- * The exact ioctl numbers of every vendor driver are unknown, so any ioctl is
- * answered with success (0). Command numbers are logged to dmesg so the real
- * ABI can be reverse engineered later.
- */
 static long kloader_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
 	pr_info(DRIVER_TAG ": ioctl cmd=0x%x arg=0x%lx (shim -> 0)\n", cmd, arg);

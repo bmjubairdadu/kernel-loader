@@ -1,29 +1,4 @@
 #!/bin/bash
-# ============================================================================
-# Kernel Loder - FAILURE WATCH (PC auto-triage)
-# Polls GitHub issues titled [AUTO-REPORT] (sent by the app's Report button),
-# diagnoses each one against driver/out_all + drivers branch, and prints the
-# exact fix command. Run it when you turn the PC on; loop it to watch live.
-#
-# Needs NOTHING manual: GitHub login is reused automatically from the
-# Windows Credential Manager (same account as Git Bash / git push).
-#
-# AUTOSTART (no manual runs): double-click scripts\install_autostart.bat ONCE.
-# From then on, every Windows boot auto-starts this script hidden in the
-# background (watch-autofix mode, checks every 5 min, logs driver/watch.log).
-#
-# What it auto-does:
-#   - lists open [AUTO-REPORT] issues (number, kernel, device, date)
-#   - extracts the kernel X.Y.Z from the issue body
-#   - AUTO-FIX 1: if a loader now exists -> comments + CLOSES the issue
-#   - AUTO-FIX 2: first-seen missing kernel -> posts diagnosis comment
-#     (buildable locally? queued : exact vendor tree needed) - one comment
-#     per issue, never spam, marked <!-- kl-watch -->
-#   - buildable-but-missing kernels are appended to driver/auto_queue.txt
-#     for the build farm (see build_queued.sh hook)
-# Auto-fix scope is honest on purpose: a missing kernel build still needs
-# its exact tree+config - the script tells you the one command to run.
-# ============================================================================
 set -u
 REPO="${REPO:-bmjubairdadu/kernel-loder}"
 PROJ="$(dirname "$(readlink -f "$0")")"
@@ -31,10 +6,6 @@ OUT_ALL="$PROJ/out_all"
 
 command -v curl >/dev/null 2>&1 || apt-get install -y curl 2>&1 | tail -n 1
 
-# Auth with ZERO manual login: GH_TOKEN comes from the Windows launcher
-# (KernelLoderWatch.bat reads the Git Bash login from the Credential
-# Manager and passes it via WSLENV). Direct GCM execution from WSL is
-# flaky, so env-first, exe-second.
 ensure_token() {
   [ -n "${GH_TOKEN:-}" ] && return 0
   local GCM="/mnt/c/Program Files/Git/mingw64/bin/git-credential-manager.exe"
@@ -46,14 +17,13 @@ ensure_token() {
   return 1
 }
 
-# GET issues JSON (open only) into a file.
 api_issues() {
   curl -s --max-time 25 -H "Authorization: Bearer $GH_TOKEN" \
     -H "Accept: application/vnd.github+json" \
     "https://api.github.com/repos/$REPO/issues?state=open&per_page=50" -o "$1"
 }
 
-api_comment() {  # $1=num $2=body
+api_comment() {
   python3 - "$1" "$2" <<'PY' > /tmp/_cm.json
 import json, sys
 print(json.dumps({"body": sys.argv[2]}))
@@ -64,22 +34,19 @@ PY
     "https://api.github.com/repos/$REPO/issues/$1/comments" >/dev/null
 }
 
-api_close() {  # $1=num
+api_close() {
   curl -s --max-time 25 -X PATCH -H "Authorization: Bearer $GH_TOKEN" \
     -H "Accept: application/vnd.github+json" -H "Content-Type: application/json" \
     --data '{"state":"closed","state_reason":"completed"}' \
     "https://api.github.com/repos/$REPO/issues/$1" >/dev/null
 }
 
-api_comments() {  # $1=num -> bodies
+api_comments() {
   curl -s --max-time 25 -H "Authorization: Bearer $GH_TOKEN" \
     -H "Accept: application/vnd.github+json" \
     "https://api.github.com/repos/$REPO/issues/$1/comments?per_page=30"
 }
 
-# Versions this PC can build without hunting vendor trees:
-#  - mainline releases listed in driver/versions.txt (kernel.org farm)
-#  - daisy family via /root/daisy337 (your own 4.9.337 tree)
 is_buildable() {
   local short="$1"
   grep -qx "$short" "$PROJ/versions.txt" 2>/dev/null && return 0
@@ -89,7 +56,6 @@ is_buildable() {
   return 1
 }
 
-# One autofix pass: close fixed issues, comment new ones once, queue builds.
 autofix_pass() {
   echo "=== $(date '+%F %T') : autofix pass ==="
   ensure_token || { echo "no GitHub token (Git Bash login missing?)"; return 1; }
@@ -137,7 +103,7 @@ PY
   done
 }
 
-MODE="${1:-once}"   # once | watch | watch-autofix
+MODE="${1:-once}"
 SLEEP_SECS="${2:-300}"
 LOG="$PROJ/watch.log"
 

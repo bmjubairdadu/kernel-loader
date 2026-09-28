@@ -1,17 +1,4 @@
 #!/bin/bash
-# ============================================================================
-# Kernel Loder - UNIVERSAL .ko FACTORY (WSL)
-# Builds kloader_driver.ko for EVERY kernel.org release in versions.txt.
-#  - native Daisy device builds (4.9.337 / 4.9.307) stay shipped as-is AND the
-#    pipeline also builds mainline uni_4.9.337 / uni_4.9.307 for other phones
-#    with the same X.Y.Z (the loader only prefers the Daisy build on a real
-#    Daisy kernel)
-#  - skips versions whose source tarball does not exist on kernel.org (404)
-#  - per-version: defconfig (MODVERSIONS/SIG/BTF off -> loadable on ANY device
-#    with the same X.Y.Z), modules_prepare, module build, vermagic check,
-#    copy to app assets as uni_<ver>.ko, then delete the tree to save disk.
-#  - 3 parallel workers via flock queue; every step logged.
-# ============================================================================
 set -u
 PROJ=/mnt/c/Users/Administrator/Downloads/DaisyDiverLoder
 OUT=$PROJ/driver/out_all
@@ -27,10 +14,6 @@ mkdir -p "$OUT" "$LOGDIR" "$WORK"
 
 log(){ echo "$(date +%m-%d\ %H:%M:%S) $*" >> "$STATUS"; }
 
-# ---------- deps ----------
-# Only touch apt when something is actually missing. The archive mirrors are often
-# unreachable from WSL, and a bare `apt-get update` then retries for minutes while
-# every package we need is already installed - which stalled a whole relaunch.
 export DEBIAN_FRONTEND=noninteractive
 have_all=1
 for t in bc bison flex curl xz git; do
@@ -44,7 +27,6 @@ else
     || log "SETUP: apt FAILED (continuing, deps may already exist)"
 fi
 
-# ---------- toolchains ----------
 if [ ! -x "$TOOL/gcc49/bin/aarch64-linux-android-gcc" ]; then
   log "TOOLCHAIN: cloning LineageOS gcc 4.9 (aarch64)..."
   git clone --depth=1 https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-android-4.9 "$TOOL/gcc49" >> $LOGDIR/toolchain.log 2>&1 \
@@ -55,7 +37,6 @@ if [ ! -x "$TOOL/proton/bin/clang" ] && ! command -v clang >/dev/null 2>&1; then
   apt-get install -y clang lld >> $LOGDIR/deps.log 2>&1 || log "TOOLCHAIN: apt clang FAILED"
 fi
 
-# ---------- queue ----------
 tr -d '\r' < "$VFILE" > "$QUEUE"
 touch "$LOCK"
 
@@ -68,22 +49,13 @@ build_one(){
   [ -f "$OUT/uni_$VER.ko" ] && { log "SKIP-DONE  $VER"; return 0; }
   [ -f "$ASSETS/uni_$VER.ko" ] && { log "SKIP-DONE  $VER"; return 0; }
 
-  # mainline arm64 starts at 3.7, so 3.0..3.6 can never produce an arm64 module.
-  # This check used to sit AFTER the download, so every one of those versions wasted
-  # a full (throttled, ~20 min) tarball fetch before being skipped. Do it first.
   if [ "$MAJOR" -eq 3 ]; then
     local MINOR3=${VER#3.}; MINOR3=${MINOR3%%.*}
     [ "$MINOR3" -lt 7 ] && { log "SKIP-NOARM64 $VER (mainline arm64 starts at 3.7)"; return 2; }
   fi
 
   local URL="https://cdn.kernel.org/pub/linux/kernel/v${MAJOR}.x/linux-$VER.tar.xz"
-  # --- tarball fetch ----------------------------------------------------------
-  # The CDN link is throttled to ~50 KB/s, so one 64 MB tarball takes ~20 min.
-  # The old code had no resume and deleted the partial on failure, so every abort
-  # restarted from zero and was then mislabelled "no source tarball on kernel.org"
-  # (a Windows-side HEAD check proves those URLs answer HTTP 200). Now: validate a
-  # cached tarball, keep + resume partials, verify with xz -t, and report
-  # SKIP-NOSRC only when kernel.org really answers 404/403/410.
+
   if [ -f "$TARBALL" ] && ! xz -t "$TARBALL" >/dev/null 2>&1; then
     log "DISCARD    $VER (cached tarball corrupt/truncated - re-downloading)"
     rm -f "$TARBALL"
@@ -130,7 +102,7 @@ build_one(){
 
   local GCC49=$TOOL/gcc49/bin
   local PROTON=$TOOL/proton/bin
-  # fall back to apt clang if proton clone is missing
+
   [ -x "$PROTON/clang" ] || PROTON=/usr/bin
 
   try_toolchain(){
@@ -150,20 +122,15 @@ build_one(){
       cd "$TREE"
       echo "--- defconfig ---"
       make ARCH=arm64 defconfig                      || exit 1
-      # universal-friendly config: no CRC table, no signing, no BTF/pahole
+
       ./scripts/config -d MODVERSIONS -d MODULE_SIG -d DEBUG_INFO_BTF -e MODULES 2>/dev/null || true
       make ARCH=arm64 olddefconfig                   || exit 1
       echo "--- modules_prepare ---"
-      # HOSTCFLAGS -fcommon: host GCC 10+ defaults to -fno-common which breaks
-      # old-kernel host tools (dtc "multiple definition of yylloc" etc.)
+
       make ARCH=arm64 -j"$(nproc)" modules_prepare HOSTCFLAGS="-O2 -fcommon" || exit 1
       echo "--- module build ---"
       if ! make ARCH=arm64 M="$MD" modules HOSTCFLAGS="-O2 -fcommon"; then
-        # Some arm64 trees (3.14, and 4.2/4.3 with CONFIG_ARM64_ERRATUM_843419) build
-        # modules with -mcmodel=large together with -fPIC, which both GCC and clang
-        # reject ("sorry, unimplemented: code model 'large' with -fpic"). The
-        # workaround exists to emit PLT stubs for the erratum - our driver never runs
-        # that sequence, so drop it and force -fno-pic, then build once more.
+
         if grep -q "code model 'large' with -fpic" "$TLOG" 2>/dev/null; then
           echo "--- PIC RETRY: dropping ARM64 erratum + forcing -fno-pic ---"
           ./scripts/config -d ARM64_ERRATUM_843419 -d ARM64_ERRATUM_845719 2>/dev/null || true
@@ -187,13 +154,12 @@ build_one(){
     grep -q '^BUILD-OK$' "$TLOG"
   }
 
-  # (arm64 availability for 3.0..3.6 is already handled before the download)
   local built=0
   if [ "$MAJOR" -le 4 ]; then
     [ -x "$GCC49/aarch64-linux-android-gcc" ] && \
       try_toolchain gcc49 "PATHPRE=$GCC49:$PATH" CROSS_COMPILE=aarch64-linux-android- && built=1
     if [ $built -eq 0 ] && [ -x "$PROTON/clang" ]; then
-      # clang + gcc49 binutils (old kernels need $(CROSS_COMPILE)ld)
+
       try_toolchain clang "PATHPRE=$PROTON:$GCC49:$PATH" CROSS_COMPILE=aarch64-linux-android- CLANG_TRIPLE=aarch64-linux-android- CC=clang && built=1
     fi
   else

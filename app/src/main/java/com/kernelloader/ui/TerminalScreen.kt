@@ -47,16 +47,37 @@ import androidx.compose.ui.unit.sp
 import com.kernelloader.driver.DriverViewModel
 import com.kernelloader.driver.TerminalLine
 import com.kernelloader.root.RootChecker
+import com.kernelloader.ui.theme.AccentAmber
+import com.kernelloader.ui.theme.AccentBlue
+import com.kernelloader.ui.theme.AccentGreen
+import com.kernelloader.ui.theme.AccentRed
+import com.kernelloader.ui.theme.AccentViolet
+import com.kernelloader.ui.theme.BorderSubtle
+import com.kernelloader.ui.theme.LogCmd
+import com.kernelloader.ui.theme.LogErr
+import com.kernelloader.ui.theme.LogFix
+import com.kernelloader.ui.theme.LogInfo
+import com.kernelloader.ui.theme.LogOk
+import com.kernelloader.ui.theme.LogOut
+import com.kernelloader.ui.theme.LogWarn
+import com.kernelloader.ui.theme.MonoSmall
+import com.kernelloader.ui.theme.MonoTiny
+import com.kernelloader.ui.theme.Surface1
+import com.kernelloader.ui.theme.Surface2
+import com.kernelloader.ui.theme.SurfaceInset
+import com.kernelloader.ui.theme.TextMuted
+import com.kernelloader.ui.theme.TextPrimary
+import com.kernelloader.ui.theme.TextSecondary
 
-private val TERM_BG = Color(0xFF0D1117)
+private val TERM_BG = SurfaceInset
 private val colorsByType = mapOf(
-    "INFO" to Color(0xFF8AB4F8),
-    "CMD"  to Color(0xFFFFD54F),
-    "OUT"  to Color(0xFFE0E0E0),
-    "OK"   to Color(0xFF69F0AE),
-    "ERR"  to Color(0xFFFF5252),
-    "FIX"  to Color(0xFFFFAB40),
-    "WARN" to Color(0xFFFFD54F)
+    "INFO" to LogInfo,
+    "CMD"  to LogCmd,
+    "OUT"  to LogOut,
+    "OK"   to LogOk,
+    "ERR"  to LogErr,
+    "FIX"  to LogFix,
+    "WARN" to LogWarn
 )
 
 @Composable
@@ -72,7 +93,6 @@ fun ConsoleScreen(
     val rootAvailable = remember { RootChecker.isRootAvailable() }
     val kernelVersion = remember { RootChecker.getKernelVersion() }
 
-    // auto-scroll to bottom when new lines arrive
     LaunchedEffect(viewModel.terminalLines.size) {
         if (viewModel.terminalLines.isNotEmpty()) {
             listState.animateScrollToItem(viewModel.terminalLines.size - 1)
@@ -87,13 +107,13 @@ fun ConsoleScreen(
                 .navigationBarsPadding()
                 .padding(12.dp)
         ) {
-            // ---- Header ----
+            
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color(0xFFE0E0E0))
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = TextPrimary)
                 }
                 Text(
                     text = "Kernel Loder Console",
@@ -102,14 +122,13 @@ fun ConsoleScreen(
                 )
                 Spacer(modifier = Modifier.weight(1f))
                 IconButton(onClick = { clipboardManager.setText(AnnotatedString(viewModel.getTerminalText())) }) {
-                    Icon(Icons.Default.Bolt, contentDescription = "Copy terminal", tint = Color(0xFF69F0AE))
+                    Icon(Icons.Default.Bolt, contentDescription = "Copy terminal", tint = AccentGreen)
                 }
                 IconButton(onClick = { viewModel.clearTerminal() }) {
-                    Icon(Icons.Default.Delete, contentDescription = "Clear terminal", tint = Color(0xFFE0E0E0))
+                    Icon(Icons.Default.Delete, contentDescription = "Clear terminal", tint = TextPrimary)
                 }
             }
 
-            // ---- Device status chips ----
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -118,29 +137,27 @@ fun ConsoleScreen(
             ) {
                 Text(
                     text = if (rootAvailable) "ROOT: OK" else "ROOT: MISSING",
-                    color = if (rootAvailable) Color(0xFF69F0AE) else Color(0xFFFF5252),
+                    color = if (rootAvailable) AccentGreen else AccentRed,
                     style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace)
                 )
                 Text(
                     text = "KERNEL: $kernelVersion",
-                    color = Color(0xFFB0BEC5),
+                    color = TextSecondary,
                     style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace)
                 )
             }
 
-            // ---- Busy indicator / current step ----
             if (viewModel.isBusy.value) {
                 LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                 Text(
                     text = ">> ${viewModel.busyStep.value}",
                     style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                    color = Color(0xFFFFAB40)
+                    color = LogWarn
                 )
             }
 
             Spacer(modifier = Modifier.height(6.dp))
 
-            // ---- Terminal body ----
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -159,11 +176,10 @@ fun ConsoleScreen(
                 }
             }
 
-            // ---- Final status ----
             if (viewModel.autoLoadStatus.value.isNotEmpty()) {
                 Text(
                     text = viewModel.autoLoadStatus.value,
-                    color = if (viewModel.autoLoadOk.value == true) Color(0xFF69F0AE) else Color(0xFFFF5252),
+                    color = if (viewModel.autoLoadOk.value == true) AccentGreen else AccentRed,
                     style = MaterialTheme.typography.bodySmall.copy(
                         fontFamily = FontFamily.Monospace,
                         fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
@@ -172,7 +188,6 @@ fun ConsoleScreen(
                 )
             }
 
-            // ---- Quick actions ----
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -183,8 +198,8 @@ fun ConsoleScreen(
                     onClick = { viewModel.autoLoadUniversal(context) },
                     enabled = !viewModel.isBusy.value && rootAvailable,
                     colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
-                        contentColor = Color(0xFF69F0AE),
-                        disabledContentColor = Color(0xFF69F0AE).copy(alpha = 0.4f)
+                        contentColor = AccentGreen,
+                        disabledContentColor = AccentGreen.copy(alpha = 0.4f)
                     )
                 ) {
                     Icon(Icons.Default.Bolt, contentDescription = null)
@@ -195,8 +210,8 @@ fun ConsoleScreen(
                     onClick = { viewModel.verifyModule() },
                     enabled = !viewModel.isBusy.value && rootAvailable,
                     colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
-                        contentColor = Color(0xFF8AB4F8),
-                        disabledContentColor = Color(0xFF8AB4F8).copy(alpha = 0.4f)
+                        contentColor = AccentBlue,
+                        disabledContentColor = AccentBlue.copy(alpha = 0.4f)
                     )
                 ) {
                     Text("VERIFY")
@@ -205,8 +220,8 @@ fun ConsoleScreen(
                     onClick = { viewModel.unloadModule(context) },
                     enabled = !viewModel.isBusy.value && rootAvailable,
                     colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
-                        contentColor = Color(0xFFFF8A65),
-                        disabledContentColor = Color(0xFFFF8A65).copy(alpha = 0.4f)
+                        contentColor = AccentRed,
+                        disabledContentColor = AccentRed.copy(alpha = 0.4f)
                     )
                 ) {
                     Text("UNLOAD")
@@ -215,15 +230,14 @@ fun ConsoleScreen(
                     onClick = { viewModel.memTest() },
                     enabled = !viewModel.isBusy.value && rootAvailable,
                     colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
-                        contentColor = Color(0xFF4DD0E1),
-                        disabledContentColor = Color(0xFF4DD0E1).copy(alpha = 0.4f)
+                        contentColor = AccentViolet,
+                        disabledContentColor = AccentViolet.copy(alpha = 0.4f)
                     )
                 ) {
                     Text("MEM TEST")
                 }
             }
 
-            // ---- Command input ----
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -234,7 +248,7 @@ fun ConsoleScreen(
                     value = input,
                     onValueChange = { input = it },
                     modifier = Modifier.weight(1f),
-                    placeholder = { Text("root command (e.g. dmesg | tail -n 30)", color = Color(0xFF78909C)) },
+                    placeholder = { Text("root command (e.g. dmesg | tail -n 30)", color = TextMuted) },
                     singleLine = true,
                     textStyle = MaterialTheme.typography.bodySmall.copy(
                         fontFamily = FontFamily.Monospace,
@@ -247,7 +261,7 @@ fun ConsoleScreen(
                         input = ""
                     }
                 ) {
-                    Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Run", tint = Color(0xFF69F0AE))
+                    Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Run", tint = AccentGreen)
                 }
             }
         }
@@ -258,7 +272,7 @@ fun ConsoleScreen(
 private fun TerminalLineRow(line: TerminalLine) {
     Text(
         text = "[${line.time}] ${line.text}",
-        color = colorsByType[line.type] ?: Color(0xFFE0E0E0),
+        color = colorsByType[line.type] ?: TextPrimary,
         style = MaterialTheme.typography.bodySmall.copy(
             fontFamily = FontFamily.Monospace,
             fontSize = 12.sp
@@ -266,4 +280,3 @@ private fun TerminalLineRow(line: TerminalLine) {
         modifier = Modifier.padding(vertical = 1.dp)
     )
 }
-

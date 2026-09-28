@@ -15,6 +15,15 @@
 
 #undef noinline	
 
+#define QX_DEFAULT_NAME		"wanbai"
+#define QX_CMD_READ		0x801
+#define QX_CMD_WRITE		0x802
+#define QX_CMD_MOD_BASE		0x803
+#define QX_CMD_HANDSHAKE	0x804
+#define QX_CMD_CLEAR		0x805
+#define QX_CMD_LAST		0x805
+#define QX_HANDSHAKE_MAGIC	666	
+
 typedef struct _COPY_MEMOBY {
 	pid_t		pid;
 	uintptr_t	addr;
@@ -33,55 +42,23 @@ static struct class *mem_tool_class;
 static struct device *mem_tool_device;
 static struct cdev char_dev;
 
-char *devicename = "wanbai";
+static char *devicename = QX_DEFAULT_NAME;
 module_param(devicename, charp, 0644);
-MODULE_PARM_DESC(devicename, "device node name (clients look for /dev/wanbai)");
+MODULE_PARM_DESC(devicename, "/dev node name (clients look for wanbai*)");
 
-static char *devname = "wanbai";
-module_param(devname, charp, 0644);
-MODULE_PARM_DESC(devname, "alias of devicename");
+static char qx_namebuf[256];
 
-#define CMD_PROC_READ	0x801
-#define CMD_PROC_WRITE	0x802
-#define CMD_MOD_BASE	0x803
-
-__attribute__((noinline)) char *get_rand_str(void)
-{
-	static const char tbl[] =
-		"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-	static char string[16];
-	char *str = string;
-	int i, lstr, flag;
-	unsigned int seed;
-
-	get_random_bytes(&seed, sizeof(seed));
-	flag = (int)(seed % 4);
-	lstr = 6 + (int)(seed % 4) + flag;
-	if (lstr > 15)
-		lstr = 15;
-
-	for (i = 0; i < lstr; i++) {
-		get_random_bytes(&seed, sizeof(seed));
-		str[i] = tbl[seed % (sizeof(tbl) - 1)];
-	}
-	str[lstr] = '\0';
-
-	return str;
-}
-
-__attribute__((noinline)) phys_addr_t translate_linear_address(struct mm_struct *mm, uintptr_t va)
+__attribute__((noinline)) phys_addr_t
+translate_linear_address(struct mm_struct *mm, uintptr_t va)
 {
 	pgd_t *pgd;
 	pud_t *pud;
 	pmd_t *pmd;
 	pte_t *pte;
-	uintptr_t page_offset;
 	phys_addr_t page_addr;
 
 	if (!mm)
 		return 0;
-
-	page_offset = va & ~PAGE_MASK;
 
 	pgd = pgd_offset(mm, va);
 	if (!pgd_present(*pgd) || pgd_none(*pgd))
@@ -95,10 +72,8 @@ __attribute__((noinline)) phys_addr_t translate_linear_address(struct mm_struct 
 	if (!pmd_present(*pmd) || pmd_none(*pmd))
 		return 0;
 
-	if (pmd_trans_huge(*pmd)) {
-		page_addr = pmd_page_paddr(*pmd) + (va & ~PMD_MASK);
-		return page_addr;
-	}
+	if (pmd_trans_huge(*pmd))
+		return pmd_page_paddr(*pmd) + (va & ~PMD_MASK);
 
 	pte = pte_offset_kernel(pmd, va);
 	if (!pte || !pte_present(*pte))
@@ -108,7 +83,8 @@ __attribute__((noinline)) phys_addr_t translate_linear_address(struct mm_struct 
 	return page_addr | (va & ~PAGE_MASK);
 }
 
-__attribute__((noinline)) size_t read_physical_address(phys_addr_t pa, void *buffer, size_t size)
+__attribute__((noinline)) size_t
+read_physical_address(phys_addr_t pa, void *buffer, size_t size)
 {
 	void *mapped;
 
@@ -124,11 +100,11 @@ __attribute__((noinline)) size_t read_physical_address(phys_addr_t pa, void *buf
 		return 0;
 	}
 	__iounmap(mapped);
-
 	return size;
 }
 
-__attribute__((noinline)) size_t write_physical_address(phys_addr_t pa, void *buffer, size_t size)
+__attribute__((noinline)) size_t
+write_physical_address(phys_addr_t pa, void *buffer, size_t size)
 {
 	void *mapped;
 
@@ -144,17 +120,17 @@ __attribute__((noinline)) size_t write_physical_address(phys_addr_t pa, void *bu
 		return 0;
 	}
 	__iounmap(mapped);
-
 	return size;
 }
 
-__attribute__((noinline)) bool read_process_memory(pid_t pid, uintptr_t addr, void *buffer, size_t size)
+__attribute__((noinline)) bool
+read_process_memory(pid_t pid, uintptr_t addr, void *buffer, size_t size)
 {
 	struct task_struct *task;
 	struct mm_struct *mm;
 	phys_addr_t pa;
 	size_t count = size, max;
-	int ok = 0;
+	int ok;
 
 	if (!size || !buffer)
 		return false;
@@ -187,13 +163,14 @@ __attribute__((noinline)) bool read_process_memory(pid_t pid, uintptr_t addr, vo
 	return ok ? true : false;
 }
 
-__attribute__((noinline)) bool write_process_memory(pid_t pid, uintptr_t addr, void *buffer, size_t size)
+__attribute__((noinline)) bool
+write_process_memory(pid_t pid, uintptr_t addr, void *buffer, size_t size)
 {
 	struct task_struct *task;
 	struct mm_struct *mm;
 	phys_addr_t pa;
 	size_t count = size, max;
-	int ok = 0;
+	int ok;
 
 	if (!size || !buffer)
 		return false;
@@ -226,7 +203,8 @@ __attribute__((noinline)) bool write_process_memory(pid_t pid, uintptr_t addr, v
 	return ok ? true : false;
 }
 
-static size_t get_module_base(pid_t pid, char *name)
+__attribute__((noinline)) size_t
+get_module_base(pid_t pid, char *name)
 {
 	struct task_struct *task;
 	struct mm_struct *mm;
@@ -259,10 +237,7 @@ static size_t get_module_base(pid_t pid, char *name)
 			continue;
 
 		path_nm = strrchr(path_nm, '/');
-		if (!path_nm)
-			path_nm = buf;
-		else
-			path_nm++;
+		path_nm = path_nm ? path_nm + 1 : buf;
 
 		if (!strcmp(path_nm, name)) {
 			count = vma->vm_start;
@@ -274,57 +249,77 @@ static size_t get_module_base(pid_t pid, char *name)
 	return count;
 }
 
-__attribute__((noinline)) int dispatch_open(struct inode *node, struct file *file)
+__attribute__((noinline)) int
+dispatch_open(struct inode *node, struct file *file)
 {
-	pr_info("kmem: open by %s (pid %d)\n", current->comm,
+	pr_info("kmem_qx: open by %s (pid %d)\n", current->comm,
 		task_pid_nr(current));
 	return 0;
 }
 
-__attribute__((noinline)) int dispatch_close(struct inode *node, struct file *file)
+__attribute__((noinline)) int
+dispatch_close(struct inode *node, struct file *file)
 {
 	return 0;
 }
 
-__attribute__((noinline)) long dispatch_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+__attribute__((noinline)) long
+dispatch_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
 	COPY_MEMOBY cm;
 	MODULE_BASE mb;
-	char name[256];
+	long ret = 0;
+
+	if (cmd < QX_CMD_READ || cmd > QX_CMD_LAST)
+		return 0;
 
 	switch (cmd) {
-	case CMD_PROC_READ: {
+	case QX_CMD_READ:
 		if (copy_from_user(&cm, (void __user *)arg, sizeof(cm)))
-			return -14;
-		
-		if (read_process_memory(cm.pid, cm.addr, cm.buffer, cm.size))
-			return 0;
-		return -5;
-	}
-	case CMD_PROC_WRITE: {
+			return -1;
+		ret = read_process_memory(cm.pid, cm.addr, cm.buffer,
+					  cm.size) ? 0 : -1;
+		break;
+
+	case QX_CMD_WRITE:
 		if (copy_from_user(&cm, (void __user *)arg, sizeof(cm)))
-			return -14;
-		if (write_process_memory(cm.pid, cm.addr, cm.buffer, cm.size))
-			return 0;
-		return -5;
-	}
-	case CMD_MOD_BASE: {
+			return -1;
+		ret = write_process_memory(cm.pid, cm.addr, cm.buffer,
+					   cm.size) ? 0 : -1;
+		break;
+
+	case QX_CMD_MOD_BASE:
 		if (copy_from_user(&mb, (void __user *)arg, sizeof(mb)))
-			return -14;
-		if (copy_from_user(name, (void __user *)mb.name, 255))
-			return -14;
-		name[255] = '\0';
-		mb.base = get_module_base(mb.pid, name);
+			return -1;
+		memset(qx_namebuf, 0, sizeof(qx_namebuf));
+		if (copy_from_user(qx_namebuf, (void __user *)mb.name, 255))
+			return -1;
+		qx_namebuf[255] = '\0';
+		mb.base = get_module_base(mb.pid, qx_namebuf);
 		if (copy_to_user((void __user *)arg, &mb, sizeof(mb)))
-			return -14;
-		return 0;
+			return -1;
+		ret = 0;
+		break;
+
+	case QX_CMD_HANDSHAKE:
+		
+		if (copy_from_user(&cm, (void __user *)arg, sizeof(cm)))
+			return -1;
+		cm.pid = QX_HANDSHAKE_MAGIC;
+		if (copy_to_user((void __user *)arg, &cm, sizeof(cm)))
+			return -1;
+		return 2;
+
+	case QX_CMD_CLEAR:
+		memset(qx_namebuf, 0, sizeof(qx_namebuf));
+		ret = 0;
+		break;
 	}
-	default:
-		return -22;
-	}
+
+	return ret;
 }
 
-struct file_operations dispatch_functions = {
+struct file_operations dispatch_fops = {
 	.owner		= THIS_MODULE,
 	.open		= dispatch_open,
 	.release	= dispatch_close,
@@ -335,31 +330,26 @@ struct file_operations dispatch_functions = {
 	.llseek		= noop_llseek,
 };
 
-static char *kmem_node(struct device *dev, umode_t *mode)
+static char *qx_devnode(struct device *dev, umode_t *mode)
 {
 	if (mode)
 		*mode = 0666;
 	return NULL;
 }
 
-static int __init driver_entry(void)
+static int __init qx_driver_entry(void)
 {
 	int ret;
-	const char *node;
+	const char *node = devicename;
 
-	node = devicename;
 	if (!node || !*node)
-		node = NULL;
-	if (devname && *devname && strcmp(devname, "wanbai"))
-		node = devname;
-	if (!node)
-		node = get_rand_str();
+		node = QX_DEFAULT_NAME;
 
 	ret = alloc_chrdev_region(&mem_tool_dev_t, 0, 1, node);
 	if (ret)
 		return ret;
 
-	cdev_init(&char_dev, &dispatch_functions);
+	cdev_init(&char_dev, &dispatch_fops);
 	char_dev.owner = THIS_MODULE;
 	ret = cdev_add(&char_dev, mem_tool_dev_t, 1);
 	if (ret)
@@ -370,7 +360,7 @@ static int __init driver_entry(void)
 		ret = PTR_ERR(mem_tool_class);
 		goto err_cdev;
 	}
-	mem_tool_class->devnode = kmem_node;
+	mem_tool_class->devnode = qx_devnode;
 
 	mem_tool_device = device_create(mem_tool_class, NULL, mem_tool_dev_t,
 					NULL, node);
@@ -379,7 +369,7 @@ static int __init driver_entry(void)
 		goto err_class;
 	}
 
-	pr_info("kmem: /dev/%s created (major %d). ready.\n",
+	pr_info("kmem_qx: /dev/%s created (major %d). ready.\n",
 		node, MAJOR(mem_tool_dev_t));
 	return 0;
 
@@ -392,7 +382,7 @@ err_region:
 	return ret;
 }
 
-static void __exit driver_unload(void)
+static void __exit qx_driver_unload(void)
 {
 	if (mem_tool_device)
 		device_destroy(mem_tool_class, mem_tool_dev_t);
@@ -400,13 +390,13 @@ static void __exit driver_unload(void)
 		class_destroy(mem_tool_class);
 	cdev_del(&char_dev);
 	unregister_chrdev_region(mem_tool_dev_t, 1);
-	pr_info("kmem: /dev/%s removed\n", devicename);
+	pr_info("kmem_qx: /dev/%s removed\n", devicename);
 }
 
-module_init(driver_entry);
-module_exit(driver_unload);
+module_init(qx_driver_entry);
+module_exit(qx_driver_unload);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("wanbai");
 MODULE_DESCRIPTION("wanbai");
-MODULE_VERSION("2.0-337");
+MODULE_VERSION("2.0-337-qx");

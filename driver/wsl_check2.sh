@@ -1,5 +1,4 @@
 #!/bin/bash
-# Build progress check (writes to a Windows-readable file)
 OUT=/mnt/c/Users/Administrator/Downloads/DaisyDiverLoder/_chk2.txt
 {
   echo "---SCRIPT---"

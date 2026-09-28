@@ -1,5 +1,4 @@
 #!/bin/bash
-# Verify the freshly built universal drivers (vermagic + module name)
 OUT=/mnt/c/Users/Administrator/Downloads/DaisyDiverLoder/_chk5.txt
 PROJ=/mnt/c/Users/Administrator/Downloads/DaisyDiverLoder
 {

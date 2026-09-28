@@ -1,21 +1,5 @@
 package com.kernelloader.driver
 
-/**
- * KERNEL LODER - UNIVERSAL KERNEL COVERAGE
- * ========================================
- * Master list of kernel versions this app supports loading on.
- *
- * 84 kernel releases (3.x -> 7.x). For every version here:
- *  - EXACT bundled module exists  -> clean load (vermagic X.Y.Z matches)
- *  - otherwise                    -> nearest-series bundled module is chosen,
- *                                    its vermagic is binary-patched to the
- *                                    running kernel and the force-load ladder
- *                                    runs (SELinux fix, chmod/chcon, insmod -f,
- *                                    sig_enforce off).
- *
- * Kernel NAME (localversion suffix) NEVER matters - only X.Y.Z numbers do.
- * New .ko files dropped into assets/drivers are picked up automatically.
- */
 object KernelCoverage {
 
     val supportedSeries: Map<String, List<String>> = mapOf(
@@ -49,9 +33,7 @@ object KernelCoverage {
         )
     )
 
-    /** Flat list of every covered kernel release. */
     val all: List<String> get() = supportedSeries.values.flatten()
 
-    /** Number of covered kernel releases (for UI/log display). */
     val count: Int get() = all.size
 }

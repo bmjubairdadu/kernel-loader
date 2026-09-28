@@ -21,28 +21,8 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-/**
- * UNIVERSAL KERNEL LOADER
- * ========================
- * This app loads a kernel module (.ko) on ANY rooted device.
- *
- * How it works:
- * 1. User presses the LOAD button
- * 2. App detects running kernel version (uname -r)
- * 3. OTA: exact-match .ko is downloaded from the GitHub driver database
- *    (fallback: best embedded match in assets/drivers/ + vermagic auto-patch)
- * 4. Module is loaded via insmod through the root shell (+ auto-fix ladder)
- * 5. Every step is printed in the Kernel Loder console (copyable)
- */
 object EmbeddedDrivers {
-    // Asset path helpers
-
-    /**
-     * Returns list of available embedded drivers with their versions.
-     * Scans assets/drivers dynamically. Any *.ko dropped into assets/drivers is
-     * picked up automatically - prefix (native_ / qx_ / rt_ / anything) is only
-     * a label. Files without an underscore are used as-is.
-     */
+    
     fun getAvailableDrivers(context: Context): List<DriverInfo> {
         val drivers = mutableListOf<DriverInfo>()
         val names = try {
@@ -57,8 +37,7 @@ object EmbeddedDrivers {
             val prefix = if (idx == -1) "" else base.substring(0, idx).uppercase(Locale.US)
             val type = if (idx == -1) "KERNEL" else prefix
             val version = if (idx == -1) base else base.substring(idx + 1)
-            // RT_ / rt- / QX_ / qx- all map onto the two driver families the
-            // game-mod clients actually speak.
+            
             val variant = when {
                 prefix.startsWith("RT") -> OtaDriverStore.RT
                 prefix.startsWith("QX") -> OtaDriverStore.QX
@@ -88,14 +67,10 @@ object EmbeddedDrivers {
         ))
     }
 
-    /**
-     * Read the REAL kernel release out of a .ko's vermagic string.
-     * Prefix of the asset name is irrelevant - this is what the kernel checks.
-     */
     fun readVermagic(context: Context, assetPath: String): String {
         return try {
             val bytes = context.resources.assets.open(assetPath).use { input ->
-                val buf = ByteArray(1 shl 20)          // up to 1 MB is enough
+                val buf = ByteArray(1 shl 20)          
                 val n = input.read(buf)
                 if (n <= 0) ByteArray(0) else buf.copyOf(n)
             }
@@ -127,7 +102,7 @@ data class DriverInfo(
     val filename: String,
     val displayName: String,
     val description: String,
-    /** "" (any), "rt" or "qx" - which game-mod client ABI this driver speaks. */
+    
     val variant: String = ""
 )
 
@@ -141,7 +116,7 @@ data class LogEntry(
 
 data class VerificationResult(
     val lsmod: List<String> = emptyList(),
-    val deviceNodeFound: Boolean = false,     // true when ANY /dev node from the module showed up
+    val deviceNodeFound: Boolean = false,     
     val dmesgLogs: List<String> = emptyList(),
     val timestamp: String = "",
     val kernelRelease: String = "",
@@ -151,11 +126,11 @@ data class VerificationResult(
 data class TerminalLine(
     val time: String,
     val text: String,
-    val type: String = "INFO"  // INFO, CMD, OUT, OK, ERR, FIX, WARN
+    val type: String = "INFO"  
 )
 
 class DriverViewModel : ViewModel() {
-    /** /dev node the game-mod clients hardcode. See [preferredDevNode]. */
+    
     val DEFAULT_DEV_NODE = "wanbai"
     var devNodeOverride = mutableStateOf("")
 
@@ -164,44 +139,33 @@ class DriverViewModel : ViewModel() {
     val logs = mutableStateListOf<LogEntry>()
     var verificationResult = mutableStateOf<VerificationResult?>(null)
 
-    // ---- Universal Terminal state ----
     val terminalLines = mutableStateListOf<TerminalLine>()
     var isBusy = mutableStateOf(false)
     var busyStep = mutableStateOf("")
-    var autoLoadStatus = mutableStateOf("")   // final one-line result
+    var autoLoadStatus = mutableStateOf("")   
     var autoLoadOk = mutableStateOf<Boolean?>(null)
 
-    // ---- OTA (GitHub driver database) state ----
     var remoteManifest = mutableStateOf<OtaDriverStore.Manifest?>(null)
-    var manifestStatus = mutableStateOf("IDLE")   // IDLE / LOADING / OK / EMPTY / OFFLINE
+    var manifestStatus = mutableStateOf("IDLE")   
 
-    // ---- Driver runtime state ----
-    /** The real lsmod name of the driver we loaded ("", "kmem_337", "entryi", ...). */
     var loadedModuleName = mutableStateOf("")
-    /** True when a memory driver is present in /proc/modules. */
+    
     var driverLoaded = mutableStateOf(false)
-    /** Human-readable module list, for the home screen. */
+    
     var driverModule = mutableStateOf("")
-    /** Boot auto-load (Magisk service.d) is installed. */
+    
     var autoloadEnabled = mutableStateOf(false)
 
-    /** Remember the module name discovered after a load (and after an unload). */
     fun setLoadedModule(name: String) {
         if (loadedModuleName.value != name) loadedModuleName.value = name
         driverLoaded.value = name.isNotBlank()
     }
 
-    // ---- In-app auto-update (GitHub Releases database) state ----
     var appUpdate = mutableStateOf<AppUpdateChecker.UpdateInfo?>(null)
-    var updateStatus = mutableStateOf("IDLE")     // IDLE / CHECKING / NONE / AVAILABLE / DOWNLOADING / DONE / ERROR
-    var updateProgress = mutableStateOf(-1)       // 0..100 while DOWNLOADING, -1 otherwise
+    var updateStatus = mutableStateOf("IDLE")     
+    var updateProgress = mutableStateOf(-1)       
     var updateMsg = mutableStateOf("")
 
-    /**
-     * Auto-update check: compare our versionCode with the newest GitHub
-     * Release. Runs automatically on app open; console-logged like everything
-     * else so the user always sees what is happening.
-     */
     fun checkForAppUpdate() {
         if (updateStatus.value == "CHECKING" || updateStatus.value == "DOWNLOADING") return
         updateStatus.value = "CHECKING"
@@ -234,7 +198,6 @@ class DriverViewModel : ViewModel() {
         }
     }
 
-    /** Download the newer APK from GitHub and open the system installer. */
     fun installAppUpdate(context: Context) {
         val info = appUpdate.value ?: return
         updateStatus.value = "DOWNLOADING"
@@ -261,11 +224,6 @@ class DriverViewModel : ViewModel() {
         }
     }
 
-    /**
-     * Fetch drivers.json from the GitHub database so the UI can show every
-     * kernel version that has a loader available. Runs automatically when the
-     * app opens and can be pulled to refresh manually.
-     */
     fun refreshManifest() {
         manifestStatus.value = "LOADING"
         tlog("DB: connecting to driver database...", "INFO")
@@ -330,7 +288,6 @@ class DriverViewModel : ViewModel() {
         return terminalLines.joinToString("\n") { "[${it.time}] ${it.text}" }
     }
 
-    /** Driverless memory engine self-test (root + /proc/pid/mem, no .ko). */
     fun memTest() {
         viewModelScope.launch {
             tlog("# memtest (driverless, no driver needed)", "CMD")
@@ -348,7 +305,6 @@ class DriverViewModel : ViewModel() {
         }
     }
 
-    /** Run a user-typed command in the root shell and stream result into the terminal */
     fun runUserCommand(cmd: String) {
         val c = cmd.trim()
         if (c.isEmpty()) return
@@ -371,12 +327,6 @@ class DriverViewModel : ViewModel() {
         }
     }
 
-    /**
-     * OTA auto-load: try to fetch an exact-match .ko from the OTA manifest first.
-     * [variant] selects the ABI family ("rt" / "qx") so the RT button never
-     * installs a QX driver (they would load but every read would fail).
-     * Returns true if a driver was downloaded and loaded.
-     */
     private suspend fun runOtaLoad(context: Context, variant: String = ""): Boolean {
         tlog("OTA: checking manifest...", "INFO")
         if (variant.isNotBlank()) {
@@ -412,12 +362,12 @@ class DriverViewModel : ViewModel() {
                     "OTA: no exact match; nearest loader = $target (distance ${resolved.distance})",
                     "WARN"
                 )
-                // ---------- REBOOT GUARD 1: force-load only on same major.minor ----------
+                
                 if (!SafetyGuard.canForceLoad(kernel, target)) {
                     SafetyGuard.refusalLines(kernel, target).forEach { tlog(it.first, it.second) }
                     return false
                 }
-                // ---------- REBOOT GUARD 2: load nothing when the kernel is already sick ----------
+                
                 if (SafetyGuard.kernelLooksUnstable()) {
                     SafetyGuard.unstableLines().forEach { tlog(it.first, it.second) }
                     return false
@@ -457,13 +407,8 @@ class DriverViewModel : ViewModel() {
             val kernel = RootChecker.getKernelRelease() ?: return false
             tlog("OTA: loading ${downloaded.name} ($kernel)...", "INFO")
 
-            // ---------- STAGING: app-private files/ is not openable by insmod
-            // on many ROMs ("No such file or directory" even though the file
-            // exists). Stage to /data/local/tmp like the embedded path. ------
             val staged = File("/data/local/tmp/kloader_ota.ko")
-            // MUST be the fixed /dev/wanbai, never a random name: the game-mod
-            // clients hardcode that path, and a devname= parameter makes the
-            // driver remove /dev/wanbai. See preferredDevNode().
+            
             val devNode = preferredDevNode()
             Shell.cmd(
                 "cp \"${downloaded.absolutePath}\" ${staged.absolutePath}",
@@ -476,41 +421,28 @@ class DriverViewModel : ViewModel() {
                 tlog("OTA: staging to /data/local/tmp failed - cannot load", "ERR")
                 return false
             }
-            tlog("OTA: staged ${staged.absolutePath} (/dev/$devNode)", "OK")
-            // Stale cleanup first: a leftover module from an earlier boot
-            // session answers "File exists" to every insmod.
+            
             Shell.cmd("rmmod kmem_337 2>/dev/null", "sleep 1").exec()
             try {
 
-            // ---------- REBOOT GUARD 3: baseline of loaded modules ----------
             val before = SafetyGuard.loadedModuleNames()
-            if (before.isNotEmpty()) {
-                tlog("SAFETY: baseline modules = ${before.size} (rescue rmmod ready)", "INFO")
-            }
 
-            // If the .ko was built for another release, patch vermagic first
-            // (mismatched vermagic => kernel rejects, or panic when forced).
             val vermagic = try { UniversalKernelLoader.readVermagic(downloaded) } catch (e: Exception) { null }
             if (vermagic != null &&
                 RootChecker.kernelShortVersion(vermagic) != RootChecker.kernelShortVersion(kernel)
             ) {
-                tlog("FIX: vermagic \"$vermagic\" != device \"$kernel\" - patching", "FIX")
                 if (UniversalKernelLoader.patchVermagic(downloaded, kernel)) {
-                    tlog("FIX: vermagic patched OK -> \"$kernel\"", "OK")
-                    // Re-stage: insmod runs from the staged copy, not the download.
+                    tlog("OTA: vermagic patched for $kernel", "FIX")
+                    
                     Shell.cmd(
                         "cp \"${downloaded.absolutePath}\" ${staged.absolutePath}",
                         "chmod 644 ${staged.absolutePath}"
                     ).exec()
                 } else {
-                    tlog("FIX: vermagic patch failed (string too long) - will try force-load", "WARN")
+                    tlog("OTA: vermagic patch failed (string too long) - trying force-load", "WARN")
                 }
             }
 
-            // ---------- insmod ladder: every binary x every arg form ----------
-            // This device's default insmod says "No such file" for a file
-            // that provably exists, so try explicit binaries (/system,
-            // /vendor, busybox) with and without devname= / -f, and log each.
             val bins = listOf(
                 "/system/bin/insmod", "/vendor/bin/insmod", "insmod",
                 "/data/adb/magisk/busybox insmod", "busybox insmod"
@@ -525,17 +457,23 @@ class DriverViewModel : ViewModel() {
                 }
             }
             var res = Shell.cmd("true").exec()
+            
+            val tried = mutableListOf<String>()
             for (cmd in forms) {
                 res = Shell.cmd(cmd).exec()
-                val oneLine = (res.out + res.err).firstOrNull { it.isNotBlank() } ?: ""
-                tlog("TRY: $cmd -> exit ${res.code} $oneLine", if (res.isSuccess) "OK" else "INFO")
-                if (res.isSuccess) break
+                if (res.isSuccess) {
+                    val how = cmd.substringBefore(' ').substringAfterLast('/')
+                    tlog("OTA: loaded via $how", "OK")
+                    break
+                }
+                tried += "$cmd -> exit ${res.code} ${(res.out + res.err).firstOrNull { it.isNotBlank() } ?: ""}".trim()
             }
 
             if (!res.isSuccess) {
+                tried.forEach { tlog("TRY: $it", "INFO") }
                 tlog("OTA: insmod failed (exit ${res.code})", "ERR")
                 val errText = (res.out + res.err).joinToString("\n")
-                // One-shot environment dump so the exact cause is visible.
+                
                 Shell.cmd(
                     "ls -l /system/bin/insmod /vendor/bin/insmod 2>&1",
                     "for b in /system/bin/insmod /vendor/bin/insmod; do echo \"== \$b\"; \$b 2>&1 | head -n 3; done",
@@ -557,10 +495,9 @@ class DriverViewModel : ViewModel() {
             }
 
             tlog("OTA: insmod OK (exit ${res.code})", "OK")
-            // ueventd resets fresh nodes to 0600 root - force world R/W.
+            
             Shell.cmd("chmod 666 /dev/$devNode 2>/dev/null").exec()
 
-            // ---------- REBOOT GUARD 4: post-load health check + rescue ----------
             waitForStability()
             if (SafetyGuard.kernelLooksUnstable()) {
                 tlog("SAFETY: kernel unstable after load (panic/oops signature caught)", "ERR")
@@ -607,24 +544,19 @@ class DriverViewModel : ViewModel() {
                 return false
             }
 
-            // The node the game client opens must exist AND be world R/W. The
-            // embedded path already did this in verifyLoad(); the OTA path did
-            // not, so a driver loaded from GitHub left /dev/wanbai at devtmpfs's
-            // default 0600 root - readable by the self-test (which runs as root)
-            // and invisible to a game app running as its own uid.
             tstep("Checking /dev/$devNode...")
             val nodes = Shell.cmd("ls /dev 2>/dev/null").exec().out.map { it.trim() }
             if (nodes.any { it == devNode }) {
                 Shell.cmd("chmod 666 /dev/$devNode 2>/dev/null").exec()
                 val mode = Shell.cmd("ls -l /dev/$devNode 2>/dev/null").exec().out.firstOrNull()?.trim().orEmpty()
-                tlog("NODE: /dev/$devNode exists -> $mode", "OK")
-                if (!mode.contains("rw-rw-rw-")) {
-                    tlog("NODE: WARN not 666 - the game app may be refused access", "WARN")
+                if (mode.contains("rw-rw-rw-")) {
+                    tlog("NODE: /dev/$devNode ready (world R/W)", "OK")
+                } else {
+                    tlog("NODE: /dev/$devNode present but not 666 - a game app may be refused", "WARN")
                 }
-                tlog("NODE: this is the exact path Aincrad / Angry Mod open", "INFO")
             } else {
-                tlog("NODE: /dev/$devNode is MISSING - the game apps cannot use this load", "ERR")
-                tlog("NODE: present instead: ${nodes.filter { it.contains("kmem") || it.contains("kloader") || it.contains("entryi") || it.contains("wanbai") }}", "ERR")
+                tlog("NODE: /dev/$devNode is MISSING - game apps cannot use this load", "ERR")
+                tlog("NODE: instead: ${nodes.filter { it.contains("kmem") || it.contains("kloader") || it.contains("entryi") || it.contains("wanbai") }}", "ERR")
                 withContext(Dispatchers.Main) {
                     autoLoadOk.value = false
                     autoLoadStatus.value = "/dev/$devNode missing"
@@ -642,7 +574,6 @@ class DriverViewModel : ViewModel() {
         }
     }
 
-    /** Small settle window so dmesg can show a problem before we call it a success. */
     private suspend fun waitForStability() {
         withContext(Dispatchers.IO) { try { Thread.sleep(900) } catch (e: InterruptedException) { } }
     }
@@ -650,13 +581,6 @@ class DriverViewModel : ViewModel() {
     private val _forceNote: String
         get() = "nearest-series loader, restart guard active"
 
-    /**
-     * UNIVERSAL AUTO-LOAD:
-     * - Works on old & new kernels
-     * - Auto-fixes problems (SELinux, permissions, vermagic mismatch, force-load)
-     * - Auto-picks best embedded driver if no file is picked
-     * - Streams every step into the terminal
-     */
     fun autoLoadUniversal(context: Context, preferOta: Boolean = true, variant: String = "") {
         if (isBusy.value) return
         isBusy.value = true
@@ -713,13 +637,11 @@ class DriverViewModel : ViewModel() {
             } catch (e: Exception) { "" }
 
             val lsmodRes = Shell.cmd("lsmod").exec()
-            // Module names = first column of lsmod (skip header). Any device/model works.
+            
             val moduleNames = lsmodRes.out.drop(1)
                 .map { it.trim().split(Regex("\\s+")).firstOrNull() ?: "" }
                 .filter { it.isNotBlank() && it != "Module" }
 
-            // The device node name is chosen by the module itself, so first look for
-            // /dev entries matching a loaded module name, then fall back to known tags.
             val devList = Shell.cmd("ls /dev 2>/dev/null").exec().out
             val matchedNodes = devList.filter { node ->
                 moduleNames.any { m -> node.contains(m, ignoreCase = true) }
@@ -743,6 +665,14 @@ class DriverViewModel : ViewModel() {
                 loadedModules = moduleNames.size
             )
 
+            val ours = knownDriverModules().filter { it in moduleNames }
+            if (ours.isNotEmpty()) {
+                setLoadedModule(ours.first())
+                driverModule.value = ours.joinToString(", ")
+            } else {
+                setLoadedModule("")
+            }
+
             addLog("lsmod", lsmodRes.out, lsmodRes.err, lsmodRes.code)
             addLog("ls /dev/<matching module nodes>", devRes.out, devRes.err, devRes.code)
             addLog("dmesg | grep module", dmesgRes.out, dmesgRes.err, dmesgRes.code)
@@ -755,55 +685,20 @@ class DriverViewModel : ViewModel() {
         addLog("File picked: ${pickedFileName.value}", emptyList(), emptyList(), 0)
     }
 
-    /**
-     * Module names this app is allowed to touch. A kernel module's lsmod name
-     * is baked in at BUILD time (KBUILD_MODNAME / .modinfo "name=") and is
-     * unrelated to the .ko file name:
-     *
-     *   rt_4.9.337-DaisyForGaming.ko  -> kmem_337
-     *   qx_4.9.337-DaisyForGaming.ko  -> kmem_337_qx
-     *   rt_4.14.117.ko                -> 5.10_A12
-     *   qx_4.14.117.ko                -> entryi
-     *
-     * The list is seeded with the names seen in this driver's own builds; the
-     * authoritative one is whatever the lsmod diff reports at load time, which
-     * is what [loadedModuleName] holds. UNLOAD only ever rmmods a name from
-     * this set - never "the last module in lsmod", which could be an unrelated
-     * driver (touching that can take the phone's camera, touch, wifi, ... down).
-     */
     private val KNOWN_DRIVER_MODULES = listOf(
         "kmem_337", "kmem_337_qx", "kmem", "entryi", "kloader",
         "5.10_A12", "wanbai", "daisy"
     )
 
-    /** Every driver module name we may inspect or unload. */
     fun knownDriverModules(): List<String> =
         (KNOWN_DRIVER_MODULES + loadedModuleName.value).filter { it.isNotBlank() }.distinct()
 
-    /**
-     * Unload the memory driver. ONLY unloads - it never installs, never
-     * patches a vermagic and never reboots. Returns the module it removed.
-     */
-    /**
-     * The /dev node to ask the driver to register.
-     *
-     * The game-mod clients (Aincrad 3.7, Angry Mod V1) open a hardcoded path.
-     * Reversing them showed the string `/dev` immediately followed by
-     * `wanbai` and a `%s/%s` format, i.e. they build `/dev/wanbai` and open
-     * that - with no discovery step and no way to be told a different name.
-     *
-     * So this must stay "wanbai". It was previously a random 8-letter string
-     * "so anti-cheat cannot fingerprint it", which made the driver unlink
-     * /dev/wanbai and create the random node instead: the load appeared to
-     * succeed while the game apps could not open anything at all.
-     */
     fun preferredDevNode(): String = if (devNodeOverride.value.isNotBlank()) {
         devNodeOverride.value.trim()
     } else {
         DEFAULT_DEV_NODE
     }
 
-    /** Remember the last node we actually verified on /dev, for the next load. */
     fun rememberDevNode(node: String) {
         if (node.isNotBlank() && node != DEFAULT_DEV_NODE) devNodeOverride.value = node.trim()
     }
@@ -814,12 +709,11 @@ class DriverViewModel : ViewModel() {
             withContext(Dispatchers.IO) {
                 try {
                     val loaded = SafetyGuard.loadedModuleNames()
-                    // 1. prefer the name this app actually loaded
+                    
                     val remembered = loadedModuleName.value
-                    // 2. otherwise any known driver module the kernel holds
+                    
                     val known = knownDriverModules().filter { it in loaded }
-                    // NEVER fall back to "some other module" - unloading a
-                    // module we did not install can disable an unrelated driver.
+                    
                     val target = when {
                         remembered.isNotBlank() && remembered in loaded -> remembered
                         known.isNotEmpty() -> known.first()
@@ -837,7 +731,7 @@ class DriverViewModel : ViewModel() {
                     tlog("UNLOAD: rmmod '$target'", "INFO")
                     var res = Shell.cmd("rmmod $target").exec()
                     if (!res.isSuccess) {
-                        // busybox fallback (some ROMs ship a broken rmmod)
+                        
                         res = Shell.cmd(
                             "BB=\$(command -v busybox); [ -z \"\$BB\" ] && BB=/data/adb/magisk/busybox; \$BB rmmod $target"
                         ).exec()
@@ -865,7 +759,6 @@ class DriverViewModel : ViewModel() {
         }
     }
 
-    /** Turn boot auto-load on/off. The .ko was staged by the last successful load. */
     fun setBootAutoload(context: Context, on: Boolean) {
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
@@ -898,7 +791,6 @@ class DriverViewModel : ViewModel() {
         }
     }
 
-    /** Re-read the real driver state from the kernel (called at screen open). */
     fun refreshDriverState(context: Context) {
         viewModelScope.launch(Dispatchers.IO) {
             DriverAutoload.state(context)
@@ -911,10 +803,6 @@ class DriverViewModel : ViewModel() {
         }
     }
 
-    /**
-     * Non-numeric tokens of a .ko file name - used to locate the module in lsmod,
-     * because a module's internal name can differ from the .ko file name.
-     */
     private fun nameTokens(fileName: String?): List<String> {
         val base = (fileName ?: "").removeSuffix(".ko")
         val tokens = base.split('_', '-', '.').filter { it.length >= 3 && it.any { c -> !c.isDigit() } }

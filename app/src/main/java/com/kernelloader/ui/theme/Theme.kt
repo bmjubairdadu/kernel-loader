@@ -12,42 +12,63 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
 
 private val DarkColorScheme = darkColorScheme(
-    primary = PrimaryDark,
-    onPrimary = OnPrimaryDark,
-    primaryContainer = PrimaryContainerDark,
-    onPrimaryContainer = OnPrimaryContainerDark,
-    secondary = SecondaryDark,
-    onSecondary = OnSecondaryDark,
-    secondaryContainer = SecondaryContainerDark,
-    onSecondaryContainer = OnSecondaryContainerDark,
-    tertiary = TertiaryDark,
-    onTertiary = OnTertiaryDark,
-    tertiaryContainer = TertiaryContainerDark,
-    onTertiaryContainer = OnTertiaryContainerDark,
-    background = BackgroundDark,
-    surface = SurfaceDark
+    primary = AccentGreen,
+    onPrimary = TextOnAccent,
+    primaryContainer = FamilyRtDeep,
+    onPrimaryContainer = AccentGreen,
+
+    secondary = AccentBlue,
+    onSecondary = TextOnAccent,
+    secondaryContainer = Surface2,
+    onSecondaryContainer = AccentBlue,
+
+    tertiary = AccentViolet,
+    onTertiary = TextOnAccent,
+    tertiaryContainer = Surface3,
+    onTertiaryContainer = AccentViolet,
+
+    background = Surface0,
+    onBackground = TextPrimary,
+    surface = Surface1,
+    onSurface = TextPrimary,
+    surfaceVariant = Surface2,
+    onSurfaceVariant = TextSecondary,
+
+    error = AccentRed,
+    onError = TextOnAccent,
+    errorContainer = Surface2,
+    onErrorContainer = AccentRed,
+
+    outline = BorderStrong,
+    outlineVariant = BorderSubtle
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = PrimaryLight,
-    onPrimary = OnPrimaryLight,
-    primaryContainer = PrimaryContainerLight,
-    onPrimaryContainer = OnPrimaryContainerLight,
-    secondary = SecondaryLight,
-    onSecondary = OnSecondaryLight,
-    secondaryContainer = SecondaryContainerLight,
-    onSecondaryContainer = OnSecondaryContainerLight,
-    tertiary = TertiaryLight,
-    onTertiary = OnTertiaryLight,
-    tertiaryContainer = TertiaryContainerLight,
-    onTertiaryContainer = OnTertiaryContainerLight
+    primary = Color_LightPrimary,
+    onPrimary = Color_White,
+    primaryContainer = Color_LightPrimaryContainer,
+    onPrimaryContainer = Color_LightOnPrimaryContainer,
+
+    secondary = Color_LightSecondary,
+    onSecondary = Color_White,
+    secondaryContainer = Color_LightSecondaryContainer,
+    onSecondaryContainer = Color_LightOnSecondaryContainer,
+
+    background = Color_LightBackground,
+    onBackground = Color_LightOnBackground,
+    surface = Color_LightSurface,
+    onSurface = Color_LightOnBackground,
+    surfaceVariant = Color_LightSurfaceVariant,
+    onSurfaceVariant = Color_LightMuted,
+
+    error = Color_LightError,
+    onError = Color_White
 )
 
 @Composable
 fun KernelLoderTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    // Dynamic color is available on Android 12+
-    dynamicColor: Boolean = true,
+    dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
     val colorScheme = when {
@@ -55,7 +76,6 @@ fun KernelLoderTheme(
             val context = LocalContext.current
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
-
         darkTheme -> DarkColorScheme
         else -> LightColorScheme
     }

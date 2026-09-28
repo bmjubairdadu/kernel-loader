@@ -1,11 +1,14 @@
 package com.kernelloader.ui
 
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -13,6 +16,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -32,6 +36,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bolt
@@ -39,8 +44,6 @@ import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.FolderOpen
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material.icons.filled.Terminal
@@ -48,7 +51,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
@@ -66,6 +68,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
@@ -80,6 +83,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kernelloader.R
@@ -88,12 +92,34 @@ import com.kernelloader.driver.DriverViewModel
 import com.kernelloader.driver.SupportContact
 import com.kernelloader.driver.OtaDriverStore
 import com.kernelloader.root.RootChecker
+import com.kernelloader.ui.theme.AccentAmber
+import com.kernelloader.ui.theme.AccentBlue
+import com.kernelloader.ui.theme.AccentGreen
+import com.kernelloader.ui.theme.AccentRed
+import com.kernelloader.ui.theme.BorderSubtle
+import com.kernelloader.ui.theme.FamilyQx
+import com.kernelloader.ui.theme.FamilyRt
+import com.kernelloader.ui.theme.FamilyRtDeep
+import com.kernelloader.ui.theme.LogCmd
+import com.kernelloader.ui.theme.LogErr
+import com.kernelloader.ui.theme.LogFix
+import com.kernelloader.ui.theme.LogInfo
+import com.kernelloader.ui.theme.LogOk
+import com.kernelloader.ui.theme.LogOut
+import com.kernelloader.ui.theme.LogWarn
+import com.kernelloader.ui.theme.MonoSmall
+import com.kernelloader.ui.theme.MonoTiny
+import com.kernelloader.ui.theme.StatusIdle
+import com.kernelloader.ui.theme.StatusOk
+import com.kernelloader.ui.theme.Surface1
+import com.kernelloader.ui.theme.Surface2
+import com.kernelloader.ui.theme.Surface3
+import com.kernelloader.ui.theme.SurfaceInset
+import com.kernelloader.ui.theme.TextDisabled
+import com.kernelloader.ui.theme.TextMuted
+import com.kernelloader.ui.theme.TextPrimary
+import com.kernelloader.ui.theme.TextSecondary
 
-// ---------------------------------------------------------------------------
-// HOME - lightweight OTA loader screen
-//   logo + name -> status chips -> animated circle button -> console
-//   -> supported kernels (live from the GitHub driver database)
-// ---------------------------------------------------------------------------
 @Composable
 fun HomeScreen(
     viewModel: DriverViewModel,
@@ -124,20 +150,34 @@ fun HomeScreen(
     LaunchedEffect(Unit) {
         viewModel.refreshManifest()
         viewModel.checkForAppUpdate()
-        // A module loaded by the boot script (or left over from last session)
-        // must be reflected in the UI without the user pressing anything.
+        
         viewModel.refreshDriverState(context)
     }
     LaunchedEffect(terminalLines.size) {
         if (terminalLines.isNotEmpty()) listState.animateScrollToItem(terminalLines.size - 1)
     }
 
-    // Which ABI family the RT / QX button last targeted. The game-mod clients
-    // (Aincrad, Angry Mod) speak two DIFFERENT driver ABIs, so the whole screen -
-    // the driver list and the "Ready:" line - follows the selected family.
     var family by remember { mutableStateOf(OtaDriverStore.RT) }
     val exact = manifest?.let { OtaDriverStore.exactFor(it, kernelRelease, family) }
-    val supported = manifest?.let { OtaDriverStore.supportedEntries(it, family) } ?: emptyList()
+
+    val kernelShort = RootChecker.kernelShortVersion(kernelRelease)
+    val supported = manifest?.let { OtaDriverStore.supportedEntries(it, family) }
+        ?.let { list ->
+            val (mine, others) = list.partition {
+                RootChecker.kernelShortVersion(it.version) == kernelShort
+            }
+            mine + others
+        } ?: emptyList()
+    
+    val newestBuild = supported
+        .dropWhile { RootChecker.kernelShortVersion(it.version) == kernelShort }
+        .firstOrNull { it.buildDate.isNotBlank() }
+        ?.buildDate
+        .orEmpty()
+    
+    val newestIndex = supported.count {
+        RootChecker.kernelShortVersion(it.version) == kernelShort
+    }
 
     AppBackground {
     Column(
@@ -150,7 +190,6 @@ fun HomeScreen(
     ) {
         Spacer(Modifier.height(10.dp))
 
-        // ---------------- header: logo + name + quick actions ----------------
         Row(verticalAlignment = Alignment.CenterVertically) {
             Image(
                 painter = painterResource(id = R.drawable.app_logo),
@@ -170,28 +209,18 @@ fun HomeScreen(
                 Text(
                     text = "Kernel Loder",
                     style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold
+                    color = TextPrimary
                 )
                 Text(
                     text = "OTA Kernel Module Loader · v${BuildConfig.VERSION_NAME}",
                     style = MaterialTheme.typography.bodySmall,
-                    color = Color(0xFFB0BEC5)
+                    color = TextMuted
                 )
-            }
-            IconButton(onClick = onPickFile) {
-                Icon(Icons.Default.FolderOpen, contentDescription = "Pick .ko file", tint = Color(0xFFE0E0E0))
-            }
-            IconButton(onClick = onNavigateToConsole) {
-                Icon(Icons.Default.Terminal, contentDescription = "Full console", tint = Color(0xFFE0E0E0))
-            }
-            IconButton(onClick = onNavigateToCredits) {
-                Icon(Icons.Default.Info, contentDescription = "Credits", tint = Color(0xFFE0E0E0))
             }
         }
 
         Spacer(Modifier.height(10.dp))
 
-        // ---------------- status chips ----------------
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             StatusChip(
                 text = if (rootAvailable) "ROOT OK" else "ROOT MISSING",
@@ -220,11 +249,10 @@ fun HomeScreen(
                 modifier = Modifier.weight(2f)
             )
             IconButton(onClick = { viewModel.refreshManifest() }) {
-                Icon(Icons.Default.Refresh, contentDescription = "Refresh driver database", tint = Color(0xFF69F0AE))
+                Icon(Icons.Default.Refresh, contentDescription = "Refresh driver database", tint = AccentGreen)
             }
         }
 
-        // ---------------- auto-update banner (GitHub Releases) ----------------
         when {
             updateStatus == "AVAILABLE" && appUpdate != null -> {
                 val pulse = rememberInfiniteTransition(label = "updatePulse")
@@ -243,10 +271,10 @@ fun HomeScreen(
                         .padding(top = 8.dp)
                         .clickable { viewModel.installAppUpdate(context) },
                     colors = CardDefaults.cardColors(
-                        containerColor = Color(0xFF12271A)
+                        containerColor = Surface2
                     ),
                     border = androidx.compose.foundation.BorderStroke(
-                        1.dp, Color(0xFF4CAF50).copy(alpha = glow)
+                        1.dp, AccentGreen.copy(alpha = glow)
                     )
                 ) {
                     Row(
@@ -256,7 +284,7 @@ fun HomeScreen(
                         Icon(
                             Icons.Default.SystemUpdate,
                             contentDescription = null,
-                            tint = Color(0xFF4CAF50),
+                            tint = AccentGreen,
                             modifier = Modifier.size(18.dp)
                         )
                         Spacer(Modifier.width(8.dp))
@@ -264,21 +292,19 @@ fun HomeScreen(
                             Text(
                                 text = "UPDATE v${appUpdate.versionCode} · ${appUpdate.versionName}",
                                 style = MaterialTheme.typography.labelMedium,
-                                color = Color(0xFF69F0AE),
+                                color = AccentGreen,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
                                 text = "tap to download & install (${appUpdate.apkSize / 1024} KB)",
-                                style = MaterialTheme.typography.labelSmall.copy(
-                                    fontFamily = FontFamily.Monospace
-                                ),
-                                color = Color(0xFFB0BEC5)
+                                style = MonoTiny,
+                                color = TextMuted
                             )
                         }
                         Text(
                             text = "INSTALL ↗",
                             style = MaterialTheme.typography.labelMedium,
-                            color = Color(0xFF4CAF50),
+                            color = AccentGreen,
                             fontWeight = FontWeight.Bold
                         )
                     }
@@ -287,22 +313,21 @@ fun HomeScreen(
             updateStatus == "DOWNLOADING" -> {
                 Card(
                     modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF1B2A1F))
+                    colors = CardDefaults.cardColors(containerColor = Surface2)
                 ) {
                     Column(Modifier.fillMaxWidth().padding(12.dp)) {
                         Text(
                             text = "DOWNLOADING UPDATE... ${if (updateProgress >= 0) "$updateProgress%" else ""}",
-                            style = MaterialTheme.typography.labelMedium.copy(
-                                fontFamily = FontFamily.Monospace
-                            ),
-                            color = Color(0xFF4CAF50),
+                            style = MonoTiny,
+                            color = AccentGreen,
                             fontWeight = FontWeight.Bold
                         )
                         Spacer(Modifier.height(6.dp))
                         LinearProgressIndicator(
                             progress = { if (updateProgress >= 0) updateProgress / 100f else 0f },
                             modifier = Modifier.fillMaxWidth(),
-                            color = Color(0xFF4CAF50)
+                            color = AccentGreen,
+                            trackColor = Surface3
                         )
                     }
                 }
@@ -310,211 +335,281 @@ fun HomeScreen(
         }
         Spacer(Modifier.height(12.dp))
 
-        // ---------------- animated circle button ----------------
-        val transition = rememberInfiniteTransition(label = "loadBtn")
-        val angle by transition.animateFloat(
-            initialValue = 0f, targetValue = 360f,
-            animationSpec = infiniteRepeatable(tween(2400, easing = LinearEasing)),
-            label = "angle"
-        )
-        val pulse by transition.animateFloat(
-            initialValue = 0.95f, targetValue = 1.05f,
-            animationSpec = infiniteRepeatable(tween(750, easing = LinearEasing), RepeatMode.Reverse),
-            label = "pulse"
-        )
-        val ringColor = when {
-            busy -> Color(0xFFFFB74D)
-            autoOk == true -> Color(0xFF4CAF50)
-            autoOk == false -> Color(0xFFEF5350)
-            else -> Color(0xFF69F0AE)
-        }
-
         Column(
             modifier = Modifier.fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Two separate load buttons: RT and QX are different ioctl ABIs, so
-            // the user must pick the one their game-mod client expects.
+            
             @Composable
             fun FamilyButton(
                 label: String,
                 tag: String,
-                container: Color,
+                accent: Color,
+                tapable: Boolean,
                 onPick: () -> Unit
             ) {
                 val selected = family == tag
+                val running = busy && selected
+
+                val anim by rememberInfiniteTransition(label = "fam-$tag").animateFloat(
+                    initialValue = 0f,
+                    targetValue = 360f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(
+                            durationMillis = if (running) 900 else 3200,
+                            easing = LinearEasing
+                        )
+                    ),
+                    label = "sweep-$tag"
+                )
+                val breathe by rememberInfiniteTransition(label = "breathe-$tag").animateFloat(
+                    initialValue = 0.965f,
+                    targetValue = 1.035f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(1400, easing = FastOutSlowInEasing),
+                        repeatMode = RepeatMode.Reverse
+                    ),
+                    label = "breathe-$tag"
+                )
+
+                val scale by animateFloatAsState(
+                    targetValue = when {
+                        running -> 1.06f
+                        selected -> breathe
+                        else -> 0.94f
+                    },
+                    animationSpec = tween(220, easing = FastOutSlowInEasing),
+                    label = "scale-$tag"
+                )
+
+                val ring = when {
+                    running -> AccentAmber
+                    selected -> accent
+                    else -> accent.copy(alpha = 0.32f)
+                }
+
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Box(modifier = Modifier.size(150.dp), contentAlignment = Alignment.Center) {
+                    Box(modifier = Modifier.size(148.dp), contentAlignment = Alignment.Center) {
                         Canvas(modifier = Modifier.fillMaxSize()) {
-                            val stroke = Stroke(width = 6.dp.toPx(), cap = StrokeCap.Round)
+                            val stroke = Stroke(width = 5.dp.toPx(), cap = StrokeCap.Round)
                             val diameter = size.minDimension - stroke.width
                             val topLeft = androidx.compose.ui.geometry.Offset(
                                 (size.width - diameter) / 2f, (size.height - diameter) / 2f
                             )
                             val arcSize = androidx.compose.ui.geometry.Size(diameter, diameter)
-                            rotate(if (selected) angle else angle + 180f) {
-                                drawArc(
-                                    color = ringColor.copy(alpha = 0.9f),
-                                    startAngle = 0f, sweepAngle = 130f, useCenter = false,
-                                    topLeft = topLeft, size = arcSize, style = stroke
-                                )
-                                drawArc(
-                                    color = ringColor.copy(alpha = 0.35f),
-                                    startAngle = 180f, sweepAngle = 100f, useCenter = false,
-                                    topLeft = topLeft, size = arcSize, style = stroke
-                                )
+
+                            drawArc(
+                                color = ring.copy(alpha = if (selected || running) 0.20f else 0.10f),
+                                startAngle = 0f, sweepAngle = 360f, useCenter = false,
+                                topLeft = topLeft, size = arcSize, style = stroke
+                            )
+
+                            if (selected || running) {
+                                rotate(anim) {
+                                    drawArc(
+                                        color = ring.copy(alpha = 0.95f),
+                                        startAngle = 0f, sweepAngle = if (running) 90f else 120f,
+                                        useCenter = false,
+                                        topLeft = topLeft, size = arcSize, style = stroke
+                                    )
+                                    drawArc(
+                                        color = ring.copy(alpha = 0.45f),
+                                        startAngle = 180f, sweepAngle = 70f, useCenter = false,
+                                        topLeft = topLeft, size = arcSize, style = stroke
+                                    )
+                                }
                             }
                         }
+
                         Button(
                             onClick = {
                                 family = tag
                                 onPick()
                             },
-                            enabled = !busy && rootAvailable,
+                            enabled = tapable && !busy && rootAvailable,
                             shape = CircleShape,
                             border = androidx.compose.foundation.BorderStroke(
-                                if (selected) 3.dp else 1.5.dp,
-                                if (selected) Color.White.copy(alpha = 0.9f)
-                                else Color.White.copy(alpha = 0.3f)
+                                width = if (selected) 2.5.dp else 1.dp,
+                                color = if (selected) ring.copy(alpha = 0.9f)
+                                else accent.copy(alpha = 0.35f)
                             ),
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = container,
-                                contentColor = Color.White,
-                                disabledContainerColor = container.copy(alpha = 0.3f),
-                                disabledContentColor = Color.White.copy(alpha = 0.55f)
+                                containerColor = if (selected || running) {
+                                    accent.copy(alpha = 0.20f)
+                                } else {
+                                    Surface2
+                                },
+                                contentColor = TextPrimary,
+                                disabledContainerColor = Surface1,
+                                disabledContentColor = TextDisabled
                             ),
-                            contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
+                            contentPadding = PaddingValues(0.dp),
                             modifier = Modifier
-                                .size(112.dp)
-                                .scale(if (selected) pulse else 0.97f)
+                                .size(114.dp)
+                                .scale(scale)
                         ) {
                             Column(
                                 horizontalAlignment = Alignment.CenterHorizontally,
                                 modifier = Modifier.padding(horizontal = 2.dp)
                             ) {
-                                if (busy && selected) {
+                                if (running) {
                                     CircularProgressIndicator(
-                                        modifier = Modifier.size(30.dp),
-                                        color = Color.White,
+                                        modifier = Modifier.size(28.dp),
+                                        color = ring,
                                         strokeWidth = 2.5.dp
                                     )
                                 } else {
                                     Icon(
                                         Icons.Default.Bolt,
                                         contentDescription = null,
-                                        modifier = Modifier.size(30.dp)
+                                        tint = if (selected || running) accent else TextMuted,
+                                        modifier = Modifier.size(28.dp)
                                     )
                                 }
-                                Spacer(Modifier.height(4.dp))
+                                Spacer(Modifier.height(5.dp))
                                 Text(
                                     text = label,
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.Bold,
+                                    color = if (selected) TextPrimary else TextSecondary,
                                     textAlign = TextAlign.Center,
                                     maxLines = 1
                                 )
                             }
                         }
                     }
-                    Spacer(Modifier.height(2.dp))
                     Text(
                         text = when (tag) {
                             OtaDriverStore.RT -> "ioctl 801/802/803"
                             else -> "ioctl 801/802/804"
                         },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = if (selected) Color(0xFF69F0AE) else Color(0xFF78909C),
-                        fontFamily = FontFamily.Monospace
+                        style = MonoTiny,
+                        color = if (selected) accent else TextDisabled
                     )
                 }
             }
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                FamilyButton("RT", OtaDriverStore.RT, Color(0xFF1E7A46)) {
-                    viewModel.autoLoadUniversal(context, preferOta = true, variant = OtaDriverStore.RT)
-                }
-                FamilyButton("QX", OtaDriverStore.QX, Color(0xFF8A4B1E)) {
-                    viewModel.autoLoadUniversal(context, preferOta = true, variant = OtaDriverStore.QX)
-                }
-            }
-            Spacer(Modifier.height(6.dp))
+            val loaded = viewModel.driverLoaded.value
+            val toUnload by animateFloatAsState(
+                targetValue = if (loaded) 1f else 0f,
+                animationSpec = tween(280, easing = FastOutSlowInEasing),
+                label = "swap"
+            )
+            
+            val loadsTapable = !loaded && toUnload < 0.5f
 
-            // ---------------- loaded state + unload ----------------
-            // A module stays in kernel memory until reboot or rmmod, so this
-            // row is normally just a status readout; UNLOAD is the one action
-            // that removes it and nothing else.
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(190.dp),
+                contentAlignment = Alignment.TopCenter
             ) {
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        text = if (viewModel.driverLoaded.value) {
-                            "LOADED: ${viewModel.driverModule.value.ifBlank { viewModel.loadedModuleName.value }}"
-                        } else {
-                            "NOT LOADED"
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        fontFamily = FontFamily.Monospace,
-                        color = if (viewModel.driverLoaded.value) Color(0xFF4CAF50) else Color(0xFFEF9A9A)
-                    )
-                    Text(
-                        text = "survives until reboot or UNLOAD",
-                        style = MaterialTheme.typography.bodySmall,
-                        fontFamily = FontFamily.Monospace,
-                        color = Color(0xFF78909C)
-                    )
-                }
-                OutlinedButton(
-                    onClick = { viewModel.unloadModule(context) },
-                    enabled = !busy && rootAvailable && viewModel.driverLoaded.value,
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = Color(0xFFFF8A65),
-                        disabledContentColor = Color(0xFFFF8A65).copy(alpha = 0.35f)
-                    ),
-                    border = androidx.compose.foundation.BorderStroke(
-                        1.dp, Color(0xFFFF8A65).copy(alpha = if (viewModel.driverLoaded.value) 0.7f else 0.25f)
-                    )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .alpha(1f - toUnload),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.Top
                 ) {
-                    Text("UNLOAD", fontWeight = FontWeight.Bold)
+                    FamilyButton("RT", OtaDriverStore.RT, FamilyRt, loadsTapable) {
+                        viewModel.autoLoadUniversal(
+                            context, preferOta = true, variant = OtaDriverStore.RT
+                        )
+                    }
+                    FamilyButton("QX", OtaDriverStore.QX, FamilyQx, loadsTapable) {
+                        viewModel.autoLoadUniversal(
+                            context, preferOta = true, variant = OtaDriverStore.QX
+                        )
+                    }
                 }
-            }
-            Spacer(Modifier.height(8.dp))
 
-            // ---------------- boot auto-load ----------------
+                UnloadPanel(
+                    visible = toUnload,
+                    moduleName = viewModel.driverModule.value.ifBlank {
+                        viewModel.loadedModuleName.value
+                    },
+                    enabled = loaded && !busy && rootAvailable,
+                    onUnload = { viewModel.unloadModule(context) }
+                )
+            }
+
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = Color(0xFF16202A)
+                colors = CardDefaults.cardColors(containerColor = Surface1),
+                border = BorderStroke(
+                    1.dp,
+                    if (viewModel.driverLoaded.value) StatusOk.copy(alpha = 0.4f)
+                    else BorderSubtle
                 )
             ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .clip(CircleShape)
+                            .background(
+                                if (viewModel.driverLoaded.value) StatusOk else StatusIdle
+                            )
+                    )
+                    Spacer(Modifier.width(10.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            text = if (viewModel.driverLoaded.value) {
+                                "LOADED · ${viewModel.driverModule.value.ifBlank { viewModel.loadedModuleName.value }}"
+                            } else {
+                                "NOT LOADED"
+                            },
+                            style = MonoSmall,
+                            color = if (viewModel.driverLoaded.value) StatusOk else TextSecondary
+                        )
+                        Text(
+                            text = if (viewModel.driverLoaded.value)
+                                "a module stays loaded until reboot or unload"
+                            else "pick RT or QX above to load it",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextMuted
+                        )
+                    }
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = Surface1),
+                border = androidx.compose.foundation.BorderStroke(
+                    1.dp,
+                    if (viewModel.autoloadEnabled.value) AccentGreen.copy(alpha = 0.45f)
+                    else BorderSubtle
+                )
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(Modifier.weight(1f)) {
                         Text(
                             text = "Load at every boot",
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Color(0xFFE0E0E0)
+                            style = MaterialTheme.typography.titleSmall,
+                            color = TextPrimary
                         )
+                        Spacer(Modifier.height(2.dp))
                         Text(
                             text = if (viewModel.autoloadEnabled.value)
-                                "ON - after a restart the driver loads by itself"
-                            else "OFF - you must tap a load button after a restart",
+                                "ON · the driver returns by itself after a restart"
+                            else "OFF · you must tap a load button after a restart",
                             style = MaterialTheme.typography.bodySmall,
-                            fontFamily = FontFamily.Monospace,
-                            color = if (viewModel.autoloadEnabled.value) Color(0xFF69F0AE) else Color(0xFF78909C)
+                            color = if (viewModel.autoloadEnabled.value) AccentGreen else TextMuted
                         )
                     }
+                    Spacer(Modifier.width(8.dp))
                     Switch(
                         checked = viewModel.autoloadEnabled.value,
                         onCheckedChange = { on -> viewModel.setBootAutoload(context, on) },
@@ -522,7 +617,7 @@ fun HomeScreen(
                     )
                 }
             }
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(8.dp))
 
             Text(
                 text = when {
@@ -530,17 +625,20 @@ fun HomeScreen(
                     autoStatus.isNotBlank() -> autoStatus
                     exact != null ->
                         "Ready: ${exact.version} ${OtaDriverStore.variantLabel(family)} loader on GitHub"
-                    else -> "Tap ${OtaDriverStore.variantLabel(family)} - detect kernel + download loader"
+                    else -> "Tap ${OtaDriverStore.variantLabel(family)} · detect kernel + download loader"
                 },
-                style = MaterialTheme.typography.bodySmall,
-                color = Color(0xFFE0E0E0),
+                style = MonoTiny,
+                color = TextSecondary,
                 textAlign = TextAlign.Center,
-                fontFamily = FontFamily.Monospace
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(SurfaceInset)
+                    .padding(horizontal = 10.dp, vertical = 8.dp)
             )
         }
         Spacer(Modifier.height(12.dp))
 
-        // ---------------- console ----------------
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
@@ -548,22 +646,24 @@ fun HomeScreen(
             Text(
                 text = "CONSOLE",
                 style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold,
-                color = Color(0xFF69F0AE),
+                color = AccentGreen,
                 modifier = Modifier.weight(1f)
             )
             IconButton(onClick = { clipboard.setText(AnnotatedString(viewModel.getTerminalText())) }) {
-                Icon(Icons.Default.ContentCopy, contentDescription = "Copy console", tint = Color(0xFFE0E0E0))
+                Icon(Icons.Default.ContentCopy, contentDescription = "Copy console", tint = TextSecondary)
             }
             IconButton(onClick = { viewModel.clearTerminal() }) {
-                Icon(Icons.Default.Delete, contentDescription = "Clear console", tint = Color(0xFFE0E0E0))
+                Icon(Icons.Default.Delete, contentDescription = "Clear console", tint = TextSecondary)
             }
         }
         Card(
-            modifier = Modifier.fillMaxWidth().height(250.dp),
-            // Fixed dark terminal background - log colors are tuned for dark,
-            // so the console stays readable in every theme.
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF0D1117))
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(250.dp)
+                .clip(RoundedCornerShape(12.dp)),
+            
+            colors = CardDefaults.cardColors(containerColor = SurfaceInset),
+            border = BorderStroke(1.dp, BorderSubtle)
         ) {
             if (terminalLines.isEmpty()) {
                 Column(
@@ -575,13 +675,13 @@ fun HomeScreen(
                         Icons.Default.Terminal,
                         contentDescription = null,
                         modifier = Modifier.size(38.dp),
-                        tint = Color(0xFF90A4AE)
+                        tint = TextDisabled
                     )
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        text = "Tap the circle to start",
+                        text = "Tap RT or QX to start",
                         style = MaterialTheme.typography.bodySmall,
-                        color = Color(0xFFB0BEC5)
+                        color = TextMuted
                     )
                 }
             } else {
@@ -605,23 +705,21 @@ fun HomeScreen(
         }
         Spacer(Modifier.height(12.dp))
 
-        // ---------------- supported kernels (GitHub database) ----------------
         Text(
             text = when {
-                manifestStatus == "OK" -> "SUPPORTED KERNELS (${supported.size}) · LATEST " +
-                        (supported.firstOrNull()?.buildDate?.take(10) ?: "n/a")
+                manifestStatus == "OK" -> "SUPPORTED KERNELS (${supported.size}) · NEWEST " +
+                        (newestBuild.take(10).ifEmpty { "n/a" })
                 manifestStatus == "LOADING" -> "FETCHING DATABASE..."
                 else -> "SUPPORTED KERNELS (offline)"
             },
             style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.Bold,
-            color = Color(0xFF69F0AE)
+            color = AccentGreen
         )
         Text(
             text = "DB updated: ${manifest?.updated?.take(10) ?: "-"}  ·  " +
                     "github.com/bmjubairdadu/kernel-loder (drivers branch)",
-            style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
-            color = Color(0xFF90A4AE),
+            style = MonoTiny,
+            color = TextMuted,
             modifier = Modifier.padding(top = 2.dp)
         )
         Row(
@@ -632,28 +730,27 @@ fun HomeScreen(
                         context.startActivity(
                             Intent(Intent.ACTION_VIEW, Uri.parse(OtaDriverStore.manifestUrl))
                         )
-                    } catch (_: Exception) { /* no browser installed */ }
+                    } catch (_: Exception) {  }
                 },
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
                 text = "open driver database ↗",
-                style = MaterialTheme.typography.labelSmall,
-                color = Color(0xFF64B5F6),
+                style = MaterialTheme.typography.labelMedium,
+                color = AccentBlue,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.weight(1f)
             )
             Text(
                 text = "raw drivers.json",
-                style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                style = MonoTiny,
+                color = TextMuted
             )
         }
         Card(
             modifier = Modifier.fillMaxWidth().padding(top = 6.dp, bottom = 16.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant
-            )
+            colors = CardDefaults.cardColors(containerColor = Surface1),
+            border = BorderStroke(1.dp, BorderSubtle)
         ) {
             when {
                 manifestStatus == "OK" -> LazyColumn(
@@ -669,21 +766,15 @@ fun HomeScreen(
                         ) {
                             Text(
                                 text = "kernel $v",
-                                style = MaterialTheme.typography.bodySmall.copy(
-                                    fontFamily = FontFamily.Monospace,
-                                    fontSize = 11.sp
-                                ),
-                                color = if (isThis) Color(0xFF4CAF50)
-                                        else Color(0xFFE0E0E0),
+                                style = MonoTiny,
+                                color = if (isThis) StatusOk else TextSecondary,
                                 modifier = Modifier.weight(1f)
                             )
                             if (e.buildDate.isNotBlank()) {
                                 Text(
                                     text = e.buildDate.take(10),
-                                    style = MaterialTheme.typography.labelSmall.copy(
-                                        fontFamily = FontFamily.Monospace
-                                    ),
-                                    color = Color(0xFF90A4AE)
+                                    style = MonoTiny,
+                                    color = TextMuted
                                 )
                                 Spacer(Modifier.width(6.dp))
                             }
@@ -691,46 +782,46 @@ fun HomeScreen(
                                 Icon(
                                     Icons.Default.CheckCircle,
                                     contentDescription = null,
-                                    tint = Color(0xFF4CAF50),
+                                    tint = StatusOk,
                                     modifier = Modifier.size(14.dp)
                                 )
                                 Spacer(Modifier.width(4.dp))
                                 Text(
                                     text = "THIS DEVICE",
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = Color(0xFF4CAF50),
+                                    color = StatusOk,
                                     fontWeight = FontWeight.Bold
                                 )
-                            } else if (idx == 0) {
+                            } else if (idx == newestIndex) {
+                                
                                 Text(
-                                    text = "LATEST",
+                                    text = "NEWEST",
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = Color(0xFFFFB74D),
+                                    color = AccentAmber,
                                     fontWeight = FontWeight.Bold
                                 )
                             }
                         }
                         HorizontalDivider(
                             modifier = Modifier.padding(vertical = 1.dp),
-                            color = Color(0xFF37474F)
+                            color = BorderSubtle
                         )
                     }
                 }
                 manifestStatus == "LOADING" -> Row(
                     modifier = Modifier.fillMaxWidth().padding(18.dp),
                     horizontalArrangement = Arrangement.Center
-                ) { CircularProgressIndicator(modifier = Modifier.size(22.dp)) }
+                ) { CircularProgressIndicator(modifier = Modifier.size(22.dp), color = AccentGreen) }
                 else -> Text(
-                    text = "No internet connection - driver database is not visible.\n" +
+                    text = "No internet connection — the driver database is not visible.\n" +
                             "Connect, then tap the refresh button.",
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(18.dp),
-                    color = Color(0xFFFFD54F)
+                    color = AccentAmber
                 )
             }
         }
 
-        // ---------------- support: custom loader via WhatsApp / GitHub ----------------
         SupportCard(
             kernelRelease = kernelRelease,
             loadFailed = autoOk == false,
@@ -742,11 +833,6 @@ fun HomeScreen(
     }
 }
 
-/**
- * Contact card: WhatsApp (logo-only circle button, full log attached
- * automatically) + GitHub failure report (one tap opens a pre-filled
- * issue - the PC auto-triage watches these). No custom textbox.
- */
 @Composable
 private fun SupportCard(
     kernelRelease: String,
@@ -759,13 +845,12 @@ private fun SupportCard(
     Card(
         modifier = Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (loadFailed) Color(0xFF3E2723)
-                             else Color(0xFF131E2C)
+            containerColor = if (loadFailed) Surface2 else Surface1
         ),
-        border = androidx.compose.foundation.BorderStroke(
+        border = BorderStroke(
             1.dp,
-            if (loadFailed) Color(0xFFEF5350).copy(alpha = 0.5f)
-            else Color(0xFF4CAF50).copy(alpha = 0.35f)
+            if (loadFailed) AccentRed.copy(alpha = 0.45f)
+            else BorderSubtle
         )
     ) {
         Column(
@@ -773,17 +858,16 @@ private fun SupportCard(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                text = if (loadFailed) "LOAD FAILED - need a custom loader?"
+                text = if (loadFailed) "Load failed — need a custom loader?"
                        else "No kernel match? Need a custom loader?",
                 style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold,
-                color = if (loadFailed) Color(0xFFFF8A65) else Color(0xFF69F0AE),
+                color = if (loadFailed) AccentRed else AccentGreen,
                 textAlign = TextAlign.Center
             )
             Text(
-                text = "Tap a button - device, kernel and full log go automatically.",
+                text = "Tap a button — device, kernel and the full log go automatically.",
                 style = MaterialTheme.typography.bodySmall,
-                color = Color(0xFFB0BEC5),
+                color = TextSecondary,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.padding(top = 4.dp)
             )
@@ -793,7 +877,7 @@ private fun SupportCard(
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // WhatsApp: logo-only circle
+                
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     IconButton(
                         onClick = {
@@ -809,7 +893,7 @@ private fun SupportCard(
                                         )
                                     )
                                 )
-                            } catch (_: Exception) { /* no WhatsApp/browser */ }
+                            } catch (_: Exception) {  }
                         },
                         modifier = Modifier
                             .size(60.dp)
@@ -827,11 +911,11 @@ private fun SupportCard(
                     Text(
                         text = "WhatsApp",
                         style = MaterialTheme.typography.labelSmall,
-                        color = Color(0xFFB0BEC5),
+                        color = TextSecondary,
                         fontWeight = FontWeight.Bold
                     )
                 }
-                // GitHub failure report: logo-only circle
+                
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     IconButton(
                         onClick = {
@@ -847,18 +931,18 @@ private fun SupportCard(
                                         )
                                     )
                                 )
-                            } catch (_: Exception) { /* no browser */ }
+                            } catch (_: Exception) {  }
                         },
                         modifier = Modifier
                             .size(60.dp)
                             .clip(CircleShape)
-                            .background(Color(0xFF1F2A37))
-                            .border(1.5.dp, Color(0xFF8AB4F8).copy(alpha = 0.6f), CircleShape)
+                            .background(Surface3)
+                            .border(1.5.dp, AccentBlue.copy(alpha = 0.6f), CircleShape)
                     ) {
                         Icon(
                             Icons.Default.BugReport,
                             contentDescription = "Send failure report to GitHub",
-                            tint = Color(0xFF8AB4F8),
+                            tint = AccentBlue,
                             modifier = Modifier.size(30.dp)
                         )
                     }
@@ -866,15 +950,15 @@ private fun SupportCard(
                     Text(
                         text = "Report",
                         style = MaterialTheme.typography.labelSmall,
-                        color = Color(0xFFB0BEC5),
+                        color = TextSecondary,
                         fontWeight = FontWeight.Bold
                     )
                 }
             }
             Text(
-                text = "Report saves on GitHub - PC auto-checks and fixes",
-                style = MaterialTheme.typography.labelSmall,
-                color = Color(0xFF90A4AE),
+                text = "Report saves on GitHub — the PC auto-checks and fixes",
+                style = MaterialTheme.typography.bodySmall,
+                color = TextMuted,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.padding(top = 8.dp)
             )
@@ -882,39 +966,130 @@ private fun SupportCard(
     }
 }
 
-// ---------------------------------------------------------------------------
 @Composable
-private fun StatusChip(text: String, ok: Boolean, modifier: Modifier = Modifier) {
-    Surface(
-        modifier = modifier,
-        shape = MaterialTheme.shapes.small,
-        color = if (ok) Color(0xFF134E2E)
-                else Color(0xFF5D1A14),
-        tonalElevation = 2.dp,
-        border = androidx.compose.foundation.BorderStroke(
-            1.dp,
-            if (ok) Color(0xFF4CAF50).copy(alpha = 0.7f)
-            else Color(0xFFEF5350).copy(alpha = 0.7f)
-        )
+private fun UnloadPanel(
+    visible: Float,
+    moduleName: String,
+    enabled: Boolean,
+    onUnload: () -> Unit
+) {
+    if (visible <= 0.001f) return
+
+    val breathe by rememberInfiniteTransition(label = "unload").animateFloat(
+        initialValue = 0.97f,
+        targetValue = 1.03f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1600, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "unloadBreathe"
+    )
+    val spin by rememberInfiniteTransition(label = "unloadSpin").animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(5200, easing = LinearEasing)
+        ),
+        label = "unloadSpin"
+    )
+    val scale = breathe * (0.9f + 0.1f * visible)
+
+    Column(
+        modifier = Modifier.alpha(visible),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        Box(modifier = Modifier.size(148.dp), contentAlignment = Alignment.Center) {
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val stroke = Stroke(width = 5.dp.toPx(), cap = StrokeCap.Round)
+                val diameter = size.minDimension - stroke.width
+                val topLeft = androidx.compose.ui.geometry.Offset(
+                    (size.width - diameter) / 2f, (size.height - diameter) / 2f
+                )
+                val arcSize = androidx.compose.ui.geometry.Size(diameter, diameter)
+                drawArc(
+                    color = AccentRed.copy(alpha = 0.20f),
+                    startAngle = 0f, sweepAngle = 360f, useCenter = false,
+                    topLeft = topLeft, size = arcSize, style = stroke
+                )
+                rotate(spin) {
+                    drawArc(
+                        color = AccentRed.copy(alpha = 0.9f),
+                        startAngle = 0f, sweepAngle = 110f, useCenter = false,
+                        topLeft = topLeft, size = arcSize, style = stroke
+                    )
+                }
+            }
+
+            Button(
+                onClick = onUnload,
+                enabled = enabled,
+                shape = CircleShape,
+                border = BorderStroke(2.5.dp, AccentRed.copy(alpha = 0.9f)),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = AccentRed.copy(alpha = 0.18f),
+                    contentColor = TextPrimary,
+                    disabledContainerColor = Surface1,
+                    disabledContentColor = TextDisabled
+                ),
+                contentPadding = PaddingValues(0.dp),
+                modifier = Modifier
+                    .size(114.dp)
+                    .scale(scale)
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(
+                        Icons.Default.Delete,
+                        contentDescription = null,
+                        tint = if (enabled) AccentRed else TextDisabled,
+                        modifier = Modifier.size(28.dp)
+                    )
+                    Spacer(Modifier.height(5.dp))
+                    Text(
+                        text = "UNLOAD",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = if (enabled) TextPrimary else TextDisabled
+                    )
+                }
+            }
+        }
         Text(
-            text = text,
-            style = MaterialTheme.typography.labelMedium.copy(fontFamily = FontFamily.Monospace),
-            fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Center,
-            color = if (ok) Color(0xFFB9F5D0) else Color(0xFFFFB4AB),
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 6.dp)
+            text = if (moduleName.isNotBlank()) "removes $moduleName" else "removes the driver",
+            style = MonoTiny,
+            color = AccentRed
         )
     }
 }
 
-// High-contrast log colors, tuned for the fixed dark console background.
+@Composable
+private fun StatusChip(text: String, ok: Boolean, modifier: Modifier = Modifier) {
+    
+    val tint = if (ok) AccentGreen else AccentRed
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(10.dp),
+        color = if (ok) FamilyRtDeep.copy(alpha = 0.35f) else tint.copy(alpha = 0.13f),
+        border = BorderStroke(1.dp, tint.copy(alpha = if (ok) 0.55f else 0.65f))
+    ) {
+        Text(
+            text = text,
+            style = MonoTiny,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center,
+            color = if (ok) StatusOk else AccentRed,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 7.dp)
+        )
+    }
+}
+
 private fun consoleLineColor(type: String): Color = when (type) {
-    "OK" -> Color(0xFF69F0AE)
-    "ERR" -> Color(0xFFFF6E6E)
-    "WARN" -> Color(0xFFFFD54F)
-    "CMD" -> Color(0xFF8AB4F8)
-    "FIX" -> Color(0xFF4DD0E1)
-    "OUT" -> Color(0xFFF1F3F4)
-    else -> Color(0xFFCFD8DC)
+    "OK" -> LogOk
+    "ERR" -> LogErr
+    "WARN" -> LogWarn
+    "CMD" -> LogCmd
+    "FIX" -> LogFix
+    "OUT" -> LogOut
+    else -> LogInfo
 }

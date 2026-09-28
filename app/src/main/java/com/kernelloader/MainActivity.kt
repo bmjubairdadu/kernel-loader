@@ -26,11 +26,6 @@ import com.kernelloader.ui.WarningRoute
 import com.kernelloader.ui.theme.KernelLoderTheme
 import com.topjohnwu.superuser.Shell
 
-/**
- * KERNEL LODER - lightweight OTA shell.
- * The APK bundles NO .ko files. Kernel modules are detected on-device,
- * downloaded from the GitHub driver database and insmod'ed.
- */
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -41,8 +36,7 @@ class MainActivity : ComponentActivity() {
         )
         enableEdgeToEdge()
         setContent {
-            // Fixed branded dark theme: no dynamic wallpaper colors, no light
-            // mode - background, console and badges always look the same.
+            
             KernelLoderTheme(darkTheme = true, dynamicColor = false) {
                 val backStack = remember { NavBackStack<NavKey>(MainRoute) }
                 NavDisplay(

@@ -1,6 +1,4 @@
 #!/bin/bash
-# Build kloader_driver.ko against EXACT 4.9.337-DaisyForGaming tree in WSL
-# Usage: bash build_ko_wsl.sh
 set -e
 KSRC=/home/jubair/daisy-build/kernel_source
 KOUT=/home/jubair/daisy-build/kernel_source/out

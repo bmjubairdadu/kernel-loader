@@ -1,5 +1,5 @@
 <resources>
-    <!-- Launcher / splash background: dark branded -->
+    
     <color name="splash_background">#FF0B1220</color>
 
     <style name="Theme.KernelLoder" parent="android:Theme.Material.NoActionBar">

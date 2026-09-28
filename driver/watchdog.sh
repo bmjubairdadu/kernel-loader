@@ -1,9 +1,4 @@
 #!/bin/bash
-# ============================================================================
-# Kernel Loder - WSL Build Auto-Recovery Watchdog
-# Runs inside WSL, monitors build health and internet connectivity.
-# If build dies or internet drops, automatically recovers/resumes.
-# ============================================================================
 set -u
 
 PROJ=/mnt/c/Users/Administrator/Downloads/DaisyDiverLoder
@@ -22,7 +17,6 @@ mkdir -p "$LOGDIR"
 log() { echo "$(date +%m-%d %H:%M:%S) $1" >> "$WATCHDOG_LOG"; }
 log "WATCHDOG: watchdog started (PID $$)"
 
-# ---------- helpers ----------
 is_build_alive() {
   pgrep -f "bash /root/build_all.sh" >/dev/null 2>&1
 }
@@ -37,7 +31,7 @@ check_internet() {
 
 retry_build() {
   log "WATCHDOG: build process died - attempting relaunch..."
-  # Re-copy versions.txt to queue only if queue is empty (avoid duplicate work)
+
   if [ -f "$VFILE" ] && [ ! -s "$QUEUE" ]; then
     tr -d '\r' < "$VFILE" > "$QUEUE"
     log "WATCHDOG: re-initialized queue from versions.txt"
@@ -56,10 +50,9 @@ retry_build() {
   fi
 }
 
-# ---------- main loop ----------
 INTERNET_DOWN_SECS=0
 while true; do
-  # 1. Check if build is alive
+
   if ! is_build_alive; then
     log "WATCHDOG: build_all.sh NOT running"
     if is_queue_empty; then
@@ -73,7 +66,6 @@ while true; do
     continue
   fi
 
-  # 2. Check internet (kernel.org reachable?)
   if ! check_internet; then
     INTERNET_DOWN_SECS=$((INTERNET_DOWN_SECS + 30))
     if [ "$INTERNET_DOWN_SECS" -gt 300 ]; then
@@ -82,13 +74,12 @@ while true; do
   else
     if [ "$INTERNET_DOWN_SECS" -gt 0 ]; then
       log "WATCHDOG: internet recovered after $INTERNET_DOWN_SECS s - resuming downloads"
-      # Wake up any stuck curl by touching queue (flock lets worker retry)
+
       touch "$QUEUE"
     fi
     INTERNET_DOWN_SECS=0
   fi
 
-  # 3. Periodic heartbeat
   if [ -f "$STATUS" ]; then
     local lines=$(wc -l < "$STATUS" 2>/dev/null || echo 0)
     local remaining=$(wc -l < "$QUEUE" 2>/dev/null || echo 0)
