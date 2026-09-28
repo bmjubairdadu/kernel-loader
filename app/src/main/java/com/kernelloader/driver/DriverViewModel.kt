@@ -362,22 +362,7 @@ class DriverViewModel : ViewModel() {
                     "OTA: no exact match; nearest loader = $target (distance ${resolved.distance})",
                     "WARN"
                 )
-                
-                if (!SafetyGuard.canForceLoad(kernel, target)) {
-                    SafetyGuard.refusalLines(kernel, target).forEach { tlog(it.first, it.second) }
-                    return false
-                }
-                
-                if (SafetyGuard.kernelLooksUnstable()) {
-                    SafetyGuard.unstableLines().forEach { tlog(it.first, it.second) }
-                    return false
-                }
-                tlog(
-                    "SAFETY: same kernel series (${SafetyGuard.majorMinor(kernel)}) - " +
-                            "trying nearest-loader force-load",
-                    "FIX"
-                )
-                return downloadAndLoadOta(context, manifest, resolved.entry, force = true)
+                return downloadAndLoadOta(context, manifest, resolved.entry)
             }
             is OtaDriverStore.ResolveResult.None -> {
                 tlog("OTA: no driver available for this kernel series", "INFO")
@@ -389,8 +374,7 @@ class DriverViewModel : ViewModel() {
     private suspend fun downloadAndLoadOta(
         context: Context,
         manifest: OtaDriverStore.Manifest,
-        entry: OtaDriverStore.DriverEntry,
-        force: Boolean = false
+        entry: OtaDriverStore.DriverEntry
     ): Boolean {
         val downloaded = OtaDriverStore.downloadDriver(
             context = context,
@@ -422,26 +406,8 @@ class DriverViewModel : ViewModel() {
                 return false
             }
             
-            Shell.cmd("rmmod kmem_337 2>/dev/null", "sleep 1").exec()
+            Shell.cmd("rmmod kmem_337 2>/dev/null", "rmmod kmem_337_qx 2>/dev/null", "sleep 1").exec()
             try {
-
-            val before = SafetyGuard.loadedModuleNames()
-
-            val vermagic = try { UniversalKernelLoader.readVermagic(downloaded) } catch (e: Exception) { null }
-            if (vermagic != null &&
-                RootChecker.kernelShortVersion(vermagic) != RootChecker.kernelShortVersion(kernel)
-            ) {
-                if (UniversalKernelLoader.patchVermagic(downloaded, kernel)) {
-                    tlog("OTA: vermagic patched for $kernel", "FIX")
-                    
-                    Shell.cmd(
-                        "cp \"${downloaded.absolutePath}\" ${staged.absolutePath}",
-                        "chmod 644 ${staged.absolutePath}"
-                    ).exec()
-                } else {
-                    tlog("OTA: vermagic patch failed (string too long) - trying force-load", "WARN")
-                }
-            }
 
             val bins = listOf(
                 "/system/bin/insmod", "/vendor/bin/insmod", "insmod",
@@ -451,10 +417,6 @@ class DriverViewModel : ViewModel() {
             for (b in bins) {
                 forms.add("$b ${staged.absolutePath} devname=$devNode")
                 forms.add("$b ${staged.absolutePath}")
-                if (force) {
-                    forms.add("$b -f ${staged.absolutePath} devname=$devNode")
-                    forms.add("$b -f ${staged.absolutePath}")
-                }
             }
             var res = Shell.cmd("true").exec()
             
@@ -497,54 +459,10 @@ class DriverViewModel : ViewModel() {
             }
 
             tlog("OTA: insmod OK (exit ${res.code})", "OK")
-            
+
             Shell.cmd("chmod 666 /dev/$devNode 2>/dev/null").exec()
 
-            waitForStability()
-            if (SafetyGuard.kernelLooksUnstable()) {
-                tlog("SAFETY: kernel unstable after load (panic/oops signature caught)", "ERR")
-                val newMods = SafetyGuard.newlyLoaded(before)
-                if (newMods.isEmpty()) {
-                    tlog("SAFETY: new module name not found - check /proc/modules", "WARN")
-                }
-                var rescued = false
-                newMods.forEach { mod ->
-                    tlog("RESCUE: rmmod $mod (preventing phone restart)", "FIX")
-                    if (SafetyGuard.rescueUnload(mod)) {
-                        rescued = true
-                        tlog("RESCUE: $mod unloaded - kernel stable, phone will not restart", "OK")
-                    } else {
-                        tlog("RESCUE: rmmod $mod failed - module is still loaded", "WARN")
-                    }
-                }
-                tlog(
-                    if (rescued)
-                        "RESULT: loader was unsafe, so it was removed. Phone did not restart."
-                    else
-                        "RESULT: loader unsafe - send the console log via WhatsApp (before any restart)",
-                    "WARN"
-                )
-                tlog("SUPPORT: request a custom loader from the WhatsApp button below", "FIX")
-                withContext(Dispatchers.Main) {
-                    autoLoadOk.value = false
-                    autoLoadStatus.value = if (rescued)
-                        "Unsafe loader removed (no restart)" else "Loader unstable - contact support"
-                    tstep("")
-                }
-                return false
-            }
-
-            tlog("SAFETY: kernel stable - no phone restart risk", "OK")
             withContext(Dispatchers.Main) { verifyModule() }
-            if (!UniversalKernelLoader.abiCheck(context, this, devNode, before, entry.variant)) {
-                tlog("RESULT: self-test failed - the driver was removed, phone safe", "WARN")
-                withContext(Dispatchers.Main) {
-                    autoLoadOk.value = false
-                    autoLoadStatus.value = "Self-test failed (driver removed)"
-                    tstep("")
-                }
-                return false
-            }
 
             tstep("Checking /dev/$devNode...")
             val nodes = Shell.cmd("ls /dev 2>/dev/null").exec().out.map { it.trim() }
@@ -574,10 +492,6 @@ class DriverViewModel : ViewModel() {
         } finally {
             if (downloaded.exists()) downloaded.delete()
         }
-    }
-
-    private suspend fun waitForStability() {
-        withContext(Dispatchers.IO) { try { Thread.sleep(900) } catch (e: InterruptedException) { } }
     }
 
     private val _forceNote: String

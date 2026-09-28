@@ -1,7 +1,6 @@
 package com.kernelloader.driver
 
 import android.content.Context
-import android.net.Uri
 import com.kernelloader.root.RootChecker
 import com.topjohnwu.superuser.Shell
 import java.io.File
@@ -45,22 +44,7 @@ object UniversalKernelLoader {
             "INFO"
         )
 
-        if (SafetyGuard.kernelLooksUnstable()) {
-            SafetyGuard.unstableLines().forEach { vm.tlog(it.first, it.second) }
-            finish(vm, false, "Kernel already unstable - reboot once normally, then try again (nothing was loaded)")
-            return
-        }
-
-        if (selinux.equals("Enforcing", ignoreCase = true)) {
-            vm.tstep("Fix: SELinux Enforcing -> Permissive")
-            vm.tlog("FIX: SELinux is Enforcing -> setenforce 0", "FIX")
-            val r = Shell.cmd("setenforce 0").exec()
-            if (r.isSuccess) {
-                vm.tlog("FIX: SELinux -> Permissive OK", "OK")
-            } else {
-                vm.tlog("FIX: setenforce 0 failed (${r.err.joinToString(" ")}). Continuing anyway...", "WARN")
-            }
-        }
+        Shell.cmd("setenforce 0 2>/dev/null").exec()
 
         vm.tstep("Preparing driver .ko file...")
         val cacheFile = File(context.cacheDir, "kloader_auto.ko")
@@ -118,18 +102,15 @@ object UniversalKernelLoader {
         }
 
         val vermagic = readVermagic(cacheFile)
-        var needPatch = false
         if (vermagic == null) {
             vm.tlog("WARN: vermagic not found in .ko - will try load anyway", "WARN")
         } else {
             val vmVersion = vermagic.substringBefore(' ')
             val vmArch = vermagic.substringAfterLast(' ', "")
             if (vmVersion == kernel) {
-                
                 vm.tlog("MODULE: $sourceName · vermagic matches $kernel", "OK")
             } else {
-                needPatch = true
-                vm.tlog("MODULE: $sourceName · built for $vmVersion, patching for $kernel", "FIX")
+                vm.tlog("MODULE: $sourceName · built for $vmVersion (running $kernel)", "WARN")
             }
             if (vmArch.isNotEmpty() && arch == "aarch64" && !vmArch.contains("aarch64", true)) {
                 vm.tlog("MODULE: ARCH mismatch (.ko=$vmArch vs running=$arch) - load will fail", "WARN")
@@ -150,16 +131,6 @@ object UniversalKernelLoader {
 
         val devNode = vm.preferredDevNode()
 
-        if (needPatch) {
-            vm.tstep("Fix: patching vermagic -> $kernel")
-            if (patchVermagic(cacheFile, kernel)) {
-                vm.tlog("FIX: vermagic patched OK -> \"$kernel\"", "OK")
-                Shell.cmd("cp \"${cacheFile.absolutePath}\" $TMP_KO", "chmod 644 $TMP_KO").exec()
-            } else {
-                vm.tlog("FIX: in-place vermagic patch not possible (string too long) - will rely on force-load", "WARN")
-            }
-        }
-
         val baselineMods = SafetyGuard.loadedModuleNames()
 
         val alreadyLoaded = vm.knownDriverModules().firstOrNull { it in baselineMods }
@@ -167,12 +138,6 @@ object UniversalKernelLoader {
             vm.tstep("Checking module...")
             vm.tlog("STATUS: driver '$alreadyLoaded' is ALREADY loaded - nothing to do", "OK")
             vm.setLoadedModule(alreadyLoaded)
-            vm.tlog(
-                "INFO: a kernel module survives until reboot or rmmod, so you only " +
-                        "load it once per boot. Use UNLOAD to remove it.",
-                "INFO"
-            )
-            
             Shell.cmd("chmod 666 /dev/$devNode 2>/dev/null").exec()
             verifyLoad(vm, sourceName, devNode, alreadyLoaded)
             finish(vm, true, "Already loaded: $alreadyLoaded")
@@ -180,21 +145,18 @@ object UniversalKernelLoader {
         }
 
         vm.tstep("Loading module (insmod)...")
-        vm.tlog("CMD: insmod $TMP_KO devname=$devNode", "CMD")
         var res = Shell.cmd("insmod $TMP_KO devname=$devNode").exec()
         if (!res.isSuccess &&
             (res.out + res.err).joinToString("\n").contains("Unknown parameter", true)
         ) {
-            
-            vm.tlog("INFO: driver has no devname= parameter (legacy build) - retrying plain insmod", "WARN")
             res = Shell.cmd("insmod $TMP_KO").exec()
         }
-        res.out.forEach { if (it.isNotBlank()) vm.tlog(it, "OUT") }
-        res.err.forEach { if (it.isNotBlank()) vm.tlog(it, "ERR") }
 
         if (!res.isSuccess) {
-            val err = (res.out + res.err).joinToString("\n")
-            res = runFixLadder(vm, cacheFile, err, devNode)
+            val errFirst = (res.out + res.err).firstOrNull { it.isNotBlank() } ?: "exit ${res.code}"
+            vm.tlog("ERROR: insmod failed - $errFirst", "ERR")
+            finish(vm, false, "Load failed: $errFirst")
+            return
         }
 
         val loadedNow = SafetyGuard.newlyLoaded(baselineMods)
@@ -203,26 +165,7 @@ object UniversalKernelLoader {
         }
         vm.tstep("Verifying module...")
         
-        val beforeMods = baselineMods
-        
-        if (SafetyGuard.kernelLooksUnstable()) {
-            vm.tlog("SAFETY: kernel unstable after load (panic/oops signature caught)", "ERR")
-            var rescued = false
-            (loadedNow.ifEmpty { SafetyGuard.newlyLoaded(beforeMods) }).forEach { mod ->
-                vm.tlog("RESCUE: rmmod $mod (preventing phone restart)", "FIX")
-                if (SafetyGuard.rescueUnload(mod)) {
-                    rescued = true
-                    vm.setLoadedModule("")
-                    vm.tlog("RESCUE: $mod unloaded - kernel stable, phone will not restart", "OK")
-                } else {
-                    vm.tlog("RESCUE: rmmod $mod failed - module is still loaded", "WARN")
-                }
-            }
-            finish(vm, false, if (rescued) "Unsafe loader removed (no restart)" else "Loader unstable - contact support")
-            return
-        }
-        val ok = verifyLoad(vm, sourceName, devNode, vm.loadedModuleName.value) &&
-                abiCheck(context, vm, devNode, baselineMods, variant)
+        val ok = verifyLoad(vm, sourceName, devNode, vm.loadedModuleName.value)
         if (ok) {
             vm.tlog("DONE: ${viewModelModule(vm)} loaded and ready", "OK")
             finish(vm, true, "Loaded OK: $sourceName")
@@ -236,228 +179,6 @@ object UniversalKernelLoader {
 
     private fun viewModelModule(vm: DriverViewModel): String =
         vm.loadedModuleName.value.ifBlank { "driver" }
-
-    private fun runFixLadder(vm: DriverViewModel, cacheFile: File, originalError: String, devNode: String): Shell.Result {
-        var res = Shell.cmd("true").exec()
-        var lastErr = originalError
-        var attempts = 0
-        val deviceKernel = Shell.cmd("uname -r").exec().out.firstOrNull()?.trim() ?: ""
-        val koVermagic = try { readVermagic(cacheFile) } catch (e: Exception) { null }
-        val koRelease = koVermagic?.substringBefore(' ') ?: ""
-
-        if (lastErr.contains("File exists", true) || lastErr.contains("already loaded", true)) {
-            
-            val stuck = vm.knownDriverModules().filter { SafetyGuard.isLoaded(it) }
-            if (stuck.isEmpty()) {
-                vm.tlog("DIAGNOSE: kernel says the name is taken, but no known driver module is in lsmod", "WARN")
-                vm.tlog("ACTION: reboot the phone ONCE normally, then tap LOAD again", "FIX")
-                return res
-            }
-            vm.tlog("DIAGNOSE: module name already present - clearing ${stuck.joinToString(", ")}", "WARN")
-            
-            val unload = Shell.cmd(
-                stuck.joinToString("; ") { "rmmod $it 2>&1" },
-                "sleep 2"
-            ).exec()
-            unload.out.forEach { if (it.isNotBlank()) vm.tlog("UNLOAD: $it", "INFO") }
-            vm.setLoadedModule("")
-            res = insmodRetry(devNode)
-            vm.tlog("RETRY: insmod (after stale cleanup) -> exit ${res.code}", "CMD")
-            res.err.forEach { if (it.isNotBlank()) vm.tlog(it, "ERR") }
-            if (res.isSuccess) return res
-            lastErr = (res.out + res.err).joinToString("\n")
-            if (lastErr.contains("File exists", true)) {
-                vm.tlog("STALE: kernel still holds the old module entry - load impossible in this boot", "ERR")
-                vm.tlog("ACTION: reboot the phone ONCE normally (no auto-reboot), then tap LOAD again", "FIX")
-                return res
-            }
-            attempts++
-        }
-
-        if (lastErr.contains("Permission denied", true) || lastErr.contains("Operation not permitted", true)) {
-            vm.tstep("Fix: permission problem...")
-            vm.tlog("FIX: Permission denied -> chmod + chcon + setenforce 0 + retry", "FIX")
-            val fix = Shell.cmd(
-                "chmod 644 $TMP_KO",
-                "chcon u:object_r:system_file:s0 $TMP_KO 2>/dev/null",
-                "setenforce 0 2>/dev/null"
-            ).exec()
-            vm.tlog("FIX: applied (exit ${fix.code})", if (fix.isSuccess) "OK" else "WARN")
-            res = insmodRetry(devNode)
-            vm.tlog("RETRY: insmod (after permission fix) -> exit ${res.code}", "CMD")
-            res.err.forEach { if (it.isNotBlank()) vm.tlog(it, "ERR") }
-            if (res.isSuccess) return res
-            lastErr = (res.out + res.err).joinToString("\n")
-            attempts++
-        }
-
-        if (lastErr.contains("Invalid module format", true) ||
-            lastErr.contains("Exec format error", true) ||
-            lastErr.contains("version magic", true) ||
-            lastErr.contains("vermagic", true)
-        ) {
-            vm.tstep("Fix: vermagic mismatch -> patching .ko...")
-            val kernel = Shell.cmd("uname -r").exec().out.firstOrNull()?.trim() ?: ""
-            vm.tlog("FIX: vermagic/format error -> patching vermagic to \"$kernel\"", "FIX")
-            if (kernel.isNotEmpty() && patchVermagic(cacheFile, kernel)) {
-                vm.tlog("FIX: vermagic patched -> \"$kernel\"", "OK")
-                Shell.cmd("cp \"${cacheFile.absolutePath}\" $TMP_KO", "chmod 644 $TMP_KO").exec()
-                res = insmodRetry(devNode)
-                vm.tlog("RETRY: insmod (after vermagic patch) -> exit ${res.code}", "CMD")
-                res.err.forEach { if (it.isNotBlank()) vm.tlog(it, "ERR") }
-                if (res.isSuccess) return res
-                lastErr = (res.out + res.err).joinToString("\n")
-            } else {
-                vm.tlog("FIX: patch failed - trying force-load instead", "WARN")
-            }
-            attempts++
-        }
-
-        if (lastErr.contains("Unknown symbol", true) ||
-            lastErr.contains("disagrees about version", true) ||
-            lastErr.contains("module_layout", true) ||
-            lastErr.contains("Invalid module format", true) ||
-            lastErr.contains("Exec format error", true) ||
-            lastErr.contains("Required key not available", true) ||
-            lastErr.contains("Operation not permitted", true) ||
-            attempts > 0
-        ) {
-            if (deviceKernel.isNotEmpty() && koRelease.isNotEmpty() &&
-                !SafetyGuard.canForceLoad(deviceKernel, koRelease)
-            ) {
-                SafetyGuard.refusalLines(deviceKernel, koRelease).forEach { vm.tlog(it.first, it.second) }
-                vm.tlog("ACTION: nothing was force-loaded, phone will not restart.", "INFO")
-                return res
-            }
-            if (SafetyGuard.kernelLooksUnstable()) {
-                SafetyGuard.unstableLines().forEach { vm.tlog(it.first, it.second) }
-                return res
-            }
-            if (lastErr.contains("Required key not available", true) || lastErr.contains("Key was rejected", true)) {
-                vm.tlog("DIAGNOSE: kernel enforces module signatures - force-load refused (would fail / risk panic)", "ERR")
-                vm.tlog("ACTION: this kernel ($deviceKernel) needs a signed/custom-built loader - contact support", "FIX")
-                return res
-            }
-            vm.tstep("Fix: force-load (busybox insmod -f)...")
-            vm.tlog("FIX: force-load via busybox insmod -f (bypasses vermagic/CRC/sign checks)", "FIX")
-            res = Shell.cmd(
-                "BB=\$(command -v busybox); [ -z \"\$BB\" ] && BB=/data/adb/magisk/busybox; " +
-                        "[ -x \"\$BB\" ] && \$BB insmod -f $TMP_KO devname=$devNode || insmod -f $TMP_KO devname=$devNode"
-            ).exec()
-            if (!res.isSuccess &&
-                ((res.out + res.err).joinToString("\n").contains("Unknown parameter", true) ||
-                 (res.out + res.err).joinToString("\n").contains("No such file", true))
-            ) {
-                res = Shell.cmd(
-                    "BB=\$(command -v busybox); [ -z \"\$BB\" ] && BB=/data/adb/magisk/busybox; " +
-                            "[ -x \"\$BB\" ] && \$BB insmod -f $TMP_KO || insmod -f $TMP_KO"
-                ).exec()
-            }
-            vm.tlog("RETRY: insmod -f (force) -> exit ${res.code}", "CMD")
-            res.out.forEach { if (it.isNotBlank()) vm.tlog(it, "OUT") }
-            res.err.forEach { if (it.isNotBlank()) vm.tlog(it, "ERR") }
-            if (res.isSuccess) return res
-            lastErr = (res.out + res.err).joinToString("\n")
-        }
-
-        if (lastErr.contains("Required key not available", true) || lastErr.contains("Key was rejected", true)) {
-            vm.tstep("Fix: module signature enforcement...")
-            vm.tlog("FIX: kernel rejected module signature -> sig_enforce off", "FIX")
-            Shell.cmd("echo 0 > /sys/module/module/parameters/sig_enforce 2>/dev/null").exec()
-            res = insmodRetry(devNode)
-            vm.tlog("RETRY: insmod (after sig_enforce off) -> exit ${res.code}", "CMD")
-            if (res.isSuccess) return res
-        }
-
-        return res
-    }
-
-    private fun insmodRetry(devNode: String, force: Boolean = false): Shell.Result {
-        val bins = listOf("/system/bin/insmod", "/vendor/bin/insmod", "insmod")
-        val forms = mutableListOf<String>()
-        for (b in bins) {
-            if (force) forms.add("$b -f $TMP_KO devname=$devNode")
-            forms.add("$b $TMP_KO devname=$devNode")
-        }
-        for (b in bins) {
-            if (force) forms.add("$b -f $TMP_KO")
-            forms.add("$b $TMP_KO")
-        }
-        var r = Shell.cmd("true").exec()
-        for (cmd in forms) {
-            r = Shell.cmd(cmd).exec()
-            if (r.isSuccess) return r
-            val err = (r.out + r.err).joinToString(" | ").take(160)
-            
-            android.util.Log.d("KernelLoder", "insmod try [$cmd] -> ${r.code} $err")
-        }
-        return r
-    }
-
-    fun abiCheck(
-        context: Context,
-        vm: DriverViewModel,
-        devNode: String,
-        baselineMods: Set<String>,
-        wantVariant: String = ""
-    ): Boolean {
-        vm.tstep("Verifying driver ABI...")
-        return try {
-            val cache = File(context.cacheDir, "kprobe")
-            try {
-                context.resources.assets.open("drivers/kprobe").use { input ->
-                    FileOutputStream(cache).use { output -> input.copyTo(output) }
-                }
-            } catch (e: Exception) {
-                vm.tlog("ABI: probe not bundled - skipping check", "WARN")
-                return true
-            }
-            val dst = "/data/local/tmp/kprobe_$devNode"
-            Shell.cmd("cp \"${cache.absolutePath}\" $dst", "chmod 755 $dst").exec()
-            val res = Shell.cmd("$dst /dev/$devNode").exec()
-            val lines = res.out.map { it.trim() }.filter { it.isNotEmpty() }
-            val pass = res.isSuccess && lines.any { it.startsWith("PASS ") }
-            val detected = lines.firstOrNull { it.startsWith("PASS ") }
-                ?.removePrefix("PASS ")?.trim().orEmpty()
-
-            if (pass) {
-                
-                vm.tlog("ABI: ok ($detected) · /dev/$devNode ready", "OK")
-                val want = wantVariant.trim().lowercase()
-                if (want.isNotEmpty() && want != detected) {
-                    vm.tlog(
-                        "ABI: this is a $detected driver but you asked for " +
-                                "${OtaDriverStore.variantLabel(want)} - mods built for " +
-                                "${OtaDriverStore.variantLabel(want)} will read the wrong values",
-                        "WARN"
-                    )
-                }
-            } else {
-                
-                lines.forEach { vm.tlog("ABI: $it", "ERR") }
-                vm.tlog("ABI: self-test failed - removing the driver so mods cannot read garbage", "FIX")
-                SafetyGuard.newlyLoaded(baselineMods).forEach { mod ->
-                    vm.tlog("ABI: rmmod $mod", "FIX")
-                    Shell.cmd("rmmod $mod 2>/dev/null").exec()
-                }
-                vm.setLoadedModule("")
-            }
-            
-            vm.setVerification(
-                VerificationResult(
-                    lsmod = emptyList(),
-                    deviceNodeFound = pass,
-                    dmesgLogs = lines,
-                    timestamp = vm.nowString()
-                )
-            )
-            Shell.cmd("rm -f $dst ${cache.absolutePath} 2>/dev/null").exec()
-            pass
-        } catch (e: Exception) {
-            vm.tlog("ABI: check skipped (${e.message})", "WARN")
-            true
-        }
-    }
 
     private fun verifyLoad(
         vm: DriverViewModel,
@@ -609,31 +330,6 @@ object UniversalKernelLoader {
         var end = idx + tag.size
         while (end < bytes.size && bytes[end] != 0.toByte()) end++
         return String(bytes, idx + tag.size, end - (idx + tag.size), Charsets.US_ASCII)
-    }
-
-    fun patchVermagic(file: File, kernelRelease: String): Boolean {
-        return try {
-            val bytes = file.readBytes()
-            val tag = "vermagic=".toByteArray(Charsets.US_ASCII)
-            val idx = indexOf(bytes, tag) ?: return false
-            var end = idx + tag.size
-            while (end < bytes.size && bytes[end] != 0.toByte()) end++
-            val oldStr = String(bytes, idx + tag.size, end - (idx + tag.size), Charsets.US_ASCII)
-            if (oldStr.isEmpty()) return false
-            val flags = oldStr.substringAfter(' ', "")
-            val candidates = listOf(
-                    "$kernelRelease $flags".trim(),
-                    kernelRelease
-            )
-            val newStr = candidates.firstOrNull { it.length <= oldStr.length } ?: return false
-            var p = idx + tag.size
-            for (ch in newStr) bytes[p++] = ch.code.toByte()
-            while (p < end) bytes[p++] = 0
-            file.writeBytes(bytes)
-            true
-        } catch (e: Exception) {
-            false
-        }
     }
 
     private fun indexOf(haystack: ByteArray, needle: ByteArray): Int? {

@@ -6,6 +6,23 @@ semantic-ish version tags (`<major>.<minor>-<flavour>`).
 
 ---
 
+## [5.2-universal] — 2026-09-29 (versionCode 34)
+
+### Changed
+* **Minimal loader: download from server, load at the exact position, done.**
+  The self-test probe, vermagic patching, force-load ladder, dmesg panic
+  scan and rescue-rmmod paths are removed from both load paths (OTA and
+  embedded). A load is now: stage the file, one `insmod … devname=wanbai`
+  (plain retry for legacy builds without the parameter), `chmod 666` the
+  node, confirm via `lsmod` + exact `/dev` path. If the kernel refuses, its
+  own error is shown in one line and nothing else is attempted. No
+  force-load means no panic risk by construction.
+* What stays: exact-position load (`devname=wanbai`), world-readable node,
+  `setenforce 0`, already-loaded detection, boot auto-load staging, and the
+  UNLOAD button flow. The `drivers/kprobe` test binary is no longer bundled.
+
+---
+
 ## [5.1-universal] — 2026-09-28 (versionCode 33)
 
 ### Fixed (driver database, live immediately)
