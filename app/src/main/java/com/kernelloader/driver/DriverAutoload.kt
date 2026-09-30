@@ -227,7 +227,7 @@ say "boot auto-load finished"
         val w = try {
             
             Shell.cmd("mkdir -p \$(dirname $scriptPath)").exec()
-            File("/data/local/tmp/kloder-boot.sh").apply {
+            File(ctx.cacheDir, "kloder-boot.sh").apply {
                 writeText(script)
             }.let { tmp ->
                 Shell.cmd("cp '${tmp.absolutePath}' $scriptPath", "chmod 755 $scriptPath", "sync").exec()

@@ -6,6 +6,17 @@ semantic-ish version tags (`<major>.<minor>-<flavour>`).
 
 ---
 
+## [5.4-universal] — 2026-09-30 (versionCode 36)
+
+### Fixed
+* **Boot auto-load install no longer fails.** The script was staged through
+  `/data/local/tmp/kloder-boot.sh`, which the app process cannot create on
+  this ROM (`EACCES`), so every switch-ON ended in `could not write ...`.
+  The temp file now lives in the app-private cache dir and only the final
+  copy runs as root.
+
+---
+
 ## [5.3-universal] — 2026-09-30 (versionCode 35)
 
 ### Fixed
