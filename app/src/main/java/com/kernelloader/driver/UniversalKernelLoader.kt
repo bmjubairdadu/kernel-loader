@@ -246,20 +246,20 @@ object UniversalKernelLoader {
         return moduleLoaded && (expectedNode.isBlank() || devExists)
     }
 
-    private fun stageForBoot(
+    fun stageForBoot(
         vm: DriverViewModel,
         context: Context,
         variant: String,
-        devNode: String
+        devNode: String,
+        koFile: File = File(TMP_KO)
     ) {
         val modName = vm.loadedModuleName.value
         if (modName.isBlank()) {
             vm.tlog("AUTOLOAD: skipped - the loaded module name is unknown, so no safe boot script", "WARN")
             return
         }
-        val ko = File(TMP_KO)
-        if (!ko.exists()) {
-            vm.tlog("AUTOLOAD: skipped - $TMP_KO is gone", "WARN")
+        if (!koFile.exists()) {
+            vm.tlog("AUTOLOAD: skipped - ${koFile.absolutePath} is gone", "WARN")
             return
         }
         if (!DriverAutoload.hasBootRunner()) {
@@ -268,7 +268,7 @@ object UniversalKernelLoader {
             return
         }
         vm.tlog("AUTOLOAD: staging so the driver comes back by itself after a reboot...", "INFO")
-        val ok = DriverAutoload.enable(context, ko, modName, variant, devNode) { m, t ->
+        val ok = DriverAutoload.enable(context, koFile, modName, variant, devNode) { m, t ->
             vm.tlog(m, t)
         }
         vm.autoloadEnabled.value = ok

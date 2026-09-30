@@ -485,6 +485,12 @@ class DriverViewModel : ViewModel() {
                 return false
             }
             rememberDevNode(devNode)
+            withContext(Dispatchers.Main) {
+                val mods = SafetyGuard.loadedModuleNames()
+                val ours = knownDriverModules().filter { it in mods }
+                if (ours.isNotEmpty()) setLoadedModule(ours.first())
+            }
+            UniversalKernelLoader.stageForBoot(this@DriverViewModel, context, entry.variant, devNode, staged)
             return true
             } finally {
                 Shell.cmd("rm -f ${staged.absolutePath} 2>/dev/null").exec()

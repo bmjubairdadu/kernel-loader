@@ -6,6 +6,17 @@ semantic-ish version tags (`<major>.<minor>-<flavour>`).
 
 ---
 
+## [5.3-universal] — 2026-09-30 (versionCode 35)
+
+### Fixed
+* **OTA loads now stage for boot, like embedded loads.** The boot auto-load
+  switch only worked after an embedded-path load, because only that path
+  staged the exact bytes and installed the service.d script. The default OTA
+  path never staged, so after a reboot nothing came back even with the switch
+  on. Both paths now share one staging step.
+
+---
+
 ## [5.2-universal] — 2026-09-29 (versionCode 34)
 
 ### Changed

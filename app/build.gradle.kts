@@ -15,8 +15,8 @@ android {
         applicationId = "com.kernelloader"
         minSdk = 28
         targetSdk = 34
-        versionCode = 34
-        versionName = "5.2-universal"
+        versionCode = 35
+        versionName = "5.3-universal"
 
         buildConfigField(
             "String",
