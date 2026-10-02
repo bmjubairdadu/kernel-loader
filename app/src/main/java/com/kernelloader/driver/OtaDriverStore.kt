@@ -219,12 +219,12 @@ object OtaDriverStore {
             if (out.exists() && out.length() > 0 &&
                 (entry.size <= 0 || out.length() == entry.size)
             ) {
-                onLog("OTA: cache hit ${out.name} (${out.length()} bytes)", "OK")
+                onLog("Driver cached", "OK")
                 return out
             }
             val url = if (entry.file.startsWith("http")) entry.file
                       else baseUrl.trimEnd('/') + "/" + entry.file.trimStart('/')
-            onLog("OTA: downloading $url", "INFO")
+            onLog("Downloading driver...", "INFO")
             val conn = (URL(url).openConnection() as HttpURLConnection).apply {
                 connectTimeout = 20000; readTimeout = 60000
                 instanceFollowRedirects = true
@@ -232,7 +232,7 @@ object OtaDriverStore {
             }
             conn.connect()
             if (conn.responseCode !in 200..299) {
-                onLog("OTA: HTTP ${conn.responseCode} for ${entry.file}", "ERR")
+                onLog("Download failed (HTTP ${conn.responseCode})", "ERR")
                 return null
             }
             out.outputStream().use { o ->
@@ -246,10 +246,10 @@ object OtaDriverStore {
                 }
             }
             conn.disconnect()
-            onLog("OTA: downloaded ${out.name} (${out.length()} bytes)", "OK")
+            onLog("Driver downloaded", "OK")
             out
         } catch (e: Exception) {
-            onLog("OTA: download failed: ${e.message}", "ERR")
+            onLog("Download failed: ${e.message}", "ERR")
             null
         }
     }

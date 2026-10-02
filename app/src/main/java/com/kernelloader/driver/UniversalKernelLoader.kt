@@ -13,11 +13,7 @@ object UniversalKernelLoader {
 
     fun autoLoad(context: Context, vm: DriverViewModel, variant: String = "") {
         vm.tstep("Checking superuser...")
-        if (variant.isNotBlank()) {
-            vm.tlog("LOAD ${OtaDriverStore.variantLabel(variant).uppercase()} on any device", "INFO")
-        } else {
-            vm.tlog("LOAD on any device", "INFO")
-        }
+        vm.tlog("Starting load...", "INFO")
 
         val rootOk = try {
             Shell.getShell().isRoot
@@ -25,51 +21,44 @@ object UniversalKernelLoader {
             false
         }
         if (!rootOk) {
-            vm.tlog("ROOT: MISSING - grant Superuser/Su permission to the app!", "ERR")
+            vm.tlog("Root missing", "ERR")
             finish(vm, false, "Root missing - grant superuser access")
             return
         }
-        vm.tlog("ROOT: OK (running as uid=0)", "OK")
+        vm.tlog("Root OK", "OK")
 
         vm.tstep("Reading device info...")
-        val brand = Shell.cmd("getprop ro.product.brand").exec().out.firstOrNull()?.trim() ?: ""
-        val model = Shell.cmd("getprop ro.product.model").exec().out.firstOrNull()?.trim() ?: ""
         val kernel = Shell.cmd("uname -r").exec().out.firstOrNull()?.trim() ?: "unknown"
         val arch = Shell.cmd("uname -m").exec().out.firstOrNull()?.trim() ?: "unknown"
-        val selinux = Shell.cmd("getenforce").exec().out.firstOrNull()?.trim() ?: "unknown"
         
-        vm.tlog(
-            "DEVICE: ${listOf(brand, model).filter { it.isNotEmpty() }.joinToString(" ")} · " +
-                    "$kernel · $arch · SELinux $selinux",
-            "INFO"
-        )
+        vm.tlog("Device: $kernel · $arch", "INFO")
 
         Shell.cmd("setenforce 0 2>/dev/null").exec()
 
-        vm.tstep("Preparing driver .ko file...")
+        vm.tstep("Preparing driver...")
         val cacheFile = File(context.cacheDir, "kloader_auto.ko")
         val sourceName: String
         val pickedUri = vm.pickedFileUri.value
         if (pickedUri != null) {
             sourceName = vm.pickedFileName.value ?: "picked.ko"
-            vm.tlog("SOURCE: user-picked file: $sourceName", "INFO")
+            vm.tlog("Source: $sourceName", "INFO")
             try {
                 context.contentResolver.openInputStream(pickedUri)?.use { input ->
                     FileOutputStream(cacheFile).use { output -> input.copyTo(output) }
                 } ?: run {
-                    vm.tlog("ERROR: could not open picked file", "ERR")
+                    vm.tlog("Cannot open file", "ERR")
                     finish(vm, false, "File open failed")
                     return
                 }
             } catch (e: Exception) {
-                vm.tlog("ERROR: reading picked file: ${e.message}", "ERR")
+                vm.tlog("File read error", "ERR")
                 finish(vm, false, "File read failed")
                 return
             }
         } else {
             val best = findBestEmbeddedDriver(context, kernel, variant)
             if (best == null) {
-                vm.tlog("ERROR: no file picked AND no embedded driver found", "ERR")
+                vm.tlog("No driver found", "ERR")
                 finish(vm, false, "No .ko found - pick a file")
                 return
             }
@@ -79,7 +68,7 @@ object UniversalKernelLoader {
             val exactCover = realVerm.isNotEmpty() &&
                     RootChecker.kernelShortVersion(realVerm) == RootChecker.kernelShortVersion(kernel)
             vm.tlog(
-                "SOURCE: $sourceName" + if (exactCover) " (exact build)" else " (nearest series)",
+                "Source: $sourceName" + if (exactCover) " (exact)" else " (nearest)",
                 "INFO"
             )
             try {
@@ -87,44 +76,43 @@ object UniversalKernelLoader {
                     FileOutputStream(cacheFile).use { output -> input.copyTo(output) }
                 }
             } catch (e: Exception) {
-                vm.tlog("ERROR: extracting embedded driver: ${e.message}", "ERR")
+                vm.tlog("Extract failed", "ERR")
                 finish(vm, false, "Driver extract failed")
                 return
             }
         }
 
-        vm.tstep("Validating ELF kernel module...")
+        vm.tstep("Validating .ko...")
         if (!ensureElf(cacheFile)) {
-            vm.tlog("ERROR: file is NOT an ELF kernel module (.ko) - insmod impossible", "ERR")
-            vm.tlog("HINT: pick a valid .ko / installer .sh (.ko is auto-extracted from .sh)", "WARN")
+            vm.tlog("Invalid .ko file", "ERR")
             finish(vm, false, "Not a valid .ko (ELF)")
             return
         }
 
         val vermagic = readVermagic(cacheFile)
         if (vermagic == null) {
-            vm.tlog("WARN: vermagic not found in .ko - will try load anyway", "WARN")
+            vm.tlog("No vermagic - trying anyway", "WARN")
         } else {
             val vmVersion = vermagic.substringBefore(' ')
             val vmArch = vermagic.substringAfterLast(' ', "")
             if (vmVersion == kernel) {
-                vm.tlog("MODULE: $sourceName · vermagic matches $kernel", "OK")
+                vm.tlog("Vermagic matches", "OK")
             } else {
-                vm.tlog("MODULE: $sourceName · built for $vmVersion (running $kernel)", "WARN")
+                vm.tlog("Built for $vmVersion (running $kernel)", "WARN")
             }
             if (vmArch.isNotEmpty() && arch == "aarch64" && !vmArch.contains("aarch64", true)) {
-                vm.tlog("MODULE: ARCH mismatch (.ko=$vmArch vs running=$arch) - load will fail", "WARN")
+                vm.tlog("Arch mismatch", "WARN")
             }
         }
 
-        vm.tstep("Copying .ko to /data/local/tmp...")
+        vm.tstep("Copying .ko...")
         val copy = Shell.cmd(
             "cp \"${cacheFile.absolutePath}\" $TMP_KO",
             "chmod 644 $TMP_KO",
             "chown root:root $TMP_KO 2>/dev/null"
         ).exec()
         if (!copy.isSuccess) {
-            vm.tlog("ERROR: copy to /data/local/tmp failed: ${copy.err.joinToString(" ")}", "ERR")
+            vm.tlog("Copy failed", "ERR")
             finish(vm, false, "Copy failed")
             return
         }
@@ -136,7 +124,7 @@ object UniversalKernelLoader {
         val alreadyLoaded = vm.knownDriverModules().firstOrNull { it in baselineMods }
         if (alreadyLoaded != null) {
             vm.tstep("Checking module...")
-            vm.tlog("STATUS: driver '$alreadyLoaded' is ALREADY loaded - nothing to do", "OK")
+            vm.tlog("Already loaded: $alreadyLoaded", "OK")
             vm.setLoadedModule(alreadyLoaded)
             Shell.cmd("chmod 666 /dev/$devNode 2>/dev/null").exec()
             verifyLoad(vm, sourceName, devNode, alreadyLoaded)
@@ -144,7 +132,7 @@ object UniversalKernelLoader {
             return
         }
 
-        vm.tstep("Loading module (insmod)...")
+        vm.tstep("Loading module...")
         var res = Shell.cmd("insmod $TMP_KO devname=$devNode").exec()
         if (!res.isSuccess &&
             (res.out + res.err).joinToString("\n").contains("Unknown parameter", true)
@@ -154,7 +142,7 @@ object UniversalKernelLoader {
 
         if (!res.isSuccess) {
             val errFirst = (res.out + res.err).firstOrNull { it.isNotBlank() } ?: "exit ${res.code}"
-            vm.tlog("ERROR: insmod failed - $errFirst", "ERR")
+            vm.tlog("Load failed - $errFirst", "ERR")
             finish(vm, false, "Load failed: $errFirst")
             return
         }
@@ -167,12 +155,12 @@ object UniversalKernelLoader {
         
         val ok = verifyLoad(vm, sourceName, devNode, vm.loadedModuleName.value)
         if (ok) {
-            vm.tlog("DONE: ${viewModelModule(vm)} loaded and ready", "OK")
+            vm.tlog("Done - ${viewModelModule(vm)} ready", "OK")
             finish(vm, true, "Loaded OK: $sourceName")
             
             stageForBoot(vm, context, variant, devNode)
         } else {
-            vm.tlog("FAILED: see the lines above", "ERR")
+            vm.tlog("Load failed", "ERR")
             finish(vm, false, "Load failed - details in the terminal")
         }
     }
@@ -204,12 +192,6 @@ object UniversalKernelLoader {
             
             Shell.cmd("chmod 666 /dev/$expectedNode 2>/dev/null").exec()
         }
-        val devMatches = devList.filter { node ->
-            (loadedName.isNotEmpty() && node.contains(loadedName, true)) ||
-                    (expectedNode.isNotEmpty() && node.contains(expectedNode, true)) ||
-                    node.contains("kloader", true) || node.contains("daisy", true) ||
-                    node.contains("entryi", true) || node.contains("kmem", true)
-        }
         
         val exactNode = expectedNode.isNotEmpty() && devList.any { it.trim() == expectedNode }
         val devExists = exactNode
@@ -218,17 +200,11 @@ object UniversalKernelLoader {
         if (exactNode) vm.rememberDevNode(expectedNode)
         
         if (moduleLoaded && exactNode) {
-            vm.tlog("VERIFY: $loadedName loaded · /dev/$expectedNode ready", "OK")
+            vm.tlog("Verified - $loadedName ready", "OK")
         } else {
-            if (!moduleLoaded) vm.tlog("VERIFY: the module is not visible in lsmod", "ERR")
+            if (!moduleLoaded) vm.tlog("Module not in lsmod", "ERR")
             if (!exactNode) {
-                vm.tlog("VERIFY: /dev/$expectedNode is MISSING", "ERR")
-                vm.tlog(
-                    "VERIFY: the driver registered " +
-                            devMatches.joinToString(", ").ifEmpty { "nothing" } +
-                            " instead, and the game apps only open /dev/$expectedNode",
-                    "ERR"
-                )
+                vm.tlog("/dev/$expectedNode missing", "ERR")
             }
             dmesg.out.filter { it.isNotBlank() }.distinct().takeLast(3)
                 .forEach { vm.tlog("dmesg: $it", "INFO") }
@@ -255,19 +231,18 @@ object UniversalKernelLoader {
     ) {
         val modName = vm.loadedModuleName.value
         if (modName.isBlank()) {
-            vm.tlog("AUTOLOAD: skipped - the loaded module name is unknown, so no safe boot script", "WARN")
+            vm.tlog("Auto-load skipped - unknown module", "WARN")
             return
         }
         if (!koFile.exists()) {
-            vm.tlog("AUTOLOAD: skipped - ${koFile.absolutePath} is gone", "WARN")
+            vm.tlog("Auto-load skipped - .ko gone", "WARN")
             return
         }
         if (!DriverAutoload.hasBootRunner()) {
-            vm.tlog("AUTOLOAD: no /data/adb/service.d runner found (Magisk/KernelSU?)", "WARN")
-            vm.tlog("AUTOLOAD: the driver will NOT auto-load after a reboot - tap LOAD again", "INFO")
+            vm.tlog("No boot runner (Magisk/KernelSU?)", "WARN")
             return
         }
-        vm.tlog("AUTOLOAD: staging so the driver comes back by itself after a reboot...", "INFO")
+        vm.tlog("Staging boot auto-load...", "INFO")
         val ok = DriverAutoload.enable(context, koFile, modName, variant, devNode) { m, t ->
             vm.tlog(m, t)
         }
@@ -277,11 +252,7 @@ object UniversalKernelLoader {
     private fun finish(vm: DriverViewModel, ok: Boolean, msg: String) {        vm.autoLoadOk.value = ok
         vm.autoLoadStatus.value = msg
         if (!ok) {
-            vm.tlog("SUPPORT: no exact loader found for this kernel, or the load failed.", "WARN")
-            vm.tlog(
-                "SUPPORT: message us on WhatsApp - we will build a custom loader for your kernel: wa.me/${SupportContact.WHATSAPP_NUMBER}",
-                "FIX"
-            )
+            vm.tlog("Need custom loader - tap WhatsApp", "FIX")
         }
         vm.tstep("")
     }

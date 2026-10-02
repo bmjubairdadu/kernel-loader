@@ -59,6 +59,7 @@ import com.kernelloader.ui.theme.LogFix
 import com.kernelloader.ui.theme.LogInfo
 import com.kernelloader.ui.theme.LogOk
 import com.kernelloader.ui.theme.LogOut
+import com.kernelloader.ui.theme.LogTimestamp
 import com.kernelloader.ui.theme.LogWarn
 import com.kernelloader.ui.theme.MonoSmall
 import com.kernelloader.ui.theme.MonoTiny
@@ -270,13 +271,41 @@ fun ConsoleScreen(
 
 @Composable
 private fun TerminalLineRow(line: TerminalLine) {
-    Text(
-        text = "[${line.time}] ${line.text}",
-        color = colorsByType[line.type] ?: TextPrimary,
-        style = MaterialTheme.typography.bodySmall.copy(
-            fontFamily = FontFamily.Monospace,
-            fontSize = 12.sp
-        ),
-        modifier = Modifier.padding(vertical = 1.dp)
-    )
+    val typeColor = colorsByType[line.type] ?: TextPrimary
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 2.dp),
+        verticalAlignment = Alignment.Top
+    ) {
+        Box(
+            modifier = Modifier
+                .padding(top = 4.dp)
+                .width(3.dp)
+                .height(12.dp)
+                .background(typeColor, RoundedCornerShape(2.dp))
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = line.time,
+            color = LogTimestamp,
+            style = MaterialTheme.typography.bodySmall.copy(
+                fontFamily = FontFamily.Monospace,
+                fontSize = 11.sp
+            ),
+            modifier = Modifier.padding(top = 1.dp, end = 8.dp)
+        )
+        Text(
+            text = line.text,
+            color = typeColor,
+            style = MaterialTheme.typography.bodySmall.copy(
+                fontFamily = FontFamily.Monospace,
+                fontSize = 12.5.sp,
+                fontWeight = if (line.type == "OK" || line.type == "ERR")
+                    androidx.compose.ui.text.font.FontWeight.SemiBold
+                else androidx.compose.ui.text.font.FontWeight.Normal
+            ),
+            modifier = Modifier.weight(1f)
+        )
+    }
 }

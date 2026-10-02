@@ -7,7 +7,7 @@
 
 [![License: GPL-3.0](https://img.shields.io/badge/License-GPL%20v3-blue.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Android%209%2B%20(arm64)-green.svg)](#requirements)
-[![Version](https://img.shields.io/badge/version-2.1--universal-orange.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-2.4--universal-orange.svg)](CHANGELOG.md)
 [![Root](https://img.shields.io/badge/root-Magisk%20%7C%20KernelSU-red.svg)](#requirements)
 
 A root-powered Android app that loads kernel modules (`.ko`) on **any** phone, with a
@@ -29,7 +29,7 @@ superuser rights.
 | ⚡ **AUTO LOAD (Universal)** | One tap: detects kernel → picks the best bundled driver → checks vermagic → fixes problems → loads → verifies. |
 | ️ **Live terminal** | Colour-coded `CMD / OK / ERR / FIX / WARN / OUT` stream of every step + a **manual root shell** input. |
 | 🔧 **Auto-fix engine** | SELinux permissive, chmod/chcon, **binary vermagic patching**, busybox `insmod -f`, `sig_enforce` off — each fix is applied *after* diagnosing the exact error, then retried. |
-|  **40 bundled drivers** | QX (640×480), RT (Full HD) and **native builds** (`native_4.9.307.ko`, `native_4.9.337.ko`) built from source with proton-clang. |
+|  **OTA driver database** | No bundled `.ko` — matching loader is downloaded from the GitHub `drivers` branch at runtime, then verified. |
 | ⚙️ **Manual control** | `insmod`, `insmod -f`, `rmmod` (auto-detects the real module name), **Verify Module** (`lsmod` + device node + `dmesg`). |
 |  **Portable driver source** | `driver/kloader_driver.c` — a clean, reusable misc-device skeleton for any arm64 kernel. |
 
@@ -47,9 +47,9 @@ superuser rights.
 
 ## ️ Download
 
-* **APK** — grab the latest `app-debug.apk` from the [**Releases**](../../releases/latest) page.
-* **Prebuilt drivers** — `driver/out/native_4.9.337.ko`, `driver/out/native_4.9.307.ko`
-  (also embedded inside the APK under `assets/drivers/`).
+* **APK** — grab the latest `app-release.apk` from the [**Releases**](../../releases/latest) page.
+* **Kernel drivers (OTA)** — no bundled `.ko`; the app downloads the matching loader
+  from the GitHub `drivers` branch database at runtime.
 * **Full source** — Kotlin + Jetpack Compose app, C kernel module and build tooling.
 
 ---
@@ -249,7 +249,7 @@ know how to recover (fastboot / recovery).
 
 <div align="center">
 
-**Kernel Loder v2.1-universal** — one loader for every kernel.
+**Kernel Loder v2.4-universal** — one loader for every kernel.
 ⭐ Star the repo if it helped you!
 
 </div>

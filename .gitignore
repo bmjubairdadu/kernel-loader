@@ -66,4 +66,16 @@ docs/screenshots/*.png
 /driver/native_status.txt
 /driver/rebuild_native.txt
 /driver/logs/
+/driver/fix49x_result.txt
+/driver/gen49x_result.txt
+/driver/ota_patch.txt
+/driver/patch_watchdog_crlf_lf.py
+/driver/publish_lf.sh
 /build_log.txt
+# ===== agent scan scratch at repo root =====
+/auc.txt
+/loglist.txt
+/reboot_scan.txt
+/ukl_scan.txt
+/vm_mid.txt
+/vm_scan.txt

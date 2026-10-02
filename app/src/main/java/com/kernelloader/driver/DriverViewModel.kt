@@ -169,7 +169,7 @@ class DriverViewModel : ViewModel() {
     fun checkForAppUpdate() {
         if (updateStatus.value == "CHECKING" || updateStatus.value == "DOWNLOADING") return
         updateStatus.value = "CHECKING"
-        tlog("UPDATE: checking GitHub Releases (current v${BuildConfig.VERSION_CODE} ${BuildConfig.VERSION_NAME})...", "INFO")
+        tlog("Checking for updates...", "INFO")
         viewModelScope.launch(Dispatchers.IO) {
             val result = AppUpdateChecker.check(BuildConfig.UPDATE_API_URL, BuildConfig.VERSION_CODE)
             withContext(Dispatchers.Main) {
@@ -177,21 +177,16 @@ class DriverViewModel : ViewModel() {
                     is AppUpdateChecker.UpdateCheck.Available -> {
                         appUpdate.value = result.info
                         updateStatus.value = "AVAILABLE"
-                        tlog(
-                            "UPDATE: new version found - v${result.info.versionCode} ${result.info.versionName} " +
-                                    "(${result.info.apkSize / 1024} KB, ${result.info.publishedAt.take(10)})",
-                            "OK"
-                        )
-                        tlog("UPDATE: tap the update banner to install", "INFO")
+                        tlog("Update available: v${result.info.versionName}", "OK")
                     }
                     AppUpdateChecker.UpdateCheck.UpToDate -> {
                         appUpdate.value = null
                         updateStatus.value = "NONE"
-                        tlog("UPDATE: app is up-to-date (v${BuildConfig.VERSION_CODE})", "OK")
+                        tlog("App up-to-date", "OK")
                     }
                     AppUpdateChecker.UpdateCheck.Offline -> {
                         if (updateStatus.value != "AVAILABLE") updateStatus.value = "ERROR"
-                        tlog("UPDATE: GitHub unreachable (offline?) - skipped", "WARN")
+                        tlog("Update check offline", "WARN")
                     }
                 }
             }
@@ -205,7 +200,7 @@ class DriverViewModel : ViewModel() {
         viewModelScope.launch(Dispatchers.IO) {
             if (!AppUpdateChecker.canInstall(context)) {
                 withContext(Dispatchers.Main) {
-                    tlog("UPDATE: \"install unknown apps\" permission needed - opening settings", "WARN")
+                    tlog("Install permission needed", "WARN")
                     updateStatus.value = "AVAILABLE"
                     updateProgress.value = -1
                     AppUpdateChecker.requestInstallPermission(context)
@@ -226,7 +221,7 @@ class DriverViewModel : ViewModel() {
 
     fun refreshManifest() {
         manifestStatus.value = "LOADING"
-        tlog("DB: connecting to driver database...", "INFO")
+        tlog("Connecting to driver DB...", "INFO")
         viewModelScope.launch(Dispatchers.IO) {
             val (m, error) = try {
                 OtaDriverStore.fetchDetailed()
@@ -242,11 +237,11 @@ class DriverViewModel : ViewModel() {
                 }
                 when {
                     m != null && m.drivers.isNotEmpty() ->
-                        tlog("DB: connected - ${m.drivers.size} loaders available", "OK")
+                        tlog("DB connected - ${m.drivers.size} drivers", "OK")
                     m != null ->
-                        tlog("DB: connected but database is empty", "WARN")
+                        tlog("DB empty", "WARN")
                     else ->
-                        tlog("DB: connection failed - $error", "ERR")
+                        tlog("DB failed - $error", "ERR")
                 }
             }
         }
@@ -290,7 +285,7 @@ class DriverViewModel : ViewModel() {
 
     fun memTest() {
         viewModelScope.launch {
-            tlog("# memtest (driverless, no driver needed)", "CMD")
+            tlog("# memtest", "CMD")
             withContext(Dispatchers.IO) {
                 try {
                     Shell.cmd("setenforce 0 2>/dev/null").exec()
@@ -328,44 +323,34 @@ class DriverViewModel : ViewModel() {
     }
 
     private suspend fun runOtaLoad(context: Context, variant: String = ""): Boolean {
-        tlog("OTA: checking manifest...", "INFO")
-        if (variant.isNotBlank()) {
-            tlog("OTA: looking for a ${OtaDriverStore.variantLabel(variant)} driver", "INFO")
-        }
+        tlog("Checking driver DB...", "INFO")
         val manifest = OtaDriverStore.fetchManifest() ?: run {
-            tlog("OTA: manifest unavailable - see DB error above, then tap refresh", "WARN")
+            tlog("DB unavailable", "WARN")
             return false
         }
         if (manifest.drivers.isEmpty()) {
-            tlog("OTA: manifest has no drivers", "WARN")
+            tlog("DB has no drivers", "WARN")
             return false
         }
         val pool = OtaDriverStore.variantsFor(manifest, variant)
         if (pool.isEmpty()) {
-            tlog(
-                "OTA: database has no ${OtaDriverStore.variantLabel(variant)} driver " +
-                        "(${manifest.drivers.size} other family entries available)",
-                "WARN"
-            )
+            tlog("No ${OtaDriverStore.variantLabel(variant)} driver", "WARN")
             return false
         }
         val kernel = RootChecker.getKernelRelease() ?: return false
         val resolved = OtaDriverStore.resolve(manifest, kernel, variant)
         when (resolved) {
             is OtaDriverStore.ResolveResult.Exact -> {
-                tlog("OTA: exact match found for $kernel", "OK")
+                tlog("Exact match: $kernel", "OK")
                 return downloadAndLoadOta(context, manifest, resolved.entry)
             }
             is OtaDriverStore.ResolveResult.Near -> {
                 val target = resolved.entry.version
-                tlog(
-                    "OTA: no exact match; nearest loader = $target (distance ${resolved.distance})",
-                    "WARN"
-                )
+                tlog("Nearest match: $target", "WARN")
                 return downloadAndLoadOta(context, manifest, resolved.entry)
             }
             is OtaDriverStore.ResolveResult.None -> {
-                tlog("OTA: no driver available for this kernel series", "INFO")
+                tlog("No driver for this kernel", "INFO")
                 return false
             }
         }
@@ -384,12 +369,12 @@ class DriverViewModel : ViewModel() {
         ) ?: return false
         try {
             if (!UniversalKernelLoader.ensureElf(downloaded)) {
-                tlog("OTA: downloaded file is not a valid ELF .ko", "ERR")
+                tlog("Invalid .ko file", "ERR")
                 return false
             }
 
             val kernel = RootChecker.getKernelRelease() ?: return false
-            tlog("OTA: loading ${downloaded.name} ($kernel)...", "INFO")
+            tlog("Loading driver...", "INFO")
 
             val staged = File("/data/local/tmp/kloader_ota.ko")
             
@@ -402,7 +387,7 @@ class DriverViewModel : ViewModel() {
                 "setenforce 0 2>/dev/null"
             ).exec()
             if (!Shell.cmd("test -f ${staged.absolutePath}").exec().isSuccess) {
-                tlog("OTA: staging to /data/local/tmp failed - cannot load", "ERR")
+                tlog("Staging failed", "ERR")
                 return false
             }
             
@@ -419,22 +404,16 @@ class DriverViewModel : ViewModel() {
                 forms.add("$b ${staged.absolutePath}")
             }
             var res = Shell.cmd("true").exec()
-            
-            val tried = mutableListOf<String>()
             for (cmd in forms) {
                 res = Shell.cmd(cmd).exec()
                 if (res.isSuccess) {
-                    val how = cmd.substringBefore(' ').substringAfterLast('/')
-                    tlog("OTA: loaded via $how", "OK")
+                    tlog("Driver loaded", "OK")
                     break
                 }
-                tried += "$cmd -> exit ${res.code} ${(res.out + res.err).firstOrNull { it.isNotBlank() } ?: ""}".trim()
             }
 
             if (!res.isSuccess) {
-                tried.take(2).forEach { tlog("TRY: $it", "INFO") }
-                if (tried.size > 2) tlog("TRY: ... (+${tried.size - 2} more, same error)", "INFO")
-                tlog("OTA: insmod failed (exit ${res.code})", "ERR")
+                tlog("Load failed", "ERR")
                 val errText = (res.out + res.err).joinToString("\n")
 
                 Shell.cmd(
@@ -443,22 +422,20 @@ class DriverViewModel : ViewModel() {
                     "cat ${staged.absolutePath} > /dev/null 2>&1 && echo READ_OK || echo READ_FAIL",
                     "od -An -tx1 ${staged.absolutePath} 2>/dev/null | head -n 1",
                     "dmesg 2>/dev/null | tail -n 10"
-                ).exec().out.filter { it.isNotBlank() }.distinct().takeLast(4)
-                    .forEach { tlog("DIAG: $it", "INFO") }
+                ).exec()
                 if (errText.contains("Invalid module format", true) ||
                     errText.contains("vermagic", true) ||
                     errText.contains("Exec format error", true)
                 ) {
-                    tlog("DIAGNOSE: vermagic / module format mismatch - this loader will not run on this kernel", "WARN")
-                    tlog("ACTION: phone did not restart (nothing was forced).", "INFO")
+                    tlog("Kernel mismatch", "WARN")
                 } else if (errText.contains("No such file or directory", true)) {
-                    tlog("DIAGNOSE: staged file not openable - try: chmod 644 + copy the .ko to /data/local/tmp manually", "WARN")
+                    tlog("Staged file not readable", "WARN")
                 }
-                tlog("SUPPORT: this kernel ($kernel) needs a custom loader - tap the WhatsApp button below", "FIX")
+                tlog("Need custom loader - tap WhatsApp", "FIX")
                 return false
             }
 
-            tlog("OTA: insmod OK (exit ${res.code})", "OK")
+            tlog("Load OK", "OK")
 
             Shell.cmd("chmod 666 /dev/$devNode 2>/dev/null").exec()
 
@@ -470,13 +447,12 @@ class DriverViewModel : ViewModel() {
                 Shell.cmd("chmod 666 /dev/$devNode 2>/dev/null").exec()
                 val mode = Shell.cmd("ls -l /dev/$devNode 2>/dev/null").exec().out.firstOrNull()?.trim().orEmpty()
                 if (mode.contains("rw-rw-rw-")) {
-                    tlog("NODE: /dev/$devNode ready (world R/W)", "OK")
+                    tlog("Node ready", "OK")
                 } else {
-                    tlog("NODE: /dev/$devNode present but not 666 - a game app may be refused", "WARN")
+                    tlog("Node not world-R/W", "WARN")
                 }
             } else {
-                tlog("NODE: /dev/$devNode is MISSING - game apps cannot use this load", "ERR")
-                tlog("NODE: instead: ${nodes.filter { it.contains("kmem") || it.contains("kloader") || it.contains("entryi") || it.contains("wanbai") }}", "ERR")
+                tlog("Node /dev/$devNode missing", "ERR")
                 withContext(Dispatchers.Main) {
                     autoLoadOk.value = false
                     autoLoadStatus.value = "/dev/$devNode missing"
@@ -518,8 +494,7 @@ class DriverViewModel : ViewModel() {
                         busyStep.value = ""
                         return@launch
                     }
-                    tlog("OTA: no OTA driver; falling back to embedded", "INFO")
-                }
+                    tlog("No DB driver - trying built-in", "INFO")                }
                 withContext(Dispatchers.Main) {
                     UniversalKernelLoader.autoLoad(context, this@DriverViewModel, variant)
                 }
@@ -591,10 +566,10 @@ class DriverViewModel : ViewModel() {
             if (ours.isNotEmpty()) {
                 setLoadedModule(ours.first())
                 driverModule.value = ours.joinToString(", ")
-                tlog("VERIFY: ${ours.first()} loaded", "OK")
+                tlog("${ours.first()} loaded", "OK")
             } else {
                 setLoadedModule("")
-                tlog("VERIFY: no driver loaded", "WARN")
+                tlog("No driver loaded", "WARN")
             }
         }
     }
@@ -638,17 +613,17 @@ class DriverViewModel : ViewModel() {
                         remembered.isNotBlank() && remembered in loaded -> remembered
                         known.isNotEmpty() -> known.first()
                         else -> {
-                            tlog("UNLOAD: no memory driver is loaded - nothing to unload", "WARN")
+                            tlog("No driver loaded", "WARN")
                             DriverAutoload.state(context)
                             if (DriverAutoload.enabled) {
-                                tlog("UNLOAD: boot auto-load is ON, so it will load again at next boot", "INFO")
+                                tlog("Auto-load is ON - will reload at boot", "INFO")
                             }
                             driverLoaded.value = false
                             return@withContext
                         }
                     }
 
-                    tlog("UNLOAD: rmmod '$target'", "INFO")
+                    tlog("Unloading '$target'...", "INFO")
                     var res = Shell.cmd("rmmod $target").exec()
                     if (!res.isSuccess) {
                         
@@ -656,19 +631,18 @@ class DriverViewModel : ViewModel() {
                             "BB=\$(command -v busybox); [ -z \"\$BB\" ] && BB=/data/adb/magisk/busybox; \$BB rmmod $target"
                         ).exec()
                     }
-                    tlog("UNLOAD: rmmod $target -> exit ${res.code}", if (res.isSuccess) "OK" else "ERR")
-                    res.err.forEach { if (it.isNotBlank()) tlog("UNLOAD: $it", "WARN") }
+                    tlog("Unload $target -> exit ${res.code}", if (res.isSuccess) "OK" else "ERR")
+                    res.err.forEach { if (it.isNotBlank()) tlog(it, "WARN") }
                     addLog("rmmod $target", res.out, res.err, res.code)
 
                     if (res.isSuccess) {
-                        tlog("UNLOAD: driver removed", "OK")
+                        tlog("Driver removed", "OK")
                         DriverAutoload.state(context)
                         if (DriverAutoload.enabled) {
-                            tlog("UNLOAD: boot auto-load is still ON - it will load again at next boot", "WARN")
-                            tlog("UNLOAD: turn the auto-load switch off to keep it unloaded", "INFO")
+                            tlog("Auto-load still ON - will reload at boot", "WARN")
                         }
                     } else {
-                        tlog("UNLOAD: FAILED - if the module is busy, a normal reboot clears it", "WARN")
+                        tlog("Unload failed - reboot clears it", "WARN")
                     }
                     setLoadedModule("")
                     refreshDriverState(context)
