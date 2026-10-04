@@ -10,12 +10,12 @@ import java.net.URL
 object OtaDriverStore {
 
     var manifestUrl: String =
-        "https://raw.githubusercontent.com/bmjubairdadu/kernel-loder/drivers/drivers.json"
+        "https://raw.githubusercontent.com/bmjubairdadu/kernel-loader/drivers/drivers.json"
 
     val fallbackManifestUrls: List<String> = listOf(
         
-        "https://cdn.jsdelivr.net/gh/bmjubairdadu/kernel-loder@drivers/drivers.json",
-        "https://github.com/bmjubairdadu/kernel-loder/releases/latest/download/drivers.json"
+        "https://cdn.jsdelivr.net/gh/bmjubairdadu/kernel-loader@drivers/drivers.json",
+        "https://github.com/bmjubairdadu/kernel-loader/releases/latest/download/drivers.json"
     )
 
     const val RT = "rt"

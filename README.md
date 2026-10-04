@@ -7,7 +7,7 @@
 ### OTA Kernel Module Loader for Android
 **One tap · Detects your kernel · Downloads the right driver · Loads it**
 
-[![Release](https://img.shields.io/github/v/release/bmjubairdadu/kernel-loder?style=flat-square)](../../releases/latest)
+[![Release](https://img.shields.io/github/v/release/bmjubairdadu/kernel-loader?style=flat-square)](../../releases/latest)
 [![Platform](https://img.shields.io/badge/platform-Android%209%2B%20arm64-green?style=flat-square)](#-requirements)
 [![Root](https://img.shields.io/badge/root-Magisk%20%7C%20KernelSU%20%7C%20APatch-red?style=flat-square)](#-requirements)
 [![License: GPL-3.0](https://img.shields.io/badge/license-GPL%20v3-blue?style=flat-square)](LICENSE)
@@ -114,8 +114,8 @@ issue, or **Copy full report** to paste it anywhere. A maintainer builds the mat
 ## 🔨 Building the app
 
 ```bash
-git clone https://github.com/bmjubairdadu/kernel-loder.git
-cd kernel-loder
+git clone https://github.com/bmjubairdadu/kernel-loader.git
+cd kernel-loader
 ./gradlew :app:assembleDebug          # or assembleRelease
 # output: app/build/outputs/apk/<variant>/app-*.apk
 ```
@@ -140,7 +140,7 @@ cd kernel-loder
 ## 🗂️ Project structure
 
 ```text
-kernel-loder/
+kernel-loader/
 ├─ app/src/main/java/com/kernelloader/
 │  ├─ MainActivity.kt
 │  ├─ driver/          # load pipeline, OTA database, boot auto-load, reports

@@ -80,7 +80,7 @@ object SupportContact {
                 URLEncoder.encode(reportText, "UTF-8")
 
     fun issueUrlFromReport(reportText: String, issueTitle: String): String =
-        "https://github.com/bmjubairdadu/kernel-loder/issues/new?title=" +
+        "https://github.com/bmjubairdadu/kernel-loader/issues/new?title=" +
                 URLEncoder.encode(issueTitle, "UTF-8") + "&body=" +
                 URLEncoder.encode(
                     "Auto build request from $APP_NAME — device info collected on-device.\n\n```\n" +
@@ -95,7 +95,7 @@ object SupportContact {
         val title = "[AUTO-REPORT] load failed on $short"
         val body = "Auto failure report from $APP_NAME $appVersion.\n\n```\n" +
                 failureReport(kernelRelease, appVersion, result, logText) + "\n```"
-        return "https://github.com/bmjubairdadu/kernel-loder/issues/new?title=" +
+        return "https://github.com/bmjubairdadu/kernel-loader/issues/new?title=" +
                 URLEncoder.encode(title, "UTF-8") + "&body=" +
                 URLEncoder.encode(body, "UTF-8")
     }

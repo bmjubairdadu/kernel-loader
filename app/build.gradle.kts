@@ -21,12 +21,12 @@ android {
         buildConfigField(
             "String",
             "UPDATE_API_URL",
-            "\"https://api.github.com/repos/bmjubairdadu/kernel-loder/releases/latest\""
+            "\"https://api.github.com/repos/bmjubairdadu/kernel-loader/releases/latest\""
         )
         buildConfigField(
             "String",
             "UPDATE_RELEASES_PAGE",
-            "\"https://github.com/bmjubairdadu/kernel-loder/releases\""
+            "\"https://github.com/bmjubairdadu/kernel-loader/releases\""
         )
     }
 
