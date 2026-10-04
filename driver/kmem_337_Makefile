@@ -1,9 +1,0 @@
-obj-m += kmem_337.o
-
-# Build against a prepared kernel tree, e.g.:
-#   make -C ~/daisy337/out M=$(PWD) ARCH=arm64 CROSS_COMPILE=aarch64-linux-android- modules
-all:
-	$(MAKE) -C $(KDIR) M=$(PWD) modules
-
-clean:
-	$(MAKE) -C $(KDIR) M=$(PWD) clean
