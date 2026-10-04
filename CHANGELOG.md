@@ -6,6 +6,19 @@ semantic-ish version tags (`<major>.<minor>-<flavour>`).
 
 ---
 
+## [Unreleased] — fast 4.9.337 drivers (no APK change)
+
+### Changed
+* **RT + QX 4.9.337 drivers use a cheaper read/write path.** Each page used
+  `ioremap` + `iounmap` (page-table alloc plus TLB-shootdown IPIs to every
+  CPU, thousands of times per second under an ESP loop) plus a `printk` on
+  every open. Reads and writes now go through `kmap_atomic` with a small
+  bounce buffer, and the per-open log is gone; create/remove logs stay. Same
+  structs, ioctls, return codes, node logic and skip-unmapped-page behavior.
+* Built against the current tree (`MODVERSIONS=n`).
+
+---
+
 ## [5.4-universal] — 2026-09-30 (versionCode 36)
 
 ### Fixed

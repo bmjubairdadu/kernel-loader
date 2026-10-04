@@ -10,6 +10,7 @@
 #include <linux/pid.h>
 #include <linux/io.h>
 #include <linux/slab.h>
+#include <linux/highmem.h>
 #include <linux/random.h>
 #include <asm/pgtable.h>
 
@@ -86,40 +87,54 @@ translate_linear_address(struct mm_struct *mm, uintptr_t va)
 __attribute__((noinline)) size_t
 read_physical_address(phys_addr_t pa, void *buffer, size_t size)
 {
+	struct page *page;
 	void *mapped;
+	void *bounce;
 
 	if (!pfn_valid(pa >> PAGE_SHIFT))
 		return 0;
 
-	mapped = ioremap_cache(pa, size);
-	if (!mapped)
+	bounce = kmalloc(size, GFP_KERNEL);
+	if (!bounce)
 		return 0;
 
-	if (__arch_copy_to_user((void __user *)buffer, mapped, size)) {
-		__iounmap(mapped);
+	page = pfn_to_page(pa >> PAGE_SHIFT);
+	mapped = kmap_atomic(page);
+	memcpy(bounce, (char *)mapped + (pa & ~PAGE_MASK), size);
+	kunmap_atomic(mapped);
+
+	if (__arch_copy_to_user((void __user *)buffer, bounce, size)) {
+		kfree(bounce);
 		return 0;
 	}
-	__iounmap(mapped);
+	kfree(bounce);
 	return size;
 }
 
 __attribute__((noinline)) size_t
 write_physical_address(phys_addr_t pa, void *buffer, size_t size)
 {
+	struct page *page;
 	void *mapped;
+	void *bounce;
 
 	if (!pfn_valid(pa >> PAGE_SHIFT))
 		return 0;
 
-	mapped = ioremap_cache(pa, size);
-	if (!mapped)
+	bounce = kmalloc(size, GFP_KERNEL);
+	if (!bounce)
 		return 0;
 
-	if (__arch_copy_from_user(mapped, (void __user *)buffer, size)) {
-		__iounmap(mapped);
+	if (__arch_copy_from_user(bounce, (void __user *)buffer, size)) {
+		kfree(bounce);
 		return 0;
 	}
-	__iounmap(mapped);
+
+	page = pfn_to_page(pa >> PAGE_SHIFT);
+	mapped = kmap_atomic(page);
+	memcpy((char *)mapped + (pa & ~PAGE_MASK), bounce, size);
+	kunmap_atomic(mapped);
+	kfree(bounce);
 	return size;
 }
 
@@ -157,6 +172,7 @@ read_process_memory(pid_t pid, uintptr_t addr, void *buffer, size_t size)
 		addr += max;
 		buffer = (void *)((char *)buffer + max);
 		count -= max;
+		cond_resched();
 	}
 
 	mmput(mm);
@@ -197,6 +213,7 @@ write_process_memory(pid_t pid, uintptr_t addr, void *buffer, size_t size)
 		addr += max;
 		buffer = (void *)((char *)buffer + max);
 		count -= max;
+		cond_resched();
 	}
 
 	mmput(mm);
@@ -252,8 +269,6 @@ get_module_base(pid_t pid, char *name)
 __attribute__((noinline)) int
 dispatch_open(struct inode *node, struct file *file)
 {
-	pr_info("kmem_qx: open by %s (pid %d)\n", current->comm,
-		task_pid_nr(current));
 	return 0;
 }
 
