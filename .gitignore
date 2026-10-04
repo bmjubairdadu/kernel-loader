@@ -40,7 +40,6 @@ Thumbs.db
 /.agent/
 /.artifacts/
 /dist/
-docs/screenshots/*.png
 
 # ===== keep these (prebuilt modules are shipped on purpose) =====
 !/app/src/main/assets/drivers/*.ko
