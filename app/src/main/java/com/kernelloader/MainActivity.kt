@@ -24,16 +24,24 @@ import com.kernelloader.ui.MainRoute
 import com.kernelloader.ui.SafetyWarningDialog
 import com.kernelloader.ui.WarningRoute
 import com.kernelloader.ui.theme.KernelLoderTheme
+import com.kernelloader.security.AppGuard
 import com.topjohnwu.superuser.Shell
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        Shell.setDefaultBuilder(
-            Shell.Builder.create()
-                .setFlags(Shell.FLAG_REDIRECT_STDERR)
-                .setTimeout(10)
-        )
+        if (AppGuard.isTampered(this)) {
+            finish()
+            return
+        }
+        if (!shellConfigured) {
+            shellConfigured = true
+            Shell.setDefaultBuilder(
+                Shell.Builder.create()
+                    .setFlags(Shell.FLAG_REDIRECT_STDERR)
+                    .setTimeout(10)
+            )
+        }
         enableEdgeToEdge()
         setContent {
             
@@ -71,6 +79,11 @@ class MainActivity : ComponentActivity() {
                 )
             }
         }
+    }
+
+    companion object {
+        @Volatile
+        private var shellConfigured = false
     }
 }
 

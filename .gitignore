@@ -79,3 +79,6 @@ docs/screenshots/*.png
 /ukl_scan.txt
 /vm_mid.txt
 /vm_scan.txt
+
+# backup artifacts
+driver/*.v17bak

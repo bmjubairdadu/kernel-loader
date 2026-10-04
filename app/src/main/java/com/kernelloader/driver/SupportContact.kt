@@ -75,6 +75,19 @@ object SupportContact {
         "https://wa.me/$WHATSAPP_NUMBER?text=" +
                 URLEncoder.encode(failureReport(kernelRelease, appVersion, result, logText), "UTF-8")
 
+    fun waLinkReport(reportText: String): String =
+        "https://wa.me/$WHATSAPP_NUMBER?text=" +
+                URLEncoder.encode(reportText, "UTF-8")
+
+    fun issueUrlFromReport(reportText: String, issueTitle: String): String =
+        "https://github.com/bmjubairdadu/kernel-loder/issues/new?title=" +
+                URLEncoder.encode(issueTitle, "UTF-8") + "&body=" +
+                URLEncoder.encode(
+                    "Auto build request from $APP_NAME — device info collected on-device.\n\n```\n" +
+                            reportText + "\n```",
+                    "UTF-8"
+                )
+
     fun issueUrl(kernelRelease: String?, appVersion: String, result: String, logText: String): String {
         val short = kernelRelease?.let {
             Regex("""(\d+)\.(\d+)\.(\d+)""").find(it)?.value

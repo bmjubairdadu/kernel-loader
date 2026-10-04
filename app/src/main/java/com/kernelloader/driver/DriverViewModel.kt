@@ -13,9 +13,13 @@ import com.kernelloader.mem.MemDirect
 import com.kernelloader.root.RootChecker
 import com.kernelloader.update.AppUpdateChecker
 import com.topjohnwu.superuser.Shell
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.coroutines.coroutineContext
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -126,7 +130,8 @@ data class VerificationResult(
 data class TerminalLine(
     val time: String,
     val text: String,
-    val type: String = "INFO"  
+    val type: String = "INFO",
+    val variant: String = ""
 )
 
 class DriverViewModel : ViewModel() {
@@ -169,7 +174,7 @@ class DriverViewModel : ViewModel() {
     fun checkForAppUpdate() {
         if (updateStatus.value == "CHECKING" || updateStatus.value == "DOWNLOADING") return
         updateStatus.value = "CHECKING"
-        tlog("Checking for updates...", "INFO")
+        tlog("Checking Update...", "INFO")
         viewModelScope.launch(Dispatchers.IO) {
             val result = AppUpdateChecker.check(BuildConfig.UPDATE_API_URL, BuildConfig.VERSION_CODE)
             withContext(Dispatchers.Main) {
@@ -177,16 +182,16 @@ class DriverViewModel : ViewModel() {
                     is AppUpdateChecker.UpdateCheck.Available -> {
                         appUpdate.value = result.info
                         updateStatus.value = "AVAILABLE"
-                        tlog("Update available: v${result.info.versionName}", "OK")
+                        tlog("Update Available: v${result.info.versionName}", "WARN")
                     }
                     AppUpdateChecker.UpdateCheck.UpToDate -> {
                         appUpdate.value = null
                         updateStatus.value = "NONE"
-                        tlog("App up-to-date", "OK")
+                        tlog("App Up To Date", "OK")
                     }
                     AppUpdateChecker.UpdateCheck.Offline -> {
                         if (updateStatus.value != "AVAILABLE") updateStatus.value = "ERROR"
-                        tlog("Update check offline", "WARN")
+                        tlog("Update Check Offline", "WARN")
                     }
                 }
             }
@@ -221,7 +226,7 @@ class DriverViewModel : ViewModel() {
 
     fun refreshManifest() {
         manifestStatus.value = "LOADING"
-        tlog("Connecting to driver DB...", "INFO")
+        tlog("Connecting to DB...", "INFO")
         viewModelScope.launch(Dispatchers.IO) {
             val (m, error) = try {
                 OtaDriverStore.fetchDetailed()
@@ -237,11 +242,11 @@ class DriverViewModel : ViewModel() {
                 }
                 when {
                     m != null && m.drivers.isNotEmpty() ->
-                        tlog("DB connected - ${m.drivers.size} drivers", "OK")
+                        tlog("Database Connected (${m.drivers.size})", "OK")
                     m != null ->
-                        tlog("DB empty", "WARN")
+                        tlog("Database Empty", "WARN")
                     else ->
-                        tlog("DB failed - $error", "ERR")
+                        tlog("Database Offline", "ERR")
                 }
             }
         }
@@ -254,15 +259,43 @@ class DriverViewModel : ViewModel() {
         private const val MAX_TERMINAL_LINES = 1200
     }
 
-    fun tlog(text: String, type: String = "INFO") {
+    var activePipelineVariant = mutableStateOf("")
+
+    fun tlog(text: String, type: String = "INFO", variant: String? = null) {
+        val v = variant ?: activePipelineVariant.value
         viewModelScope.launch(Dispatchers.Main) {
-            terminalLines.add(TerminalLine(timeFormat.format(Date()), text, type))
+            terminalLines.add(TerminalLine(timeFormat.format(Date()), text, type, v))
             trimTerminal()
         }
     }
 
+    private fun variantOfModule(module: String): String = when {
+        module.contains("qx", true) -> OtaDriverStore.QX
+        module.isNotBlank() -> OtaDriverStore.RT
+        else -> ""
+    }
+
     fun tstep(step: String) {
         viewModelScope.launch(Dispatchers.Main) { busyStep.value = step }
+    }
+
+    private var loadJob: Job? = null
+
+    private suspend fun checkpoint() {
+        coroutineContext.ensureActive()
+    }
+
+    fun stopLoad() {
+        if (!isBusy.value) return
+        tlog("Stop Requested", "WARN")
+        loadJob?.cancel()
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching { Shell.cmd("killall insmod 2>/dev/null; true").exec() }
+        }
+        isBusy.value = false
+        busyStep.value = ""
+        autoLoadOk.value = false
+        autoLoadStatus.value = "Stopped by user"
     }
 
     private fun trimTerminal() {
@@ -322,7 +355,91 @@ class DriverViewModel : ViewModel() {
         }
     }
 
+    private val LOCAL_KO_CANDIDATES = listOf(
+        "/data/adb/kloder/driver.ko",
+        "/data/local/tmp/driver.ko",
+        "/data/adb/kloder/driver_rt.ko",
+        "/data/adb/kloder/driver_qx.ko"
+    )
+
+    private fun firstLocalKo(variant: String = ""): File? {
+        val explicit = when (variant.lowercase(Locale.US)) {
+            OtaDriverStore.RT -> "/data/adb/kloder/driver_rt.ko"
+            OtaDriverStore.QX -> "/data/adb/kloder/driver_qx.ko"
+            else -> null
+        }
+        if (explicit != null) {
+            return if (Shell.cmd("test -f $explicit").exec().isSuccess) File(explicit) else null
+        }
+        return LOCAL_KO_CANDIDATES.firstOrNull { Shell.cmd("test -f $it").exec().isSuccess }
+            ?.let { File(it) }
+    }
+
+    private suspend fun loadStagedKo(context: Context, localKo: File): Boolean {
+        tlog("Using local driver.ko", "INFO")
+        val devNode = preferredDevNode()
+        val staged = File("/data/local/tmp/kloader_local.ko")
+        Shell.cmd(
+            "cp \"${localKo.absolutePath}\" ${staged.absolutePath}",
+            "chmod 644 ${staged.absolutePath}",
+            "chown root:root ${staged.absolutePath} 2>/dev/null",
+            "chcon u:object_r:system_file:s0 ${staged.absolutePath} 2>/dev/null",
+            "setenforce 0 2>/dev/null"
+        ).exec()
+        if (!Shell.cmd("test -f ${staged.absolutePath}").exec().isSuccess) {
+            tlog("Staging failed", "ERR")
+            return false
+        }
+        Shell.cmd("rmmod kmem_337 2>/dev/null", "rmmod kmem_337_qx 2>/dev/null", "sleep 1").exec()
+        return try {
+            val bins = listOf(
+                "/system/bin/insmod", "/vendor/bin/insmod", "insmod",
+                "/data/adb/magisk/busybox insmod", "busybox insmod"
+            )
+            var res = Shell.cmd("true").exec()
+            for (b in bins) {
+                checkpoint()
+                for (form in listOf("$b ${staged.absolutePath} devname=$devNode", "$b ${staged.absolutePath}")) {
+                    res = Shell.cmd(form).exec()
+                    if (res.isSuccess) break
+                }
+                if (res.isSuccess) break
+            }
+            if (!res.isSuccess) {
+                (res.out + res.err).firstOrNull { it.isNotBlank() }?.let {
+                    tlog("insmod: ${it.trim()}", "ERR")
+                }
+                return false
+            }
+            tlog("Load OK", "OK")
+            Shell.cmd("chmod 666 /dev/$devNode 2>/dev/null").exec()
+            withContext(Dispatchers.Main) { verifyModule() }
+            val nodes = Shell.cmd("ls /dev 2>/dev/null").exec().out.map { it.trim() }
+            if (devNode !in nodes) {
+                tlog("Node /dev/$devNode missing", "ERR")
+                return false
+            }
+            rememberDevNode(devNode)
+            withContext(Dispatchers.Main) {
+                val mods = SafetyGuard.loadedModuleNames()
+                val ours = knownDriverModules().filter { it in mods }
+                if (ours.isNotEmpty()) setLoadedModule(ours.first())
+            }
+            UniversalKernelLoader.stageForBoot(this@DriverViewModel, context, "", devNode, staged)
+            true
+        } finally {
+            Shell.cmd("rm -f ${staged.absolutePath} 2>/dev/null").exec()
+        }
+    }
+
     private suspend fun runOtaLoad(context: Context, variant: String = ""): Boolean {
+        checkpoint()
+        val localKo = firstLocalKo(variant)
+        if (localKo != null) {
+            if (loadStagedKo(context, localKo)) return true
+            tlog("Local driver failed - trying DB", "WARN")
+        }
+        checkpoint()
         tlog("Checking driver DB...", "INFO")
         val manifest = OtaDriverStore.fetchManifest() ?: run {
             tlog("DB unavailable", "WARN")
@@ -338,20 +455,20 @@ class DriverViewModel : ViewModel() {
             return false
         }
         val kernel = RootChecker.getKernelRelease() ?: return false
+        checkpoint()
         val resolved = OtaDriverStore.resolve(manifest, kernel, variant)
-        when (resolved) {
+        return when (resolved) {
             is OtaDriverStore.ResolveResult.Exact -> {
                 tlog("Exact match: $kernel", "OK")
-                return downloadAndLoadOta(context, manifest, resolved.entry)
+                downloadAndLoadOta(context, manifest, resolved.entry)
             }
             is OtaDriverStore.ResolveResult.Near -> {
-                val target = resolved.entry.version
-                tlog("Nearest match: $target", "WARN")
-                return downloadAndLoadOta(context, manifest, resolved.entry)
+                tlog("Nearest match: ${resolved.entry.version}", "WARN")
+                downloadAndLoadOta(context, manifest, resolved.entry)
             }
             is OtaDriverStore.ResolveResult.None -> {
                 tlog("No driver for this kernel", "INFO")
-                return false
+                false
             }
         }
     }
@@ -361,6 +478,7 @@ class DriverViewModel : ViewModel() {
         manifest: OtaDriverStore.Manifest,
         entry: OtaDriverStore.DriverEntry
     ): Boolean {
+        checkpoint()
         val downloaded = OtaDriverStore.downloadDriver(
             context = context,
             baseUrl = manifest.baseUrl,
@@ -405,6 +523,7 @@ class DriverViewModel : ViewModel() {
             }
             var res = Shell.cmd("true").exec()
             for (cmd in forms) {
+                checkpoint()
                 res = Shell.cmd(cmd).exec()
                 if (res.isSuccess) {
                     tlog("Driver loaded", "OK")
@@ -415,14 +534,15 @@ class DriverViewModel : ViewModel() {
             if (!res.isSuccess) {
                 tlog("Load failed", "ERR")
                 val errText = (res.out + res.err).joinToString("\n")
+                (res.out + res.err).firstOrNull { it.isNotBlank() }?.let {
+                    tlog("insmod: ${it.trim()}", "ERR")
+                }
 
                 Shell.cmd(
-                    "ls -l /system/bin/insmod /vendor/bin/insmod 2>&1",
-                    "for b in /system/bin/insmod /vendor/bin/insmod; do echo \"== \$b\"; \$b 2>&1 | head -n 3; done",
-                    "cat ${staged.absolutePath} > /dev/null 2>&1 && echo READ_OK || echo READ_FAIL",
-                    "od -An -tx1 ${staged.absolutePath} 2>/dev/null | head -n 1",
-                    "dmesg 2>/dev/null | tail -n 10"
-                ).exec()
+                    "dmesg 2>/dev/null | grep -i -E 'kmem|module|insmod' | tail -n 5"
+                ).exec().out.filter { it.isNotBlank() }.take(3)
+                    .forEach { tlog("dmesg: $it", "INFO") }
+
                 if (errText.contains("Invalid module format", true) ||
                     errText.contains("vermagic", true) ||
                     errText.contains("Exec format error", true)
@@ -485,24 +605,62 @@ class DriverViewModel : ViewModel() {
         busyStep.value = "Starting..."
         autoLoadOk.value = null
         autoLoadStatus.value = ""
-        viewModelScope.launch(Dispatchers.IO) {
+        loadJob = viewModelScope.launch(Dispatchers.IO) {
             try {
-                if (preferOta) {
-                    val handled = runOtaLoad(context, variant)
-                    if (handled) {
-                        isBusy.value = false
-                        busyStep.value = ""
-                        return@launch
+                if (variant.isBlank() && preferOta) {
+                    activePipelineVariant.value = OtaDriverStore.RT
+                    tlog("PIPELINE 1/3 — RT driver", "CMD")
+                    tstep("Stage 1/3: RT driver")
+                    val rtHandled = runOtaLoad(context, OtaDriverStore.RT)
+                    if (rtHandled) return@launch
+                    checkpoint()
+                    activePipelineVariant.value = ""
+                    tlog("RT Failed → QX", "WARN")
+                    activePipelineVariant.value = OtaDriverStore.QX
+                    tlog("PIPELINE 2/3 — QX driver", "CMD")
+                    tstep("Stage 2/3: QX driver")
+                    val qxHandled = runOtaLoad(context, OtaDriverStore.QX)
+                    if (qxHandled) return@launch
+                    checkpoint()
+                    activePipelineVariant.value = ""
+                    tlog("QX Failed → Built-in", "WARN")
+                    tlog("PIPELINE 3/3 — Built-in", "CMD")
+                    tstep("Stage 3/3: built-in loader")
+                    withContext(Dispatchers.Main) {
+                        UniversalKernelLoader.autoLoad(context, this@DriverViewModel, variant)
                     }
-                    tlog("No DB driver - trying built-in", "INFO")                }
-                withContext(Dispatchers.Main) {
-                    UniversalKernelLoader.autoLoad(context, this@DriverViewModel, variant)
+                } else if (preferOta) {
+                    activePipelineVariant.value = variant.lowercase(Locale.US)
+                    tlog("PIPELINE — ${OtaDriverStore.variantLabel(variant)} driver (forced)", "CMD")
+                    tstep("Stage 1/2: ${OtaDriverStore.variantLabel(variant)} driver")
+                    val handled = runOtaLoad(context, variant)
+                    if (handled) return@launch
+                    checkpoint()
+                    activePipelineVariant.value = ""
+                    tlog("DB driver failed — trying built-in loader", "INFO")
+                    tstep("Stage 2/2: built-in loader")
+                    withContext(Dispatchers.Main) {
+                        UniversalKernelLoader.autoLoad(context, this@DriverViewModel, variant)
+                    }
+                } else {
+                    withContext(Dispatchers.Main) {
+                        UniversalKernelLoader.autoLoad(context, this@DriverViewModel, variant)
+                    }
                 }
+                if (autoLoadOk.value != true && !driverLoaded.value) {
+                    tlog("All Pipelines Failed", "ERR")
+                    autoLoadOk.value = false
+                    if (autoLoadStatus.value.isBlank()) {
+                        autoLoadStatus.value = "Load failed — RT, QX and built-in all failed"
+                    }
+                }
+            } catch (e: CancellationException) {
             } catch (e: Exception) {
                 tlog("FATAL: ${e.message}", "ERR")
                 autoLoadStatus.value = "FATAL: ${e.message}"
                 autoLoadOk.value = false
             } finally {
+                activePipelineVariant.value = ""
                 viewModelScope.launch(Dispatchers.Main) {
                     isBusy.value = false
                     busyStep.value = ""
@@ -566,7 +724,7 @@ class DriverViewModel : ViewModel() {
             if (ours.isNotEmpty()) {
                 setLoadedModule(ours.first())
                 driverModule.value = ours.joinToString(", ")
-                tlog("${ours.first()} loaded", "OK")
+                tlog("${ours.first()} loaded", "OK", variant = variantOfModule(ours.first()))
             } else {
                 setLoadedModule("")
                 tlog("No driver loaded", "WARN")
@@ -623,20 +781,24 @@ class DriverViewModel : ViewModel() {
                         }
                     }
 
-                    tlog("Unloading '$target'...", "INFO")
+                    tlog("Unloading '$target'...", "INFO", variant = variantOfModule(target))
                     var res = Shell.cmd("rmmod $target").exec()
                     if (!res.isSuccess) {
-                        
+
                         res = Shell.cmd(
                             "BB=\$(command -v busybox); [ -z \"\$BB\" ] && BB=/data/adb/magisk/busybox; \$BB rmmod $target"
                         ).exec()
                     }
-                    tlog("Unload $target -> exit ${res.code}", if (res.isSuccess) "OK" else "ERR")
+                    tlog(
+                        "Unload $target -> exit ${res.code}",
+                        if (res.isSuccess) "OK" else "ERR",
+                        variant = variantOfModule(target)
+                    )
                     res.err.forEach { if (it.isNotBlank()) tlog(it, "WARN") }
                     addLog("rmmod $target", res.out, res.err, res.code)
 
                     if (res.isSuccess) {
-                        tlog("Driver removed", "OK")
+                        tlog("Driver removed", "OK", variant = variantOfModule(target))
                         DriverAutoload.state(context)
                         if (DriverAutoload.enabled) {
                             tlog("Auto-load still ON - will reload at boot", "WARN")
@@ -658,6 +820,7 @@ class DriverViewModel : ViewModel() {
             withContext(Dispatchers.IO) {
                 try {
                     DriverAutoload.state(context)
+                    activePipelineVariant.value = variantOfModule(DriverAutoload.moduleName)
                     if (on) {
                         val staged = DriverAutoload.stagedKo
                         if (staged.isBlank()) {
@@ -680,6 +843,8 @@ class DriverViewModel : ViewModel() {
                 } catch (e: Exception) {
                     tlog("AUTOLOAD ERROR: ${e.message}", "ERR")
                     autoloadEnabled.value = false
+                } finally {
+                    activePipelineVariant.value = ""
                 }
             }
         }

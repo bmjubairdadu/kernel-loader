@@ -6,6 +6,31 @@ semantic-ish version tags (`<major>.<minor>-<flavour>`).
 
 ---
 
+## [2.0] — 2026-10-05
+
+### Added
+* One-tap LOAD pipeline: **RT → QX → built-in**, each stage reported and
+  cancellable with a **STOP** button.
+* OTA driver database with exact kernel matching — RT and QX supported-kernel
+  lists shown separately with `THIS DEVICE` / `NEWEST` badges.
+* Boot auto-load toggle: the staged driver reloads itself after every reboot.
+* **Auto build-request reports** — for unsupported kernels the app collects
+  vermagic (from an on-device `.ko`), kernel config flags from
+  `/proc/config.gz`, `/proc/version`, device identity, `dmesg` tail and the
+  full log, then offers a ready WhatsApp message, a pre-filled GitHub issue or
+  clipboard text.
+* Anti-tamper: signing-certificate check at every launch, debugger/Xposed
+  refusal, backup disabled, verbose log stripping in release builds.
+* Redesigned gradient UI with animated logo, single clean **status console**
+  with short statuses, full console with `ALL · STATUS · RT · QX` filters.
+* In-app self-update from GitHub releases.
+
+### Fixed
+* Crash on reopening the app after it was backgrounded (libsu main shell was
+  already created).
+
+---
+
 ## [Unreleased] — fast 4.9.337 drivers (no APK change)
 
 ### Changed
