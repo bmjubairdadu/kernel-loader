@@ -667,7 +667,7 @@ private fun HomeHeader(
             }
             Image(
                 painter = painterResource(id = R.drawable.app_logo),
-                contentDescription = "Kernel Loder logo",
+                contentDescription = "Kernel Loader logo",
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .size(42.dp)
@@ -679,7 +679,7 @@ private fun HomeHeader(
         Spacer(Modifier.width(11.dp))
         Column(Modifier.weight(1f)) {
             Text(
-                text = "Kernel Loder",
+                text = "Kernel Loader",
                 style = MaterialTheme.typography.headlineSmall.copy(
                     brush = Brush.linearGradient(listOf(Color.White, GradientRtStart))
                 )

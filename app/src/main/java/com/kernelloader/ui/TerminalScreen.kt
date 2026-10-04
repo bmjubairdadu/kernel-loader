@@ -144,7 +144,7 @@ fun ConsoleScreen(
                     )
                 }
                 Text(
-                    text = "Kernel Loder Console",
+                    text = "Kernel Loader Console",
                     style = MaterialTheme.typography.titleLarge.copy(
                         brush = Brush.linearGradient(listOf(Color.White, GradientRtStart))
                     )

@@ -62,7 +62,7 @@ fun CreditsScreen(onBack: () -> Unit) {
         ) {
             Image(
                 painter = painterResource(id = R.drawable.app_logo),
-                contentDescription = "Kernel Loder logo",
+                contentDescription = "Kernel Loader logo",
                 modifier = Modifier
                     .size(92.dp)
                     .clip(CircleShape)

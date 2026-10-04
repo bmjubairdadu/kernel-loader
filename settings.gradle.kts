@@ -23,5 +23,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Kernel Loder"
+rootProject.name = "Kernel Loader"
 include(":app")

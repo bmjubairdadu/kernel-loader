@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to **Kernel Loder** are documented here.
+All notable changes to **Kernel Loader** are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 semantic-ish version tags (`<major>.<minor>-<flavour>`).
 
@@ -434,7 +434,7 @@ OTA groundwork release (superseded by 2.3).
 * `docs/` — Bangla install / build / FAQ guides.
 
 ### Changed
-* **Project renamed to “Kernel Loder”** (`settings.gradle.kts` rootProject name, app label,
+* **Project renamed to “Kernel Loader”** (`settings.gradle.kts` rootProject name, app label,
   credits screen) — the app no longer carries a device-specific identity.
 * **Device-agnostic everything:** the app never checks brand/model/codename, only the kernel release.
 * Driver selection now reads the **real kernel release from each `.ko` binary (vermagic)**

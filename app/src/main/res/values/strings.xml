@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Kernel Loder</string>
+    <string name="app_name">Kernel Loader</string>
     <string name="kernel_loader">Kernel Loader</string>
     <string name="load_kernel">⚡ Load Kernel</string>
     <string name="import_ko">Import .ko</string>
@@ -20,7 +20,7 @@
     <string name="device_node_check">/dev device node check:</string>
     <string name="dmesg_logs">dmesg logs:</string>
     <string name="credits">Credits</string>
-    <string name="credits_universal">Kernel Loder - Universal Kernel Module Loader\nWorks on ANY device, ANY model, old &amp; new kernels\nBuilt by JUBAIR HOSEN</string>
+    <string name="credits_universal">Kernel Loader - Universal Kernel Module Loader\nWorks on ANY device, ANY model, old &amp; new kernels\nBuilt by JUBAIR HOSEN</string>
     <string name="safety_warning_title">Safety Warning</string>
     <string name="safety_warning_message">This app loads kernel modules (.ko) as root. A wrong module or a mismatched kernel version can crash, reboot or brick the device. The loader tries to auto-fix problems, but no guarantee is given. Use at your own risk.</string>
     <string name="confirm">I Understand, Continue</string>

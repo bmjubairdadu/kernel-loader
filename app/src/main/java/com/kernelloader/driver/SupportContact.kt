@@ -5,7 +5,7 @@ import java.net.URLEncoder
 
 object SupportContact {
     
-    const val APP_NAME = "Kernel Loder"
+    const val APP_NAME = "Kernel Loader"
 
     const val WHATSAPP_NUMBER = "8801785917145"
 
@@ -18,7 +18,7 @@ object SupportContact {
         val sdk = Build.VERSION.SDK_INT
         return buildString {
             appendLine("╔══════════════════════════╗")
-            appendLine("   ⚡  KERNEL LODER SUPPORT  ⚡")
+            appendLine("   ⚡  KERNEL LOADER SUPPORT  ⚡")
             appendLine("╚══════════════════════════╝")
             appendLine()
             appendLine("📱 Device  : $model")
@@ -57,7 +57,7 @@ object SupportContact {
             .takeLast(maxLogChars)
         return buildString {
             appendLine("╔══════════════════════════╗")
-            appendLine("   ⚡ KERNEL LODER REPORT ⚡")
+            appendLine("   ⚡ KERNEL LOADER REPORT ⚡")
             appendLine("╚══════════════════════════╝")
             appendLine()
             appendLine("📱 Device  : $model")

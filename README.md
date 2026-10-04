@@ -1,8 +1,8 @@
 <div align="center">
 
-<img src="app/src/main/res/mipmap-xxxhdpi/ic_launcher.png" width="72" alt="Kernel Loder" onerror="this.style.display='none'"/>
+<img src="app/src/main/res/mipmap-xxxhdpi/ic_launcher.png" width="72" alt="Kernel Loader" onerror="this.style.display='none'"/>
 
-# ⚡ Kernel Loder
+# ⚡ Kernel Loader
 
 ### OTA Kernel Module Loader for Android
 **One tap · Detects your kernel · Downloads the right driver · Loads it**
@@ -16,7 +16,7 @@
 
 ---
 
-**Kernel Loder** is a root-powered Android app that loads kernel modules (`.ko`) on any
+**Kernel Loader** is a root-powered Android app that loads kernel modules (`.ko`) on any
 arm64 device. It reads your **exact running kernel**, finds a matching driver in the
 **OTA driver database** (40+ prebuilt kernels), loads it through a safe pipeline and
 verifies the result — all from one clean, dark interface.
@@ -170,7 +170,7 @@ is given**. Keep a backup of your boot image and know how to recover.
 
 <div align="center">
 
-**Kernel Loder v2.0** — one tap, the right driver, every kernel.
+**Kernel Loader v2.0** — one tap, the right driver, every kernel.
 ⭐ Star the repo if it helped you!
 
 </div>
