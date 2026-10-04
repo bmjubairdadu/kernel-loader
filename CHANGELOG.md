@@ -16,6 +16,8 @@ semantic-ish version tags (`<major>.<minor>-<flavour>`).
   bounce buffer, and the per-open log is gone; create/remove logs stay. Same
   structs, ioctls, return codes, node logic and skip-unmapped-page behavior.
 * Built against the current tree (`MODVERSIONS=n`).
+* 2026-10-05: rebuilt for kernel #8 (`MODVERSIONS=y`, CRC `0xc3cf050d`); same
+  fast path, no source change.
 
 ---
 
