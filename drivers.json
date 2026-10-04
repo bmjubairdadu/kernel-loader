@@ -1,5 +1,5 @@
 {
-  "updated": "2026-09-30T08:16:01Z",
+  "updated": "2026-10-04T11:56:13Z",
   "branch": "drivers",
   "baseUrl": "https://raw.githubusercontent.com/bmjubairdadu/kernel-loder/drivers",
   "variants": {
@@ -126,11 +126,11 @@
       "label": "4.9.186"
     },
     {
-      "version": "4.9.337-DaisyForGaming SMP preempt mod_unload modversions aarch64",
+      "version": "4.9.337-DaisyForGaming SMP preempt mod_unload aarch64",
       "file": "qx_4.9.337-DaisyForGaming.ko",
-      "sha256": "8f289f6102cce8921c094a9304bbffa70b57b67a89cbc50f3876f468ffa72ea5",
-      "size": 19160,
-      "buildDate": "2026-09-30",
+      "sha256": "9b2da3243e38af4bece3ef8253a7aa39775dbe181736e7163fc48f91ea1e977b",
+      "size": 17392,
+      "buildDate": "2026-10-04",
       "variant": "qx",
       "label": "4.9.337-DaisyForGaming"
     },
@@ -315,11 +315,11 @@
       "label": "4.9.186"
     },
     {
-      "version": "4.9.337-DaisyForGaming SMP preempt mod_unload modversions aarch64",
+      "version": "4.9.337-DaisyForGaming SMP preempt mod_unload aarch64",
       "file": "rt_4.9.337-DaisyForGaming.ko",
-      "sha256": "4a333be48988c58fc708ac52ede595967b29260a63278944e913397561eca6d5",
-      "size": 20088,
-      "buildDate": "2026-09-30",
+      "sha256": "ccbd44306c34a1b3893a1a4fd0ba775a3170865ed3f857b51b5f466ad967f02b",
+      "size": 18240,
+      "buildDate": "2026-10-04",
       "variant": "rt",
       "label": "4.9.337-DaisyForGaming"
     },
