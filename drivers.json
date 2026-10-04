@@ -1,7 +1,7 @@
 {
   "updated": "2026-10-04T18:40:08Z",
   "branch": "drivers",
-  "baseUrl": "https://raw.githubusercontent.com/bmjubairdadu/kernel-loder/drivers",
+  "baseUrl": "https://raw.githubusercontent.com/bmjubairdadu/kernel-loader/drivers",
   "variants": {
     "rt": "RT ABI - ioctl 0x801/0x802/0x803, returns 0 on success",
     "qx": "QX ABI - ioctl 0x801/0x802 + 0x804/0x805 handshake, returns -1 on failure"
