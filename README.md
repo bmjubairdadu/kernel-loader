@@ -149,10 +149,12 @@ kernel-loder/
 │  ├─ security/        # AppGuard anti-tamper
 │  ├─ ui/              # Compose screens & theme
 │  └─ update/          # GitHub release update checker
-├─ driver/             # kernel module sources + WSL build tooling
 ├─ docs/screenshots/
-└─ .github/workflows/  # CI
+└─ .github/workflows/  # CI (APK build)
 ```
+
+> The kernel-module sources, compiled `.ko` artifacts and the WSL build tooling
+> are **private** and intentionally not part of this repository.
 
 ## ⚠️ Safety / Disclaimer
 
