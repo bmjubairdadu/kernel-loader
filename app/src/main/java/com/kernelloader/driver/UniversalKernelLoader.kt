@@ -252,6 +252,7 @@ object UniversalKernelLoader {
     private fun finish(vm: DriverViewModel, ok: Boolean, msg: String) {        vm.autoLoadOk.value = ok
         vm.autoLoadStatus.value = msg
         if (!ok) {
+            vm.lastLoadError.value = msg
             vm.tlog("Need custom loader - tap WhatsApp", "FIX")
         }
         vm.tstep("")

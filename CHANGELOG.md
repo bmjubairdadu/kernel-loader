@@ -6,6 +6,58 @@ semantic-ish version tags (`<major>.<minor>-<flavour>`).
 
 ---
 
+## [2.1] — 2026-10-05 (versionCode 3, tag v3)
+
+### Added
+* **One-tap auto build report as a ZIP on WhatsApp.** The WhatsApp button now
+  collects everything on its own and opens WhatsApp with
+  `report_<kernel-version>.zip` attached plus a one-line caption
+  (`Samsung SM-S921B, 4.14.284-LONGSU, NO MATCH`) — the user only taps send.
+  Inside the ZIP:
+  * `report.txt` — the full 14-field build template (`KERNEL / VERSION / ARCH /
+    PAGE SIZE / DEVICE / ANDROID / FP / ROOT / BUNDLE / DB MATCH / VERMAGIC /
+    RESULT / DMESG / APP LOG`) plus a `SOURCE` line (kernel source URL if
+    `/proc/version` carries one, otherwise `unknown`)
+  * `Module.symvers.txt` — the kernel CRC table, extracted on the phone
+  * `config.txt` — the complete kernel config from `/proc/config.gz`
+  * `dmesg.txt` — the insmod-related dmesg tail with the exact last error
+  * `applog.txt` — the app's own log
+* **The app runs `kcrc_dump` itself.** The CRC extractor is downloaded from
+  the `drivers` branch (raw.githubusercontent → jsDelivr → github.com
+  fallbacks, ELF + size verified, cached in the app's private dir), staged to
+  `/data/local/tmp` and executed through the root shell. Users no longer need
+  MT Manager or a manual download; a MODVERSIONS-less kernel is detected and
+  reported as "no CRC file needed". If the extractor fails, its exact output
+  ships as `kcrc_status.txt`.
+* **ROOT type detection** in reports: Magisk / KernelSU / APatch / other `su`
+  (via `su -v` + `/data/adb` markers).
+* **BUNDLE field** — records which driver families the last pipeline actually
+  tried (`RT → QX → built-in`, or the forced variant).
+* **RESULT now carries the exact insmod error text**, captured at the moment
+  the load failed, instead of a summarised status.
+* WhatsApp package visibility (`<queries>`) and a `jid` extra so the report
+  opens the dev chat directly on most WhatsApp builds; WhatsApp's own
+  send-to screen (everything pre-filled) is the fallback, and a plain text
+  report link is the last resort when no WhatsApp install exists.
+
+### Fixed
+* **In-app auto-update never fired.** `scripts/publish_apk.ps1` published
+  releases to the pre-rename repo (`bmjubairdadu/kernel-loder`) while the
+  updater watches `bmjubairdadu/kernel-loader`; every update check came back
+  "up to date". The publish scripts now target the renamed repo. Release tags
+  are single increasing integers (`v3`, `v4`, …) matching `versionCode` —
+  the updater's tag parser reads the first number, so dotted tags like
+  `v2.1` could never trigger an update.
+
+### Changed
+* Report template depth: 20 insmod-related `dmesg` lines (was 5), the last 50
+  app-log lines (was 12), full `/proc/version`, plus the key kernel config
+  flags. GitHub-issue and clipboard reports use the same template.
+* The report ZIP lives in the FileProvider cache (`report/`), wiped on every
+  run.
+
+---
+
 ## [2.0] — 2026-10-05
 
 ### Added

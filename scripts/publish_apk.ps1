@@ -12,7 +12,7 @@ param(
     [string]$ApkPath = "",
     [string]$Title = "",
     [string]$Notes = "",
-    [string]$Repo = "bmjubairdadu/kernel-loder"
+    [string]$Repo = "bmjubairdadu/kernel-loader"
 )
 $ErrorActionPreference = 'Stop'
 

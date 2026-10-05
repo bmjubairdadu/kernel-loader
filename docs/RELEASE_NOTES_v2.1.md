@@ -51,4 +51,4 @@ for a different kernel is unstable. Use at your own risk.
 * [`docs/FAQ_BANGLA.md`](../blob/main/docs/FAQ_BANGLA.md) — FAQ
 * [`CHANGELOG.md`](../blob/main/CHANGELOG.md) — full history
 
-**Full changelog:** https://github.com/bmjubairdadu/kernel-loder/blob/main/CHANGELOG.md
+**Full changelog:** https://github.com/bmjubairdadu/kernel-loader/blob/main/CHANGELOG.md

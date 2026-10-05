@@ -1,6 +1,11 @@
 package com.kernelloader.driver
 
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.os.Build
+import androidx.core.content.FileProvider
+import java.io.File
 import java.net.URLEncoder
 
 object SupportContact {
@@ -78,6 +83,51 @@ object SupportContact {
     fun waLinkReport(reportText: String): String =
         "https://wa.me/$WHATSAPP_NUMBER?text=" +
                 URLEncoder.encode(reportText, "UTF-8")
+
+    /**
+     * Opens WhatsApp with the report ZIP attached and a one-line caption.
+     * jid extra targets the dev chat directly on most WhatsApp builds; when the
+     * build ignores it, WhatsApp's own send-to screen opens with everything filled.
+     * Returns false when no WhatsApp installation could be launched.
+     */
+    fun sendZipViaWhatsApp(context: Context, zip: File, caption: String): Boolean {
+        val uri = FileProvider.getUriForFile(
+            context, "${context.packageName}.fileprovider", zip
+        )
+        fun newIntent(): Intent = Intent(Intent.ACTION_SEND).apply {
+            type = "application/zip"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            putExtra(Intent.EXTRA_TEXT, caption)
+            putExtra("jid", "$WHATSAPP_NUMBER@s.whatsapp.net")
+            addFlags(
+                Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                        Intent.FLAG_ACTIVITY_NEW_TASK
+            )
+        }
+        val targets = listOf("com.whatsapp", "com.whatsapp.w4b")
+        for (pkg in targets) {
+            val intent = newIntent().apply { setPackage(pkg) }
+            val resolved = try {
+                context.packageManager.resolveActivity(intent, 0)
+            } catch (_: Exception) {
+                null
+            }
+            if (resolved != null) {
+                return try {
+                    context.startActivity(intent)
+                    true
+                } catch (_: Exception) {
+                    false
+                }
+            }
+        }
+        return try {
+            context.startActivity(Intent.createChooser(newIntent(), "Send report via WhatsApp"))
+            true
+        } catch (_: Exception) {
+            false
+        }
+    }
 
     fun issueUrlFromReport(reportText: String, issueTitle: String): String =
         "https://github.com/bmjubairdadu/kernel-loader/issues/new?title=" +

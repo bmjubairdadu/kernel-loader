@@ -14,6 +14,8 @@ object DeviceReportCollector {
     private val VERMAGIC_KO_CANDIDATES = listOf(
         "/data/adb/kloder/driver.ko",
         "/data/local/tmp/driver.ko",
+        "/data/adb/kloder/driver_rt.ko",
+        "/data/adb/kloder/driver_qx.ko",
         "/vendor/lib/modules/*.ko",
         "/odm/lib/modules/*.ko",
         "/system/lib/modules/*.ko"
@@ -32,15 +34,25 @@ object DeviceReportCollector {
         val sdkInt: Int,
         val pageSize: String,
         val rootAvailable: Boolean,
+        val rootType: String,
+        val bundleTried: String,
         val configFlags: List<String>,
         val vermagic: String,
         val vermagicSource: String,
+        val sourceUrl: String,
         val loadedOurs: List<String>,
         val dmesgTail: List<String>,
+        val lastError: String,
         val collectedAt: String
     ) {
         private val kernelShort: String =
             Regex("""\d+\.\d+\.\d+""").find(kernelRelease)?.value ?: "unknown"
+
+        // "4.14.284-LONGSU-gffbd2268fef7" -> "4.14.284-LONGSU"
+        val kernelCaption: String =
+            Regex("""\d+\.\d+\.\d+(?:-[A-Za-z0-9._]+)?""").find(kernelRelease)?.value ?: kernelShort
+
+        val deviceLine: String get() = "$manufacturer $model".trim()
 
         val issueTitle: String =
             "[BUILD REQUEST] $manufacturer $model — $kernelShort ($kernelArch)"
@@ -50,47 +62,52 @@ object DeviceReportCollector {
             appVersion: String,
             matchStatus: String,
             resultText: String,
-            logText: String
+            logText: String,
+            kcrcNote: String = ""
         ): String = buildString {
             appendLine("⚡ $appName — AUTO BUILD REQUEST")
             appendLine("═══════════════════════════")
             appendLine("KERNEL    : $kernelRelease")
+            appendLine("VERSION   : ${procVersion.take(220)}")
             appendLine("ARCH      : $kernelArch")
             appendLine("PAGE SIZE : $pageSize")
-            if (procVersion.isNotBlank()) {
-                appendLine("VERSION   : ${procVersion.take(160)}")
-            }
-            appendLine("DEVICE    : $manufacturer $model (board: $board, soc: $soc)")
+            appendLine("DEVICE    : $deviceLine (board: $board, soc: $soc)")
             appendLine("ANDROID   : $androidVersion (API $sdkInt)")
-            if (fingerprint.isNotBlank()) appendLine("FP        : ${fingerprint.take(110)}")
-            appendLine("ROOT      : ${if (rootAvailable) "yes" else "no"}")
+            appendLine("FP        : ${fingerprint.take(140)}")
+            appendLine("ROOT      : ${if (rootAvailable) "yes ($rootType)" else "no"}")
+            appendLine("BUNDLE    : ${bundleTried.ifBlank { "auto (RT → QX → built-in)" }}")
             appendLine("DB MATCH  : $matchStatus")
+            appendLine("VERMAGIC  : ${vermagic.ifBlank { procVersion.take(150) }}")
             if (vermagic.isNotBlank()) {
-                appendLine("VERMAGIC  : $vermagic")
                 appendLine("  (from: $vermagicSource)")
             }
+            appendLine("SOURCE    : ${sourceUrl.ifBlank { "unknown" }}")
+            appendLine("RESULT    : ${lastError.ifBlank { resultText }.take(320)}")
+            appendLine("DMESG     :")
+            if (dmesgTail.isEmpty()) appendLine("  (unavailable)")
+            else dmesgTail.forEach { appendLine("  $it") }
+            appendLine("APP LOG   :")
+            val tail = logText.lines().filter { it.isNotBlank() }.takeLast(50)
+            if (tail.isEmpty()) appendLine("  (empty)")
+            else tail.forEach { appendLine("  $it") }
             if (configFlags.isNotEmpty()) {
-                appendLine("CONFIG FLAGS:")
+                appendLine("CONFIG    :")
                 configFlags.forEach { appendLine("  $it") }
             }
+            if (kcrcNote.isNotBlank()) appendLine("KCRC      : $kcrcNote")
             if (loadedOurs.isNotEmpty()) {
                 appendLine("LOADED    : ${loadedOurs.joinToString(", ")}")
             }
-            if (dmesgTail.isNotEmpty()) {
-                appendLine("DMESG TAIL:")
-                dmesgTail.forEach { appendLine("  ${it.take(120)}") }
-            }
-            if (resultText.isNotBlank()) appendLine("RESULT    : ${resultText.take(100)}")
             appendLine("APP       : $appName $appVersion · $collectedAt")
-            val tail = logText.lines().filter { it.isNotBlank() }.takeLast(12).joinToString("\n")
-            if (tail.isNotBlank()) {
-                appendLine("LOG TAIL:")
-                append(tail)
-            }
         }
     }
 
-    fun collect(rootAvailable: Boolean, loadedModules: List<String>): DeviceReport {
+    fun collect(
+        rootAvailable: Boolean,
+        loadedModules: List<String>,
+        bundleTried: String = "",
+        lastError: String = ""
+    ): DeviceReport {
         val kernelRelease = cmdOut("uname -r")
         val arch = cmdOut("uname -m")
         val procVersion = cmdOut("cat /proc/version").lineSequence().firstOrNull().orEmpty()
@@ -127,11 +144,20 @@ object DeviceReportCollector {
             }
         }
 
-        val dmesgTail = cmdOut("dmesg 2>/dev/null | tail -n 5")
+        val dmesgTail = cmdOut(
+            "dmesg 2>/dev/null | grep -iE 'insmod|module|vermagic|kmem|kloader|entryi|daisy|wanbai|symbol' | tail -n 20"
+        )
             .lines()
             .map { it.trim() }
             .filter { it.isNotBlank() }
-            .take(5)
+            .take(20)
+            .ifEmpty {
+                cmdOut("dmesg 2>/dev/null | tail -n 20")
+                    .lines()
+                    .map { it.trim() }
+                    .filter { it.isNotBlank() }
+                    .take(20)
+            }
 
         return DeviceReport(
             kernelRelease = kernelRelease.ifBlank { RootChecker.getKernelRelease().orEmpty() },
@@ -146,13 +172,35 @@ object DeviceReportCollector {
             sdkInt = Build.VERSION.SDK_INT,
             pageSize = pageSize,
             rootAvailable = rootAvailable,
+            rootType = if (rootAvailable) detectRootType() else "",
+            bundleTried = bundleTried,
             configFlags = configFlags,
             vermagic = vermagic,
             vermagicSource = vermagicSource,
+            sourceUrl = Regex("""https?://[^\s"']+""").find(procVersion)?.value.orEmpty(),
             loadedOurs = loadedModules.filter { it.isNotBlank() },
             dmesgTail = dmesgTail,
+            lastError = lastError.trim(),
             collectedAt = dateFormat.format(Date())
         )
+    }
+
+    private fun detectRootType(): String {
+        val suVersion = cmdOut("su -v 2>/dev/null").lineSequence().firstOrNull().orEmpty().trim()
+        val suLower = suVersion.lowercase(Locale.US)
+        return when {
+            suLower.contains("magisk") -> suVersion.take(48)
+            suLower.contains("kernelsu") || suLower.contains("ksu") -> suVersion.take(48)
+            suLower.contains("apatch") -> suVersion.take(48)
+            Shell.cmd("test -d /data/adb/magisk 2>/dev/null").exec().isSuccess ->
+                "Magisk ${suVersion.take(24)}".trim()
+            Shell.cmd("test -d /data/adb/ksu 2>/dev/null").exec().isSuccess ->
+                "KernelSU ${suVersion.take(24)}".trim()
+            Shell.cmd("test -d /data/adb/ap 2>/dev/null").exec().isSuccess ->
+                "APatch ${suVersion.take(24)}".trim()
+            suVersion.isNotBlank() -> "su (${suVersion.take(48)})"
+            else -> "yes (unknown su)"
+        }
     }
 
     private fun cmdOut(cmd: String): String = try {

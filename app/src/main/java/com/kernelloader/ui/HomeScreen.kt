@@ -104,6 +104,7 @@ import com.kernelloader.R
 import com.kernelloader.driver.DeviceReportCollector
 import com.kernelloader.driver.DriverViewModel
 import com.kernelloader.driver.OtaDriverStore
+import com.kernelloader.driver.ReportPackBuilder
 import com.kernelloader.driver.SupportContact
 import com.kernelloader.driver.TerminalLine
 import com.kernelloader.root.RootChecker
@@ -613,11 +614,13 @@ fun HomeScreen(
             )
 
             SupportCard(
-                kernelRelease = kernelRelease,
+                viewModel = viewModel,
                 loadFailed = autoOk == false,
                 hasExact = exact != null,
                 appVersion = "v${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
-                resultText = autoStatus.ifBlank { "load failed / no exact loader" },
+                resultText = viewModel.lastLoadError.value.ifBlank {
+                    autoStatus.ifBlank { "load failed / no exact loader" }
+                },
                 loadedModule = loadedModule,
                 getLog = { viewModel.getTerminalText() }
             )
@@ -1077,7 +1080,7 @@ private fun RingButton(
 
 @Composable
 private fun SupportCard(
-    kernelRelease: String,
+    viewModel: DriverViewModel,
     loadFailed: Boolean,
     hasExact: Boolean,
     appVersion: String,
@@ -1089,27 +1092,26 @@ private fun SupportCard(
     val clipboard = LocalClipboardManager.current
     val scope = rememberCoroutineScope()
     var preparing by remember { mutableStateOf(false) }
+    var stepText by remember { mutableStateOf("") }
 
-    fun gatherAndSend(open: (DeviceReportCollector.DeviceReport, String) -> Unit) {
-        scope.launch {
-            preparing = true
-            val report = withContext(Dispatchers.IO) {
-                DeviceReportCollector.collect(
-                    rootAvailable = RootChecker.isRootAvailable(),
-                    loadedModules = listOf(loadedModule)
-                )
-            }
-            preparing = false
-            val text = report.buildText(
-                appName = SupportContact.APP_NAME,
-                appVersion = appVersion,
-                matchStatus = if (hasExact) "EXACT MATCH FOUND" else "NO MATCH IN DB",
-                resultText = resultText,
-                logText = getLog()
-            )
-            open(report, text)
-        }
-    }
+    val matchStatus = if (hasExact) "EXACT MATCH FOUND" else "NO MATCH IN DB"
+
+    fun collectReport(): DeviceReportCollector.DeviceReport =
+        DeviceReportCollector.collect(
+            rootAvailable = RootChecker.isRootAvailable(),
+            loadedModules = listOf(loadedModule),
+            bundleTried = viewModel.lastBundleTried.value,
+            lastError = resultText
+        )
+
+    fun buildReportText(report: DeviceReportCollector.DeviceReport): String =
+        report.buildText(
+            appName = SupportContact.APP_NAME,
+            appVersion = appVersion,
+            matchStatus = matchStatus,
+            resultText = resultText,
+            logText = getLog()
+        )
 
     Card(
         modifier = Modifier.fillMaxWidth().padding(top = 14.dp, bottom = 16.dp),
@@ -1136,7 +1138,8 @@ private fun SupportCard(
                 textAlign = TextAlign.Center
             )
             Text(
-                text = "The app auto-collects kernel vermagic, config flags & device info — you just hit send.",
+                text = "One tap packs report.txt, Module.symvers.txt (CRC table), " +
+                        "config.txt, dmesg.txt & applog.txt into a ZIP — you just hit send.",
                 style = MaterialTheme.typography.bodySmall,
                 color = TextSecondary,
                 textAlign = TextAlign.Center,
@@ -1150,6 +1153,14 @@ private fun SupportCard(
                     color = AccentAmber,
                     trackColor = Surface3
                 )
+                if (stepText.isNotBlank()) {
+                    Text(
+                        text = stepText,
+                        style = MonoTiny,
+                        color = AccentAmber,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                }
             }
 
             Row(
@@ -1160,15 +1171,53 @@ private fun SupportCard(
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     IconButton(
                         onClick = {
-                            gatherAndSend { _, text ->
+                            if (preparing) return@IconButton
+                            scope.launch {
+                                preparing = true
+                                stepText = "Collecting device info..."
                                 try {
-                                    context.startActivity(
-                                        Intent(
-                                            Intent.ACTION_VIEW,
-                                            Uri.parse(SupportContact.waLinkReport(text))
+                                    val pack = withContext(Dispatchers.IO) {
+                                        ReportPackBuilder.buildPack(
+                                            context = context,
+                                            rootAvailable = RootChecker.isRootAvailable(),
+                                            loadedModule = loadedModule,
+                                            bundleTried = viewModel.lastBundleTried.value,
+                                            matchStatus = matchStatus,
+                                            resultText = resultText,
+                                            logText = getLog(),
+                                            onStep = { stepText = it }
                                         )
-                                    )
-                                } catch (_: Exception) {
+                                    }
+                                    val sent = pack.zipFile?.let {
+                                        SupportContact.sendZipViaWhatsApp(context, it, pack.caption)
+                                    } ?: false
+                                    if (!sent) {
+                                        context.startActivity(
+                                            Intent(
+                                                Intent.ACTION_VIEW,
+                                                // wa.me URLs cap around 2k chars — keep the caption short
+                                                Uri.parse(
+                                                    SupportContact.waLinkReport(
+                                                        "${pack.caption}\n\n${pack.fullText.take(1300)}"
+                                                    )
+                                                )
+                                            )
+                                        )
+                                        Toast.makeText(
+                                            context,
+                                            "ZIP share unavailable — text report opened instead",
+                                            Toast.LENGTH_LONG
+                                        ).show()
+                                    }
+                                } catch (e: Exception) {
+                                    Toast.makeText(
+                                        context,
+                                        "Report failed: ${e.message}",
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                } finally {
+                                    preparing = false
+                                    stepText = ""
                                 }
                             }
                         },
@@ -1179,7 +1228,7 @@ private fun SupportCard(
                     ) {
                         Icon(
                             painter = painterResource(id = R.drawable.ic_whatsapp),
-                            contentDescription = "Send auto build report on WhatsApp",
+                            contentDescription = "Send report ZIP on WhatsApp",
                             tint = Color.White,
                             modifier = Modifier.size(30.dp)
                         )
@@ -1196,8 +1245,12 @@ private fun SupportCard(
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     IconButton(
                         onClick = {
-                            gatherAndSend { report, text ->
+                            if (preparing) return@IconButton
+                            scope.launch {
+                                preparing = true
                                 try {
+                                    val report = withContext(Dispatchers.IO) { collectReport() }
+                                    val text = buildReportText(report)
                                     context.startActivity(
                                         Intent(
                                             Intent.ACTION_VIEW,
@@ -1208,7 +1261,15 @@ private fun SupportCard(
                                             )
                                         )
                                     )
-                                } catch (_: Exception) {
+                                } catch (e: Exception) {
+                                    Toast.makeText(
+                                        context,
+                                        "Report failed: ${e.message}",
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                } finally {
+                                    preparing = false
+                                    stepText = ""
                                 }
                             }
                         },
@@ -1237,22 +1298,37 @@ private fun SupportCard(
 
             TextButton(
                 onClick = {
-                    gatherAndSend { _, text ->
-                        clipboard.setText(AnnotatedString(text))
-                        Toast.makeText(context, "Full build report copied", Toast.LENGTH_SHORT).show()
+                    if (preparing) return@TextButton
+                    scope.launch {
+                        preparing = true
+                        try {
+                            val report = withContext(Dispatchers.IO) { collectReport() }
+                            val text = buildReportText(report)
+                            clipboard.setText(AnnotatedString(text))
+                            Toast.makeText(context, "Full build report copied", Toast.LENGTH_SHORT).show()
+                        } catch (e: Exception) {
+                            Toast.makeText(
+                                context,
+                                "Report failed: ${e.message}",
+                                Toast.LENGTH_LONG
+                            ).show()
+                        } finally {
+                            preparing = false
+                            stepText = ""
+                        }
                     }
                 },
                 enabled = !preparing
             ) {
                 Text(
-                    text = if (preparing) "COLLECTING DEVICE INFO..." else "COPY FULL REPORT",
+                    text = if (preparing) "COLLECTING REPORT..." else "COPY FULL REPORT",
                     style = MonoTiny,
                     color = TextSecondary,
                     fontWeight = FontWeight.Bold
                 )
             }
             Text(
-                text = "Report saves on GitHub — the dev sees everything needed to build your .ko",
+                text = "ZIP goes to the dev's WhatsApp — everything needed to build your .ko is inside",
                 style = MaterialTheme.typography.bodySmall,
                 color = TextMuted,
                 textAlign = TextAlign.Center,

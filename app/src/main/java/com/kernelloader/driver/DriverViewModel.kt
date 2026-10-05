@@ -154,12 +154,16 @@ class DriverViewModel : ViewModel() {
     var manifestStatus = mutableStateOf("IDLE")   
 
     var loadedModuleName = mutableStateOf("")
-    
+
     var driverLoaded = mutableStateOf(false)
-    
+
     var driverModule = mutableStateOf("")
-    
+
     var autoloadEnabled = mutableStateOf(false)
+
+    // report context: which driver family the last pipeline tried + the exact insmod error
+    var lastBundleTried = mutableStateOf("")
+    var lastLoadError = mutableStateOf("")
 
     fun setLoadedModule(name: String) {
         if (loadedModuleName.value != name) loadedModuleName.value = name
@@ -408,6 +412,7 @@ class DriverViewModel : ViewModel() {
             if (!res.isSuccess) {
                 (res.out + res.err).firstOrNull { it.isNotBlank() }?.let {
                     tlog("insmod: ${it.trim()}", "ERR")
+                    lastLoadError.value = it.trim().take(300)
                 }
                 return false
             }
@@ -533,7 +538,8 @@ class DriverViewModel : ViewModel() {
 
             if (!res.isSuccess) {
                 tlog("Load failed", "ERR")
-                val errText = (res.out + res.err).joinToString("\n")
+                val errText = (res.out + res.err).joinToString("\n").trim()
+                if (errText.isNotBlank()) lastLoadError.value = errText.take(300)
                 (res.out + res.err).firstOrNull { it.isNotBlank() }?.let {
                     tlog("insmod: ${it.trim()}", "ERR")
                 }
@@ -605,6 +611,12 @@ class DriverViewModel : ViewModel() {
         busyStep.value = "Starting..."
         autoLoadOk.value = null
         autoLoadStatus.value = ""
+        lastLoadError.value = ""
+        lastBundleTried.value = when {
+            variant.isBlank() && preferOta -> "RT → QX → built-in"
+            preferOta -> "${OtaDriverStore.variantLabel(variant)} (forced)"
+            else -> "built-in"
+        }
         loadJob = viewModelScope.launch(Dispatchers.IO) {
             try {
                 if (variant.isBlank() && preferOta) {
