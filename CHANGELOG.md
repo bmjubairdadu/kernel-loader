@@ -6,6 +6,36 @@ semantic-ish version tags (`<major>.<minor>-<flavour>`).
 
 ---
 
+## [Unreleased]
+
+### Fixed
+* The insmod ladder's fatal-error check now runs **before** the legacy
+  unknown-parameter retry: toybox reports "unknown symbol in module, or
+  unknown parameter" as one combined line, which used to be misread as a
+  legacy retry and burned 4 attempts on a deterministic kernel rejection.
+* **Report residue is cleared automatically.** The loose report files are
+  deleted as soon as the ZIP is packed; the ZIP is wiped the moment the
+  user returns from WhatsApp (sent or cancelled — by then WhatsApp has
+  either read the stream or never opened it, so there is no read race);
+  and an app start wipes the report dir as a backstop. Nothing survives
+  a restart.
+
+### Security
+* **OTA drivers are hash-verified now.** `drivers.json` carries a
+  `sha256` per entry; the app verifies the cached copy before reuse and
+  the download before staging, and deletes + rejects on mismatch. A
+  corrupted or tampered `.ko` can no longer reach `insmod`.
+* The `/dev` node name is sanitized to letters/digits/`_`/`-` (max 32)
+  everywhere it reaches a shell command or the boot script.
+* The embedded-base64 scan in `ensureElf` is skipped for files over
+  16 MB, so a large non-ELF pick can no longer spin the regex scanner.
+* Temp residue removed: the staged `/data/local/tmp/kloader_auto.ko` is
+  deleted after every built-in load attempt (success or fail), the boot
+  script's cache copy is deleted right after install, and old update
+  APKs are cleared before each new update download.
+
+---
+
 ## [2.2] — 2026-10-05 (versionCode 4, tag v4)
 
 ### Fixed

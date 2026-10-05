@@ -176,6 +176,8 @@ object AppUpdateChecker {
     fun downloadAndInstall(context: Context, info: UpdateInfo, onProgress: (Int) -> Unit = {}): String {
         return try {
             val dir = File(context.cacheDir, "updates").apply { mkdirs() }
+            // drop APKs from previous update attempts before pulling a new one
+            dir.listFiles()?.forEach { it.delete() }
             val out = File(dir, "kloader_update_${info.versionCode}.apk")
             val conn = (URL(info.apkUrl).openConnection() as HttpURLConnection).apply {
                 connectTimeout = 15000; readTimeout = 30000

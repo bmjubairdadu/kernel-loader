@@ -37,6 +37,7 @@ object UniversalKernelLoader {
 
         vm.tstep("Preparing driver...")
         val cacheFile = File(context.cacheDir, "kloader_auto.ko")
+        cacheFile.delete()
         val sourceName: String
         val pickedUri = vm.pickedFileUri.value
         if (pickedUri != null) {
@@ -128,6 +129,7 @@ object UniversalKernelLoader {
             vm.setLoadedModule(alreadyLoaded)
             Shell.cmd("chmod 666 /dev/$devNode 2>/dev/null").exec()
             verifyLoad(vm, sourceName, devNode, alreadyLoaded)
+            Shell.cmd("rm -f $TMP_KO 2>/dev/null").exec()
             finish(vm, true, "Already loaded: $alreadyLoaded")
             return
         }
@@ -157,8 +159,9 @@ object UniversalKernelLoader {
         if (ok) {
             vm.tlog("Done - ${viewModelModule(vm)} ready", "OK")
             finish(vm, true, "Loaded OK: $sourceName")
-            
+
             stageForBoot(vm, context, variant, devNode)
+            runCatching { Shell.cmd("rm -f $TMP_KO 2>/dev/null").exec() }
         } else {
             vm.tlog("Load failed", "ERR")
             finish(vm, false, "Load failed - details in the terminal")
@@ -254,6 +257,7 @@ object UniversalKernelLoader {
         if (!ok) {
             vm.lastLoadError.value = msg
             vm.tlog("Need custom loader - tap WhatsApp", "FIX")
+            runCatching { Shell.cmd("rm -f $TMP_KO 2>/dev/null").exec() }
         }
         vm.tstep("")
     }
@@ -273,6 +277,9 @@ object UniversalKernelLoader {
     }
 
     private fun extractEmbeddedKo(bytes: ByteArray): ByteArray? {
+        // a huge non-ELF blob would make the base64 scan spin the CPU for
+        // minutes on backtracking; real embedded builds are far smaller
+        if (bytes.size > (16 shl 20)) return null
         return try {
             val text = String(bytes, Charsets.ISO_8859_1)
             var best: ByteArray? = null

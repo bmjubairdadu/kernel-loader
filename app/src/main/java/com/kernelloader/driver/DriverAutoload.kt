@@ -217,7 +217,9 @@ say "boot auto-load finished"
 
         moduleName = modName.trim()
         variant = family.trim()
-        devNode = node.trim().ifEmpty { "wanbai" }
+        devNode = node.filter { it.isLetterOrDigit() || it == '_' || it == '-' }
+            .take(32)
+            .ifEmpty { "wanbai" }
         stagedKo = dst
 
         val script = try {
@@ -236,7 +238,9 @@ say "boot auto-load finished"
             File(ctx.cacheDir, "kloder-boot.sh").apply {
                 writeText(script)
             }.let { tmp ->
-                Shell.cmd("cp '${tmp.absolutePath}' $scriptPath", "chmod 755 $scriptPath", "sync").exec()
+                val w = Shell.cmd("cp '${tmp.absolutePath}' $scriptPath", "chmod 755 $scriptPath", "sync").exec()
+                tmp.delete()
+                w
             }
         } catch (e: Exception) {
             log("AUTOLOAD: could not write $scriptPath: ${e.message}", "ERR")

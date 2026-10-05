@@ -784,14 +784,17 @@ class DriverViewModel : ViewModel() {
     fun knownDriverModules(): List<String> =
         (KNOWN_DRIVER_MODULES + loadedModuleName.value).filter { it.isNotBlank() }.distinct()
 
-    fun preferredDevNode(): String = if (devNodeOverride.value.isNotBlank()) {
-        devNodeOverride.value.trim()
-    } else {
-        DEFAULT_DEV_NODE
+    private fun sanitizeNode(node: String): String =
+        node.filter { it.isLetterOrDigit() || it == '_' || it == '-' }.take(32)
+
+    fun preferredDevNode(): String {
+        val safe = sanitizeNode(devNodeOverride.value)
+        return if (safe.isBlank()) DEFAULT_DEV_NODE else safe
     }
 
     fun rememberDevNode(node: String) {
-        if (node.isNotBlank() && node != DEFAULT_DEV_NODE) devNodeOverride.value = node.trim()
+        val safe = sanitizeNode(node)
+        if (safe.isNotBlank() && safe != DEFAULT_DEV_NODE) devNodeOverride.value = safe
     }
 
     fun unloadModule(context: Context) {

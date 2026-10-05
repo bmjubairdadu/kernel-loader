@@ -216,11 +216,17 @@ object OtaDriverStore {
     ): File? {
         return try {
             val out = cachedFile(context, entry)
+            val expected = entry.sha256.trim().lowercase()
             if (out.exists() && out.length() > 0 &&
                 (entry.size <= 0 || out.length() == entry.size)
             ) {
-                onLog("Driver cached", "OK")
-                return out
+                if (hashMatches(out, expected)) {
+                    onLog("Driver cached", "OK")
+                    return out
+                }
+                // a cached file that fails its manifest hash must never reach insmod
+                onLog("Cached driver failed sha256 - redownloading", "WARN")
+                out.delete()
             }
             val url = if (entry.file.startsWith("http")) entry.file
                       else baseUrl.trimEnd('/') + "/" + entry.file.trimStart('/')
@@ -246,11 +252,31 @@ object OtaDriverStore {
                 }
             }
             conn.disconnect()
+            if (!hashMatches(out, expected)) {
+                onLog("Downloaded driver failed sha256 - rejected", "ERR")
+                out.delete()
+                return null
+            }
             onLog("Driver downloaded", "OK")
             out
         } catch (e: Exception) {
             onLog("Download failed: ${e.message}", "ERR")
             null
         }
+    }
+
+    private fun hashMatches(file: File, expected: String): Boolean {
+        if (expected.isBlank()) return true
+        return try { sha256Of(file) == expected } catch (_: Exception) { false }
+    }
+
+    fun sha256Of(file: File): String {
+        val md = java.security.MessageDigest.getInstance("SHA-256")
+        file.inputStream().use { input ->
+            val buf = ByteArray(64 * 1024)
+            var n: Int
+            while (input.read(buf).also { n = it } != -1) md.update(buf, 0, n)
+        }
+        return md.digest().joinToString("") { "%02x".format(it) }
     }
 }
