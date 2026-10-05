@@ -1,12 +1,12 @@
 {
-  "updated": "2026-10-05T15:56:08Z",
+  "updated": "2026-10-05T16:54:16Z",
   "branch": "drivers",
   "baseUrl": "https://raw.githubusercontent.com/bmjubairdadu/kernel-loader/drivers",
   "variants": {
     "rt": "RT ABI - ioctl 0x801/0x802/0x803, returns 0 on success",
     "qx": "QX ABI - ioctl 0x801/0x802 + 0x804/0x805 handshake, returns -1 on failure"
   },
-  "count": 40,
+  "count": 42,
   "drivers": [
     {
       "version": "4.14.117-perf SMP preempt mod_unload modversions aarch64",
@@ -367,6 +367,24 @@
       "buildDate": "2026-09-27T15:33:50Z",
       "variant": "rt",
       "label": "6.6"
+    },
+    {
+      "version": "4.14.284-LONGSU-gffbd2268fef7 SMP preempt mod_unload modversions aarch64",
+      "file": "rt_4.14.284-LONGSU-gffbd2268fef7.ko",
+      "sha256": "3d855e20fe91ff858cbfda314b90b1f5aaef1209dd28109c23ef678b51388c6c",
+      "size": 23536,
+      "buildDate": "2026-10-05T16:54:16Z",
+      "variant": "rt",
+      "label": "4.14.284-LONGSU-gffbd2268fef7"
+    },
+    {
+      "version": "4.14.284-LONGSU-gffbd2268fef7 SMP preempt mod_unload modversions aarch64",
+      "file": "qx_4.14.284-LONGSU-gffbd2268fef7.ko",
+      "sha256": "23d20260d7226a99a71c990829ad9224b62b27663035ebed3097a0d006563ef7",
+      "size": 22880,
+      "buildDate": "2026-10-05T16:54:16Z",
+      "variant": "qx",
+      "label": "4.14.284-LONGSU-gffbd2268fef7"
     }
   ]
 }
