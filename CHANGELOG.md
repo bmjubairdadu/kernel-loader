@@ -6,6 +6,35 @@ semantic-ish version tags (`<major>.<minor>-<flavour>`).
 
 ---
 
+## [2.2] — 2026-10-05 (versionCode 4, tag v4)
+
+### Fixed
+* **The CRC extractor step broke with the rebuilt `kcrc_dump`.** The tools on
+  the `drivers` branch are now tiny (~10 KB) dynamic-PIE builds (the old
+  3.5 MB static build segfaulted at startup on Android 11), but the app's
+  download check required ≥ 1 MB — every report would have failed the
+  Module.symvers step. The accepted size window is now 4 KB – 64 MB, and the
+  ELF machine type is verified on download so an arm build can never run on
+  an arm64 shell (and vice versa).
+* **32-bit phones are supported now.** `uname -m` `armv7*`/`armv8*` shells
+  download `kcrc_dump-arm` (9.8 KB, ELF `0x28`) instead of the aarch64 build;
+  both arches cache under their own name and the other arch's stale copy is
+  removed after a successful download.
+* **A cached extractor can no longer go stale.** Before running, the app
+  compares the cached file size against a HEAD request to the primary mirror
+  and re-downloads when the published tool changed — the extractor can be
+  rebuilt on the `drivers` branch without shipping a new APK. (Users who
+  already cached the old 3.5 MB static build get the new one automatically;
+  on Android ≤ 10 the old build would still have run, on Android 11+ it
+  segfaulted.)
+
+### Changed
+* The extractor now self-unhides `kptr_restrict`, so no extra root-side
+  preparation is needed before the CRC dump (drivers-branch tools commit
+  `5b108ce`).
+
+---
+
 ## [2.1] — 2026-10-05 (versionCode 3, tag v3)
 
 ### Added
