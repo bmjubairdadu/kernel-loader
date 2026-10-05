@@ -5,9 +5,9 @@
 #   powershell -ExecutionPolicy Bypass -File scripts/publish_apk.ps1 -Tag v8 -ApkPath app\build\outputs\apk\release\app-release.apk -Title "Kernel Loader v2.3" -Notes "OTA kernel loader release"
 #
 # Requirements: GitHub CLI (gh) installed and authenticated (gh auth login).
-# The asset is uploaded as "KernelLoader_<tag>-release.apk"; the in-app
-# auto-updater (AppUpdateChecker -> releases/latest API) prefers an .apk
-# asset whose name contains "release" and falls back to any .apk asset.
+# The asset is uploaded as "Kernel-Loader-v<versionName>.apk" (the versionName
+# is read from app/build.gradle.kts). The in-app auto-updater
+# (AppUpdateChecker -> releases/latest API) accepts any .apk asset.
 param(
     [string]$Tag = "v8",
     [string]$ApkPath = "",
@@ -29,8 +29,18 @@ if (-not (Test-Path $ApkPath)) {
 $apkItem = Get-Item $ApkPath
 Write-Host ("APK: {0} ({1:N2} MB)" -f $apkItem.FullName, ($apkItem.Length / 1MB))
 
-# Upload under the branded asset name for the release page.
-$assetName = "KernelLoader_$Tag-release.apk"
+# Upload under the branded asset name used by every release:
+# Kernel-Loader-v<versionName>.apk (matches the v2.0 release naming).
+$gradleFile = Join-Path $root 'app\build.gradle.kts'
+$VersionName = ""
+if (Test-Path $gradleFile) {
+    $gradleText = Get-Content $gradleFile -Raw
+    if ($gradleText -match 'versionName\s*=\s*"([^"]+)"') { $VersionName = $Matches[1] }
+}
+if ([string]::IsNullOrWhiteSpace($VersionName)) {
+    Write-Error "Could not read versionName from app\build.gradle.kts"
+}
+$assetName = "Kernel-Loader-v$VersionName.apk"
 $assetPath = $apkItem.FullName
 if ($apkItem.Name -ne $assetName) {
     $tmp = Join-Path ([IO.Path]::GetTempPath()) 'kernelloader-publish'
