@@ -80,7 +80,8 @@ object DriverAutoload {
         val dir = stageDir()
         val ko = stagedKo
         val mod = moduleName
-        val node = "/dev/$devNode"
+        val nodeName = devNode.trim().ifEmpty { "wanbai" }
+        val node = "/dev/$nodeName"
         val fam = variant.uppercase()
         val shell = """
 #!/system/bin/sh
@@ -125,17 +126,9 @@ while [ @i -lt 90 ]; do
 done
 say "boot stage released"
 
-# 3. already loaded? no-op. A module lives in kernel memory until reboot, and
-#    a manual load may have run before, so never insmod twice.
-if grep -q "^@MODNAME@ " /proc/modules 2>/dev/null; then
-    say "SKIP: @MODNAME@ is already loaded"
-    chmod 666 "@NODE@" 2>/dev/null
-    say "done (node perms refreshed)"
-    exit 0
-fi
-
-# 4. permissive SELinux: the game-mod client is a separate uid and cannot open
-#    the node while SELinux enforces. Best effort.
+# 3. permissive SELinux before anything else: the game-mod client is a
+#    separate uid and cannot open the node while SELinux enforces, and every
+#    exit path below (including the already-loaded skip) needs this.
 ENF=@(getenforce 2>/dev/null)
 if [ "@ENF@" = "Enforcing" ]; then
     if setenforce 0 2>/dev/null; then
@@ -147,10 +140,22 @@ else
     say "SELinux already @ENF@"
 fi
 
-# 5. load it
+# 4. already loaded? no-op. A module lives in kernel memory until reboot, and
+#    a manual load may have run before, so never insmod twice.
+if grep -q "^@MODNAME@ " /proc/modules 2>/dev/null; then
+    say "SKIP: @MODNAME@ is already loaded"
+    chmod 666 "@NODE@" 2>/dev/null
+    say "done (node perms refreshed)"
+    exit 0
+fi
+
+# 5. load it - devname pins the node name the client opens; without it the
+#    driver registers its built-in default and @NODE@ never appears
 chmod 644 "@KO@" 2>/dev/null
-if insmod "@KO@" >> "@LOG@" 2>&1; then
-    say "OK: insmod succeeded"
+if insmod "@KO@" devname="@NODENAME@" >> "@LOG@" 2>&1; then
+    say "OK: insmod succeeded (devname=@NODENAME@)"
+elif insmod "@KO@" >> "@LOG@" 2>&1; then
+    say "OK: insmod succeeded (legacy build, no devname)"
 else
     say "FAIL: insmod failed (details in @LOG@.why)"
     tail -n 5 "@LOG@" > "@LOG@.why" 2>/dev/null
@@ -170,11 +175,12 @@ say "boot auto-load finished"
         val out = shell
             .replace("@MODNAME@", mod)
             .replace("@FAMILY@", fam)
+            .replace("@NODENAME@", nodeName)
             .replace("@NODE@", node)
             .replace("@KO@", ko)
             .replace("@DIR@", dir)
             .replace("@LOG@", "$dir/boot.log")
-            
+
             .replace("@ENF@", "\$ENF")
             .replace("@", "$")
         

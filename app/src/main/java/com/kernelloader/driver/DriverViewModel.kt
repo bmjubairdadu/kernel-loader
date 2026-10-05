@@ -16,6 +16,7 @@ import com.topjohnwu.superuser.Shell
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -366,6 +367,54 @@ class DriverViewModel : ViewModel() {
         "/data/adb/kloder/driver_qx.ko"
     )
 
+    // deterministic kernel rejections: retrying the same .ko through other
+    // loader binaries cannot succeed, so the ladder must stop instead of
+    // hammering insmod (each failed insmod wakes the whole module loader)
+    private val FATAL_INSMOD_ERRORS = listOf(
+        "invalid module format",
+        "disagrees about version",
+        "vermagic",
+        "exec format error",
+        "operation not permitted",
+        "required key not available",
+        "permission denied",
+        "file exists",
+        "unknown symbol"
+    )
+
+    private val MAX_INSMOD_ATTEMPTS = 4
+    private val INSMOD_BACKOFF_MS = 500L
+
+    /**
+     * One bounded insmod ladder for every load path: devname form first, plain
+     * form for legacy .ko builds, at most [MAX_INSMOD_ATTEMPTS] real attempts
+     * with a small backoff between them. A missing loader binary moves on to
+     * the next candidate; a deterministic kernel rejection aborts the ladder.
+     */
+    private suspend fun runInsmodLadder(koPath: String, devNode: String): Shell.Result {
+        val bins = listOf(
+            "insmod", "/system/bin/insmod", "/vendor/bin/insmod",
+            "/data/adb/magisk/busybox insmod", "busybox insmod"
+        )
+        var res = Shell.cmd("true").exec()
+        var attempts = 0
+        outer@ for (b in bins) {
+            for (withDev in listOf(true, false)) {
+                checkpoint()
+                if (attempts >= MAX_INSMOD_ATTEMPTS) break@outer
+                if (attempts > 0) delay(INSMOD_BACKOFF_MS)
+                attempts++
+                res = Shell.cmd(if (withDev) "$b $koPath devname=$devNode" else "$b $koPath").exec()
+                if (res.isSuccess) return res
+                val err = (res.out + res.err).joinToString(" ").lowercase(Locale.US)
+                if (err.contains("not found") || err.contains("no such file")) continue@outer
+                if (err.contains("unknown parameter")) continue
+                if (FATAL_INSMOD_ERRORS.any { err.contains(it) }) break@outer
+            }
+        }
+        return res
+    }
+
     private fun firstLocalKo(variant: String = ""): File? {
         val explicit = when (variant.lowercase(Locale.US)) {
             OtaDriverStore.RT -> "/data/adb/kloder/driver_rt.ko"
@@ -396,19 +445,7 @@ class DriverViewModel : ViewModel() {
         }
         Shell.cmd("rmmod kmem_337 2>/dev/null", "rmmod kmem_337_qx 2>/dev/null", "sleep 1").exec()
         return try {
-            val bins = listOf(
-                "/system/bin/insmod", "/vendor/bin/insmod", "insmod",
-                "/data/adb/magisk/busybox insmod", "busybox insmod"
-            )
-            var res = Shell.cmd("true").exec()
-            for (b in bins) {
-                checkpoint()
-                for (form in listOf("$b ${staged.absolutePath} devname=$devNode", "$b ${staged.absolutePath}")) {
-                    res = Shell.cmd(form).exec()
-                    if (res.isSuccess) break
-                }
-                if (res.isSuccess) break
-            }
+            val res = runInsmodLadder(staged.absolutePath, devNode)
             if (!res.isSuccess) {
                 (res.out + res.err).firstOrNull { it.isNotBlank() }?.let {
                     tlog("insmod: ${it.trim()}", "ERR")
@@ -517,23 +554,9 @@ class DriverViewModel : ViewModel() {
             Shell.cmd("rmmod kmem_337 2>/dev/null", "rmmod kmem_337_qx 2>/dev/null", "sleep 1").exec()
             try {
 
-            val bins = listOf(
-                "/system/bin/insmod", "/vendor/bin/insmod", "insmod",
-                "/data/adb/magisk/busybox insmod", "busybox insmod"
-            )
-            val forms = mutableListOf<String>()
-            for (b in bins) {
-                forms.add("$b ${staged.absolutePath} devname=$devNode")
-                forms.add("$b ${staged.absolutePath}")
-            }
-            var res = Shell.cmd("true").exec()
-            for (cmd in forms) {
-                checkpoint()
-                res = Shell.cmd(cmd).exec()
-                if (res.isSuccess) {
-                    tlog("Driver loaded", "OK")
-                    break
-                }
+            val res = runInsmodLadder(staged.absolutePath, devNode)
+            if (res.isSuccess) {
+                tlog("Driver loaded", "OK")
             }
 
             if (!res.isSuccess) {
