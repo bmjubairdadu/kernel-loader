@@ -6,20 +6,6 @@ semantic-ish version tags (`<major>.<minor>-<flavour>`).
 
 ---
 
-## [2.3] — 2026-10-05 (versionCode 5, tag v5)
-
-### Fixed
-* **"Update Check Offline" on every launch.** The updater polled
-  `api.github.com` unauthenticated, which rate-limits by IP (60 requests per
-  hour) — every user behind the same carrier NAT shares one budget, so the
-  check failed for large groups of users. The updater now reads the public
-  release pages instead, which are not rate-limited: `/releases/latest`
-  redirects to the current tag, and `/releases/expanded_assets/<tag>` lists
-  the APK asset (size read via a HEAD request). The old API JSON flow is kept
-  only as a fallback in case the page layout ever changes.
-
----
-
 ## [2.2] — 2026-10-05 (versionCode 4, tag v4)
 
 ### Fixed
@@ -41,6 +27,14 @@ semantic-ish version tags (`<major>.<minor>-<flavour>`).
   already cached the old 3.5 MB static build get the new one automatically;
   on Android ≤ 10 the old build would still have run, on Android 11+ it
   segfaulted.)
+* **"Update Check Offline" on every launch.** The updater polled
+  `api.github.com` unauthenticated, which rate-limits by IP (60 requests per
+  hour) — every user behind the same carrier NAT shares one budget, so the
+  check failed for large groups of users. The updater now reads the public
+  release pages instead, which are not rate-limited: `/releases/latest`
+  redirects to the current tag, and `/releases/expanded_assets/<tag>` lists
+  the APK asset (size read via a HEAD request). The old API JSON flow is kept
+  only as a fallback in case the page layout ever changes.
 
 ### Changed
 * The extractor now self-unhides `kptr_restrict`, so no extra root-side
