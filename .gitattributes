@@ -1,1 +1,2 @@
 *.ko binary
+tools/kcrc_dump binary

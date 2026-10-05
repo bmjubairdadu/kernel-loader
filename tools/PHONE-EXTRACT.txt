@@ -1,0 +1,51 @@
+Kernel CRC extract - phone steps (no PC needed, MT Manager is enough)
+=====================================================================
+Use this when the driver database has no match for a kernel and nobody
+can provide its Module.symvers. One run on the rooted phone gives the
+file needed to build exact drivers on PC.
+
+WHAT YOU NEED ON THE PHONE
+  - root (Magisk / KernelSU / APatch - su must work)
+  - MT Manager (or any terminal that can run commands as root)
+  - the file: kcrc_dump (download link from your builder)
+
+STEPS
+  1. Download kcrc_dump to the phone (browser download is fine).
+  2. In MT Manager, copy kcrc_dump to /data/local/tmp/
+     and set permission 755 (execute). Or in a root shell:
+       cp /sdcard/Download/kcrc_dump /data/local/tmp/kcrc_dump
+       chmod 755 /data/local/tmp/kcrc_dump
+  3. Run as root, saving output to a file:
+       su -c '/data/local/tmp/kcrc_dump /sdcard/Module.symvers.txt'
+  4. Expected last line looks like:
+       entries=5123 gpl=1488 kcrctab=5123
+     Any nonzero entries count means success.
+  5. Send back to your builder:
+       - /sdcard/Module.symvers.txt
+       - the output of: uname -r
+       - a screenshot of Settings > About phone > Build number
+         (optional, helps confirm the exact build)
+
+IF IT FAILS, READ THE ERROR
+  - "cannot open /proc/kallsyms: run as root" -> su did not grant root.
+    Grant root to MT Manager / terminal and retry.
+  - "no __kcrctab_ entries" -> this kernel was built WITHOUT MODVERSIONS.
+    Good news: no CRC file is needed at all. Only the uname -r string
+    is needed, and the driver in the database (or a fresh vermagic build)
+    will load. Tell your builder exactly this line.
+  - "cannot open /proc/kcore" -> root is restricted (some stock-based
+    roots block it). Try KernelSU/APatch instead of Magisk, or ask the
+    kernel builder for out/Module.symvers directly.
+  - "unsupported kcore format" -> non-standard kernel, send the exact
+    message back to your builder.
+
+WHAT THE BUILDER DOES WITH Module.symvers.txt
+  Builds RT+QX drivers against it, verifies every CRC, uploads both to
+  the driver database. The app then downloads them over OTA - no APK,
+  no reflash, nothing else changes on the phone.
+
+SAFETY NOTES
+  - This tool only READS kernel memory addresses published by the kernel
+    itself in /proc/kallsyms and /proc/kcore. It writes nothing, patches
+    nothing, loads nothing.
+  - Run it once, then delete it. It has no further use on the phone.
