@@ -1,5 +1,5 @@
 {
-  "updated": "2026-10-04T18:40:08Z",
+  "updated": "2026-10-05T13:28:49Z",
   "branch": "drivers",
   "baseUrl": "https://raw.githubusercontent.com/bmjubairdadu/kernel-loader/drivers",
   "variants": {
@@ -130,7 +130,7 @@
       "file": "qx_4.9.337-DaisyForGaming.ko",
       "sha256": "b867458e01a62a72da8aaeae171de69dd404dbbf7bc38ac6364d1b36d4fd22ce",
       "size": 20208,
-      "buildDate": "2026-10-05",
+      "buildDate": "2026-10-05T13:28:49Z",
       "variant": "qx",
       "label": "4.9.337-DaisyForGaming"
     },
@@ -319,7 +319,7 @@
       "file": "rt_4.9.337-DaisyForGaming.ko",
       "sha256": "3f17e7774deb5b46c4e569834c8ae07798db4b6d16517b266b13ff8095c175f6",
       "size": 21000,
-      "buildDate": "2026-10-05",
+      "buildDate": "2026-10-05T13:28:49Z",
       "variant": "rt",
       "label": "4.9.337-DaisyForGaming"
     },
