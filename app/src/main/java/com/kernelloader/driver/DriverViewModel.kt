@@ -180,7 +180,7 @@ class DriverViewModel : ViewModel() {
         updateStatus.value = "CHECKING"
         tlog("Checking Update...", "INFO")
         viewModelScope.launch(Dispatchers.IO) {
-            val result = AppUpdateChecker.check(BuildConfig.UPDATE_API_URL, BuildConfig.VERSION_CODE)
+            val result = AppUpdateChecker.check(BuildConfig.UPDATE_RELEASES_PAGE, BuildConfig.VERSION_CODE)
             withContext(Dispatchers.Main) {
                 when (result) {
                     is AppUpdateChecker.UpdateCheck.Available -> {

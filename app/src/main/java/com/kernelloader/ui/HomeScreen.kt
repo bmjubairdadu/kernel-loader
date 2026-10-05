@@ -270,7 +270,8 @@ fun HomeScreen(
                                     fontWeight = FontWeight.Bold
                                 )
                                 Text(
-                                    text = "tap to download & install (${appUpdate.apkSize / 1024} KB)",
+                                    text = "tap to download & install" +
+                                            if (appUpdate.apkSize > 0) " (${appUpdate.apkSize / 1024} KB)" else "",
                                     style = MonoTiny,
                                     color = TextMuted
                                 )

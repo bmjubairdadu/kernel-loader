@@ -31,7 +31,91 @@ object AppUpdateChecker {
 
     private const val UA = "KernelLoder-Updater/1.0"
 
-    fun check(apiUrl: String, currentVersionCode: Int): UpdateCheck {
+    /**
+     * The REST API rate-limits unauthenticated clients per IP, so everyone on
+     * the same carrier NAT shares one tiny budget and sees "Update Check
+     * Offline". The public release pages are not rate-limited: /releases/latest
+     * redirects to the tag, /releases/expanded_assets/<tag> lists the assets.
+     * The API JSON flow is kept only as a fallback for a page-layout change.
+     */
+    fun check(releasesPageUrl: String, currentVersionCode: Int): UpdateCheck {
+        checkFromReleasePage(releasesPageUrl, currentVersionCode)?.let { return it }
+        return checkFromApi(apiUrlFromPage(releasesPageUrl), currentVersionCode)
+    }
+
+    private fun checkFromReleasePage(pageUrl: String, currentVersionCode: Int): UpdateCheck? {
+        val page = pageUrl.trimEnd('/')
+        // only the final redirect URL matters here; the page body does not
+        val (_, finalUrl) = fetch("$page/latest") ?: return null
+        val tag = latestTagFromUrl(finalUrl) ?: return null
+        val code = Regex("""v?(\d+)""").find(tag)?.groupValues?.last()?.toIntOrNull()
+            ?: return null
+        if (code <= currentVersionCode) return UpdateCheck.UpToDate
+
+        val assetsBody = fetch("$page/expanded_assets/$tag")?.first ?: return null
+        val apkHref = Regex("""href="([^"]+/releases/download/[^"]+\.apk)"""")
+            .findAll(assetsBody)
+            .firstOrNull()?.groupValues?.get(1)
+            ?: return null
+        val apkUrl = if (apkHref.startsWith("/")) "https://github.com$apkHref" else apkHref
+
+        return UpdateCheck.Available(
+            UpdateInfo(
+                versionCode = code,
+                versionName = tag.removePrefix("v").ifBlank { tag },
+                apkUrl = apkUrl,
+                apkSize = headContentLength(apkUrl) ?: 0L,
+                notes = "",
+                publishedAt = ""
+            )
+        )
+    }
+
+    private fun apiUrlFromPage(pageUrl: String): String {
+        val repo = Regex("""github\.com/([^/]+/[^/]+)""")
+            .find(pageUrl)?.groupValues?.get(1) ?: return ""
+        return "https://api.github.com/repos/$repo/releases/latest"
+    }
+
+    private fun latestTagFromUrl(url: String): String? =
+        Regex("""/releases/tag/([^/?#]+)""").find(url)?.groupValues?.get(1)
+
+    private fun fetch(url: String): Pair<String, String>? = try {
+        val conn = (URL(url).openConnection() as HttpURLConnection).apply {
+            connectTimeout = 12000; readTimeout = 12000
+            instanceFollowRedirects = true
+            setRequestProperty("User-Agent", UA)
+            setRequestProperty("Accept", "text/html,*/*")
+        }
+        conn.connect()
+        val ok = conn.responseCode in 200..299
+        val body = if (ok) conn.inputStream.bufferedReader().readText() else null
+        val finalUrl = conn.url.toString()
+        conn.disconnect()
+        body?.let { it to finalUrl }
+    } catch (e: Exception) {
+        null
+    }
+
+    private fun headContentLength(url: String): Long? = try {
+        val conn = (URL(url).openConnection() as HttpURLConnection).apply {
+            connectTimeout = 12000; readTimeout = 12000
+            requestMethod = "HEAD"
+            instanceFollowRedirects = true
+            setRequestProperty("User-Agent", UA)
+        }
+        conn.connect()
+        val len = if (conn.responseCode in 200..299) {
+            conn.contentLengthLong.takeIf { it > 0 }
+        } else null
+        conn.disconnect()
+        len
+    } catch (e: Exception) {
+        null
+    }
+
+    private fun checkFromApi(apiUrl: String, currentVersionCode: Int): UpdateCheck {
+        if (apiUrl.isBlank()) return UpdateCheck.Offline
         val text = try {
             val conn = (URL(apiUrl).openConnection() as HttpURLConnection).apply {
                 connectTimeout = 12000; readTimeout = 12000
@@ -51,7 +135,7 @@ object AppUpdateChecker {
         return try {
             val rel = JSONObject(text)
             val tag = rel.optString("tag_name", "")
-            
+
             val code = Regex("""v?(\d+)""").find(tag)?.groupValues?.last()?.toIntOrNull()
                 ?: rel.optInt("id", 0)
             if (code <= currentVersionCode) return UpdateCheck.UpToDate
@@ -63,7 +147,7 @@ object AppUpdateChecker {
                 val a = assets.getJSONObject(i)
                 val name = a.optString("name", "")
                 if (name.endsWith(".apk", true)) {
-                    
+
                     if (name.contains("release", true) || apkUrl.isBlank()) {
                         apkUrl = a.optString("browser_download_url", "")
                         apkSize = a.optLong("size", 0L)
