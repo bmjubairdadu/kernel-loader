@@ -1,5 +1,5 @@
 {
-  "updated": "2026-10-05T16:54:16Z",
+  "updated": "2026-10-05T17:18:22Z",
   "branch": "drivers",
   "baseUrl": "https://raw.githubusercontent.com/bmjubairdadu/kernel-loader/drivers",
   "variants": {
@@ -124,15 +124,6 @@
       "buildDate": "2026-09-27T15:33:50Z",
       "variant": "qx",
       "label": "4.9.186"
-    },
-    {
-      "version": "4.9.337-DaisyForGaming SMP preempt mod_unload modversions aarch64",
-      "file": "qx_4.9.337-DaisyForGaming.ko",
-      "sha256": "e5db833f31bd7246ecfffdaa593368a585e8430d5dd34894d8d3a00ca923d5a4",
-      "size": 22048,
-      "buildDate": "2026-10-05T15:56:08Z",
-      "variant": "qx",
-      "label": "4.9.337-DaisyForGaming"
     },
     {
       "version": "5.10.168-android12-9-gf23f00da6b8e-dirty SMP preempt mod_unload modversions aarch64",
@@ -315,15 +306,6 @@
       "label": "4.9.186"
     },
     {
-      "version": "4.9.337-DaisyForGaming SMP preempt mod_unload modversions aarch64",
-      "file": "rt_4.9.337-DaisyForGaming.ko",
-      "sha256": "7d6397f75cda8ebe5cd6aef3f331caf2ce52efb08bb3f10feb767628e8210c93",
-      "size": 22968,
-      "buildDate": "2026-10-05T15:56:08Z",
-      "variant": "rt",
-      "label": "4.9.337-DaisyForGaming"
-    },
-    {
       "version": "5.10.198-00001-gcab9fa53e761-dirty SMP preempt mod_unload modversions aarch64",
       "file": "rt_5.10.ko",
       "sha256": "50513c4800a7c21ebcaefc766d36abeec6da95c5b6ef100e69045157e6140eea",
@@ -385,6 +367,24 @@
       "buildDate": "2026-10-05T16:54:16Z",
       "variant": "qx",
       "label": "4.14.284-LONGSU-gffbd2268fef7"
+    },
+    {
+      "version": "4.9.337-DaisyForGaming SMP preempt mod_unload modversions aarch64",
+      "file": "4.9.337-rt.ko",
+      "sha256": "73223bfd5d4dcc09bfc2884ee7841c67aac86464324b8d0ecffe828bc434e7e8",
+      "size": 22968,
+      "buildDate": "2026-10-05T17:18:22Z",
+      "variant": "rt",
+      "label": "4.9.337"
+    },
+    {
+      "version": "4.9.337-DaisyForGaming SMP preempt mod_unload modversions aarch64",
+      "file": "4.9.337-qx.ko",
+      "sha256": "3df9743ba3cd594a97537be790fd5e273c14cfd9c72d5bbda01b7cbd3dfd8015",
+      "size": 22040,
+      "buildDate": "2026-10-05T17:18:22Z",
+      "variant": "qx",
+      "label": "4.9.337"
     }
   ]
 }
