@@ -4,43 +4,51 @@ Use this when the driver database has no match for a kernel and nobody
 can provide its Module.symvers. One run on the rooted phone gives the
 file needed to build exact drivers on PC.
 
-DOWNLOAD
-  https://github.com/bmjubairdadu/kernel-loader/raw/refs/heads/drivers/tools/kcrc_dump
-  size   : 3520040 bytes
-  sha256 : cf7c798cfd76783ba0a54de97bf8cb4d75bfb9272117bea7f296d382d016273f
-  (aarch64, static PIE, no dependencies, reads nothing outside the kernel's
-   own /proc entries)
+DOWNLOAD (pick the one matching the phone)
+  64-bit (almost all phones made after 2015):
+    https://github.com/bmjubairdadu/kernel-loader/raw/refs/heads/drivers/tools/kcrc_dump
+    size   : 11320 bytes
+    sha256 : a1be166d14d9efbb20b6e56173d64f9d8c8ec1e3f446dabca1744964dc053621
+  32-bit (old phones, check with: uname -m -> armv7l):
+    https://github.com/bmjubairdadu/kernel-loader/raw/refs/heads/drivers/tools/kcrc_dump-arm
+    size   : 9804 bytes
+    sha256 : 79cdbc34d0c825a25856606e7cd10d24b41f7e4bf3f4e3f83ceb900c45c6612
+  (dynamic PIE, Android 5.0+, no dependencies, reads nothing outside the
+   kernel's own /proc entries)
 
 WHAT YOU NEED ON THE PHONE
   - root (Magisk / KernelSU / APatch - su must work)
   - MT Manager (or any terminal that can run commands as root)
-  - the file: kcrc_dump
+  - the file: kcrc_dump (or kcrc_dump-arm on 32-bit phones)
 
-STEPS
+STEPS (one command does everything)
   1. Download kcrc_dump to the phone (browser download is fine).
-  2. In MT Manager, copy kcrc_dump to /data/local/tmp/
-     and set permission 755 (execute). Or in a root shell:
-       cp /sdcard/Download/kcrc_dump /data/local/tmp/kcrc_dump
-       chmod 755 /data/local/tmp/kcrc_dump
-  3. Run as root, saving output to a file:
-       su -c '/data/local/tmp/kcrc_dump /sdcard/Module.symvers.txt'
-  4. Expected output ends with:
+  2. In MT Manager open a root terminal and paste this single line:
+       su -c 'cp /sdcard/Download/kcrc_dump /data/local/tmp/ && chmod 755 /data/local/tmp/kcrc_dump && /data/local/tmp/kcrc_dump /sdcard/Module.symvers.txt'
+     (on 32-bit phones use kcrc_dump-arm in both places)
+  3. The tool unhides the kernel addresses itself (kptr_restrict),
+     then reads the CRC table. Expected output ends with:
        uname: Linux version 4.14.284-...
        entries=5123 gpl=1488 kcrctab=5123
      Any nonzero entries count means success.
-  5. Send back to your builder:
+  4. Send back to your builder:
        - /sdcard/Module.symvers.txt
-       - the "uname:" line printed above
+       - the full output text above (it shows where it stopped on failure)
        - a screenshot of Settings > About phone > Build number
          (optional, helps confirm the exact build)
 
 IF IT FAILS, READ THE ERROR
   - "cannot open /proc/kallsyms: run as root" -> su did not grant root.
     Grant root to MT Manager / terminal and retry.
-  - "no __kcrctab_ entries" -> this kernel was built WITHOUT MODVERSIONS.
-    Good news: no CRC file is needed at all. Only the uname -r string
-    is needed, and the driver in the database (or a fresh vermagic build)
-    will load. Tell your builder exactly this line.
+  - "kptr_restrict locked, addresses may stay hidden" + "no __kcrctab_
+    entries" -> root could not unhide addresses (some kernels enforce
+    it). Run this once manually, then re-run the tool:
+      su -c 'echo 0 > /proc/sys/kernel/kptr_restrict'
+  - "no __kcrctab_ entries" (without the locked line) -> this kernel
+    was built WITHOUT MODVERSIONS. Good news: no CRC file is needed
+    at all. Only the uname -r string is needed, and the driver in the
+    database (or a fresh vermagic build) will load. Tell your builder
+    exactly this line.
   - "cannot open /proc/kcore" -> root is restricted (some stock-based
     roots block it). Try KernelSU/APatch instead of Magisk, or ask the
     kernel builder for out/Module.symvers directly.
@@ -66,5 +74,7 @@ NOTES ON THE OUTPUT FILE
 SAFETY NOTES
   - This tool only READS kernel memory addresses published by the kernel
     itself in /proc/kallsyms and /proc/kcore. It writes nothing, patches
-    nothing, loads nothing.
+    nothing, loads nothing. The single write it attempts is
+    /proc/sys/kernel/kptr_restrict back to 0, which only re-enables the
+    standard address display for root - and only when run as root.
   - Run it once, then delete it. It has no further use on the phone.

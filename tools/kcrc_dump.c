@@ -112,10 +112,36 @@ int main(int argc, char **argv) {
     size_t i, j;
     size_t written = 0;
     size_t gpl_written = 0;
+    size_t skipped = 0;
+    unsigned long nlines = 0;
+
+    setvbuf(stderr, NULL, _IONBF, 0);
+    fprintf(stderr, "dbg: start\n");
 
     if (argc > 2) {
         fprintf(stderr, "usage: kcrc_dump [output-file]\n");
         return 1;
+    }
+    {
+        FILE *rf = fopen("/proc/sys/kernel/kptr_restrict", "r");
+        if (rf) {
+            char rb[16];
+            if (fgets(rb, sizeof(rb), rf)) {
+                if (rb[0] != '0') {
+                    FILE *wf = fopen("/proc/sys/kernel/kptr_restrict", "w");
+                    if (wf) {
+                        fputs("0\n", wf);
+                        fclose(wf);
+                        fprintf(stderr, "dbg: kptr_restrict lowered\n");
+                    } else {
+                        fprintf(stderr, "dbg: kptr_restrict locked, addresses may stay hidden\n");
+                    }
+                } else {
+                    fprintf(stderr, "dbg: kptr_restrict already 0\n");
+                }
+            }
+            fclose(rf);
+        }
     }
     if (argc == 2) {
         out = fopen(argv[1], "w");
@@ -130,14 +156,18 @@ int main(int argc, char **argv) {
         fprintf(stderr, "cannot open %s: run as root, KALLSYMS required\n", KALLSYMS_PATH);
         return 2;
     }
+    fprintf(stderr, "dbg: kallsyms open ok\n");
     while ((len = getline(&line, &llen, kf)) >= 0) {
         unsigned long long addr;
         char *name;
+        nlines++;
         if (len < 19)
             continue;
         addr = strtoull(line, NULL, 16);
-        if (addr == 0)
+        if (addr == 0) {
+            skipped++;
             continue;
+        }
         name = strchr(line, ' ');
         if (!name)
             continue;
@@ -154,6 +184,8 @@ int main(int argc, char **argv) {
     }
     fclose(kf);
     free(line);
+    fprintf(stderr, "dbg: kallsyms done lines=%lu kcrctab=%lu gpl=%lu zeroaddr=%lu\n",
+            nlines, (unsigned long)crcs.count, (unsigned long)gpl.count, (unsigned long)skipped);
 
     if (crcs.count == 0) {
         fprintf(stderr, "no __kcrctab_ entries: kernel has no MODVERSIONS or kallsyms hidden\n");
@@ -165,11 +197,18 @@ int main(int argc, char **argv) {
         fprintf(stderr, "cannot open %s: run as root\n", KCORE_PATH);
         return 3;
     }
+    fprintf(stderr, "dbg: kcore open ok\n");
     if (pread_all(kcore_fd, &ehdr, sizeof(ehdr), 0) != (ssize_t)sizeof(ehdr) ||
         memcmp(ehdr.e_ident, ELFMAG, SELFMAG) != 0 ||
         ehdr.e_ident[EI_CLASS] != ELFCLASS64 ||
         ehdr.e_ident[EI_DATA] != ELFDATA2LSB) {
         fprintf(stderr, "unsupported kcore format: need 64-bit LE ELF\n");
+        return 3;
+    }
+    fprintf(stderr, "dbg: ehdr phoff=%llu phnum=%u phentsize=%u\n",
+            (unsigned long long)ehdr.e_phoff, ehdr.e_phnum, ehdr.e_phentsize);
+    if (ehdr.e_phnum > 4096 || ehdr.e_phentsize < sizeof(Elf64_Phdr)) {
+        fprintf(stderr, "insane phdr table: refusing to walk it\n");
         return 3;
     }
     for (i = 0; i < ehdr.e_phnum; i++) {
@@ -198,6 +237,7 @@ int main(int argc, char **argv) {
         fprintf(stderr, "no load segments in kcore\n");
         return 3;
     }
+    fprintf(stderr, "dbg: segs=%lu\n", (unsigned long)nsegs);
 
     {
         FILE *vf = fopen("/proc/version", "r");
@@ -217,6 +257,8 @@ int main(int argc, char **argv) {
         unsigned long long v = 0;
         unsigned int crc32;
         const char *flavor;
+        if ((i % 500) == 0)
+            fprintf(stderr, "dbg: read %lu/%lu\n", (unsigned long)i, (unsigned long)crcs.count);
         for (j = 0; j < nsegs; j++) {
             if (crcs.items[i].addr >= segs[j].vaddr &&
                 crcs.items[i].addr + 8 <= segs[j].vaddr + segs[j].memsz) {
