@@ -408,8 +408,11 @@ class DriverViewModel : ViewModel() {
                 if (res.isSuccess) return res
                 val err = (res.out + res.err).joinToString(" ").lowercase(Locale.US)
                 if (err.contains("not found") || err.contains("no such file")) continue@outer
-                if (err.contains("unknown parameter")) continue
+                // fatal check MUST come first: toybox reports one combined line
+                // ("unknown symbol in module, or unknown parameter") and the
+                // kernel's own dmesg line names the real deterministic reason
                 if (FATAL_INSMOD_ERRORS.any { err.contains(it) }) break@outer
+                if (err.contains("unknown parameter")) continue
             }
         }
         return res
