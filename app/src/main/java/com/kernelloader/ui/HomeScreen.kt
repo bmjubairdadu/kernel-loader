@@ -68,6 +68,7 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -109,6 +110,9 @@ import com.kernelloader.driver.SupportContact
 import com.kernelloader.driver.TerminalLine
 import com.kernelloader.root.RootChecker
 import com.kernelloader.ui.theme.*
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -141,6 +145,8 @@ fun HomeScreen(
     val loadedModule = viewModel.driverModule.value.ifBlank { viewModel.loadedModuleName.value }
 
     LaunchedEffect(Unit) {
+        // backstop: no report residue may survive an app restart
+        withContext(Dispatchers.IO) { ReportPackBuilder.wipeReportDir(context) }
         viewModel.refreshManifest()
         viewModel.checkForAppUpdate()
 
@@ -1097,6 +1103,21 @@ private fun SupportCard(
 
     val matchStatus = if (hasExact) "EXACT MATCH FOUND" else "NO MATCH IN DB"
 
+    // report cleanup: the zip survives only while the user is inside WhatsApp;
+    // the moment they return (sent or cancelled) every trace is wiped
+    var wipeOnResume by remember { mutableStateOf(false) }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val obs = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME && wipeOnResume) {
+                wipeOnResume = false
+                scope.launch(Dispatchers.IO) { ReportPackBuilder.wipeReportDir(context) }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(obs)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(obs) }
+    }
+
     fun collectReport(): DeviceReportCollector.DeviceReport =
         DeviceReportCollector.collect(
             rootAvailable = RootChecker.isRootAvailable(),
@@ -1192,6 +1213,9 @@ private fun SupportCard(
                                     val sent = pack.zipFile?.let {
                                         SupportContact.sendZipViaWhatsApp(context, it, pack.caption)
                                     } ?: false
+                                    // WhatsApp has read (or never opened) the zip by the
+                                    // time the user is back here - arm the wipe
+                                    wipeOnResume = true
                                     if (!sent) {
                                         context.startActivity(
                                             Intent(
