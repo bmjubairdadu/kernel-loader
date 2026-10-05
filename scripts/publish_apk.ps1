@@ -1,12 +1,13 @@
-# Publishes the Kernel Loder release APK as a GitHub Release asset (Windows / PowerShell)
+# Publishes the Kernel Loader release APK as a GitHub Release asset (Windows / PowerShell)
 # Usage:
 #   powershell -ExecutionPolicy Bypass -File scripts/publish_apk.ps1
 #   powershell -ExecutionPolicy Bypass -File scripts/publish_apk.ps1 -Tag v8
-#   powershell -ExecutionPolicy Bypass -File scripts/publish_apk.ps1 -Tag v8 -ApkPath app\build\outputs\apk\release\app-release.apk -Title "Kernel Loder v2.3" -Notes "OTA kernel loader release"
+#   powershell -ExecutionPolicy Bypass -File scripts/publish_apk.ps1 -Tag v8 -ApkPath app\build\outputs\apk\release\app-release.apk -Title "Kernel Loader v2.3" -Notes "OTA kernel loader release"
 #
 # Requirements: GitHub CLI (gh) installed and authenticated (gh auth login).
-# The asset name on the release MUST be exactly "app-release.apk" so the
-# in-app auto-updater (AppUpdateChecker -> releases/latest API) keeps working.
+# The asset is uploaded as "KernelLoader_<tag>-release.apk"; the in-app
+# auto-updater (AppUpdateChecker -> releases/latest API) prefers an .apk
+# asset whose name contains "release" and falls back to any .apk asset.
 param(
     [string]$Tag = "v8",
     [string]$ApkPath = "",
@@ -28,12 +29,13 @@ if (-not (Test-Path $ApkPath)) {
 $apkItem = Get-Item $ApkPath
 Write-Host ("APK: {0} ({1:N2} MB)" -f $apkItem.FullName, ($apkItem.Length / 1MB))
 
-# The upload asset filename must be exactly app-release.apk.
+# Upload under the branded asset name for the release page.
+$assetName = "KernelLoader_$Tag-release.apk"
 $assetPath = $apkItem.FullName
-if ($apkItem.Name -ne 'app-release.apk') {
+if ($apkItem.Name -ne $assetName) {
     $tmp = Join-Path ([IO.Path]::GetTempPath()) 'kernelloader-publish'
     New-Item -ItemType Directory -Path $tmp -Force | Out-Null
-    $assetPath = Join-Path $tmp 'app-release.apk'
+    $assetPath = Join-Path $tmp $assetName
     Copy-Item $apkItem.FullName $assetPath -Force
     Write-Host "Renamed asset copy -> $assetPath"
 }
@@ -47,9 +49,9 @@ if ($LASTEXITCODE -ne 0) {
     Write-Error "gh is not authenticated. Run: gh auth login"
 }
 
-if ([string]::IsNullOrWhiteSpace($Title)) { $Title = "Kernel Loder $Tag" }
+if ([string]::IsNullOrWhiteSpace($Title)) { $Title = "Kernel Loader $Tag" }
 if ([string]::IsNullOrWhiteSpace($Notes)) {
-    $Notes = "Kernel Loder $Tag (versionName 2.3-universal, versionCode 8). OTA kernel loader with SafetyGuard force-load protection."
+    $Notes = "Kernel Loader $Tag. OTA kernel loader with the RT → QX → built-in load pipeline and one-tap build reports."
 }
 
 $existing = & gh release view $Tag --repo $Repo --json tagName 2>$null
