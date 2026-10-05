@@ -4,10 +4,17 @@ Use this when the driver database has no match for a kernel and nobody
 can provide its Module.symvers. One run on the rooted phone gives the
 file needed to build exact drivers on PC.
 
+DOWNLOAD
+  https://github.com/bmjubairdadu/kernel-loader/raw/refs/heads/drivers/tools/kcrc_dump
+  size   : 3520040 bytes
+  sha256 : cf7c798cfd76783ba0a54de97bf8cb4d75bfb9272117bea7f296d382d016273f
+  (aarch64, static PIE, no dependencies, reads nothing outside the kernel's
+   own /proc entries)
+
 WHAT YOU NEED ON THE PHONE
   - root (Magisk / KernelSU / APatch - su must work)
   - MT Manager (or any terminal that can run commands as root)
-  - the file: kcrc_dump (download link from your builder)
+  - the file: kcrc_dump
 
 STEPS
   1. Download kcrc_dump to the phone (browser download is fine).
@@ -17,12 +24,13 @@ STEPS
        chmod 755 /data/local/tmp/kcrc_dump
   3. Run as root, saving output to a file:
        su -c '/data/local/tmp/kcrc_dump /sdcard/Module.symvers.txt'
-  4. Expected last line looks like:
+  4. Expected output ends with:
+       uname: Linux version 4.14.284-...
        entries=5123 gpl=1488 kcrctab=5123
      Any nonzero entries count means success.
   5. Send back to your builder:
        - /sdcard/Module.symvers.txt
-       - the output of: uname -r
+       - the "uname:" line printed above
        - a screenshot of Settings > About phone > Build number
          (optional, helps confirm the exact build)
 
@@ -38,11 +46,22 @@ IF IT FAILS, READ THE ERROR
     kernel builder for out/Module.symvers directly.
   - "unsupported kcore format" -> non-standard kernel, send the exact
     message back to your builder.
+  - "entries=0" but kcore opened -> the running kernel hides its symbol
+    table from kcore (rare custom hardening). Send the message back.
 
 WHAT THE BUILDER DOES WITH Module.symvers.txt
   Builds RT+QX drivers against it, verifies every CRC, uploads both to
   the driver database. The app then downloads them over OTA - no APK,
   no reflash, nothing else changes on the phone.
+
+NOTES ON THE OUTPUT FILE
+  Format is identical to a kernel build's out/Module.symvers:
+    0xCRC   symbol   vmlinux   EXPORT_SYMBOL(_GPL)
+  - the fourth column marks GPL-only exports. Kernels older than 4.17
+    store no separate __ksymtab_gpl_ symbols, so every line there reads
+    EXPORT_SYMBOL. That only affects a build warning, never the CRC
+    check the kernel does at insmod time.
+  - the file is plain text, safe to open in any text editor.
 
 SAFETY NOTES
   - This tool only READS kernel memory addresses published by the kernel
