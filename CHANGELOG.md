@@ -25,6 +25,20 @@ semantic-ish version tags (`<major>.<minor>-<flavour>`).
   staged .ko's real modinfo name and refuses (with a clear message) when
   that cannot be determined.
 
+### Changed
+* **Every device / kernel hardening:**
+  - Boot staging now falls back to the .ko's own modinfo `name=` (read in
+    pure Kotlin) when the module is invisible in lsmod — stealth builds
+    stage and auto-load like everything else.
+  - Module names are validated, not mangled: `5.10_A12` keeps its dot
+    (the old filter turned it into `510_A12`, a name that could never
+    unload).
+  - The staged-name reader falls back to `grep -a` when a ROM ships
+    without `strings`.
+  - Wrong-arch devices (arm32 / x86) fail fast with a clear
+    "arm64 CPU required" message instead of burning the whole pipeline on
+    `Exec format error`.
+
 ## [1.0] - 2026-10-10
 
 > **Fresh start.** Versioning restarts at 1.0 with this build — it is the

@@ -40,8 +40,17 @@ object UniversalKernelLoader {
         vm.tstep("Reading device info...")
         val kernel = Shell.cmd("uname -r").exec().out.firstOrNull()?.trim() ?: "unknown"
         val arch = Shell.cmd("uname -m").exec().out.firstOrNull()?.trim() ?: "unknown"
-        
+
         vm.tlog("Device: $kernel · $arch", "INFO")
+
+        // every .ko in the database and the assets is aarch64; a wrong-arch
+        // device can only fail at insmod with "Exec format error", so say so
+        // up front instead of burning the whole pipeline
+        if (arch != "aarch64" && arch != "arm64") {
+            vm.tlog("This driver set is arm64-only - device reports $arch", "ERR")
+            finish(vm, false, "arm64 CPU required (device: $arch)")
+            return
+        }
 
         Shell.cmd("setenforce 0 2>/dev/null").exec()
 
@@ -461,11 +470,15 @@ object UniversalKernelLoader {
         devNode: String,
         koFile: File = File(TMP_KO)
     ) {
-        val modName = vm.loadedModuleName.value
+        // stealth builds unlink themselves from /proc/modules, so lsmod has
+        // no name to remember - the .ko's own modinfo still knows it
+        val modName = vm.loadedModuleName.value.ifBlank { readModinfoName(koFile) }
         if (modName.isBlank()) {
+            vm.tlog("Boot staging skipped - unknown module", "WARN")
             return
         }
         if (!koFile.exists()) {
+            vm.tlog("Boot staging skipped - .ko gone", "WARN")
             return
         }
 
@@ -547,6 +560,45 @@ object UniversalKernelLoader {
         var end = idx + tag.size
         while (end < bytes.size && bytes[end] != 0.toByte()) end++
         return String(bytes, idx + tag.size, end - (idx + tag.size), Charsets.US_ASCII)
+    }
+
+    /**
+     * The module name a .ko registers under, from its modinfo section
+     * (`\0name=<name>\0`). Pure Kotlin, no shell - used when the module has
+     * unlinked itself from /proc/modules (stealth builds) and lsmod can no
+     * longer tell us what to rmmod or stage. The name is kernel-generated
+     * and trusted, but only accepted if it is a plain module name - "5.10_A12"
+     * keeps its dot, and anything else is rejected instead of mangled.
+     */
+    fun readModinfoName(file: File): String {
+        val ok = Regex("[A-Za-z0-9._-]+")
+        return try {
+            val bytes = file.readBytes()
+            val tag = byteArrayOf(0, 'n'.code.toByte(), 'a'.code.toByte(), 'm'.code.toByte(), 'e'.code.toByte(), '='.code.toByte())
+            var from = 0
+            while (from <= bytes.size - tag.size) {
+                val idx = indexOfRange(bytes, tag, from) ?: return ""
+                var end = idx + tag.size
+                while (end < bytes.size && bytes[end] != 0.toByte() && end - (idx + tag.size) < 64) end++
+                val n = String(bytes, idx + tag.size, end - (idx + tag.size), Charsets.US_ASCII).trim()
+                if (ok.matches(n)) return n
+                from = idx + 1
+            }
+            ""
+        } catch (e: Exception) {
+            ""
+        }
+    }
+
+    private fun indexOfRange(haystack: ByteArray, needle: ByteArray, from: Int): Int? {
+        if (haystack.size < needle.size) return null
+        outer@ for (i in from..(haystack.size - needle.size)) {
+            for (j in needle.indices) {
+                if (haystack[i + j] != needle[j]) continue@outer
+            }
+            return i
+        }
+        return null
     }
 
     private fun indexOf(haystack: ByteArray, needle: ByteArray): Int? {

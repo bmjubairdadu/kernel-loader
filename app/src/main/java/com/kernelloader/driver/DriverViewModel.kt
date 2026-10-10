@@ -894,16 +894,21 @@ class DriverViewModel : ViewModel() {
      * than an honest "unknown".
      */
     fun stagedModuleName(): String {
+        val ok = Regex("[A-Za-z0-9._-]+")
         val paths = listOfNotNull(
             DriverAutoload.stagedKo.ifBlank { null },
             "${DriverAutoload.stageDir()}/driver.ko"
         ).distinct()
         for (p in paths) {
-            val res = Shell.cmd("strings '$p' 2>/dev/null | grep -m1 '^name=' | cut -d= -f2").exec()
-            val n = res.out.firstOrNull()?.trim()
-                ?.filter { it.isLetterOrDigit() || it == '_' || it == '-' }
-                ?.take(32).orEmpty()
-            if (n.isNotBlank() && n != "Module") return n
+            var res = Shell.cmd("strings '$p' 2>/dev/null | grep -m1 '^name=' | cut -d= -f2").exec()
+            var n = res.out.firstOrNull()?.trim().orEmpty()
+            if (!ok.matches(n)) {
+                // some ROMs ship without toybox `strings` - grep the binary
+                // directly; the leading non-letter keeps "devname=" from matching
+                res = Shell.cmd("grep -aom1 '[^a-zA-Z]name=[a-zA-Z0-9._-]*' '$p' 2>/dev/null").exec()
+                n = res.out.firstOrNull().orEmpty().substringAfter("name=").trim()
+            }
+            if (ok.matches(n) && n != "Module") return n
         }
         return ""
     }
