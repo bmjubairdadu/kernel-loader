@@ -133,7 +133,7 @@
       "buildDate": "2026-10-10",
       "file": "qx_4.9.337-DaisyForGaming.ko",
       "label": "4.9.337-DaisyForGaming",
-      "sha256": "dbd3d2ced82ee10c3d18452ac41768f16d3bae12f218545c97354023b881fccf",
+      "sha256": "9b01c06f67a810d5044a5e944efc504a5e9582c601da1af5559ba461b69868e8",
       "size": 23928,
       "variant": "qx",
       "version": "4.9.337-DaisyForGaming SMP preempt mod_unload modversions aarch64"
@@ -331,7 +331,7 @@
       "buildDate": "2026-10-10",
       "file": "rt_4.9.337-DaisyForGaming.ko",
       "label": "4.9.337-DaisyForGaming",
-      "sha256": "411ebdebf8bde3dbacb8dcc986eb672d9827466959de5c7b5da29842d61ffe99",
+      "sha256": "f0000e0ace52257672105fb1cebb9bebe4dabc82bc17db86022a1a29d00b35be",
       "size": 23824,
       "variant": "rt",
       "version": "4.9.337-DaisyForGaming SMP preempt mod_unload modversions aarch64"
@@ -382,7 +382,7 @@
       "version": "6.6.57-4k-gd66e9166bfa1-dirty SMP preempt mod_unload modversions aarch64"
     }
   ],
-  "updated": "2026-10-10T16:39:18Z",
+  "updated": "2026-10-10T17:00:09Z",
   "variants": {
     "qx": "QX ABI - ioctl 0x801/0x802 + 0x804/0x805 handshake, returns -1 on failure",
     "rt": "RT ABI - ioctl 0x801/0x802/0x803, returns 0 on success"
