@@ -2,9 +2,11 @@
 /*
  * kmem_337_core.h - Shared engine for RT/QX kernel memory drivers
  *
- * Fast path for 4.9 arm64: single kernel bounce per ioctl, stack buffer
- * for small I/O (no slab alloc), one copy_to/from_user per op, mmap read
- * lock held across the page walk, strict input caps, batched u32 reads.
+ * Fast path for 4.9 arm64: kernel bounce per ioctl (chunked past 32K),
+ * stack buffer for small I/O (no slab alloc), mmap read lock held across
+ * the page walk, batched u32 reads. Observable behaviour matches the 3.0
+ * driver exactly: partial transfers succeed, any size works, failures
+ * report -EIO like before.
  */
 #ifndef _KMEM_337_CORE_H
 #define _KMEM_337_CORE_H
@@ -36,7 +38,7 @@
 #define KMEM_CLASS_CREATE(name) class_create(THIS_MODULE, name)
 #endif
 
-#define KMEM_MAX_RW 65536
+#define KMEM_CHUNK_RW 32768
 #define KMEM_STACK_RW 256
 #define KMEM_BATCH_U32_MAX 32
 #define KMEM_NAME_MAX 63
@@ -157,60 +159,82 @@ static int kmem_rw_process(pid_t pid, uintptr_t addr, void __user *ubuf,
 	struct mm_struct *mm;
 	char stack[KMEM_STACK_RW];
 	char *kbuf;
+	size_t bsz;
+	size_t done = 0;
 	int dynamic = 0;
-	int rc;
+	int ok = 0;
 
 	if (!size || !ubuf)
-		return -EINVAL;
-	if (size > KMEM_MAX_RW)
-		return -EINVAL;
-	if (addr + size < addr)
-		return -EINVAL;
+		return -EIO;
 	if (pid <= 0)
-		return -ESRCH;
+		return -EIO;
 
 	task = kmem_get_task(pid);
 	if (!task)
-		return -ESRCH;
+		return -EIO;
 	mm = get_task_mm(task);
 	put_task_struct(task);
 	if (!mm)
-		return -ESRCH;
+		return -EIO;
 
 	if (size <= sizeof(stack)) {
 		kbuf = stack;
+		bsz = sizeof(stack);
 	} else {
-		kbuf = kmalloc(size, GFP_KERNEL);
+		bsz = size <= KMEM_CHUNK_RW ? size : KMEM_CHUNK_RW;
+		kbuf = kmalloc(bsz, GFP_KERNEL);
 		if (!kbuf) {
 			mmput(mm);
-			return -ENOMEM;
+			return -EIO;
 		}
 		dynamic = 1;
 	}
 
-	if (is_write) {
-		if (copy_from_user(kbuf, ubuf, size)) {
-			rc = -EFAULT;
-			goto out;
+	while (done < size) {
+		size_t step = size - done;
+		size_t left = step;
+		uintptr_t cur = addr + done;
+		char __user *dst = (char __user *)ubuf + done;
+		int big = (size > KMEM_BIG_RW);
+
+		if (step > bsz)
+			step = bsz;
+		if (is_write) {
+			if (copy_from_user(kbuf, dst, step))
+				break;
+		} else {
+			memset(kbuf, 0, step);
 		}
 		KMEM_MMAP_READ_LOCK(mm);
-		rc = kmem_rw_locked(mm, addr, kbuf, size, 1);
+		while (left > 0) {
+			size_t chunk = PAGE_SIZE - (cur & (PAGE_SIZE - 1));
+			phys_addr_t pa;
+			char *part;
+
+			if (chunk > left)
+				chunk = left;
+			part = kbuf + (step - left);
+			pa = kmem_translate_va(mm, cur);
+			if (pa && kmem_copy_phys(pa, part, chunk,
+						 is_write) == chunk)
+				ok = 1;
+			cur += chunk;
+			left -= chunk;
+			if (big)
+				cond_resched();
+		}
 		KMEM_MMAP_READ_UNLOCK(mm);
-	} else {
-		KMEM_MMAP_READ_LOCK(mm);
-		rc = kmem_rw_locked(mm, addr, kbuf, size, 0);
-		KMEM_MMAP_READ_UNLOCK(mm);
-		if (rc)
-			goto out;
-		if (copy_to_user(ubuf, kbuf, size))
-			rc = -EFAULT;
+		if (!is_write) {
+			if (copy_to_user(dst, kbuf, step))
+				break;
+		}
+		done += step;
 	}
 
-out:
 	if (dynamic)
 		kfree(kbuf);
 	mmput(mm);
-	return rc;
+	return ok ? 0 : -EIO;
 }
 
 static inline int kmem_read_process(pid_t pid, uintptr_t addr,

@@ -239,4 +239,4 @@ module_exit(rt_exit);
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("daisy");
 MODULE_DESCRIPTION("RT memory accessor");
-MODULE_VERSION("3.1-337");
+MODULE_VERSION("3.1.1-337");
