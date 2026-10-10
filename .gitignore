@@ -82,5 +82,6 @@ Thumbs.db
 # backup artifacts
 driver/*.v17bak
 
-# ===== private: driver sources, builds and tooling are not public =====
-driver/
+# ===== private: WSL/kernel build tooling at the repo root is not public =====
+# anchored so it can never swallow app/src/main/java/com/kernelloader/driver/
+/driver/
