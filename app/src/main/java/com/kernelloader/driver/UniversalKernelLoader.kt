@@ -200,10 +200,21 @@ object UniversalKernelLoader {
         val nodePresent = Shell.cmd("test -e $nodePath 2>/dev/null").exec().isSuccess
         // the ladder must cover every module name this driver family can
         // register: embedded qx builds come up as "entryi", rt builds as
-        // "5.10_A12", local kmem builds as kmem_337 / kmem_337_qx
-        val candidates = vm.knownDriverModules()
+        // "5.10_A12", local kmem builds as kmem_337 / kmem_337_qx. The staged
+        // .ko may register under yet another name — ask its modinfo and try
+        // that first, so a driver the app itself installed is always unloadable.
+        DriverAutoload.state(context)
+        val stagedName = vm.stagedModuleName()
+        var candidates = vm.knownDriverModules()
+        if (stagedName.isNotBlank() && stagedName !in candidates) {
+            candidates = candidates + stagedName
+        }
+        if (stagedName.isNotBlank()) {
+            candidates = listOf(stagedName) + candidates.filter { it != stagedName }
+        }
         val visible = candidates.filter { it in SafetyGuard.loadedModuleNames() }
         if (nodePresent) vm.tlog("$nodePath live", "INFO")
+        if (stagedName.isNotBlank() && visible.isEmpty()) vm.tlog("Staged driver registers as '$stagedName'", "INFO")
         if (visible.isNotEmpty()) vm.tlog("lsmod: ${visible.joinToString()}", "INFO")
 
         if (!nodePresent && visible.isEmpty()) {
@@ -305,6 +316,9 @@ object UniversalKernelLoader {
             }
             vm.tlog("Unload failed at: $step", "ERR")
             if (lastStderr.isNotBlank()) vm.tlog("stderr: $lastStderr", "ERR")
+            if (visible.isEmpty() && nodePresent) {
+                vm.tlog("Node $nodePath answered but no known module is in lsmod - it may be loaded under an unknown name or the node is stale; a reboot clears either", "WARN")
+            }
             DriverAutoload.state(context)
             if (DriverAutoload.enabled) {
                 vm.tlog("Auto-load is ON - it will reload at boot", "INFO")

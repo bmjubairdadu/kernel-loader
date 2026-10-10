@@ -8,6 +8,23 @@ semantic-ish version tags (`<major>.<minor>-<flavour>`).
 
 ## [Unreleased]
 
+## [1.1] - 2026-10-11
+
+### Fixed
+* **Unload works for drivers registered under any name.** The rmmod ladder
+  now reads the real `name=` (modinfo) out of the staged `driver.ko` on the
+  device and tries that first — a driver the app installed always comes
+  down, even when its lsmod name is outside the known list. When the node
+  answers but no known module is loaded, the failure message says so
+  honestly (unknown name or stale node) instead of a bare "all candidates
+  rejected".
+* **The boot script is never named after the node.** Flipping "Load at
+  every boot" ON with no remembered module used to write
+  `will insmod 'wanbai'` — the node name, not a module name — into the
+  script, breaking its already-loaded check. The script now uses the
+  staged .ko's real modinfo name and refuses (with a clear message) when
+  that cannot be determined.
+
 ## [1.0] - 2026-10-10
 
 > **Fresh start.** Versioning restarts at 1.0 with this build — it is the

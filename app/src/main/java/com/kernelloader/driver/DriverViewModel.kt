@@ -885,6 +885,29 @@ class DriverViewModel : ViewModel() {
     fun knownDriverModules(): List<String> =
         (KNOWN_DRIVER_MODULES + loadedModuleName.value).filter { it.isNotBlank() }.distinct()
 
+    /**
+     * The real lsmod name the staged driver .ko registers under (its modinfo
+     * `name=`), read from the binary on the device. Falls back to the standard
+     * stage paths when prefs are blank — e.g. a fresh install over an old
+     * version's staging dir. Returns "" when nothing readable is found.
+     * Never guess: an unload or boot script keyed on a wrong name is worse
+     * than an honest "unknown".
+     */
+    fun stagedModuleName(): String {
+        val paths = listOfNotNull(
+            DriverAutoload.stagedKo.ifBlank { null },
+            "${DriverAutoload.stageDir()}/driver.ko"
+        ).distinct()
+        for (p in paths) {
+            val res = Shell.cmd("strings '$p' 2>/dev/null | grep -m1 '^name=' | cut -d= -f2").exec()
+            val n = res.out.firstOrNull()?.trim()
+                ?.filter { it.isLetterOrDigit() || it == '_' || it == '-' }
+                ?.take(32).orEmpty()
+            if (n.isNotBlank() && n != "Module") return n
+        }
+        return ""
+    }
+
     private fun sanitizeNode(node: String): String =
         node.filter { it.isLetterOrDigit() || it == '_' || it == '-' }.take(32)
 
@@ -945,10 +968,21 @@ class DriverViewModel : ViewModel() {
                                 return@withContext
                             }
                         }
+                        // name the boot script after what the .ko really
+                        // registers as — the node name "wanbai" is NOT a
+                        // module name and would break the already-loaded check
+                        val modName = loadedModuleName.value.ifBlank {
+                            DriverAutoload.moduleName.ifBlank { stagedModuleName() }
+                        }
+                        if (modName.isBlank()) {
+                            tlog("AUTOLOAD: cannot tell which module the staged driver registers - load the driver once with the app, then flip this on", "ERR")
+                            withContext(Dispatchers.Main) { autoloadEnabled.value = false }
+                            return@withContext
+                        }
                         val ok = DriverAutoload.enable(
                             context,
                             File(staged),
-                            loadedModuleName.value.ifBlank { DriverAutoload.moduleName.ifBlank { "wanbai" } },
+                            modName,
                             DriverAutoload.variant,
                             DriverAutoload.devNode
                         ) { m, t -> tlog(m, t) }
