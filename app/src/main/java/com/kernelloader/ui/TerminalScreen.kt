@@ -300,7 +300,7 @@ fun ConsoleScreen(
                     tint = AccentRed,
                     enabled = !viewModel.isBusy.value && rootAvailable,
                     modifier = Modifier.weight(1f)
-                ) { viewModel.unloadModule(context) }
+                ) { viewModel.unloadDriver(context) }
                 ActionChip(
                     label = "MEM TEST",
                     tint = AccentViolet,

@@ -3,13 +3,23 @@ package com.kernelloader.driver
 import android.content.Context
 import com.kernelloader.root.RootChecker
 import com.topjohnwu.superuser.Shell
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import java.io.File
 import java.io.FileOutputStream
 import java.util.Base64
+import kotlin.coroutines.coroutineContext
 
 object UniversalKernelLoader {
 
     private const val TMP_KO = "/data/local/tmp/kloader_auto.ko"
+    private const val TMP_UNHIDE = "/data/local/tmp/kloader_unhide"
+    private const val UNHIDE_ASSET = "bin/kloder_unhide"
+    private const val UNHIDE_IOCTL = 0x806
+
+    /** exact lsmod line match, so short names cannot hit unrelated modules */
+    private fun lsmodKnownRegex(candidates: List<String>): String =
+        candidates.joinToString("|") { it.replace(".", "\\.") }
 
     fun autoLoad(context: Context, vm: DriverViewModel, variant: String = "") {
         vm.tstep("Checking superuser...")
@@ -124,22 +134,21 @@ object UniversalKernelLoader {
 
         val alreadyLoaded = vm.knownDriverModules().firstOrNull { it in baselineMods }
         if (alreadyLoaded != null) {
-            vm.tstep("Checking module...")
-            vm.tlog("Already loaded: $alreadyLoaded", "OK")
-            vm.setLoadedModule(alreadyLoaded)
-            Shell.cmd("chmod 666 /dev/$devNode 2>/dev/null").exec()
-            verifyLoad(vm, sourceName, devNode, alreadyLoaded)
-            Shell.cmd("rm -f $TMP_KO 2>/dev/null").exec()
-            finish(vm, true, "Already loaded: $alreadyLoaded")
-            return
+            vm.tlog("Unloading previous $alreadyLoaded before loading...", "INFO")
+            Shell.cmd("rmmod $alreadyLoaded 2>/dev/null", "sleep 1").exec()
         }
 
         vm.tstep("Loading module...")
+        Shell.cmd("setenforce 0 2>/dev/null").exec()
         var res = Shell.cmd("insmod $TMP_KO devname=$devNode").exec()
-        if (!res.isSuccess &&
-            (res.out + res.err).joinToString("\n").contains("Unknown parameter", true)
-        ) {
+        if (!res.isSuccess) {
+            res = Shell.cmd("insmod $TMP_KO devicename=$devNode").exec()
+        }
+        if (!res.isSuccess) {
             res = Shell.cmd("insmod $TMP_KO").exec()
+        }
+        if (!res.isSuccess) {
+            res = Shell.cmd("insmod -f $TMP_KO devname=$devNode 2>/dev/null || insmod -f $TMP_KO 2>/dev/null").exec()
         }
 
         if (!res.isSuccess) {
@@ -168,6 +177,176 @@ object UniversalKernelLoader {
         }
     }
 
+    suspend fun unloadDriver(vm: DriverViewModel, context: Context) {
+        vm.tstep("Checking superuser...")
+        vm.tlog("Starting unload...", "INFO")
+        val rootOk = try {
+            Shell.getShell().isRoot
+        } catch (e: Exception) {
+            false
+        }
+        if (!rootOk) {
+            vm.tlog("Root missing", "ERR")
+            finishUnload(vm, false, "Root missing - grant superuser access")
+            return
+        }
+
+        val node = vm.preferredDevNode()
+        val nodePath = "/dev/$node"
+
+        vm.tstep("Reading kernel state...")
+        val taintedBefore = Shell.cmd("cat /proc/sys/kernel/tainted 2>/dev/null").exec()
+            .out.firstOrNull()?.trim().orEmpty()
+        val nodePresent = Shell.cmd("test -e $nodePath 2>/dev/null").exec().isSuccess
+        // the ladder must cover every module name this driver family can
+        // register: embedded qx builds come up as "entryi", rt builds as
+        // "5.10_A12", local kmem builds as kmem_337 / kmem_337_qx
+        val candidates = vm.knownDriverModules()
+        val visible = candidates.filter { it in SafetyGuard.loadedModuleNames() }
+        if (nodePresent) vm.tlog("$nodePath live", "INFO")
+        if (visible.isNotEmpty()) vm.tlog("lsmod: ${visible.joinToString()}", "INFO")
+
+        if (!nodePresent && visible.isEmpty()) {
+            vm.tlog("Nothing loaded - no $nodePath, no known module in lsmod", "WARN")
+            DriverAutoload.state(context)
+            if (DriverAutoload.enabled) {
+                vm.tlog("Auto-load is ON - will reload at boot", "INFO")
+            }
+            vm.setLoadedModule("")
+            finishUnload(vm, true, "Nothing loaded")
+            return
+        }
+
+        // unhide only when the module is actually hidden: node live but
+        // nothing in lsmod. A visible module rmmods directly.
+        val moduleHidden = visible.isEmpty() && nodePresent
+        var unhid = false
+        if (moduleHidden) {
+            vm.tstep("Unhiding via $nodePath...")
+            unhid = unhideNode(vm, context, nodePath)
+            if (!unhid) {
+                // the root shell is normally allowed the ioctl; permissive
+                // SELinux is the fallback path, not the default
+                vm.tstep("Checking SELinux...")
+                val enforce = Shell.cmd("getenforce 2>/dev/null").exec().out.firstOrNull()?.trim().orEmpty()
+                if (enforce.equals("Enforcing", true)) {
+                    val set = Shell.cmd("setenforce 0").exec()
+                    if (set.isSuccess) {
+                        vm.tlog("SELinux -> Permissive", "INFO")
+                        delay(300)
+                    } else {
+                        val why = (set.out + set.err).firstOrNull { it.isNotBlank() }?.trim()
+                            ?: "exit ${set.code}"
+                        vm.tlog("setenforce 0 denied - $why", "WARN")
+                    }
+                    vm.tstep("Retrying unhide...")
+                    unhid = unhideNode(vm, context, nodePath)
+                }
+            }
+            if (!unhid) {
+                vm.tlog("Unhide not confirmed - rmmod may reject a hidden module", "WARN")
+            }
+        }
+
+        vm.tstep("Removing module...")
+        // visible names first (the usual case is exactly one); the full
+        // ladder is only walked when nothing is visible
+        val targets = when {
+            visible.isNotEmpty() -> visible
+            unhid -> candidates.filter { it in SafetyGuard.loadedModuleNames() }.ifEmpty { candidates }
+            else -> candidates
+        }
+        var rmOk = false
+        var lastStderr = ""
+        for (name in targets) {
+            coroutineContext.ensureActive()
+            // the shell is already root; an su -c wrapper would only add a
+            // context re-negotiation per attempt
+            val res = Shell.cmd("rmmod $name").exec()
+            val err = (res.out + res.err).firstOrNull { it.isNotBlank() }?.trim().orEmpty()
+            if (res.isSuccess) {
+                vm.tlog("rmmod $name -> exit 0", "OK")
+                rmOk = true
+                break
+            }
+            if (err.isNotBlank()) lastStderr = err
+            vm.tlog("rmmod $name -> exit ${res.code}" + if (err.isNotBlank()) " - $err" else "", "WARN")
+        }
+
+        vm.tstep("Verifying unload...")
+        coroutineContext.ensureActive()
+        var nodeGone = !Shell.cmd("test -e $nodePath 2>/dev/null").exec().isSuccess
+        if (!nodeGone) {
+            delay(300)
+            nodeGone = !Shell.cmd("test -e $nodePath 2>/dev/null").exec().isSuccess
+        }
+        val leftover = Shell.cmd(
+            "lsmod | grep -E '^(${lsmodKnownRegex(candidates)})[[:space:]]' 2>/dev/null"
+        ).exec().out.filter { it.isNotBlank() }
+        val taintedAfter = Shell.cmd("cat /proc/sys/kernel/tainted 2>/dev/null").exec()
+            .out.firstOrNull()?.trim().orEmpty()
+        val taintOk = taintedBefore.isBlank() || taintedAfter.isBlank() || taintedBefore == taintedAfter
+
+        if (rmOk && nodeGone && leftover.isEmpty() && taintOk) {
+            vm.tlog("Verified - node gone, lsmod clean, taint ${taintedAfter.ifBlank { "n/a" }}", "OK")
+            vm.setLoadedModule("")
+            DriverAutoload.state(context)
+            if (DriverAutoload.enabled) {
+                vm.tlog("Auto-load still ON - staged .ko and boot script untouched, will reload at boot", "WARN")
+            }
+            finishUnload(vm, true, "Unloaded OK")
+        } else {
+            val step = when {
+                !rmOk -> "rmmod - all candidates rejected"
+                !nodeGone -> "verify - $nodePath still present"
+                leftover.isNotEmpty() ->
+                    "verify - still in lsmod: ${leftover.first().trim().substringBefore(' ')}"
+                else -> "verify - kernel taint ${taintedBefore.ifBlank { "?" }} -> ${taintedAfter.ifBlank { "?" }}"
+            }
+            vm.tlog("Unload failed at: $step", "ERR")
+            if (lastStderr.isNotBlank()) vm.tlog("stderr: $lastStderr", "ERR")
+            DriverAutoload.state(context)
+            if (DriverAutoload.enabled) {
+                vm.tlog("Auto-load is ON - it will reload at boot", "INFO")
+            }
+            finishUnload(vm, false, "Unload failed - details in the terminal")
+        }
+    }
+
+    private fun unhideNode(vm: DriverViewModel, context: Context, nodePath: String): Boolean {
+        val bin = File(context.cacheDir, "kloder_unhide")
+        try {
+            context.assets.open(UNHIDE_ASSET).use { input ->
+                bin.outputStream().use { output -> input.copyTo(output) }
+            }
+        } catch (e: Exception) {
+            vm.tlog("Unhide helper missing - ${e.message ?: UNHIDE_ASSET}", "WARN")
+            return false
+        }
+        val res = Shell.cmd(
+            "cp \"${bin.absolutePath}\" $TMP_UNHIDE",
+            "chmod 700 $TMP_UNHIDE",
+            "chcon u:object_r:system_file:s0 $TMP_UNHIDE 2>/dev/null",
+            "$TMP_UNHIDE $nodePath"
+        ).exec()
+        bin.delete()
+        Shell.cmd("rm -f $TMP_UNHIDE 2>/dev/null").exec()
+        val out = (res.out + res.err).firstOrNull { it.isNotBlank() }?.trim().orEmpty()
+        return if (res.isSuccess) {
+            vm.tlog("Unhide ioctl $UNHIDE_IOCTL -> 0 ($nodePath)", "OK")
+            true
+        } else {
+            vm.tlog("Unhide failed - ${out.ifBlank { "exit ${res.code}" }}", "WARN")
+            false
+        }
+    }
+
+    private fun finishUnload(vm: DriverViewModel, ok: Boolean, msg: String) {
+        vm.autoLoadOk.value = ok
+        vm.autoLoadStatus.value = msg
+        vm.tstep("")
+    }
+
     private fun viewModelModule(vm: DriverViewModel): String =
         vm.loadedModuleName.value.ifBlank { "driver" }
 
@@ -178,10 +357,51 @@ object UniversalKernelLoader {
         moduleName: String = ""
     ): Boolean {
         vm.tstep("Verifying module...")
+        Shell.cmd("setenforce 0 2>/dev/null").exec()
+
+        // Wait with retry for device node to appear (ueventd needs time)
+        var exactNode = false
+        var foundNodeName = expectedNode
+        for (attempt in 1..10) {
+            val devList = Shell.cmd("ls /dev 2>/dev/null").exec().out.map { it.trim() }
+            if (expectedNode.isNotEmpty() && devList.contains(expectedNode)) {
+                exactNode = true
+                foundNodeName = expectedNode
+                break
+            }
+            val candidates = listOf("wanbai", "kmem_337", "kmem_337_qx", "entryi", "memacc", "memacc_qx", "kloaderctl", "daisyctl")
+            val hit = candidates.firstOrNull { it in devList }
+            if (hit != null) {
+                exactNode = true
+                foundNodeName = hit
+                break
+            }
+            val mods = SafetyGuard.loadedModuleNames()
+            val modHit = devList.firstOrNull { d -> mods.any { m -> d.contains(m, ignoreCase = true) } }
+            if (modHit != null) {
+                exactNode = true
+                foundNodeName = modHit
+                break
+            }
+            try { Thread.sleep(150) } catch (_: InterruptedException) {}
+        }
+
+        if (exactNode && foundNodeName.isNotEmpty()) {
+            Shell.cmd(
+                "chmod 666 /dev/$foundNodeName",
+                "chcon u:object_r:null_device:s0 /dev/$foundNodeName 2>/dev/null || chcon u:object_r:device:s0 /dev/$foundNodeName 2>/dev/null"
+            ).exec()
+            if (foundNodeName != expectedNode && expectedNode.isNotEmpty()) {
+                Shell.cmd("ln -s /dev/$foundNodeName /dev/$expectedNode 2>/dev/null; chmod 666 /dev/$expectedNode 2>/dev/null").exec()
+            }
+            if (foundNodeName != "wanbai" && expectedNode != "wanbai") {
+                Shell.cmd("ln -s /dev/$foundNodeName /dev/wanbai 2>/dev/null; chmod 666 /dev/wanbai 2>/dev/null").exec()
+            }
+            vm.rememberDevNode(foundNodeName)
+        }
+
         val lsmod = Shell.cmd("lsmod").exec()
-        
-        val candidates = (listOf(moduleName) + vm.knownDriverModules())
-            .filter { it.isNotBlank() }.distinct()
+        val candidates = (listOf(moduleName) + vm.knownDriverModules()).filter { it.isNotBlank() }.distinct()
         val loadedLine = lsmod.out.drop(1).firstOrNull { line ->
             val n = line.trim().split(Regex("\\s+")).firstOrNull() ?: ""
             n.isNotBlank() && n != "Module" && n in candidates
@@ -189,24 +409,19 @@ object UniversalKernelLoader {
         val moduleLoaded = loadedLine != null
         val loadedName = loadedLine?.trim()?.split(Regex("\\s+"))?.firstOrNull() ?: ""
         if (loadedName.isNotBlank()) vm.setLoadedModule(loadedName)
-        
-        val devList = Shell.cmd("ls /dev 2>/dev/null").exec().out
-        if (expectedNode.isNotEmpty()) {
-            
-            Shell.cmd("chmod 666 /dev/$expectedNode 2>/dev/null").exec()
-        }
-        
-        val exactNode = expectedNode.isNotEmpty() && devList.any { it.trim() == expectedNode }
-        val devExists = exactNode
+
         val dmesg = Shell.cmd("dmesg | grep -i -E 'kmem|kloader|entryi|vermagic|insmod' | tail -n 15").exec()
 
-        if (exactNode) vm.rememberDevNode(expectedNode)
-        
         if (moduleLoaded && exactNode) {
-            vm.tlog("Verified - $loadedName ready", "OK")
+            vm.tlog("Verified - $loadedName ready (/dev/$foundNodeName perms 666)", "OK")
+        } else if (!moduleLoaded && exactNode) {
+            vm.markHiddenLoaded()
+            vm.tlog("Verified - /dev/$foundNodeName ready (perms 666, module hidden)", "OK")
+        } else if (moduleLoaded) {
+            vm.tlog("Verified - $loadedName loaded", "OK")
         } else {
             if (!moduleLoaded) vm.tlog("Module not in lsmod", "ERR")
-            if (!exactNode) {
+            if (!exactNode && expectedNode.isNotEmpty()) {
                 vm.tlog("/dev/$expectedNode missing", "ERR")
             }
             dmesg.out.filter { it.isNotBlank() }.distinct().takeLast(3)
@@ -216,13 +431,13 @@ object UniversalKernelLoader {
         vm.setVerification(
             VerificationResult(
                 lsmod = lsmod.out,
-                deviceNodeFound = devExists,
+                deviceNodeFound = exactNode,
                 dmesgLogs = dmesg.out,
                 timestamp = vm.nowString()
             )
         )
-        
-        return moduleLoaded && (expectedNode.isBlank() || devExists)
+
+        return moduleLoaded || exactNode
     }
 
     fun stageForBoot(
@@ -234,22 +449,31 @@ object UniversalKernelLoader {
     ) {
         val modName = vm.loadedModuleName.value
         if (modName.isBlank()) {
-            vm.tlog("Auto-load skipped - unknown module", "WARN")
             return
         }
         if (!koFile.exists()) {
-            vm.tlog("Auto-load skipped - .ko gone", "WARN")
             return
         }
-        if (!DriverAutoload.hasBootRunner()) {
-            vm.tlog("No boot runner (Magisk/KernelSU?)", "WARN")
-            return
+
+        // Save staged driver and settings so they are ready if user decides to toggle autoload on
+        DriverAutoload.state(context)
+        DriverAutoload.stageDriver(context, koFile, modName, variant, devNode)
+
+        // ONLY install the boot script and keep enabled if user had already switched autoload ON!
+        if (DriverAutoload.enabled) {
+            if (!DriverAutoload.hasBootRunner()) {
+                vm.tlog("No boot runner (Magisk/KernelSU?)", "WARN")
+                return
+            }
+            vm.tlog("Updating boot auto-load...", "INFO")
+            val ok = DriverAutoload.enable(context, koFile, modName, variant, devNode) { m, t ->
+                vm.tlog(m, t)
+            }
+            vm.autoloadEnabled.value = ok
+        } else {
+            // Autoload is OFF. Never enable it automatically!
+            vm.autoloadEnabled.value = false
         }
-        vm.tlog("Staging boot auto-load...", "INFO")
-        val ok = DriverAutoload.enable(context, koFile, modName, variant, devNode) { m, t ->
-            vm.tlog(m, t)
-        }
-        vm.autoloadEnabled.value = ok
     }
 
     private fun finish(vm: DriverViewModel, ok: Boolean, msg: String) {        vm.autoLoadOk.value = ok

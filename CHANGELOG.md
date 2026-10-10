@@ -8,7 +8,85 @@ semantic-ish version tags (`<major>.<minor>-<flavour>`).
 
 ## [Unreleased]
 
+## [1.0] - 2026-10-10
+
+> **Fresh start.** Versioning restarts at 1.0 with this build — it is the
+> baseline the app is maintained from now on.
+
+### Added
+* **Kernel Driver 3.1 architecture rollout across all kernels (4.9 … 6.6, RT & QX).**
+  The driver engine has been upgraded to version 3.1 across all 42 supported kernel
+  configurations in the OTA database and embedded APK assets:
+  - **Shared core engine (`kmem_337_core.h`)**: Single-bounce kernel I/O, stack fast
+    path (zero slab/kmalloc allocations for reads $\le$ 256 bytes), and page walk executed
+    with `mmap_read_lock` / `mmap_sem` read lock held across the translation.
+  - **Additive Batch u32 Ioctl (`0x807`)**: Added `CMD_BATCH_U32` allowing clients to
+    read up to 32 non-contiguous 32-bit addresses in a single syscall, drastically
+    reducing userland-to-kernel context switch overhead.
+  - **Full Backward Compatibility**: All legacy ioctls (`0x801` read, `0x802` write,
+    `0x803` modbase, `0x804/0x805` QX handshake, and `0x806` unhide) remain 100%
+    binary- and ABI-compatible. No loader code change is required.
+  - **Node and Parameter Aliasing**: Both RT (`memacc.c`) and QX (`memacc_qx.c`) wrappers
+    expose both `devname` and `devicename` module parameters, creating `/dev/wanbai`
+    with `0666` permissions and automated asynchronous deferred permission recovery.
+  - **Embedded Fallback Assets Synced**: APK assets now bundle 42 prebuilt 3.1 fallback
+    drivers covering kernel versions 4.9 through 6.6.
+
+### Changed
+* **Boot auto-load is opt-in.** A successful load only STAGES the .ko for
+  later; the boot script is installed solely while the "Load at every
+  boot" switch is ON, and the switch stays OFF until the user flips it.
+  Switch it OFF and unload — the next restart loads nothing. A load never
+  turns the switch on by itself anymore.
+* **Faster UNLOAD.** The unhide helper (ioctl `0x806`) runs only when the
+  module is actually hidden (node live, nothing in `lsmod`); a visible
+  module is rmmod'ed directly. rmmod runs in the already-root shell (no
+  `su -c` context re-negotiation per attempt) and known visible names are
+  tried before the full candidate ladder. The SELinux permissive fallback
+  (300 ms) is only paid when the first unhide attempt fails.
+* **Faster LOAD.** The pre-insmod cleanup removes only modules that are
+  actually live and skips its wait entirely on a fresh load (0.4 s only
+  when a stale driver really was removed). Load verification now waits
+  for the device node to appear (ueventd race) and applies chmod/chcon on
+  the first hit, so the node is client-ready the moment load reports
+  success.
+
+## [2.3] - 2026-10-10
+
+### Added
+* **Real UNLOAD for the stealth driver.** The new `unloadDriver` flow opens
+  the `/dev/wanbai` node and sends the unhide ioctl (`0x806`) through a
+  tiny freestanding helper binary (`bin/kloder_unhide`, built from
+  `driver/kloder_unhide.c` — the app cannot issue ioctls from Java since
+  `android.system.Os` has no `ioctl` and `Libcore.os` is blocked at
+  targetSdk 34), sets SELinux permissive when needed (300 ms settle, one
+  unhide retry — a hidden module cannot be rmmod'ed), then walks the
+  known-module ladder (`memacc → memacc_qx → kmem_337 → kmem_337_qx →
+  entryi → kmem → kloader → 5.10_A12 → wanbai → daisy`), stopping at the
+  first success. Verification requires the node gone, `lsmod` clean of
+  every known driver name and `/proc/sys/kernel/tainted` back at its
+  pre-unload value; failures name the exact step and stderr.
+  Boot-autoload staging is never touched.
+* UNLOAD is now offered whenever the driver is actually loaded — node
+  present or a known module in `lsmod` — so a stealth-loaded driver
+  (module hidden, node live) shows UNLOAD instead of "not loaded", and
+  pressing it with nothing loaded reports "Nothing loaded" without
+  crashing.
+* The load path tolerates stealth too: verification passes on the live
+  node when the module has already unlinked itself from `/proc/modules`,
+  and a load attempt while the driver is already active is reported as
+  "Driver already loaded" instead of an insmod `File exists` failure.
+
 ### Fixed
+* **The unload and reload ladders now use the real module names.** The
+  embedded/OTA `qx_*.ko` builds register as `entryi` in `lsmod` and the
+  `rt_*.ko` builds as `5.10_A12` (verified from each `.ko`'s modinfo), but
+  the rmmod ladder and the pre-insmod cleanup only tried
+  `memacc`/`kmem_337` — unloading an RT/QX driver failed at rmmod and
+  switching variants died on insmod `File exists`. Both paths now walk
+  the full known-module list, and the post-unload `lsmod` check is
+  anchored to exact names so short patterns cannot match unrelated
+  modules.
 * The insmod ladder's fatal-error check now runs **before** the legacy
   unknown-parameter retry: toybox reports "unknown symbol in module, or
   unknown parameter" as one combined line, which used to be misread as a

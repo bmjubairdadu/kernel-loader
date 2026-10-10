@@ -46,6 +46,16 @@ object DriverAutoload {
             variant = p.getString("variant", "") ?: ""
             devNode = p.getString("node", "wanbai") ?: "wanbai"
         }
+        // be truthful: a pref that says ON while the boot script is gone
+        // (removed by hand, another tool, or an older app version) is OFF
+        if (_enabled) {
+            _enabled = try {
+                Shell.cmd("test -f ${scriptPath()}").exec().isSuccess
+            } catch (e: Exception) {
+                false
+            }
+            if (!_enabled) save(ctx)
+        }
     }
 
     private fun save(ctx: Context) {
@@ -149,13 +159,18 @@ if grep -q "^@MODNAME@ " /proc/modules 2>/dev/null; then
     exit 0
 fi
 
-# 5. load it - devname pins the node name the client opens; without it the
-#    driver registers its built-in default and @NODE@ never appears
+# 5. load it - devname or devicename pins the node name the client opens
 chmod 644 "@KO@" 2>/dev/null
 if insmod "@KO@" devname="@NODENAME@" >> "@LOG@" 2>&1; then
     say "OK: insmod succeeded (devname=@NODENAME@)"
+elif insmod "@KO@" devicename="@NODENAME@" >> "@LOG@" 2>&1; then
+    say "OK: insmod succeeded (devicename=@NODENAME@)"
 elif insmod "@KO@" >> "@LOG@" 2>&1; then
-    say "OK: insmod succeeded (legacy build, no devname)"
+    say "OK: insmod succeeded (plain insmod)"
+elif insmod -f "@KO@" devname="@NODENAME@" >> "@LOG@" 2>&1; then
+    say "OK: insmod -f succeeded (devname=@NODENAME@)"
+elif insmod -f "@KO@" >> "@LOG@" 2>&1; then
+    say "OK: insmod -f succeeded (plain insmod)"
 else
     say "FAIL: insmod failed (details in @LOG@.why)"
     tail -n 5 "@LOG@" > "@LOG@.why" 2>/dev/null
@@ -165,9 +180,24 @@ fi
 sleep 1
 if [ -e "@NODE@" ]; then
     chmod 666 "@NODE@" 2>/dev/null
+    chcon u:object_r:null_device:s0 "@NODE@" 2>/dev/null || chcon u:object_r:device:s0 "@NODE@" 2>/dev/null
+    if [ "@NODE@" != "/dev/wanbai" ]; then
+        ln -s "@NODE@" /dev/wanbai 2>/dev/null
+        chmod 666 /dev/wanbai 2>/dev/null
+    fi
     say "OK: @NODE@ present, perms 666"
 else
-    say "WARN: @NODE@ missing - is the driver really loaded?"
+    say "WARN: @NODE@ missing - checking candidates"
+    for cand in /dev/wanbai /dev/kmem_337 /dev/entryi /dev/memacc; do
+        if [ -e "@cand" ]; then
+            chmod 666 "@cand" 2>/dev/null
+            chcon u:object_r:null_device:s0 "@cand" 2>/dev/null
+            ln -s "@cand" "@NODE@" 2>/dev/null
+            ln -s "@cand" /dev/wanbai 2>/dev/null
+            say "OK: linked @cand to @NODE@"
+            break
+        fi
+    done
 fi
 say "boot auto-load finished"
 """.trimIndent() + "\n"
@@ -189,6 +219,35 @@ say "boot auto-load finished"
             throw IllegalStateException("boot script template has unknown placeholders: ${bad.joinToString()}")
         }
         return out
+    }
+
+    /**
+     * Stage the driver .ko and save metadata into prefs without enabling the boot script.
+     * This prepares the driver so if the user later toggles "Load at every boot", it is ready.
+     */
+    fun stageDriver(ctx: Context, koFile: File, modName: String, family: String, node: String): Boolean {
+        if (modName.isBlank() || modName == "Module" || !koFile.exists()) return false
+        val dir = stageDir()
+        val dst = "$dir/driver.ko"
+        val res = try {
+            Shell.cmd(
+                "mkdir -p $dir",
+                "cp '${koFile.absolutePath}' $dst",
+                "chmod 644 $dst",
+                "sync"
+            ).exec()
+        } catch (e: Exception) {
+            return false
+        }
+        if (!res.isSuccess) return false
+        moduleName = modName.trim()
+        variant = family.trim()
+        devNode = node.filter { it.isLetterOrDigit() || it == '_' || it == '-' }
+            .take(32)
+            .ifEmpty { "wanbai" }
+        stagedKo = dst
+        save(ctx)
+        return true
     }
 
     fun enable(ctx: Context, koFile: File, modName: String, family: String, node: String, log: (String, String) -> Unit): Boolean {

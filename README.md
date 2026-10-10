@@ -36,19 +36,24 @@ No device hunting. No adb. No manual `insmod`.
 - ⚡ **One-tap LOAD** — auto pipeline: **RT → QX → built-in**. If the RT driver fails, QX
   is tried automatically, then the built-in universal loader.
 - 🎯 **Exact kernel matching** — the app reads `uname -r` and resolves an **exact**
-  prebuilt driver from the OTA database (40+ kernels, growing).
+  prebuilt driver from the OTA database (42 kernels, 4.9 → 6.6, Driver Engine 3.1).
+- 🧨 **One-tap UNLOAD** — removes the driver cleanly, including **stealth-loaded**
+  builds: the app sends the driver's unhide ioctl (`0x806`) through a bundled
+  freestanding helper, then `rmmod`s the module and verifies the node is gone,
+  `lsmod` is clean and the kernel taint is unchanged.
 - 🛑 **STOP button** — any load can be cancelled mid-pipeline with one tap.
 - 🗒️ **Status console** — short, colour-coded live status of every step
   (`Database Connected`, `Driver loaded`, `Load OK`...).
 - 🔀 **RT / QX separation** — supported-kernel lists are split per ABI
   (`RT KERNELS` / `QX KERNELS`) with `THIS DEVICE` / `NEWEST` badges.
-- 🔁 **Boot auto-load** — the driver re-loads itself after every reboot via a
-  Magisk/APatch service script.
+- 🔁 **Boot auto-load — opt-in** — the switch is **OFF by default** and loading never
+  turns it on. Flip it ON yourself and a Magisk/APatch service script re-loads the
+  driver after every reboot; switch it OFF again and the next reboot loads nothing.
 - 🧾 **Auto build-request reports** — unsupported kernel? The app collects everything a
   builder needs (see below) and hands you a ready-made WhatsApp message or GitHub issue.
 - 📲 **In-app updates** — the app checks GitHub releases and can install its own update.
 - 🛡️ **Anti-tamper** — signature check, debugger/Xposed refusal, obfuscated release
-  builds (see [Security](#-security)).
+  builds, sha256-verified OTA drivers (see [Security](#-security)).
 
 ## 📥 Download
 
@@ -71,8 +76,11 @@ one-tap in-app install.
 2. Wait for `Database Connected` in the status console.
 3. Tap **LOAD** — the pipeline detects your kernel, downloads the matching driver,
    loads it and verifies the `/dev` node.
-4. (Optional) switch **Load at every boot** ON — the driver survives reboots.
-5. Wrong driver family? Force **RT** or **QX** with the chips under LOAD.
+4. Wrong driver family? Force **RT** or **QX** with the chips under LOAD.
+5. Done with it? Tap **UNLOAD** — the driver is removed and the kernel state is
+   verified clean.
+6. Want the driver to survive reboots? Flip **Load at every boot** ON — it stays
+   opt-in; the loader never enables it by itself.
 
 ## 🧭 How the load pipeline works
 
@@ -89,7 +97,7 @@ Stage 2/3 · QX driver ── same flow with the QX ABI build
 Stage 3/3 · Built-in ─── embedded universal loader
    │
    ▼
-verify: lsmod + /dev node → boot auto-load staged
+verify: lsmod + /dev node → driver staged for the boot switch (script installs only if the switch is ON)
 ```
 
 Every stage is cancellable with the **STOP** button, and each ABI's logs stay tagged so
@@ -170,7 +178,7 @@ is given**. Keep a backup of your boot image and know how to recover.
 
 <div align="center">
 
-**Kernel Loader v2.0** — one tap, the right driver, every kernel.
+**Kernel Loader v1.0** — one tap, the right driver, every kernel.
 ⭐ Star the repo if it helped you!
 
 </div>

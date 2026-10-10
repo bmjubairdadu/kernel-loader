@@ -171,6 +171,12 @@ class DriverViewModel : ViewModel() {
         driverLoaded.value = name.isNotBlank()
     }
 
+    fun markHiddenLoaded() {
+        loadedModuleName.value = ""
+        driverModule.value = ""
+        driverLoaded.value = true
+    }
+
     var appUpdate = mutableStateOf<AppUpdateChecker.UpdateInfo?>(null)
     var updateStatus = mutableStateOf("IDLE")     
     var updateProgress = mutableStateOf(-1)       
@@ -363,6 +369,12 @@ class DriverViewModel : ViewModel() {
     private val LOCAL_KO_CANDIDATES = listOf(
         "/data/adb/kloder/driver.ko",
         "/data/local/tmp/driver.ko",
+        "/data/local/tmp/kmem.ko",
+        "/data/local/tmp/kmem_337.ko",
+        "/data/local/tmp/kmem_337_qx.ko",
+        "/data/local/tmp/memacc.ko",
+        "/data/local/tmp/memacc_qx.ko",
+        "/data/local/tmp/wanbai.ko",
         "/data/adb/kloder/driver_rt.ko",
         "/data/adb/kloder/driver_qx.ko"
     )
@@ -396,26 +408,89 @@ class DriverViewModel : ViewModel() {
             "insmod", "/system/bin/insmod", "/vendor/bin/insmod",
             "/data/adb/magisk/busybox insmod", "busybox insmod"
         )
+        val paramVariants = listOf(
+            "devname=$devNode",
+            "devicename=$devNode",
+            ""
+        )
         var res = Shell.cmd("true").exec()
         var attempts = 0
         outer@ for (b in bins) {
-            for (withDev in listOf(true, false)) {
+            for (param in paramVariants) {
                 checkpoint()
                 if (attempts >= MAX_INSMOD_ATTEMPTS) break@outer
                 if (attempts > 0) delay(INSMOD_BACKOFF_MS)
                 attempts++
-                res = Shell.cmd(if (withDev) "$b $koPath devname=$devNode" else "$b $koPath").exec()
+                val cmd = if (param.isNotBlank()) "$b $koPath $param" else "$b $koPath"
+                res = Shell.cmd(cmd).exec()
                 if (res.isSuccess) return res
                 val err = (res.out + res.err).joinToString(" ").lowercase(Locale.US)
                 if (err.contains("not found") || err.contains("no such file")) continue@outer
-                // fatal check MUST come first: toybox reports one combined line
-                // ("unknown symbol in module, or unknown parameter") and the
-                // kernel's own dmesg line names the real deterministic reason
-                if (FATAL_INSMOD_ERRORS.any { err.contains(it) }) break@outer
-                if (err.contains("unknown parameter")) continue
+
+                val hasParam = param.isNotBlank()
+                if (hasParam && (err.contains("unknown parameter") || err.contains("unknown symbol in module, or unknown parameter"))) {
+                    continue
+                }
+
+                if (!hasParam && FATAL_INSMOD_ERRORS.any { err.contains(it) }) break@outer
             }
         }
+        if (!res.isSuccess) {
+            val force = Shell.cmd("insmod -f $koPath devname=$devNode 2>/dev/null || insmod -f $koPath devicename=$devNode 2>/dev/null || insmod -f $koPath 2>/dev/null").exec()
+            if (force.isSuccess) return force
+        }
         return res
+    }
+
+    private suspend fun prepareAndVerifyDeviceNode(devNode: String): Boolean {
+        tstep("Preparing device node...")
+        Shell.cmd("setenforce 0 2>/dev/null").exec()
+        var foundNode: String? = null
+        for (i in 1..10) {
+            val nodes = Shell.cmd("ls /dev 2>/dev/null").exec().out.map { it.trim() }
+            if (devNode in nodes) {
+                foundNode = devNode
+                break
+            }
+            val candidates = listOf("wanbai", "kmem_337", "kmem_337_qx", "entryi", "memacc", "memacc_qx", "kloaderctl", "daisyctl")
+            val hit = candidates.firstOrNull { it in nodes }
+            if (hit != null) {
+                foundNode = hit
+                break
+            }
+            val mods = SafetyGuard.loadedModuleNames()
+            val modHit = nodes.firstOrNull { d -> mods.any { m -> d.contains(m, ignoreCase = true) } }
+            if (modHit != null) {
+                foundNode = modHit
+                break
+            }
+            delay(200)
+        }
+
+        if (foundNode != null) {
+            Shell.cmd(
+                "chmod 666 /dev/$foundNode",
+                "chcon u:object_r:null_device:s0 /dev/$foundNode 2>/dev/null || chcon u:object_r:device:s0 /dev/$foundNode 2>/dev/null"
+            ).exec()
+            if (foundNode != devNode) {
+                Shell.cmd("ln -s /dev/$foundNode /dev/$devNode 2>/dev/null; chmod 666 /dev/$devNode 2>/dev/null").exec()
+            }
+            if (foundNode != "wanbai" && devNode != "wanbai") {
+                Shell.cmd("ln -s /dev/$foundNode /dev/wanbai 2>/dev/null; chmod 666 /dev/wanbai 2>/dev/null").exec()
+            }
+            rememberDevNode(foundNode)
+            tlog("Node /dev/$foundNode ready (perms 666, SELinux ok)", "OK")
+            return true
+        }
+
+        val loaded = SafetyGuard.loadedModuleNames()
+        val hit = knownDriverModules().filter { it in loaded }
+        if (hit.isNotEmpty()) {
+            tlog("Module ${hit.first()} loaded in kernel (node pending)", "WARN")
+            return true
+        }
+        tlog("Node /dev/$devNode missing", "ERR")
+        return false
     }
 
     private fun firstLocalKo(variant: String = ""): File? {
@@ -425,10 +500,32 @@ class DriverViewModel : ViewModel() {
             else -> null
         }
         if (explicit != null) {
-            return if (Shell.cmd("test -f $explicit").exec().isSuccess) File(explicit) else null
+            return if (Shell.cmd("test -f '$explicit'").exec().isSuccess) File(explicit) else null
         }
-        return LOCAL_KO_CANDIDATES.firstOrNull { Shell.cmd("test -f $it").exec().isSuccess }
-            ?.let { File(it) }
+        val staticHit = LOCAL_KO_CANDIDATES.firstOrNull { Shell.cmd("test -f '$it'").exec().isSuccess }
+        if (staticHit != null) return File(staticHit)
+
+        val tmpKos = Shell.cmd("ls /data/local/tmp/*.ko 2>/dev/null").exec().out
+            .map { it.trim() }
+            .filter { it.endsWith(".ko") && it != "/data/local/tmp/kloader_ota.ko" && it != "/data/local/tmp/kloader_local.ko" && it != "/data/local/tmp/kmem.ko" }
+        return tmpKos.firstOrNull()?.let { File(it) }
+    }
+
+    /**
+     * rmmod every module of this family that is actually live before a fresh
+     * insmod — the embedded qx/rt .ko builds come up as "entryi" / "5.10_A12",
+     * so removing only kmem_337 variants would leave the old driver loaded and
+     * the next insmod would die with "File exists". Nothing live -> no rmmod
+     * and no wait: a fresh load must not pay for the switch case.
+     */
+    private fun rmmodKnownDrivers() {
+        val live = try { SafetyGuard.loadedModuleNames() } catch (e: Exception) { emptySet() }
+        val stale = knownDriverModules().filter { it in live }
+        if (stale.isEmpty()) return
+        Shell.cmd(
+            *stale.map { "rmmod $it 2>/dev/null" }.toTypedArray(),
+            "sleep 0.4"
+        ).exec()
     }
 
     private suspend fun loadStagedKo(context: Context, localKo: File): Boolean {
@@ -446,7 +543,7 @@ class DriverViewModel : ViewModel() {
             tlog("Staging failed", "ERR")
             return false
         }
-        Shell.cmd("rmmod kmem_337 2>/dev/null", "rmmod kmem_337_qx 2>/dev/null", "sleep 1").exec()
+        rmmodKnownDrivers()
         return try {
             val res = runInsmodLadder(staged.absolutePath, devNode)
             if (!res.isSuccess) {
@@ -457,14 +554,16 @@ class DriverViewModel : ViewModel() {
                 return false
             }
             tlog("Load OK", "OK")
-            Shell.cmd("chmod 666 /dev/$devNode 2>/dev/null").exec()
             withContext(Dispatchers.Main) { verifyModule() }
-            val nodes = Shell.cmd("ls /dev 2>/dev/null").exec().out.map { it.trim() }
-            if (devNode !in nodes) {
-                tlog("Node /dev/$devNode missing", "ERR")
+            val nodeOk = prepareAndVerifyDeviceNode(devNode)
+            if (!nodeOk) {
+                withContext(Dispatchers.Main) {
+                    autoLoadOk.value = false
+                    autoLoadStatus.value = "/dev/$devNode missing"
+                    tstep("")
+                }
                 return false
             }
-            rememberDevNode(devNode)
             withContext(Dispatchers.Main) {
                 val mods = SafetyGuard.loadedModuleNames()
                 val ours = knownDriverModules().filter { it in mods }
@@ -553,8 +652,8 @@ class DriverViewModel : ViewModel() {
                 tlog("Staging failed", "ERR")
                 return false
             }
-            
-            Shell.cmd("rmmod kmem_337 2>/dev/null", "rmmod kmem_337_qx 2>/dev/null", "sleep 1").exec()
+
+            rmmodKnownDrivers()
             try {
 
             val res = runInsmodLadder(staged.absolutePath, devNode)
@@ -588,23 +687,9 @@ class DriverViewModel : ViewModel() {
             }
 
             tlog("Load OK", "OK")
-
-            Shell.cmd("chmod 666 /dev/$devNode 2>/dev/null").exec()
-
             withContext(Dispatchers.Main) { verifyModule() }
-
-            tstep("Checking /dev/$devNode...")
-            val nodes = Shell.cmd("ls /dev 2>/dev/null").exec().out.map { it.trim() }
-            if (nodes.any { it == devNode }) {
-                Shell.cmd("chmod 666 /dev/$devNode 2>/dev/null").exec()
-                val mode = Shell.cmd("ls -l /dev/$devNode 2>/dev/null").exec().out.firstOrNull()?.trim().orEmpty()
-                if (mode.contains("rw-rw-rw-")) {
-                    tlog("Node ready", "OK")
-                } else {
-                    tlog("Node not world-R/W", "WARN")
-                }
-            } else {
-                tlog("Node /dev/$devNode missing", "ERR")
+            val nodeOk = prepareAndVerifyDeviceNode(devNode)
+            if (!nodeOk) {
                 withContext(Dispatchers.Main) {
                     autoLoadOk.value = false
                     autoLoadStatus.value = "/dev/$devNode missing"
@@ -612,7 +697,6 @@ class DriverViewModel : ViewModel() {
                 }
                 return false
             }
-            rememberDevNode(devNode)
             withContext(Dispatchers.Main) {
                 val mods = SafetyGuard.loadedModuleNames()
                 val ours = knownDriverModules().filter { it in mods }
@@ -638,14 +722,22 @@ class DriverViewModel : ViewModel() {
         autoLoadOk.value = null
         autoLoadStatus.value = ""
         lastLoadError.value = ""
-        lastBundleTried.value = when {
-            variant.isBlank() && preferOta -> "RT → QX → built-in"
-            preferOta -> "${OtaDriverStore.variantLabel(variant)} (forced)"
-            else -> "built-in"
+        if (pickedFileUri.value != null) {
+            lastBundleTried.value = pickedFileName.value ?: "custom file"
+        } else {
+            lastBundleTried.value = when {
+                variant.isBlank() && preferOta -> "RT → QX → built-in"
+                preferOta -> "${OtaDriverStore.variantLabel(variant)} (forced)"
+                else -> "built-in"
+            }
         }
         loadJob = viewModelScope.launch(Dispatchers.IO) {
             try {
-                if (variant.isBlank() && preferOta) {
+                if (pickedFileUri.value != null) {
+                    tlog("Loading custom file: ${pickedFileName.value}", "CMD")
+                    tstep("Loading custom file...")
+                    UniversalKernelLoader.autoLoad(context, this@DriverViewModel, variant)
+                } else if (variant.isBlank() && preferOta) {
                     activePipelineVariant.value = OtaDriverStore.RT
                     tlog("PIPELINE 1/3 — RT driver", "CMD")
                     tstep("Stage 1/3: RT driver")
@@ -664,9 +756,7 @@ class DriverViewModel : ViewModel() {
                     tlog("QX Failed → Built-in", "WARN")
                     tlog("PIPELINE 3/3 — Built-in", "CMD")
                     tstep("Stage 3/3: built-in loader")
-                    withContext(Dispatchers.Main) {
-                        UniversalKernelLoader.autoLoad(context, this@DriverViewModel, variant)
-                    }
+                    UniversalKernelLoader.autoLoad(context, this@DriverViewModel, variant)
                 } else if (preferOta) {
                     activePipelineVariant.value = variant.lowercase(Locale.US)
                     tlog("PIPELINE — ${OtaDriverStore.variantLabel(variant)} driver (forced)", "CMD")
@@ -677,13 +767,9 @@ class DriverViewModel : ViewModel() {
                     activePipelineVariant.value = ""
                     tlog("DB driver failed — trying built-in loader", "INFO")
                     tstep("Stage 2/2: built-in loader")
-                    withContext(Dispatchers.Main) {
-                        UniversalKernelLoader.autoLoad(context, this@DriverViewModel, variant)
-                    }
+                    UniversalKernelLoader.autoLoad(context, this@DriverViewModel, variant)
                 } else {
-                    withContext(Dispatchers.Main) {
-                        UniversalKernelLoader.autoLoad(context, this@DriverViewModel, variant)
-                    }
+                    UniversalKernelLoader.autoLoad(context, this@DriverViewModel, variant)
                 }
                 if (autoLoadOk.value != true && !driverLoaded.value) {
                     tlog("All Pipelines Failed", "ERR")
@@ -739,7 +825,7 @@ class DriverViewModel : ViewModel() {
             val matchedNodes = devList.filter { node ->
                 moduleNames.any { m -> node.contains(m, ignoreCase = true) }
             }
-            val candidateNodes = (moduleNames + matchedNodes + listOf("kloaderctl", "daisyctl", "entryi", "kmem_337"))
+            val candidateNodes = (moduleNames + matchedNodes + listOf("kloaderctl", "daisyctl", "entryi", "kmem_337", "wanbai"))
                 .filter { it.isNotBlank() }.distinct()
             val devCmd = candidateNodes.joinToString(" ") { "ls /dev/$it 2>/dev/null;" } + " true"
             val devRes = Shell.cmd(devCmd).exec()
@@ -774,10 +860,25 @@ class DriverViewModel : ViewModel() {
         pickedFileUri.value = uri
         pickedFileName.value = getFileName(context, uri)
         addLog("File picked: ${pickedFileName.value}", emptyList(), emptyList(), 0)
+        tlog("Selected module: ${pickedFileName.value}", "OK")
+    }
+
+    fun clearPickedFile() {
+        pickedFileUri.value = null
+        pickedFileName.value = null
+        tlog("Cleared custom module", "INFO")
+    }
+
+    fun loadPickedFile(context: Context) {
+        if (pickedFileUri.value == null) {
+            tlog("No module file selected", "WARN")
+            return
+        }
+        autoLoadUniversal(context, preferOta = false, variant = "")
     }
 
     private val KNOWN_DRIVER_MODULES = listOf(
-        "kmem_337", "kmem_337_qx", "kmem", "entryi", "kloader",
+        "memacc", "memacc_qx", "kmem_337", "kmem_337_qx", "kmem", "entryi", "kloader",
         "5.10_A12", "wanbai", "daisy"
     )
 
@@ -797,60 +898,23 @@ class DriverViewModel : ViewModel() {
         if (safe.isNotBlank() && safe != DEFAULT_DEV_NODE) devNodeOverride.value = safe
     }
 
-    fun unloadModule(context: Context) {
+    fun unloadDriver(context: Context) {
         if (isBusy.value) return
-        viewModelScope.launch {
-            withContext(Dispatchers.IO) {
-                try {
-                    val loaded = SafetyGuard.loadedModuleNames()
-                    
-                    val remembered = loadedModuleName.value
-                    
-                    val known = knownDriverModules().filter { it in loaded }
-                    
-                    val target = when {
-                        remembered.isNotBlank() && remembered in loaded -> remembered
-                        known.isNotEmpty() -> known.first()
-                        else -> {
-                            tlog("No driver loaded", "WARN")
-                            DriverAutoload.state(context)
-                            if (DriverAutoload.enabled) {
-                                tlog("Auto-load is ON - will reload at boot", "INFO")
-                            }
-                            driverLoaded.value = false
-                            return@withContext
-                        }
-                    }
-
-                    tlog("Unloading '$target'...", "INFO", variant = variantOfModule(target))
-                    var res = Shell.cmd("rmmod $target").exec()
-                    if (!res.isSuccess) {
-
-                        res = Shell.cmd(
-                            "BB=\$(command -v busybox); [ -z \"\$BB\" ] && BB=/data/adb/magisk/busybox; \$BB rmmod $target"
-                        ).exec()
-                    }
-                    tlog(
-                        "Unload $target -> exit ${res.code}",
-                        if (res.isSuccess) "OK" else "ERR",
-                        variant = variantOfModule(target)
-                    )
-                    res.err.forEach { if (it.isNotBlank()) tlog(it, "WARN") }
-                    addLog("rmmod $target", res.out, res.err, res.code)
-
-                    if (res.isSuccess) {
-                        tlog("Driver removed", "OK", variant = variantOfModule(target))
-                        DriverAutoload.state(context)
-                        if (DriverAutoload.enabled) {
-                            tlog("Auto-load still ON - will reload at boot", "WARN")
-                        }
-                    } else {
-                        tlog("Unload failed - reboot clears it", "WARN")
-                    }
-                    setLoadedModule("")
-                    refreshDriverState(context)
-                } catch (e: Exception) {
-                    tlog("UNLOAD ERROR: ${e.message}", "ERR")
+        isBusy.value = true
+        busyStep.value = "Starting..."
+        loadJob = viewModelScope.launch(Dispatchers.IO) {
+            try {
+                UniversalKernelLoader.unloadDriver(this@DriverViewModel, context)
+            } catch (e: CancellationException) {
+            } catch (e: Exception) {
+                tlog("UNLOAD FATAL: ${e.message}", "ERR")
+                autoLoadOk.value = false
+                autoLoadStatus.value = "Unload failed: ${e.message}"
+            } finally {
+                refreshDriverState(context)
+                viewModelScope.launch(Dispatchers.Main) {
+                    isBusy.value = false
+                    busyStep.value = ""
                 }
             }
         }
@@ -863,27 +927,39 @@ class DriverViewModel : ViewModel() {
                     DriverAutoload.state(context)
                     activePipelineVariant.value = variantOfModule(DriverAutoload.moduleName)
                     if (on) {
-                        val staged = DriverAutoload.stagedKo
-                        if (staged.isBlank()) {
-                            tlog("AUTOLOAD: load the driver once first, then switch this on", "WARN")
-                            autoloadEnabled.value = false
-                            return@withContext
+                        var staged = DriverAutoload.stagedKo
+                        if (staged.isBlank() || !Shell.cmd("test -f '$staged'").exec().isSuccess) {
+                            val fallbacks = listOf(
+                                "${DriverAutoload.stageDir()}/driver.ko",
+                                "/data/adb/kloder/driver.ko",
+                                "/data/local/tmp/kmem.ko",
+                                "/data/local/tmp/kloader_local.ko",
+                                "/data/local/tmp/kloader_ota.ko"
+                            )
+                            val found = fallbacks.firstOrNull { Shell.cmd("test -f '$it'").exec().isSuccess }
+                            if (found != null) {
+                                staged = found
+                            } else {
+                                tlog("AUTOLOAD: load the driver once first, then switch this on", "WARN")
+                                withContext(Dispatchers.Main) { autoloadEnabled.value = false }
+                                return@withContext
+                            }
                         }
                         val ok = DriverAutoload.enable(
                             context,
                             File(staged),
-                            loadedModuleName.value.ifBlank { DriverAutoload.moduleName },
+                            loadedModuleName.value.ifBlank { DriverAutoload.moduleName.ifBlank { "wanbai" } },
                             DriverAutoload.variant,
                             DriverAutoload.devNode
                         ) { m, t -> tlog(m, t) }
-                        autoloadEnabled.value = ok
+                        withContext(Dispatchers.Main) { autoloadEnabled.value = ok }
                     } else {
                         DriverAutoload.disable(context) { m, t -> tlog(m, t) }
-                        autoloadEnabled.value = false
+                        withContext(Dispatchers.Main) { autoloadEnabled.value = false }
                     }
                 } catch (e: Exception) {
                     tlog("AUTOLOAD ERROR: ${e.message}", "ERR")
-                    autoloadEnabled.value = false
+                    withContext(Dispatchers.Main) { autoloadEnabled.value = false }
                 } finally {
                     activePipelineVariant.value = ""
                 }
@@ -897,8 +973,9 @@ class DriverViewModel : ViewModel() {
             autoloadEnabled.value = DriverAutoload.enabled
             val loaded = SafetyGuard.loadedModuleNames()
             val hit = knownDriverModules().filter { it in loaded }
-            if (hit.isNotEmpty()) setLoadedModule(hit.first())
-            driverLoaded.value = hit.isNotEmpty()
+            val nodePresent = Shell.cmd("test -e /dev/${preferredDevNode()} 2>/dev/null").exec().isSuccess
+            if (hit.isNotEmpty()) setLoadedModule(hit.first()) else setLoadedModule("")
+            driverLoaded.value = hit.isNotEmpty() || nodePresent
             driverModule.value = hit.joinToString(", ")
         }
     }

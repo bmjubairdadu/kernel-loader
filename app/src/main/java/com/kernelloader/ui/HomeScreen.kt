@@ -47,6 +47,7 @@ import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Stop
@@ -57,6 +58,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -449,7 +451,7 @@ fun HomeScreen(
                     visible = toUnload,
                     moduleName = loadedModule,
                     enabled = loaded && !busy && rootAvailable,
-                    onUnload = { viewModel.unloadModule(context) }
+                    onUnload = { viewModel.unloadDriver(context) }
                 )
             }
 
@@ -516,6 +518,90 @@ fun HomeScreen(
                             tint = StatusOk,
                             modifier = Modifier.size(18.dp)
                         )
+                    }
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+
+            val pickedFile = viewModel.pickedFileName.value
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = Surface1),
+                border = BorderStroke(
+                    1.dp,
+                    if (pickedFile != null) AccentBlue.copy(alpha = 0.5f) else BorderSubtle
+                )
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 10.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                text = "Custom Driver (.ko)",
+                                style = MaterialTheme.typography.titleSmall,
+                                color = TextPrimary
+                            )
+                            Spacer(Modifier.height(2.dp))
+                            Text(
+                                text = if (pickedFile != null)
+                                    "Selected: $pickedFile"
+                                else "Pick your own custom .ko driver from storage",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (pickedFile != null) AccentBlue else TextMuted
+                            )
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        OutlinedButton(
+                            onClick = onPickFile,
+                            enabled = !busy && rootAvailable,
+                            border = BorderStroke(1.dp, if (pickedFile != null) AccentBlue else BorderSubtle),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.FolderOpen,
+                                contentDescription = null,
+                                tint = if (pickedFile != null) AccentBlue else TextSecondary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                text = if (pickedFile != null) "CHANGE" else "BROWSE",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = if (pickedFile != null) AccentBlue else TextPrimary
+                            )
+                        }
+                    }
+                    if (pickedFile != null) {
+                        Spacer(Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Button(
+                                onClick = { viewModel.loadPickedFile(context) },
+                                enabled = !busy && rootAvailable,
+                                modifier = Modifier.weight(1f),
+                                colors = ButtonDefaults.buttonColors(containerColor = AccentGreen)
+                            ) {
+                                Icon(Icons.Default.Bolt, contentDescription = null, tint = TextOnAccent, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text("LOAD CUSTOM", color = TextOnAccent, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                            }
+                            OutlinedButton(
+                                onClick = { viewModel.clearPickedFile() },
+                                enabled = !busy,
+                                border = BorderStroke(1.dp, BorderSubtle),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = TextSecondary)
+                            ) {
+                                Text("CLEAR", style = MaterialTheme.typography.labelMedium)
+                            }
+                        }
                     }
                 }
             }
