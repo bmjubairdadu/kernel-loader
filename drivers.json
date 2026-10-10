@@ -49,6 +49,15 @@
       "version": "4.14.186-perf SMP preempt mod_unload modversions aarch64"
     },
     {
+      "buildDate": "2026-10-05T16:54:16Z",
+      "file": "qx_4.14.284-LONGSU-gffbd2268fef7.ko",
+      "label": "4.14.284-LONGSU-gffbd2268fef7",
+      "sha256": "23d20260d7226a99a71c990829ad9224b62b27663035ebed3097a0d006563ef7",
+      "size": 22880,
+      "variant": "qx",
+      "version": "4.14.284-LONGSU-gffbd2268fef7 SMP preempt mod_unload modversions aarch64"
+    },
+    {
       "buildDate": "2026-09-27T15:33:50Z",
       "file": "qx_4.19.113.ko",
       "label": "4.19.113",
@@ -119,6 +128,15 @@
       "size": 12352,
       "variant": "qx",
       "version": "4.9.186-perf SMP preempt mod_unload modversions aarch64"
+    },
+    {
+      "buildDate": "2026-10-10",
+      "file": "qx_4.9.337-DaisyForGaming.ko",
+      "label": "4.9.337-DaisyForGaming",
+      "sha256": "c330debf21af1a320b897e2ef7b4e18841a0d8fdbe754c16653cf76437a74515",
+      "size": 23904,
+      "variant": "qx",
+      "version": "4.9.337-DaisyForGaming SMP preempt mod_unload modversions aarch64"
     },
     {
       "buildDate": "2026-09-27T15:33:50Z",
@@ -238,6 +256,15 @@
       "version": "4.14.186-perf-g9be022c0d-dirty SMP preempt mod_unload modversions aarch64"
     },
     {
+      "buildDate": "2026-10-05T16:54:16Z",
+      "file": "rt_4.14.284-LONGSU-gffbd2268fef7.ko",
+      "label": "4.14.284-LONGSU-gffbd2268fef7",
+      "sha256": "3d855e20fe91ff858cbfda314b90b1f5aaef1209dd28109c23ef678b51388c6c",
+      "size": 23536,
+      "variant": "rt",
+      "version": "4.14.284-LONGSU-gffbd2268fef7 SMP preempt mod_unload modversions aarch64"
+    },
+    {
       "buildDate": "2026-09-27T15:33:49Z",
       "file": "rt_4.19.113.ko",
       "label": "4.19.113",
@@ -301,6 +328,15 @@
       "version": "4.9.186-perf-gdcfb1676-dirty SMP preempt mod_unload modversions aarch64"
     },
     {
+      "buildDate": "2026-10-10",
+      "file": "rt_4.9.337-DaisyForGaming.ko",
+      "label": "4.9.337-DaisyForGaming",
+      "sha256": "f3fdcdc980680266c6068698270ac480097a236c5a64084e0ad940d9a311a070",
+      "size": 23672,
+      "variant": "rt",
+      "version": "4.9.337-DaisyForGaming SMP preempt mod_unload modversions aarch64"
+    },
+    {
       "buildDate": "2026-09-27T15:33:50Z",
       "file": "rt_5.10.ko",
       "label": "5.10",
@@ -344,45 +380,9 @@
       "size": 327560,
       "variant": "rt",
       "version": "6.6.57-4k-gd66e9166bfa1-dirty SMP preempt mod_unload modversions aarch64"
-    },
-    {
-      "buildDate": "2026-10-05T16:54:16Z",
-      "file": "rt_4.14.284-LONGSU-gffbd2268fef7.ko",
-      "label": "4.14.284-LONGSU-gffbd2268fef7",
-      "sha256": "3d855e20fe91ff858cbfda314b90b1f5aaef1209dd28109c23ef678b51388c6c",
-      "size": 23536,
-      "variant": "rt",
-      "version": "4.14.284-LONGSU-gffbd2268fef7 SMP preempt mod_unload modversions aarch64"
-    },
-    {
-      "buildDate": "2026-10-05T16:54:16Z",
-      "file": "qx_4.14.284-LONGSU-gffbd2268fef7.ko",
-      "label": "4.14.284-LONGSU-gffbd2268fef7",
-      "sha256": "23d20260d7226a99a71c990829ad9224b62b27663035ebed3097a0d006563ef7",
-      "size": 22880,
-      "variant": "qx",
-      "version": "4.14.284-LONGSU-gffbd2268fef7 SMP preempt mod_unload modversions aarch64"
-    },
-    {
-      "buildDate": "2026-10-10T13:05:04Z",
-      "file": "rt_4.9.337-DaisyForGaming.ko",
-      "label": "4.9.337-DaisyForGaming",
-      "sha256": "878e5aa9c06e6e931d2a65f1fe94d69ee5e653793ce86e0ccf0c11953289aee6",
-      "size": 20776,
-      "variant": "rt",
-      "version": "4.9.337-DaisyForGaming SMP preempt mod_unload modversions aarch64"
-    },
-    {
-      "buildDate": "2026-10-10T13:05:04Z",
-      "file": "qx_4.9.337-DaisyForGaming.ko",
-      "label": "4.9.337-DaisyForGaming",
-      "sha256": "5f66a12017518dc08400e48b0b09a4e0aa7a2f6f065185f06383586623164b08",
-      "size": 21816,
-      "variant": "qx",
-      "version": "4.9.337-DaisyForGaming SMP preempt mod_unload modversions aarch64"
     }
   ],
-  "updated": "2026-10-10T13:05:04Z",
+  "updated": "2026-10-10T16:01:48Z",
   "variants": {
     "qx": "QX ABI - ioctl 0x801/0x802 + 0x804/0x805 handshake, returns -1 on failure",
     "rt": "RT ABI - ioctl 0x801/0x802/0x803, returns 0 on success"
