@@ -161,8 +161,9 @@ kernel-loader/
 └─ .github/workflows/  # CI (APK build)
 ```
 
-> The kernel-module sources, compiled `.ko` artifacts and the WSL build tooling
-> are **private** and intentionally not part of this repository.
+> The driver-engine sources live in `driver/` (`kmem_337_core.h`, `memacc.c`,
+> `memacc_qx.c`) alongside the WSL build scripts; the compiled `.ko` artifacts ship
+> in the APK and the OTA database.
 
 ## ⚠️ Safety / Disclaimer
 
