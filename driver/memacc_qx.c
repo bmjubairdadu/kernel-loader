@@ -35,7 +35,7 @@ static struct cdev qx_cdev;
 static struct class *qx_class;
 static struct device *qx_device;
 
-#define QX_PERM_MAX_TRIES	8
+#define QX_PERM_MAX_TRIES	30
 static int qx_perm_tries;
 static void qx_perm_work_fn(struct work_struct *w);
 static struct delayed_work qx_perm_work;
@@ -258,4 +258,4 @@ module_exit(qx_exit);
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("daisy");
 MODULE_DESCRIPTION("QX memory accessor");
-MODULE_VERSION("3.1.1-337-qx");
+MODULE_VERSION("3.1.2-337-qx");

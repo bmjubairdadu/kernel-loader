@@ -31,7 +31,7 @@ static struct cdev rt_cdev;
 static struct class *rt_class;
 static struct device *rt_device;
 
-#define RT_PERM_MAX_TRIES	8
+#define RT_PERM_MAX_TRIES	30
 static int rt_perm_tries;
 static void rt_perm_work_fn(struct work_struct *w);
 static struct delayed_work rt_perm_work;
@@ -239,4 +239,4 @@ module_exit(rt_exit);
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("daisy");
 MODULE_DESCRIPTION("RT memory accessor");
-MODULE_VERSION("3.1.1-337");
+MODULE_VERSION("3.1.2-337");
