@@ -1,7 +1,7 @@
 {
   "baseUrl": "https://raw.githubusercontent.com/bmjubairdadu/kernel-loader/drivers",
   "branch": "drivers",
-  "count": 42,
+  "count": 49,
   "drivers": [
     {
       "buildDate": "2026-09-27T15:33:50Z",
@@ -229,6 +229,17 @@
       "version": "4.14.117-perf+ SMP preempt mod_unload modversions aarch64"
     },
     {
+      "version": "4.14.141-g4e3bb1fab-dirty SMP preempt mod_unload modversions aarch64",
+      "file": "rt_4.14.141.ko",
+      "variant": "rt",
+      "label": "4.14.141",
+      "sha256": "e52721bb8d4dbf4588903bf226112aaa9d69b413ec2917c8a70bc4ac55b479be",
+      "size": 561254,
+      "buildDate": "2026-10-11",
+      "source": "vendor-sh",
+      "verified": false
+    },
+    {
       "buildDate": "2026-09-27T15:33:49Z",
       "file": "rt_4.14.180-190.ko",
       "label": "4.14.180-190",
@@ -247,6 +258,17 @@
       "version": "4.14.186-g49c02c2de-dirty SMP preempt mod_unload modversions aarch64"
     },
     {
+      "version": "4.14.186-perf-g30fa96c92-dirty SMP preempt mod_unload modversions aarch64",
+      "file": "rt_4.14.186b.ko",
+      "variant": "rt",
+      "label": "4.14.186b",
+      "sha256": "8fa885ee15ae6a3327fa6c9b047c06173d0b9d72d2db96cef5d7f2a39220c711",
+      "size": 566460,
+      "buildDate": "2026-10-11",
+      "source": "vendor-sh",
+      "verified": false
+    },
+    {
       "buildDate": "2026-09-27T15:33:49Z",
       "file": "rt_4.14.186c.ko",
       "label": "4.14.186c",
@@ -254,6 +276,17 @@
       "size": 194128,
       "variant": "rt",
       "version": "4.14.186-perf-g9be022c0d-dirty SMP preempt mod_unload modversions aarch64"
+    },
+    {
+      "version": "4.14.190-perf-g17171cc0d-dirty SMP preempt mod_unload modversions aarch64",
+      "file": "rt_4.14.190.ko",
+      "variant": "rt",
+      "label": "4.14.190",
+      "sha256": "f73177ccca3cd56ce731b607d0f6db345c9baddbe809074b080f23bdd89189c5",
+      "size": 573882,
+      "buildDate": "2026-10-11",
+      "source": "vendor-sh",
+      "verified": false
     },
     {
       "buildDate": "2026-10-05T16:54:16Z",
@@ -310,6 +343,17 @@
       "version": "4.19.191-g914ba8403bb3-dirty SMP preempt mod_unload modversions aarch64"
     },
     {
+      "version": "4.19.191+ SMP preempt mod_unload modversions aarch64",
+      "file": "rt_4.19.191b.ko",
+      "variant": "rt",
+      "label": "4.19.191b",
+      "sha256": "07c6a07a5cb6f0a468b0a66322ddc5079f293050ade571888711003cee34794a",
+      "size": 712428,
+      "buildDate": "2026-10-11",
+      "source": "vendor-sh",
+      "verified": false
+    },
+    {
       "buildDate": "2026-09-27T15:33:49Z",
       "file": "rt_4.19.81.ko",
       "label": "4.19.81",
@@ -355,6 +399,17 @@
       "version": "5.15.167-00023-g952e16e5fc48-dirty SMP preempt mod_unload modversions aarch64"
     },
     {
+      "version": "5.4.191-qgki-g7aac66291bd5-dirty SMP preempt mod_unload modversions aarch64",
+      "file": "rt_5.4.191-qgki.ko",
+      "variant": "rt",
+      "label": "5.4.191-qgki",
+      "sha256": "141a906e86025a34a2791660d761424116a973039a21890c34f4b42c02b904d2",
+      "size": 919556,
+      "buildDate": "2026-10-11",
+      "source": "vendor-sh",
+      "verified": false
+    },
+    {
       "buildDate": "2026-09-27T15:33:50Z",
       "file": "rt_5.4oppo.ko",
       "label": "5.4oppo",
@@ -362,6 +417,17 @@
       "size": 301216,
       "variant": "rt",
       "version": "5.4.191-g7aac66291bd5-dirty SMP preempt mod_unload modversions aarch64"
+    },
+    {
+      "version": "5.4.61-qgki-ga9244def8-dirty SMP preempt mod_unload modversions aarch64",
+      "file": "rt_5.4.61-qgki.ko",
+      "variant": "rt",
+      "label": "5.4.61-qgki",
+      "sha256": "672e34723c2ab3351a977fee242ae276e1461a3479c35bae64c703ad13990e97",
+      "size": 920001,
+      "buildDate": "2026-10-11",
+      "source": "vendor-sh",
+      "verified": false
     },
     {
       "buildDate": "2026-09-27T15:33:50Z",
@@ -373,6 +439,17 @@
       "version": "6.1.112-00034-g226e9f92a06c-dirty SMP preempt mod_unload modversions aarch64"
     },
     {
+      "version": "6.12.23-android16-5-maybe-dirty-4k SMP preempt mod_unload modversions aarch64",
+      "file": "rt_6.12.ko",
+      "variant": "rt",
+      "label": "6.12",
+      "sha256": "6a71491cf16118365c28bdd6e7e4321d9e35e5c041e0201fd36bdb60c57cdb42",
+      "size": 950218,
+      "buildDate": "2026-10-11",
+      "source": "vendor-sh",
+      "verified": false
+    },
+    {
       "buildDate": "2026-09-27T15:33:50Z",
       "file": "rt_6.6.ko",
       "label": "6.6",
@@ -382,7 +459,7 @@
       "version": "6.6.57-4k-gd66e9166bfa1-dirty SMP preempt mod_unload modversions aarch64"
     }
   ],
-  "updated": "2026-10-10T17:00:09Z",
+  "updated": "2026-10-10T19:01:43Z",
   "variants": {
     "qx": "QX ABI - ioctl 0x801/0x802 + 0x804/0x805 handshake, returns -1 on failure",
     "rt": "RT ABI - ioctl 0x801/0x802/0x803, returns 0 on success"
