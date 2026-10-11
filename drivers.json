@@ -1,7 +1,7 @@
 {
   "baseUrl": "https://raw.githubusercontent.com/bmjubairdadu/kernel-loader/drivers",
   "branch": "drivers",
-  "count": 47,
+  "count": 49,
   "drivers": [
     {
       "buildDate": "2026-09-27T15:33:50Z",
@@ -209,6 +209,17 @@
       "size": 23384,
       "variant": "qx",
       "version": "5.4.86-qgki SMP preempt mod_unload modversions aarch64"
+    },
+    {
+      "version": "6.12.30-android16-5-g1ed949324a3e-ab13881345-4k SMP preempt mod_unload modversions aarch64",
+      "file": "qx_6.12.30-GrassKSU.ko",
+      "variant": "qx",
+      "label": "6.12.30-GrassKSU",
+      "sha256": "37f31346d4c1f45a33834d6476129ea80915fb6728018c4b8aebb36c7fe04c0f",
+      "size": 339480,
+      "buildDate": "2026-10-11",
+      "source": "gki-unverified",
+      "verified": false
     },
     {
       "buildDate": "2026-09-27T15:33:49Z",
@@ -432,6 +443,17 @@
       "verified": false
     },
     {
+      "version": "6.12.30-android16-5-g1ed949324a3e-ab13881345-4k SMP preempt mod_unload modversions aarch64",
+      "file": "rt_6.12.30-GrassKSU.ko",
+      "variant": "rt",
+      "label": "6.12.30-GrassKSU",
+      "sha256": "c86cd0d0a9676f0f409ed220f3f94c8af1a4999e581771919cba4667f84ee030",
+      "size": 339296,
+      "buildDate": "2026-10-11",
+      "source": "gki-unverified",
+      "verified": false
+    },
+    {
       "buildDate": "2026-09-27T15:33:50Z",
       "file": "rt_6.6.ko",
       "label": "6.6",
@@ -441,7 +463,7 @@
       "version": "6.6.57-4k-gd66e9166bfa1-dirty SMP preempt mod_unload modversions aarch64"
     }
   ],
-  "updated": "2026-10-11T14:24:15Z",
+  "updated": "2026-10-11T14:35:35Z",
   "variants": {
     "qx": "QX ABI - ioctl 0x801/0x802 + 0x804/0x805 handshake, returns -1 on failure",
     "rt": "RT ABI - ioctl 0x801/0x802/0x803, returns 0 on success"
