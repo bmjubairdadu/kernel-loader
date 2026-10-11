@@ -8,69 +8,12 @@ semantic-ish version tags (`<major>.<minor>-<flavour>`).
 
 ## [Unreleased]
 
-## [1.3] - 2026-10-11
+## [1.0] - 2026-10-11
 
-### Fixed
-* **Root state no longer blocks or goes stale.** Home and Console computed
-  root availability (and the kernel release, a root-shell call) on the main
-  thread during first composition — a fresh install could freeze on the
-  su prompt, and granting root afterwards left "ROOT MISSING" + disabled
-  buttons until the screen was left and re-entered. Both screens now
-  resolve root/kernel info off the main thread and re-check on every
-  ON_RESUME, so the UI lights up the moment root is granted.
-* Full codebase audit (OTA store, updater, anti-tamper, report builder,
-  memory test, load/unload/autoload pipelines): no further defects found.
-
-## [1.2] - 2026-10-11
-
-### Fixed
-* **The "Load at every boot" switch now actually rules the boot script.**
-  The switch's OFF state lived only in app prefs, while a boot script left
-  on disk by an older app version (or an install that wiped the app's data)
-  kept re-installing the staged driver at every boot — reload after
-  restart, and again after unload, all with the switch showing OFF. The
-  app now reconciles the disk with the switch in both directions: prefs
-  ON + script gone → back to OFF; prefs OFF + script present → the
-  leftover script is removed (both known script paths) and the terminal
-  says so. Loading, unloading and opening the app all enforce this.
-* Toggling the switch OFF also cleans the boot logs now (the `rm -f`
-  prefix was missing, so the removal log could claim failure on success).
-
-## [1.1] - 2026-10-11
-
-### Fixed
-* **Unload works for drivers registered under any name.** The rmmod ladder
-  now reads the real `name=` (modinfo) out of the staged `driver.ko` on the
-  device and tries that first — a driver the app installed always comes
-  down, even when its lsmod name is outside the known list. When the node
-  answers but no known module is loaded, the failure message says so
-  honestly (unknown name or stale node) instead of a bare "all candidates
-  rejected".
-* **The boot script is never named after the node.** Flipping "Load at
-  every boot" ON with no remembered module used to write
-  `will insmod 'wanbai'` — the node name, not a module name — into the
-  script, breaking its already-loaded check. The script now uses the
-  staged .ko's real modinfo name and refuses (with a clear message) when
-  that cannot be determined.
-
-### Changed
-* **Every device / kernel hardening:**
-  - Boot staging now falls back to the .ko's own modinfo `name=` (read in
-    pure Kotlin) when the module is invisible in lsmod — stealth builds
-    stage and auto-load like everything else.
-  - Module names are validated, not mangled: `5.10_A12` keeps its dot
-    (the old filter turned it into `510_A12`, a name that could never
-    unload).
-  - The staged-name reader falls back to `grep -a` when a ROM ships
-    without `strings`.
-  - Wrong-arch devices (arm32 / x86) fail fast with a clear
-    "arm64 CPU required" message instead of burning the whole pipeline on
-    `Exec format error`.
-
-## [1.0] - 2026-10-10
-
-> **Fresh start.** Versioning restarts at 1.0 with this build — it is the
-> baseline the app is maintained from now on.
+> **Fresh start.** Versioning restarts at 1.0 and this is the shipped
+> baseline: tag, release asset and the app itself all read v1.0. It carries
+> the full on-device hardening pass (unload, autoload switch, root state)
+> on top of the Driver Engine 3.1 rollout.
 
 ### Added
 * **Kernel Driver 3.1 architecture rollout across all kernels (4.9 … 6.6, RT & QX).**
@@ -109,6 +52,45 @@ semantic-ish version tags (`<major>.<minor>-<flavour>`).
   for the device node to appear (ueventd race) and applies chmod/chcon on
   the first hit, so the node is client-ready the moment load reports
   success.
+* **Every device / kernel hardening.** Boot staging falls back to the
+  .ko's own modinfo `name=` (pure Kotlin) when the module is invisible in
+  lsmod, so stealth builds stage and auto-load like everything else;
+  module names are validated, not mangled (`5.10_A12` keeps its dot);
+  the staged-name reader falls back to `grep -a` when a ROM ships without
+  `strings`; wrong-arch devices fail fast with "arm64 CPU required"
+  instead of burning the pipeline on `Exec format error`.
+
+### Fixed
+* **Unload works for drivers registered under any name.** The rmmod ladder
+  reads the real `name=` (modinfo) out of the staged `driver.ko` on the
+  device and tries that first — a driver the app installed always comes
+  down, even when its lsmod name is outside the known list. When the node
+  answers but no known module is loaded, the failure message says so
+  honestly (unknown name or stale node) instead of a bare "all candidates
+  rejected".
+* **The boot script is never named after the node.** With no remembered
+  module the script used to read `will insmod 'wanbai'` — the node name,
+  not a module name — breaking its already-loaded check. It now uses the
+  staged .ko's real modinfo name and refuses (with a clear message) when
+  that cannot be determined.
+* **The "Load at every boot" switch rules the boot script on disk.** The
+  switch's OFF state used to live only in app prefs while a script left
+  behind by an older version (or a data-wiping reinstall) kept reloading
+  the driver at every boot and again after every unload. The app now
+  reconciles the disk with the switch in both directions: prefs ON + no
+  script → back to OFF; prefs OFF + script present → the leftover script
+  is removed (both known script paths) and the terminal says so.
+  Toggling OFF also cleans the boot logs now (the `rm -f` prefix was
+  missing, so successful removals could log as failures).
+* **Root state no longer blocks or goes stale.** Home and Console computed
+  root availability (and the kernel release, a root-shell call) on the
+  main thread during first composition — a fresh install could freeze on
+  the su prompt, and granting root afterwards left "ROOT MISSING" +
+  disabled buttons until the screen was left and re-entered. Both screens
+  resolve root/kernel info off the main thread and re-check on every
+  ON_RESUME, so the UI lights up the moment root is granted.
+* Full codebase audit (OTA store, updater, anti-tamper, report builder,
+  memory test, load/unload/autoload pipelines): no further defects found.
 
 ## [2.3] - 2026-10-10
 
