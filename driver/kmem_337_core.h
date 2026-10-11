@@ -38,6 +38,14 @@
 #define KMEM_MMAP_READ_UNLOCK(mm) up_read(&(mm)->mmap_sem)
 #endif
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 11, 0)
+#define KMEM_KMAP(pg) kmap_local_page(pg)
+#define KMEM_KUNMAP(addr) kunmap_local(addr)
+#else
+#define KMEM_KMAP(pg) kmap_atomic(pg)
+#define KMEM_KUNMAP(addr) kunmap_atomic(addr)
+#endif
+
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 4, 0)
 #define KMEM_CLASS_CREATE(name) class_create(name)
 #else
@@ -115,7 +123,7 @@ static size_t kmem_copy_user_page(struct mm_struct *mm, uintptr_t va,
 		page = pfn_to_page(pa >> PAGE_SHIFT);
 		if (!get_page_unless_zero(page))
 			return 0;
-		mapped = kmap_atomic(page);
+		mapped = KMEM_KMAP(page);
 		off = pa & ~PAGE_MASK;
 		if (is_write) {
 			memcpy((char *)mapped + off, kbuf, sz);
@@ -123,7 +131,7 @@ static size_t kmem_copy_user_page(struct mm_struct *mm, uintptr_t va,
 		} else {
 			memcpy(kbuf, (char *)mapped + off, sz);
 		}
-		kunmap_atomic(mapped);
+		KMEM_KUNMAP(mapped);
 		put_page(page);
 		return sz;
 	}
@@ -140,14 +148,14 @@ static size_t kmem_copy_user_page(struct mm_struct *mm, uintptr_t va,
 	}
 	pte_unmap_unlock(pte, ptl);
 	off = va & (PAGE_SIZE - 1);
-	mapped = kmap_atomic(page);
+	mapped = KMEM_KMAP(page);
 	if (is_write) {
 		memcpy((char *)mapped + off, kbuf, sz);
 		set_page_dirty_lock(page);
 	} else {
 		memcpy(kbuf, (char *)mapped + off, sz);
 	}
-	kunmap_atomic(mapped);
+	KMEM_KUNMAP(mapped);
 	put_page(page);
 	return sz;
 }
@@ -358,22 +366,25 @@ static uintptr_t kmem_get_modbase(pid_t pid, const char *name)
 		return 0;
 
 	KMEM_MMAP_READ_LOCK(mm);
-	for (vma = mm->mmap; vma; vma = vma->vm_next) {
-		if (!vma->vm_file)
-			continue;
+	vma = find_vma(mm, 0);
+	while (vma) {
+		uintptr_t next = vma->vm_end;
 
-		buf[0] = '\0';
-		path = d_path(&vma->vm_file->f_path, buf, sizeof(buf));
-		if (IS_ERR(path))
-			continue;
-
-		base = strrchr(path, '/');
-		base = base ? base + 1 : path;
-
-		if (!strcmp(base, name)) {
-			found = vma->vm_start;
-			break;
+		if (vma->vm_file) {
+			buf[0] = '\0';
+			path = d_path(&vma->vm_file->f_path, buf, sizeof(buf));
+			if (!IS_ERR(path)) {
+				base = strrchr(path, '/');
+				base = base ? base + 1 : path;
+				if (!strcmp(base, name)) {
+					found = vma->vm_start;
+					break;
+				}
+			}
 		}
+		if (next <= vma->vm_start)
+			break;
+		vma = find_vma(mm, next);
 	}
 	KMEM_MMAP_READ_UNLOCK(mm);
 

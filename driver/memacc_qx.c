@@ -36,9 +36,11 @@ static struct class *qx_class;
 static struct device *qx_device;
 
 #define QX_PERM_MAX_TRIES	30
+#ifndef KMEM_NO_PERM_WORK
 static int qx_perm_tries;
 static void qx_perm_work_fn(struct work_struct *w);
 static struct delayed_work qx_perm_work;
+#endif
 
 static char *devicename = "wanbai";
 module_param(devicename, charp, 0644);
@@ -176,6 +178,7 @@ static const char *qx_pick_node(void)
  * and cannot open it. Locate the freshly-created node through the VFS and
  * widen its mode so it is usable the instant init() returns.
  */
+#ifndef KMEM_NO_PERM_WORK
 static void qx_perm_work_fn(struct work_struct *w)
 {
 	struct path path;
@@ -200,6 +203,7 @@ static void qx_perm_work_fn(struct work_struct *w)
 
 	schedule_delayed_work(&qx_perm_work, msecs_to_jiffies(200));
 }
+#endif
 
 static int __init qx_init(void)
 {
@@ -241,9 +245,11 @@ static int __init qx_init(void)
 	}
 
 	/* Force 0666 on /dev/<node> regardless of devtmpfs/ueventd. */
+#ifndef KMEM_NO_PERM_WORK
 	INIT_DELAYED_WORK(&qx_perm_work, qx_perm_work_fn);
 	qx_perm_tries = 0;
 	schedule_delayed_work(&qx_perm_work, 0);
+#endif
 
 	return 0;
 
@@ -258,7 +264,9 @@ err_region:
 
 static void __exit qx_exit(void)
 {
+#ifndef KMEM_NO_PERM_WORK
 	cancel_delayed_work_sync(&qx_perm_work);
+#endif
 	device_destroy(qx_class, qx_dev);
 	class_destroy(qx_class);
 	cdev_del(&qx_cdev);

@@ -32,9 +32,11 @@ static struct class *rt_class;
 static struct device *rt_device;
 
 #define RT_PERM_MAX_TRIES	30
+#ifndef KMEM_NO_PERM_WORK
 static int rt_perm_tries;
 static void rt_perm_work_fn(struct work_struct *w);
 static struct delayed_work rt_perm_work;
+#endif
 
 static char *devicename = "wanbai";
 module_param(devicename, charp, 0644);
@@ -157,6 +159,7 @@ static const char *rt_pick_node(void)
  * node actually exists. Because ueventd may lag behind init(), retry a few
  * times on a short delay before giving up.
  */
+#ifndef KMEM_NO_PERM_WORK
 static void rt_perm_work_fn(struct work_struct *w)
 {
 	struct path path;
@@ -181,6 +184,7 @@ static void rt_perm_work_fn(struct work_struct *w)
 
 	schedule_delayed_work(&rt_perm_work, msecs_to_jiffies(200));
 }
+#endif
 
 static int __init rt_init(void)
 {
@@ -222,9 +226,11 @@ static int __init rt_init(void)
 	}
 
 	/* Force 0666 on /dev/<node> regardless of devtmpfs/ueventd. */
+#ifndef KMEM_NO_PERM_WORK
 	INIT_DELAYED_WORK(&rt_perm_work, rt_perm_work_fn);
 	rt_perm_tries = 0;
 	schedule_delayed_work(&rt_perm_work, 0);
+#endif
 
 	return 0;
 
@@ -239,7 +245,9 @@ err_region:
 
 static void __exit rt_exit(void)
 {
+#ifndef KMEM_NO_PERM_WORK
 	cancel_delayed_work_sync(&rt_perm_work);
+#endif
 	device_destroy(rt_class, rt_dev);
 	class_destroy(rt_class);
 	cdev_del(&rt_cdev);
