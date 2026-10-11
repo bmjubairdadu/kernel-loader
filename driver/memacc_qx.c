@@ -48,6 +48,15 @@ static char *devname = "wanbai";
 module_param(devname, charp, 0644);
 MODULE_PARM_DESC(devname, "alias of devicename");
 
+static unsigned long st_read;
+module_param(st_read, ulong, 0444);
+static unsigned long st_write;
+module_param(st_write, ulong, 0444);
+static unsigned long st_modbase;
+module_param(st_modbase, ulong, 0444);
+static unsigned long st_batch;
+module_param(st_batch, ulong, 0444);
+
 static int qx_open(struct inode *inode, struct file *file)
 {
 	return 0;
@@ -67,6 +76,7 @@ static long qx_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 
 	switch (cmd) {
 	case QX_CMD_READ:
+		st_read++;
 		if (copy_from_user(&cm, (void __user *)arg, sizeof(cm)))
 			return -1;
 		if (kmem_read_process(cm.pid, cm.addr,
@@ -75,6 +85,7 @@ static long qx_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		return 0;
 
 	case QX_CMD_WRITE:
+		st_write++;
 		if (copy_from_user(&cm, (void __user *)arg, sizeof(cm)))
 			return -1;
 		if (kmem_write_process(cm.pid, cm.addr,
@@ -83,6 +94,7 @@ static long qx_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		return 0;
 
 	case QX_CMD_MOD_BASE:
+		st_modbase++;
 		if (copy_from_user(&mb, (void __user *)arg, sizeof(mb)))
 			return -1;
 		memset(name, 0, sizeof(name));
@@ -109,6 +121,7 @@ static long qx_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		return 0;
 
 	case QX_CMD_BATCH_U32:
+		st_batch++;
 		if (copy_from_user(&bu, (void __user *)arg, sizeof(bu)))
 			return -1;
 		if (kmem_batch_read_u32(&bu)) {
@@ -258,4 +271,4 @@ module_exit(qx_exit);
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("daisy");
 MODULE_DESCRIPTION("QX memory accessor");
-MODULE_VERSION("3.1.3-337-qx");
+MODULE_VERSION("3.1.4-337-qx");
