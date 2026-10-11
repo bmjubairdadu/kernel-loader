@@ -1009,6 +1009,10 @@ class DriverViewModel : ViewModel() {
     fun refreshDriverState(context: Context) {
         viewModelScope.launch(Dispatchers.IO) {
             DriverAutoload.state(context)
+            DriverAutoload.lastCleanupNote.takeIf { it.isNotBlank() }?.let {
+                tlog(it, "WARN")
+                DriverAutoload.clearCleanupNote()
+            }
             autoloadEnabled.value = DriverAutoload.enabled
             val loaded = SafetyGuard.loadedModuleNames()
             val hit = knownDriverModules().filter { it in loaded }

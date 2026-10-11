@@ -38,6 +38,12 @@ object DriverAutoload {
     var lastBootLog: String = ""
         private set
 
+    /** one-line note when state() had to reconcile the disk with the switch */
+    var lastCleanupNote: String = ""
+        private set
+
+    fun clearCleanupNote() { lastCleanupNote = "" }
+
     fun state(ctx: Context) {
         prefs(ctx).let { p ->
             _enabled = p.getBoolean("enabled", false)
@@ -46,15 +52,34 @@ object DriverAutoload {
             variant = p.getString("variant", "") ?: ""
             devNode = p.getString("node", "wanbai") ?: "wanbai"
         }
-        // be truthful: a pref that says ON while the boot script is gone
-        // (removed by hand, another tool, or an older app version) is OFF
+        // the switch is the single source of truth for boot loading, so the
+        // disk must agree with it in BOTH directions:
+        //  - pref ON while the script is gone (removed by hand, another tool)
+        //    -> OFF, self-heal the pref
+        //  - pref OFF while a script lingers (left by an older app version or
+        //    an install that wiped prefs) -> the script would reload the
+        //    driver at every boot with the switch showing OFF - take it down
+        val scriptThere = try {
+            Shell.cmd("test -f $SCRIPT_PRIMARY 2>/dev/null || test -f $SCRIPT_FALLBACK 2>/dev/null").exec().isSuccess
+        } catch (e: Exception) {
+            false
+        }
         if (_enabled) {
-            _enabled = try {
-                Shell.cmd("test -f ${scriptPath()}").exec().isSuccess
+            if (!scriptThere) {
+                _enabled = false
+                lastCleanupNote = "AUTOLOAD: switch showed ON but no boot script exists - reset to OFF"
+                save(ctx)
+            }
+        } else if (scriptThere) {
+            val gone = try {
+                Shell.cmd("rm -f $SCRIPT_PRIMARY $SCRIPT_FALLBACK", "sync").exec().isSuccess
             } catch (e: Exception) {
                 false
             }
-            if (!_enabled) save(ctx)
+            if (gone) {
+                lastCleanupNote = "AUTOLOAD: leftover boot script removed (switch is OFF - it would have reloaded the driver at boot)"
+                save(ctx)
+            }
         }
     }
 
@@ -320,10 +345,13 @@ say "boot auto-load finished"
     }
 
     fun disable(ctx: Context, log: (String, String) -> Unit) {
-        val p = scriptPath()
         val dir = stageDir()
         val res = try {
-            Shell.cmd("rm -f $p", "$dir/boot.log $dir/boot.log.why 2>/dev/null", "sync").exec()
+            Shell.cmd(
+                "rm -f $SCRIPT_PRIMARY $SCRIPT_FALLBACK",
+                "rm -f $dir/boot.log $dir/boot.log.why 2>/dev/null",
+                "sync"
+            ).exec()
         } catch (e: Exception) {
             log("AUTOLOAD: remove failed: ${e.message}", "ERR")
             return
@@ -332,7 +360,7 @@ say "boot auto-load finished"
         save(ctx)
         log(
             if (res.isSuccess) "AUTOLOAD: boot script removed -> driver will NOT auto-load"
-            else "AUTOLOAD: could not remove $p (exit ${res.code})",
+            else "AUTOLOAD: could not remove $SCRIPT_PRIMARY (exit ${res.code})",
             if (res.isSuccess) "OK" else "ERR"
         )
     }

@@ -8,6 +8,21 @@ semantic-ish version tags (`<major>.<minor>-<flavour>`).
 
 ## [Unreleased]
 
+## [1.2] - 2026-10-11
+
+### Fixed
+* **The "Load at every boot" switch now actually rules the boot script.**
+  The switch's OFF state lived only in app prefs, while a boot script left
+  on disk by an older app version (or an install that wiped the app's data)
+  kept re-installing the staged driver at every boot — reload after
+  restart, and again after unload, all with the switch showing OFF. The
+  app now reconciles the disk with the switch in both directions: prefs
+  ON + script gone → back to OFF; prefs OFF + script present → the
+  leftover script is removed (both known script paths) and the terminal
+  says so. Loading, unloading and opening the app all enforce this.
+* Toggling the switch OFF also cleans the boot logs now (the `rm -f`
+  prefix was missing, so the removal log could claim failure on success).
+
 ## [1.1] - 2026-10-11
 
 ### Fixed
