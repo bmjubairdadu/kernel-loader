@@ -217,7 +217,7 @@ static int __init rt_init(void)
 		ret = PTR_ERR(rt_class);
 		goto err_cdev;
 	}
-	rt_class->devnode = rt_devnode;
+	rt_class->devnode = (typeof(rt_class->devnode))rt_devnode;
 
 	rt_device = device_create(rt_class, NULL, rt_dev, NULL, node);
 	if (IS_ERR(rt_device)) {
@@ -260,4 +260,4 @@ module_exit(rt_exit);
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("daisy");
 MODULE_DESCRIPTION("RT memory accessor");
-MODULE_VERSION("3.1.4-337");
+MODULE_VERSION("3.1.5-337");

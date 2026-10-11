@@ -31,8 +31,8 @@
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 8, 0)
 #include <linux/mmap_lock.h>
-#define KMEM_MMAP_READ_LOCK(mm) mmap_read_lock(mm)
-#define KMEM_MMAP_READ_UNLOCK(mm) mmap_read_unlock(mm)
+#define KMEM_MMAP_READ_LOCK(mm) down_read(&(mm)->mmap_lock)
+#define KMEM_MMAP_READ_UNLOCK(mm) up_read(&(mm)->mmap_lock)
 #else
 #define KMEM_MMAP_READ_LOCK(mm) down_read(&(mm)->mmap_sem)
 #define KMEM_MMAP_READ_UNLOCK(mm) up_read(&(mm)->mmap_sem)
@@ -107,7 +107,16 @@ static size_t kmem_copy_user_page(struct mm_struct *mm, uintptr_t va,
 	if (pgd_none(*pgd) || !pgd_present(*pgd))
 		return 0;
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 0, 0)
+	{
+		p4d_t *p4d = p4d_offset(pgd, va);
+		if (p4d_none(*p4d) || !p4d_present(*p4d))
+			return 0;
+		pud = pud_offset(p4d, va);
+	}
+#else
 	pud = pud_offset(pgd, va);
+#endif
 	if (pud_none(*pud) || !pud_present(*pud))
 		return 0;
 

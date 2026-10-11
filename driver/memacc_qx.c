@@ -236,7 +236,7 @@ static int __init qx_init(void)
 		ret = PTR_ERR(qx_class);
 		goto err_cdev;
 	}
-	qx_class->devnode = qx_devnode;
+	qx_class->devnode = (typeof(qx_class->devnode))qx_devnode;
 
 	qx_device = device_create(qx_class, NULL, qx_dev, NULL, node);
 	if (IS_ERR(qx_device)) {
@@ -279,4 +279,4 @@ module_exit(qx_exit);
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("daisy");
 MODULE_DESCRIPTION("QX memory accessor");
-MODULE_VERSION("3.1.4-337-qx");
+MODULE_VERSION("3.1.5-337-qx");
