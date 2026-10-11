@@ -83,13 +83,17 @@ static inline struct task_struct *kmem_get_task(pid_t pid)
 	return task;
 }
 
-static phys_addr_t kmem_translate_va(struct mm_struct *mm, uintptr_t va)
+static size_t kmem_copy_user_page(struct mm_struct *mm, uintptr_t va,
+				    char *kbuf, size_t sz, int is_write)
 {
 	pgd_t *pgd;
 	pud_t *pud;
 	pmd_t *pmd;
 	pte_t *pte;
-	phys_addr_t pa;
+	spinlock_t *ptl;
+	struct page *page;
+	void *mapped;
+	size_t off;
 
 	pgd = pgd_offset(mm, va);
 	if (pgd_none(*pgd) || !pgd_present(*pgd))
@@ -103,33 +107,48 @@ static phys_addr_t kmem_translate_va(struct mm_struct *mm, uintptr_t va)
 	if (pmd_none(*pmd) || !pmd_present(*pmd))
 		return 0;
 
-	if (pmd_trans_huge(*pmd))
-		return pmd_page_paddr(*pmd) + (va & ~PMD_MASK);
+	if (pmd_trans_huge(*pmd)) {
+		phys_addr_t pa = pmd_page_paddr(*pmd) + (va & ~PMD_MASK);
 
-	pte = pte_offset_kernel(pmd, va);
-	if (!pte || !pte_present(*pte))
+		if (!pfn_valid(pa >> PAGE_SHIFT))
+			return 0;
+		page = pfn_to_page(pa >> PAGE_SHIFT);
+		if (!get_page_unless_zero(page))
+			return 0;
+		mapped = kmap_atomic(page);
+		off = pa & ~PAGE_MASK;
+		if (is_write) {
+			memcpy((char *)mapped + off, kbuf, sz);
+			set_page_dirty_lock(page);
+		} else {
+			memcpy(kbuf, (char *)mapped + off, sz);
+		}
+		kunmap_atomic(mapped);
+		put_page(page);
+		return sz;
+	}
+
+	pte = pte_offset_map_lock(mm, pmd, va, &ptl);
+	if (!pte_present(*pte)) {
+		pte_unmap_unlock(pte, ptl);
 		return 0;
-
-	pa = (phys_addr_t)pte_pfn(*pte) << PAGE_SHIFT;
-	return pa | (va & ~PAGE_MASK);
-}
-
-static size_t kmem_copy_phys(phys_addr_t pa, char *kbuf, size_t sz,
-			     int is_write)
-{
-	struct page *page;
-	void *mapped;
-
-	if (!pfn_valid(pa >> PAGE_SHIFT))
+	}
+	page = pte_page(*pte);
+	if (!get_page_unless_zero(page)) {
+		pte_unmap_unlock(pte, ptl);
 		return 0;
-
-	page = pfn_to_page(pa >> PAGE_SHIFT);
+	}
+	pte_unmap_unlock(pte, ptl);
+	off = va & (PAGE_SIZE - 1);
 	mapped = kmap_atomic(page);
-	if (is_write)
-		memcpy((char *)mapped + (pa & ~PAGE_MASK), kbuf, sz);
-	else
-		memcpy(kbuf, (char *)mapped + (pa & ~PAGE_MASK), sz);
+	if (is_write) {
+		memcpy((char *)mapped + off, kbuf, sz);
+		set_page_dirty_lock(page);
+	} else {
+		memcpy(kbuf, (char *)mapped + off, sz);
+	}
 	kunmap_atomic(mapped);
+	put_page(page);
 	return sz;
 }
 
@@ -142,14 +161,11 @@ static int kmem_rw_locked(struct mm_struct *mm, uintptr_t addr, char *kbuf,
 	while (done < size) {
 		uintptr_t cur = addr + done;
 		size_t chunk = PAGE_SIZE - (cur & (PAGE_SIZE - 1));
-		phys_addr_t pa;
 
 		if (chunk > size - done)
 			chunk = size - done;
-		pa = kmem_translate_va(mm, cur);
-		if (!pa)
-			break;
-		if (!kmem_copy_phys(pa, kbuf + done, chunk, is_write))
+		if (!kmem_copy_user_page(mm, cur, kbuf + done, chunk,
+					 is_write))
 			break;
 		done += chunk;
 		if (big)
@@ -214,15 +230,13 @@ static int kmem_rw_process(pid_t pid, uintptr_t addr, void __user *ubuf,
 		KMEM_MMAP_READ_LOCK(mm);
 		while (left > 0) {
 			size_t chunk = PAGE_SIZE - (cur & (PAGE_SIZE - 1));
-			phys_addr_t pa;
 			char *part;
 
 			if (chunk > left)
 				chunk = left;
 			part = kbuf + (step - left);
-			pa = kmem_translate_va(mm, cur);
-			if (pa && kmem_copy_phys(pa, part, chunk,
-						 is_write) == chunk)
+			if (kmem_copy_user_page(mm, cur, part, chunk,
+						is_write) == chunk)
 				ok = 1;
 			cur += chunk;
 			left -= chunk;
@@ -264,7 +278,6 @@ static int kmem_batch_u32_locked(struct mm_struct *mm, const __u64 *addr,
 	for (i = 0; i < count; i++) {
 		uintptr_t va = (uintptr_t)addr[i];
 		__u32 val = 0;
-		phys_addr_t pa;
 
 		if (!addr[i]) {
 			out[i] = 0;
@@ -272,9 +285,8 @@ static int kmem_batch_u32_locked(struct mm_struct *mm, const __u64 *addr,
 			continue;
 		}
 		if ((va & (PAGE_SIZE - 1)) <= PAGE_SIZE - sizeof(val)) {
-			pa = kmem_translate_va(mm, va);
-			if (!pa ||
-			    !kmem_copy_phys(pa, (char *)&val, sizeof(val), 0)) {
+			if (kmem_copy_user_page(mm, va, (char *)&val,
+						sizeof(val), 0) != sizeof(val)) {
 				out[i] = 0;
 				all_ok = 0;
 				continue;
