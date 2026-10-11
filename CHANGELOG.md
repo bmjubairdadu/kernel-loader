@@ -8,6 +8,19 @@ semantic-ish version tags (`<major>.<minor>-<flavour>`).
 
 ## [Unreleased]
 
+## [1.3] - 2026-10-11
+
+### Fixed
+* **Root state no longer blocks or goes stale.** Home and Console computed
+  root availability (and the kernel release, a root-shell call) on the main
+  thread during first composition — a fresh install could freeze on the
+  su prompt, and granting root afterwards left "ROOT MISSING" + disabled
+  buttons until the screen was left and re-entered. Both screens now
+  resolve root/kernel info off the main thread and re-check on every
+  ON_RESUME, so the UI lights up the moment root is granted.
+* Full codebase audit (OTA store, updater, anti-tamper, report builder,
+  memory test, load/unload/autoload pipelines): no further defects found.
+
 ## [1.2] - 2026-10-11
 
 ### Fixed

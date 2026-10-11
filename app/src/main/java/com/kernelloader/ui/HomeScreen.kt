@@ -129,9 +129,34 @@ fun HomeScreen(
     val context = LocalContext.current
     val scroll = rememberScrollState()
 
-    val rootAvailable = remember { RootChecker.isRootAvailable() }
-    val kernelVersion = remember { RootChecker.getKernelVersion() }
-    val kernelRelease = remember { RootChecker.getKernelRelease() ?: kernelVersion }
+    // root + kernel release are root-shell calls - never block the first
+    // frame on them, and re-check on every ON_RESUME so a late root grant
+    // lights the buttons up without leaving the screen
+    var rootAvailable by remember { mutableStateOf(false) }
+    var kernelVersion by remember { mutableStateOf("") }
+    var kernelRelease by remember { mutableStateOf("") }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val screenScope = rememberCoroutineScope()
+    DisposableEffect(lifecycleOwner) {
+        fun resync() {
+            screenScope.launch(Dispatchers.IO) {
+                val root = RootChecker.isRootAvailable()
+                val kVer = RootChecker.getKernelVersion()
+                val kRel = RootChecker.getKernelRelease() ?: kVer
+                kotlinx.coroutines.withContext(Dispatchers.Main) {
+                    rootAvailable = root
+                    if (kVer.isNotBlank() && !kVer.startsWith("Error")) kernelVersion = kVer
+                    if (kRel.isNotBlank()) kernelRelease = kRel
+                }
+            }
+        }
+        resync()
+        val obs = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) resync()
+        }
+        lifecycleOwner.lifecycle.addObserver(obs)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(obs) }
+    }
 
     val manifest = viewModel.remoteManifest.value
     val manifestStatus = viewModel.manifestStatus.value

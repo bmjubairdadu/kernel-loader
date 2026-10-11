@@ -108,8 +108,15 @@ fun ConsoleScreen(
     var filter by remember { mutableStateOf("ALL") }
     val listState = rememberLazyListState()
 
-    val rootAvailable = remember { RootChecker.isRootAvailable() }
+    // root check is a root-shell call - async so the screen paints first,
+    // and the chips light up as soon as the shell resolves
+    var rootAvailable by remember { mutableStateOf(false) }
     val kernelVersion = remember { RootChecker.getKernelVersion() }
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            RootChecker.isRootAvailable()
+        }.let { rootAvailable = it }
+    }
 
     val shown = when (filter) {
         "RT" -> viewModel.terminalLines.filter { it.variant == OtaDriverStore.RT }
