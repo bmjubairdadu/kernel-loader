@@ -17,6 +17,12 @@
 #include <linux/rwsem.h>
 #include <linux/mm.h>
 #include <linux/sched.h>
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
+#include <linux/sched/mm.h>
+#endif
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
+#include <linux/sched/task.h>
+#endif
 #include <linux/pid.h>
 #include <linux/uaccess.h>
 #include <linux/slab.h>
