@@ -8,10 +8,10 @@
       "file": "qx_4.14.113-25741605.ko",
       "variant": "qx",
       "label": "4.14.113-25741605",
-      "sha256": "28b96e9ffe1d2b4ac79d20e17d7bdb28f3e9b50b48b41c22f5a70ff87c76be32",
-      "size": 233064,
+      "sha256": "03868ce9f12d75c376acf2da6e73201df054f0eaa7e121a38783db9eae06e577",
+      "size": 233440,
       "buildDate": "2026-10-14",
-      "source": "mainline-414-unverified",
+      "source": "mainline-414-unverified-tolerant",
       "verified": false
     },
     {
@@ -237,10 +237,10 @@
       "file": "rt_4.14.113-25741605.ko",
       "variant": "rt",
       "label": "4.14.113-25741605",
-      "sha256": "ebc3dce9566d43d77c03dfb63d17bf851e1050e869d2ac20fd493b15cb1e4519",
-      "size": 229168,
+      "sha256": "2588831e5f838e9d0e9829fcc257ebb9f7cc056789d00de5505ab2e6bbb5a8a1",
+      "size": 229544,
       "buildDate": "2026-10-14",
-      "source": "mainline-414-unverified",
+      "source": "mainline-414-unverified-tolerant",
       "verified": false
     },
     {
@@ -485,7 +485,7 @@
       "version": "6.6.57-4k-gd66e9166bfa1-dirty SMP preempt mod_unload modversions aarch64"
     }
   ],
-  "updated": "2026-10-14T13:01:20Z",
+  "updated": "2026-10-14T14:12:31Z",
   "variants": {
     "qx": "QX ABI - ioctl 0x801/0x802 + 0x804/0x805 handshake, returns -1 on failure",
     "rt": "RT ABI - ioctl 0x801/0x802/0x803, returns 0 on success"
