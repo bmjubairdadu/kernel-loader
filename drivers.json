@@ -1,8 +1,19 @@
 {
   "baseUrl": "https://raw.githubusercontent.com/bmjubairdadu/kernel-loader/drivers",
   "branch": "drivers",
-  "count": 49,
+  "count": 51,
   "drivers": [
+    {
+      "version": "4.14.113-25741605 SMP preempt mod_unload modversions aarch64",
+      "file": "qx_4.14.113-25741605.ko",
+      "variant": "qx",
+      "label": "4.14.113-25741605",
+      "sha256": "28b96e9ffe1d2b4ac79d20e17d7bdb28f3e9b50b48b41c22f5a70ff87c76be32",
+      "size": 233064,
+      "buildDate": "2026-10-14",
+      "source": "mainline-414-unverified",
+      "verified": false
+    },
     {
       "buildDate": "2026-09-27T15:33:50Z",
       "file": "qx_4.14.117.ko",
@@ -219,6 +230,17 @@
       "size": 348856,
       "buildDate": "2026-10-11",
       "source": "gki-unverified-perm-unverified",
+      "verified": false
+    },
+    {
+      "version": "4.14.113-25741605 SMP preempt mod_unload modversions aarch64",
+      "file": "rt_4.14.113-25741605.ko",
+      "variant": "rt",
+      "label": "4.14.113-25741605",
+      "sha256": "ebc3dce9566d43d77c03dfb63d17bf851e1050e869d2ac20fd493b15cb1e4519",
+      "size": 229168,
+      "buildDate": "2026-10-14",
+      "source": "mainline-414-unverified",
       "verified": false
     },
     {
@@ -463,7 +485,7 @@
       "version": "6.6.57-4k-gd66e9166bfa1-dirty SMP preempt mod_unload modversions aarch64"
     }
   ],
-  "updated": "2026-10-14T10:22:48Z",
+  "updated": "2026-10-14T13:01:20Z",
   "variants": {
     "qx": "QX ABI - ioctl 0x801/0x802 + 0x804/0x805 handshake, returns -1 on failure",
     "rt": "RT ABI - ioctl 0x801/0x802/0x803, returns 0 on success"
