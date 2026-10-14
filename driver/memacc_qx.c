@@ -140,12 +140,119 @@ static long qx_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	}
 }
 
+#ifdef CONFIG_COMPAT
+#include <linux/compat.h>
+
+typedef struct {
+	compat_int_t	pid;
+	compat_uptr_t	addr;
+	compat_uptr_t	buffer;
+	compat_size_t	size;
+} compat_copy_memoby_t;
+
+typedef struct {
+	compat_int_t	pid;
+	compat_u64	addr;
+	compat_uptr_t	buffer;
+	compat_size_t	size;
+} compat_copy_memoby64_t;
+
+typedef struct {
+	compat_int_t	pid;
+	compat_uptr_t	name;
+	compat_uptr_t	base;
+} compat_module_base_t;
+
+static long qx_compat_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+{
+	void __user *uarg = compat_ptr(arg);
+	compat_copy_memoby_t cm32;
+	compat_copy_memoby64_t cm64;
+	compat_module_base_t mb32;
+	char name[256];
+	uintptr_t base;
+
+	switch (cmd) {
+	case QX_CMD_READ:
+		st_read++;
+		if (copy_from_user(&cm32, uarg, sizeof(cm32)))
+			return -1;
+		if (cm32.size == 0) {
+			if (copy_from_user(&cm64, uarg, sizeof(cm64)))
+				return -1;
+			if (kmem_read_process(cm64.pid, (uintptr_t)cm64.addr,
+					      compat_ptr(cm64.buffer), cm64.size))
+				return -1;
+		} else {
+			if (kmem_read_process(cm32.pid, (uintptr_t)cm32.addr,
+					      compat_ptr(cm32.buffer), cm32.size))
+				return -1;
+		}
+		return 0;
+
+	case QX_CMD_WRITE:
+		st_write++;
+		if (copy_from_user(&cm32, uarg, sizeof(cm32)))
+			return -1;
+		if (cm32.size == 0) {
+			if (copy_from_user(&cm64, uarg, sizeof(cm64)))
+				return -1;
+			if (kmem_write_process(cm64.pid, (uintptr_t)cm64.addr,
+					       compat_ptr(cm64.buffer), cm64.size))
+				return -1;
+		} else {
+			if (kmem_write_process(cm32.pid, (uintptr_t)cm32.addr,
+					       compat_ptr(cm32.buffer), cm32.size))
+				return -1;
+		}
+		return 0;
+
+	case QX_CMD_MOD_BASE:
+		st_modbase++;
+		if (copy_from_user(&mb32, uarg, sizeof(mb32)))
+			return -1;
+		memset(name, 0, sizeof(name));
+		if (copy_from_user(name, compat_ptr(mb32.name), 255))
+			return -1;
+		name[255] = '\0';
+		base = kmem_get_modbase(mb32.pid, name);
+		mb32.base = (compat_uptr_t)base;
+		if (copy_to_user(uarg, &mb32, sizeof(mb32)))
+			return -1;
+		{
+			compat_u64 base64 = base;
+			copy_to_user((char __user *)uarg + 8, &base64, sizeof(base64));
+		}
+		return 0;
+
+	case QX_CMD_HANDSHAKE:
+		if (copy_from_user(&cm32, uarg, sizeof(cm32)))
+			return -1;
+		cm32.pid = QX_HANDSHAKE_MAGIC;
+		if (copy_to_user(uarg, &cm32, sizeof(cm32)))
+			return -1;
+		return 2;
+
+	case QX_CMD_CLEAR:
+		return 0;
+
+	case QX_CMD_UNHIDE:
+		return 0;
+
+	default:
+		return qx_ioctl(file, cmd, (unsigned long)uarg);
+	}
+}
+#endif
+
 static const struct file_operations qx_fops = {
 	.owner		= THIS_MODULE,
 	.open		= qx_open,
 	.release	= qx_release,
 	.unlocked_ioctl	= qx_ioctl,
 #ifdef CONFIG_COMPAT
+	.compat_ioctl	= qx_compat_ioctl,
+#else
 	.compat_ioctl	= qx_ioctl,
 #endif
 	.llseek		= noop_llseek,
@@ -171,13 +278,6 @@ static const char *qx_pick_node(void)
 	return node;
 }
 
-/*
- * devtmpfs is NOT mounted on this Android build (/dev is a read-only
- * ramdisk), so the DEVMODE=0666 uevent never reaches a node and the char
- * device lands with root-only 0600. Android apps run as unprivileged uids
- * and cannot open it. Locate the freshly-created node through the VFS and
- * widen its mode so it is usable the instant init() returns.
- */
 #ifndef KMEM_NO_PERM_WORK
 static void qx_perm_work_fn(struct work_struct *w)
 {
@@ -222,15 +322,6 @@ static int __init qx_init(void)
 	if (ret)
 		goto err_region;
 
-	/*
-	 * The sysfs class name must be UNIQUE across modules. RT and QX both
-	 * default their /dev node to "wanbai", so naming the class after the
-	 * node makes the second insmod fail with
-	 *   sysfs: cannot create duplicate filename '/class/wanbai'
-	 *   kobject_add_internal failed ... -EEXIST
-	 * Use the module name instead: the /dev node keeps its own name, only
-	 * the class is per-module.
-	 */
 	qx_class = KMEM_CLASS_CREATE("memacc_qx");
 	if (IS_ERR(qx_class)) {
 		ret = PTR_ERR(qx_class);
@@ -244,7 +335,6 @@ static int __init qx_init(void)
 		goto err_class;
 	}
 
-	/* Force 0666 on /dev/<node> regardless of devtmpfs/ueventd. */
 #ifndef KMEM_NO_PERM_WORK
 	INIT_DELAYED_WORK(&qx_perm_work, qx_perm_work_fn);
 	qx_perm_tries = 0;
@@ -279,4 +369,4 @@ module_exit(qx_exit);
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("daisy");
 MODULE_DESCRIPTION("QX memory accessor");
-MODULE_VERSION("3.1.5-337-qx");
+MODULE_VERSION("3.1.6-337-qx");

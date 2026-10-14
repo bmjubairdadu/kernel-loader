@@ -120,12 +120,105 @@ static long rt_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	}
 }
 
+#ifdef CONFIG_COMPAT
+#include <linux/compat.h>
+
+typedef struct {
+	compat_int_t	pid;
+	compat_uptr_t	addr;
+	compat_uptr_t	buffer;
+	compat_size_t	size;
+} compat_copy_memoby_t;
+
+typedef struct {
+	compat_int_t	pid;
+	compat_u64	addr;
+	compat_uptr_t	buffer;
+	compat_size_t	size;
+} compat_copy_memoby64_t;
+
+typedef struct {
+	compat_int_t	pid;
+	compat_uptr_t	name;
+	compat_uptr_t	base;
+} compat_module_base_t;
+
+static long rt_compat_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+{
+	void __user *uarg = compat_ptr(arg);
+	compat_copy_memoby_t cm32;
+	compat_copy_memoby64_t cm64;
+	compat_module_base_t mb32;
+	char name[256];
+	int ret;
+	uintptr_t base;
+
+	switch (cmd) {
+	case CMD_PROC_READ:
+		st_read++;
+		if (copy_from_user(&cm32, uarg, sizeof(cm32)))
+			return -EFAULT;
+		if (cm32.size == 0) {
+			if (copy_from_user(&cm64, uarg, sizeof(cm64)))
+				return -EFAULT;
+			ret = kmem_read_process(cm64.pid, (uintptr_t)cm64.addr,
+						compat_ptr(cm64.buffer), cm64.size);
+		} else {
+			ret = kmem_read_process(cm32.pid, (uintptr_t)cm32.addr,
+						compat_ptr(cm32.buffer), cm32.size);
+		}
+		return ret ? -EIO : 0;
+
+	case CMD_PROC_WRITE:
+		st_write++;
+		if (copy_from_user(&cm32, uarg, sizeof(cm32)))
+			return -EFAULT;
+		if (cm32.size == 0) {
+			if (copy_from_user(&cm64, uarg, sizeof(cm64)))
+				return -EFAULT;
+			ret = kmem_write_process(cm64.pid, (uintptr_t)cm64.addr,
+						 compat_ptr(cm64.buffer), cm64.size);
+		} else {
+			ret = kmem_write_process(cm32.pid, (uintptr_t)cm32.addr,
+						 compat_ptr(cm32.buffer), cm32.size);
+		}
+		return ret ? -EIO : 0;
+
+	case CMD_MOD_BASE:
+		st_modbase++;
+		if (copy_from_user(&mb32, uarg, sizeof(mb32)))
+			return -EFAULT;
+		memset(name, 0, sizeof(name));
+		if (copy_from_user(name, compat_ptr(mb32.name), 255))
+			return -EFAULT;
+		name[255] = '\0';
+		base = kmem_get_modbase(mb32.pid, name);
+		mb32.base = (compat_uptr_t)base;
+		if (copy_to_user(uarg, &mb32, sizeof(mb32)))
+			return -EFAULT;
+		{
+			compat_u64 base64 = base;
+			copy_to_user((char __user *)uarg + 8, &base64, sizeof(base64));
+		}
+		return 0;
+
+	case CMD_UNHIDE:
+		return 0;
+
+	default:
+		return rt_ioctl(file, cmd, (unsigned long)uarg);
+	}
+}
+#endif
+
 static const struct file_operations rt_fops = {
 	.owner		= THIS_MODULE,
 	.open		= rt_open,
 	.release	= rt_release,
 	.unlocked_ioctl	= rt_ioctl,
 #ifdef CONFIG_COMPAT
+	.compat_ioctl	= rt_compat_ioctl,
+#else
 	.compat_ioctl	= rt_ioctl,
 #endif
 	.llseek		= noop_llseek,
@@ -151,14 +244,6 @@ static const char *rt_pick_node(void)
 	return node;
 }
 
-/*
- * devtmpfs is NOT mounted on this Android build (/dev is a read-only
- * ramdisk), and Android's ueventd creates the node asynchronously with
- * root-only 0600 regardless of our DEVMODE=0666 hint. Apps run as
- * unprivileged uids and cannot open it. Widen the mode ourselves once the
- * node actually exists. Because ueventd may lag behind init(), retry a few
- * times on a short delay before giving up.
- */
 #ifndef KMEM_NO_PERM_WORK
 static void rt_perm_work_fn(struct work_struct *w)
 {
@@ -203,15 +288,6 @@ static int __init rt_init(void)
 	if (ret)
 		goto err_region;
 
-	/*
-	 * The sysfs class name must be UNIQUE across modules. RT and QX both
-	 * default their /dev node to "wanbai", so naming the class after the
-	 * node makes the second insmod fail with
-	 *   sysfs: cannot create duplicate filename '/class/wanbai'
-	 *   kobject_add_internal failed ... -EEXIST
-	 * Use the module name instead: the /dev node keeps its own name, only
-	 * the class is per-module.
-	 */
 	rt_class = KMEM_CLASS_CREATE("memacc");
 	if (IS_ERR(rt_class)) {
 		ret = PTR_ERR(rt_class);
@@ -225,7 +301,6 @@ static int __init rt_init(void)
 		goto err_class;
 	}
 
-	/* Force 0666 on /dev/<node> regardless of devtmpfs/ueventd. */
 #ifndef KMEM_NO_PERM_WORK
 	INIT_DELAYED_WORK(&rt_perm_work, rt_perm_work_fn);
 	rt_perm_tries = 0;
@@ -260,4 +335,4 @@ module_exit(rt_exit);
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("daisy");
 MODULE_DESCRIPTION("RT memory accessor");
-MODULE_VERSION("3.1.5-337");
+MODULE_VERSION("3.1.6-337");
