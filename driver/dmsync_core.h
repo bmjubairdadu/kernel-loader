@@ -50,16 +50,6 @@ static void kmem_hide_module(struct module *mod)
 	kmem_hidden = 1;
 }
 
-static void kmem_unhide_module(struct module *mod)
-{
-	if (!kmem_hidden)
-		return;
-	mutex_lock(&module_mutex);
-	list_add(&mod->list, kmem_hide_prev);
-	mutex_unlock(&module_mutex);
-	kmem_hidden = 0;
-}
-
 #define KMEM_NAME_MAX 255
 
 typedef struct {

