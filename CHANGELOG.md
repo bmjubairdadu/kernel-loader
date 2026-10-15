@@ -6,15 +6,50 @@ semantic-ish version tags (`<major>.<minor>-<flavour>`).
 
 ---
 
-## [1.1] - 2026-10-15
+## [1.1] - 2026-10-15 (versionCode 5, tag v5)
 
-### Added
-* **Kernel Driver Engine 3.2 (Full 32-bit Compat IOCTL, Cache Flush & Safe Write)**
-  - **Dedicated `compat_ioctl` Handlers**: Added native 32-bit compat ioctl handlers with `compat_ptr()` in both `memacc.c` (RT) and `memacc_qx.c` (QX). Completely eliminates pointer misalignment, structure size mismatch, and kernel data abort (`el1_da`) panics when 32-bit loaders access memory.
-  - **ARM64 Hardware Cache Flushing**: Added `kmem_flush_cache()` with `dc cvau` (data cache clean to PoU), `dsb ish`, and `ic ivau` (instruction cache invalidate to PoU). Ensures code patches or memory modifications are instantly visible in the CPU instruction pipeline without stale cache misses.
-  - **Safe Copy-On-Write (COW) Write Fallback**: Integrated `get_user_pages_remote(..., FOLL_FORCE | FOLL_WRITE)` fallback for read-only executable pages, demand-paged mappings, and ZRAM-swapped memory.
-  - **Case-Insensitive Module Base Lookup**: Added `kmem_strcasestr()` to effortlessly locate `.so` base addresses regardless of case casing (`libil2cpp.so` vs `libIL2CPP.so`).
-  - **Batch Read Compat Support**: Added full `CMD_BATCH_U32` support in compat ioctl for 32-bit processes.
+> **Stealth release.** The driver now hides one-way on load (list +
+> sysfs, no unhide back) exactly like the reference RT drivers, so
+> UNLOAD is replaced by RESTART (reboot to unload). Read/write goes
+> through a physical-alias path that leaves no fault/COW/pagemap trace.
+
+### Changed (app)
+* **UNLOAD button is now RESTART** (home + terminal screens). The driver
+  offers no unhide ioctl anymore, so only a reboot unloads it — the button
+  runs `reboot` via the root shell instead of the old rmmod ladder.
+* Removed `UniversalKernelLoader.unloadDriver` and the unhide-helper path
+  (`0x806`, `kloder_unhide` staging); status text now reads "a module stays
+  loaded until reboot".
+
+### Changed (driver 3.2.x, via OTA — no APK change needed)
+* **Physical-alias read/write.** Page-table walk + `ioremap_cache`, no
+  `get_user_pages`, no `FOLL_FORCE`, no PTE dirty, no cache flush, no
+  `mmap` locking, no rate limiter — the same approach as the proven-safe
+  reference drivers.
+* **Minimal ioctl surface.** RT answers only `0x801/0x802/0x803`
+  (unknown → `-EINVAL`); QX answers `0x801–0x805` (unknown → `0`).
+  Batch (`0x807`), status (`0x808`) and unhide (`0x806`) are gone.
+* **Neutral names.** Modules `dmsync_rt` / `dmsync_qx`, classes
+  `dmsync` / `dmsync_qx`, single `/dev` node (extra `wanbai` alias device
+  removed) — no `memacc` / `ksync` / `kmem_337` strings left in the `.ko`.
+* **3.2.1:** the 32-bit compat modbase path now checks its second
+  `copy_to_user` (gcc-11 `warn_unused_result` fix, 64-bit path untouched).
+
+### Fixed (driver database, live immediately)
+* **Rebuilt `rt/qx_4.14.113-25741605.ko` from the Samsung M31 source.**
+  The phone's kernel has no CRC table (`kcrctab=0`), so the old entry —
+  no CRCs but a `modversions` vermagic flag — could never load. The new
+  build carries the exact vermagic `4.14.113-25741605 SMP preempt
+  mod_unload aarch64` (no `modversions` token) with no `__versions`
+  section.
+* `rt/qx_4.9.337-DaisyForGaming.ko` updated to the same 3.2.0 core
+  (exact CRCs, phone-tested).
+
+### Fixed (release process)
+* Release tags must stay plain integers equal to `versionCode`
+  (`v5`, `v6`, …) — the updater parses the tag with `v?(\d+)`, so the
+  `v1.1` tag read as `1` and installed v1.0 apps reported "up to date".
+  Retagged as `v5`; rule documented in `scripts/publish_apk.ps1`.
 
 ## [1.0] - 2026-10-11
 
