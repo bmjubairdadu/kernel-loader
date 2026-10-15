@@ -138,7 +138,8 @@
       "sha256": "f3075591c7ea5b05a28f31d01a20a7c1d1080d069c8c50a2c096a487f9ec03c5",
       "size": 32112,
       "variant": "qx",
-      "version": "4.9.337-DaisyForGaming SMP preempt mod_unload modversions aarch64"
+      "version": "4.9.337-DaisyForGaming SMP preempt mod_unload modversions aarch64",
+      "verified": true
     },
     {
       "buildDate": "2026-09-27T15:33:50Z",
@@ -393,7 +394,8 @@
       "sha256": "33c7def08bc93c139c3a0c1cd0765c1de7b207f01f8668770a95ff6356c63ada",
       "size": 30720,
       "variant": "rt",
-      "version": "4.9.337-DaisyForGaming SMP preempt mod_unload modversions aarch64"
+      "version": "4.9.337-DaisyForGaming SMP preempt mod_unload modversions aarch64",
+      "verified": true
     },
     {
       "buildDate": "2026-09-27T15:33:50Z",
@@ -485,7 +487,7 @@
       "version": "6.6.57-4k-gd66e9166bfa1-dirty SMP preempt mod_unload modversions aarch64"
     }
   ],
-  "updated": "2026-10-15T04:07:21Z",
+  "updated": "2026-10-15T05:46:40Z",
   "variants": {
     "qx": "QX ABI - ioctl 0x801/0x802 + 0x804/0x805 handshake, returns -1 on failure",
     "rt": "RT ABI - ioctl 0x801/0x802/0x803, returns 0 on success"
