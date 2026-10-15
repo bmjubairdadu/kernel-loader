@@ -179,7 +179,7 @@ is given**. Keep a backup of your boot image and know how to recover.
 
 <div align="center">
 
-**Kernel Loader v1.0** — one tap, the right driver, every kernel.
+**Kernel Loader v1.1** — one tap, the right driver, every kernel.
 ⭐ Star the repo if it helped you!
 
 </div>

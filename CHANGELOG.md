@@ -21,6 +21,16 @@ the in-app updater parses the tag number, so dotted tags never trigger updates.
   reuses the already-loaded hidden driver (node verified) instead of
   running `insmod` into `File exists`; the built-in loader treats
   `File exists` as already-loaded too.
+* **Animated home rings.** The LOAD ring (driver not loaded) and the
+  RESTART ring (driver resident) breathe and sweep slowly (5.2 s/turn)
+  while idle and spin fast while working. The sweep is a layer-only
+  transform fed by a throttled frame loop (~20 updates/s): no
+  recomposition, no idle repaint, and it stops by itself when the ring is
+  hidden or the screen is off (measured 2.9% janky frames vs ~100% for
+  the naive 60 fps version).
+* **RESTART feedback.** Tapping RESTART flips the panel straight to a
+  spinner + "REBOOTING", so the tap is visibly acknowledged while the
+  reboot lands.
 
 ### 🔄 Changed
 * **UNLOAD → RESTART** (home + terminal screens). Only a reboot unloads
@@ -34,6 +44,9 @@ the in-app updater parses the tag number, so dotted tags never trigger updates.
   `/dev` node, zero `memacc`/`ksync` strings left).
 * **3.2.1:** the 32-bit compat modbase path now checks its second copy
   (gcc-11 build fix, 64-bit path untouched).
+* **Idle repaint killed.** The home screen no longer repaints while
+  nothing moves, and the load pipeline's shell work runs off the main
+  thread — long root calls can't freeze the UI anymore.
 
 ### 🛠️ Fixed
 * **Rebuilt `rt/qx_4.14.113-25741605.ko` from the Samsung M31 source.**
