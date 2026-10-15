@@ -6,7 +6,15 @@ semantic-ish version tags (`<major>.<minor>-<flavour>`).
 
 ---
 
-## [Unreleased]
+## [1.1] - 2026-10-15
+
+### Added
+* **Kernel Driver Engine 3.2 (Full 32-bit Compat IOCTL, Cache Flush & Safe Write)**
+  - **Dedicated `compat_ioctl` Handlers**: Added native 32-bit compat ioctl handlers with `compat_ptr()` in both `memacc.c` (RT) and `memacc_qx.c` (QX). Completely eliminates pointer misalignment, structure size mismatch, and kernel data abort (`el1_da`) panics when 32-bit loaders access memory.
+  - **ARM64 Hardware Cache Flushing**: Added `kmem_flush_cache()` with `dc cvau` (data cache clean to PoU), `dsb ish`, and `ic ivau` (instruction cache invalidate to PoU). Ensures code patches or memory modifications are instantly visible in the CPU instruction pipeline without stale cache misses.
+  - **Safe Copy-On-Write (COW) Write Fallback**: Integrated `get_user_pages_remote(..., FOLL_FORCE | FOLL_WRITE)` fallback for read-only executable pages, demand-paged mappings, and ZRAM-swapped memory.
+  - **Case-Insensitive Module Base Lookup**: Added `kmem_strcasestr()` to effortlessly locate `.so` base addresses regardless of case casing (`libil2cpp.so` vs `libIL2CPP.so`).
+  - **Batch Read Compat Support**: Added full `CMD_BATCH_U32` support in compat ioctl for 32-bit processes.
 
 ## [1.0] - 2026-10-11
 
