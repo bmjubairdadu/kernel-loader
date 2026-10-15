@@ -733,6 +733,24 @@ class DriverViewModel : ViewModel() {
         }
         loadJob = viewModelScope.launch(Dispatchers.IO) {
             try {
+                // 3.2+ driver hides from lsmod on load - a second LOAD would
+                // insmod into "File exists". Reuse the resident driver instead.
+                val resident = SafetyGuard.hiddenDriverClass()
+                if (resident != null) {
+                    tlog("Driver already loaded ($resident, hidden) - reusing", "OK")
+                    if (prepareAndVerifyDeviceNode(preferredDevNode())) {
+                        markHiddenLoaded()
+                        driverLoaded.value = true
+                        autoLoadOk.value = true
+                        autoLoadStatus.value = "Already loaded: /dev/${preferredDevNode()}"
+                        tlog("Done - driver ready", "OK")
+                    } else {
+                        tlog("Resident driver has no live node - reload after reboot", "WARN")
+                        autoLoadOk.value = false
+                        autoLoadStatus.value = "Driver resident but node missing - reboot, then LOAD"
+                    }
+                    return@launch
+                }
                 if (pickedFileUri.value != null) {
                     tlog("Loading custom file: ${pickedFileName.value}", "CMD")
                     tstep("Loading custom file...")

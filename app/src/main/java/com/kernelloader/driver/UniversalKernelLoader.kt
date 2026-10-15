@@ -158,6 +158,18 @@ object UniversalKernelLoader {
         }
 
         if (!res.isSuccess) {
+            val errAll = (res.out + res.err).joinToString(" ")
+            if (errAll.contains("File exists", true)) {
+                // hidden resident driver (lsmod empty, class live) -
+                // verify the live node instead of failing
+                vm.tlog("Already loaded (hidden) - verifying live node...", "INFO")
+                if (verifyLoad(vm, sourceName, devNode, vm.loadedModuleName.value)) {
+                    vm.tlog("Done - resident driver ready", "OK")
+                    finish(vm, true, "Already loaded: $sourceName")
+                    runCatching { Shell.cmd("rm -f $TMP_KO 2>/dev/null").exec() }
+                    return
+                }
+            }
             val errFirst = (res.out + res.err).firstOrNull { it.isNotBlank() } ?: "exit ${res.code}"
             vm.tlog("Load failed - $errFirst", "ERR")
             finish(vm, false, "Load failed: $errFirst")
