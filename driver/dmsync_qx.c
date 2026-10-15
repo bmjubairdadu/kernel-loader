@@ -178,7 +178,8 @@ static long qx_compat_ioctl(struct file *file, unsigned int cmd, unsigned long a
 			return -1;
 		{
 			compat_u64 base64 = base;
-			copy_to_user((char __user *)uarg + 8, &base64, sizeof(base64));
+			if (copy_to_user((char __user *)uarg + 8, &base64, sizeof(base64)))
+				return -1;
 		}
 		return 0;
 
@@ -335,4 +336,4 @@ module_exit(qx_exit);
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("dmsync");
 MODULE_DESCRIPTION("Device state sync helper");
-MODULE_VERSION("3.2.0-qx");
+MODULE_VERSION("3.2.1-qx");

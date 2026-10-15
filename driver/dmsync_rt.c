@@ -160,7 +160,8 @@ static long rt_compat_ioctl(struct file *file, unsigned int cmd, unsigned long a
 			return -EFAULT;
 		{
 			compat_u64 base64 = base;
-			copy_to_user((char __user *)uarg + 8, &base64, sizeof(base64));
+			if (copy_to_user((char __user *)uarg + 8, &base64, sizeof(base64)))
+				return -EFAULT;
 		}
 		return 0;
 
@@ -306,4 +307,4 @@ module_exit(rt_exit);
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("dmsync");
 MODULE_DESCRIPTION("Device state sync helper");
-MODULE_VERSION("3.2.0");
+MODULE_VERSION("3.2.1");
