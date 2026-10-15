@@ -73,10 +73,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -115,6 +117,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -161,6 +164,7 @@ fun HomeScreen(
     val manifestStatus = viewModel.manifestStatus.value
     val busy = viewModel.isBusy.value
     val busyStep = viewModel.busyStep.value
+    val rebooting = viewModel.rebooting.value
     val autoOk = viewModel.autoLoadOk.value
     val autoStatus = viewModel.autoLoadStatus.value
     val terminalLines = viewModel.terminalLines
@@ -488,6 +492,7 @@ fun HomeScreen(
                     visible = toUnload,
                     moduleName = loadedModule,
                     enabled = loaded && !busy && rootAvailable,
+                    busy = rebooting,
                     onUnload = { viewModel.rebootDevice(context) }
                 )
             }
@@ -1140,39 +1145,41 @@ private fun RingButton(
     accentEnd: Color,
     busy: Boolean,
     enabled: Boolean,
+    animated: Boolean = false,
     onClick: () -> Unit,
     content: @Composable ColumnScope.() -> Unit
 ) {
-    // Spin and breathe run only while a load is in flight. A perpetual
-    // animation kept the whole window re-rendering every frame (~19ms on this
-    // GPU) even when the app was idle - that constant load is what made the
-    // screen feel sluggish. Idle now draws a single static frame.
-    val breathe: Float
-    val spin: Float
-    if (busy) {
-        val transition = rememberInfiniteTransition(label = "ring")
-        val breatheState by transition.animateFloat(
-            initialValue = 0.97f,
-            targetValue = 1.03f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(1600, easing = FastOutSlowInEasing),
-                repeatMode = RepeatMode.Reverse
-            ),
-            label = "breathe"
-        )
-        val spinState by transition.animateFloat(
-            initialValue = 0f,
-            targetValue = 360f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(900, easing = LinearEasing)
-            ),
-            label = "spin"
-        )
-        breathe = breatheState
-        spin = spinState
-    } else {
-        breathe = 1f
-        spin = 0f
+    // Ring motion runs only while a load is in flight or when the caller asked
+    // for the slow idle spin (the restart ring). While busy the states follow
+    // every frame; idle updates are gated to ~20 per second - a 5.2s turn is
+    // only ~3.5 degrees per tick, so it still reads as a smooth spin, but the
+    // window renders a third of the frames (an idle 60fps spin burned ~85% of
+    // a core + ~20ms gpu per frame on the dev phone). The values are plain
+    // float states read only inside the graphicsLayer blocks below, so one
+    // update touches the two layer transforms and nothing else - no
+    // recomposition, no relayout, no re-recorded draw commands.
+    val spinState = remember { mutableFloatStateOf(0f) }
+    val breatheState = remember { mutableFloatStateOf(1f) }
+    LaunchedEffect(busy, animated) {
+        if (!busy && !animated) {
+            spinState.floatValue = 0f
+            breatheState.floatValue = 1f
+            return@LaunchedEffect
+        }
+        val spinPeriodMs = if (busy) 900f else 5200f
+        val breathePeriodMs = if (busy) 3200f else 4000f
+        val idleGapMs = if (busy) 0L else 45L
+        var baseNs = 0L
+        while (true) {
+            val nowNs = withFrameNanos { it }
+            if (baseNs == 0L) baseNs = nowNs
+            val tMs = (nowNs - baseNs) / 1_000_000f
+            spinState.floatValue = (tMs / spinPeriodMs * 360f) % 360f
+            val phase = (tMs % breathePeriodMs) / breathePeriodMs
+            val tri = if (phase < 0.5f) phase * 2f else 2f - phase * 2f
+            breatheState.floatValue = 0.97f + 0.06f * tri
+            if (idleGapMs > 0) delay(idleGapMs)
+        }
     }
     val scaleSpec = if (busy) 1.05f else 1f
     val ringBrush = Brush.sweepGradient(
@@ -1184,7 +1191,7 @@ private fun RingButton(
         Canvas(
             modifier = Modifier
                 .fillMaxSize()
-                .graphicsLayer { rotationZ = spin }
+                .graphicsLayer { rotationZ = spinState.floatValue }
         ) {
             val stroke = Stroke(width = 5.dp.toPx(), cap = StrokeCap.Round)
             val glow = Stroke(width = 12.dp.toPx(), cap = StrokeCap.Round)
@@ -1233,7 +1240,7 @@ private fun RingButton(
                 .graphicsLayer {
                     // breathe is read in the layer block, not in composition:
                     // the ring keeps pulsing without recomposing the button
-                    val s = scaleSpec * breathe
+                    val s = scaleSpec * breatheState.floatValue
                     scaleX = s
                     scaleY = s
                 }
@@ -1565,38 +1572,53 @@ private fun UnloadPanel(
     visible: Float,
     moduleName: String,
     enabled: Boolean,
+    busy: Boolean,
     onUnload: () -> Unit
 ) {
     if (visible <= 0.001f) return
 
+    val hot = enabled || busy
     Column(
         modifier = Modifier.alpha(visible),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         RingButton(
-            accentStart = if (enabled) GradientRedStart else TextDisabled,
-            accentEnd = if (enabled) GradientRedEnd else TextDisabled,
-            busy = false,
+            accentStart = if (hot) GradientRedStart else TextDisabled,
+            accentEnd = if (hot) GradientRedEnd else TextDisabled,
+            busy = busy,
             enabled = enabled,
+            animated = enabled && !busy,
             onClick = onUnload
         ) {
-            Icon(
-                Icons.Default.Refresh,
-                contentDescription = null,
-                tint = if (enabled) GradientRedStart else TextDisabled,
-                modifier = Modifier.size(28.dp)
-            )
+            if (busy) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(26.dp),
+                    color = GradientRedStart,
+                    strokeWidth = 2.5.dp
+                )
+            } else {
+                Icon(
+                    Icons.Default.Refresh,
+                    contentDescription = null,
+                    tint = if (enabled) GradientRedStart else TextDisabled,
+                    modifier = Modifier.size(28.dp)
+                )
+            }
             Spacer(Modifier.height(5.dp))
             Text(
-                text = "RESTART",
+                text = if (busy) "REBOOTING" else "RESTART",
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold,
-                color = if (enabled) TextPrimary else TextDisabled
+                color = if (hot) TextPrimary else TextDisabled
             )
         }
         Spacer(Modifier.height(6.dp))
         Text(
-            text = if (moduleName.isNotBlank()) "reboots to unload $moduleName" else "reboots to unload the driver",
+            text = when {
+                busy -> "the phone restarts now - the driver goes with it"
+                moduleName.isNotBlank() -> "reboots to unload $moduleName"
+                else -> "reboots to unload the driver"
+            },
             style = MonoTiny,
             color = AccentRed,
             textAlign = TextAlign.Center,

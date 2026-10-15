@@ -148,6 +148,10 @@ class DriverViewModel : ViewModel() {
     val terminalLines = mutableStateListOf<TerminalLine>()
     var isBusy = mutableStateOf(false)
     var busyStep = mutableStateOf("")
+
+    // true only while the reboot-to-unload is in flight: the restart ring spins
+    // fast and shows a spinner for this, not for unrelated busy actions
+    var rebooting = mutableStateOf(false)
     var autoLoadStatus = mutableStateOf("")   
     var autoLoadOk = mutableStateOf<Boolean?>(null)
 
@@ -974,6 +978,7 @@ class DriverViewModel : ViewModel() {
     fun rebootDevice(context: Context) {
         if (isBusy.value) return
         isBusy.value = true
+        rebooting.value = true
         busyStep.value = "Rebooting..."
         loadJob = viewModelScope.launch(Dispatchers.IO) {
             try {
@@ -992,6 +997,7 @@ class DriverViewModel : ViewModel() {
                 autoLoadStatus.value = "Reboot failed: ${e.message}"
             } finally {
                 viewModelScope.launch(Dispatchers.Main) {
+                    rebooting.value = false
                     isBusy.value = false
                     busyStep.value = ""
                 }
