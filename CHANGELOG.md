@@ -1,63 +1,50 @@
-# Changelog
+# 📋 Changelog — Kernel Loader
 
-All notable changes to **Kernel Loader** are documented here.
-Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
-semantic-ish version tags (`<major>.<minor>-<flavour>`).
+All notable changes are documented here (newest first).
+Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+Release tags are plain integers equal to `versionCode` (`v5`, `v6`, …) —
+the in-app updater parses the tag number, so dotted tags never trigger updates.
 
 ---
 
-## [1.1] - 2026-10-15 (versionCode 5, tag v5)
+## [1.1] — 2026-10-15 (versionCode 5, tag `v5`) 🥷 Stealth release
 
-> **Stealth release.** The driver now hides one-way on load (list +
-> sysfs, no unhide back) exactly like the reference RT drivers, so
-> UNLOAD is replaced by RESTART (reboot to unload). Read/write goes
-> through a physical-alias path that leaves no fault/COW/pagemap trace.
+> The driver now hides one-way on load — exactly like the reference RT
+> drivers. No way back, so UNLOAD becomes RESTART. Reads and writes leave
+> no fault/COW/pagemap trace behind.
 
-### Changed (app)
-* **UNLOAD button is now RESTART** (home + terminal screens). The driver
-  offers no unhide ioctl anymore, so only a reboot unloads it — the button
-  runs `reboot` via the root shell instead of the old rmmod ladder.
-* Removed `UniversalKernelLoader.unloadDriver` and the unhide-helper path
-  (`0x806`, `kloder_unhide` staging); status text now reads "a module stays
-  loaded until reboot".
+### ✨ Added
+* **LOADED BUT HIDDEN status.** When the module is live but invisible in
+  `lsmod`, the home screen says so explicitly (new `hiddenLoaded` state,
+  also picked up by refresh) instead of a bare `LOADED ·`.
+* **Resident-driver reuse.** LOAD checks `/sys/class/dmsync*` first and
+  reuses the already-loaded hidden driver (node verified) instead of
+  running `insmod` into `File exists`; the built-in loader treats
+  `File exists` as already-loaded too.
 
-### Changed (driver 3.2.x, via OTA — no APK change needed)
-* **Physical-alias read/write.** Page-table walk + `ioremap_cache`, no
-  `get_user_pages`, no `FOLL_FORCE`, no PTE dirty, no cache flush, no
-  `mmap` locking, no rate limiter — the same approach as the proven-safe
-  reference drivers.
-* **Minimal ioctl surface.** RT answers only `0x801/0x802/0x803`
-  (unknown → `-EINVAL`); QX answers `0x801–0x805` (unknown → `0`).
-  Batch (`0x807`), status (`0x808`) and unhide (`0x806`) are gone.
-* **Neutral names.** Modules `dmsync_rt` / `dmsync_qx`, classes
-  `dmsync` / `dmsync_qx`, single `/dev` node (extra `wanbai` alias device
-  removed) — no `memacc` / `ksync` / `kmem_337` strings left in the `.ko`.
-* **3.2.1:** the 32-bit compat modbase path now checks its second
-  `copy_to_user` (gcc-11 `warn_unused_result` fix, 64-bit path untouched).
+### 🔄 Changed
+* **UNLOAD → RESTART** (home + terminal screens). Only a reboot unloads
+  the driver now — the button runs `reboot` via the root shell. The old
+  rmmod/unhide ladder and the `0x806` helper path are removed.
+* **Driver 3.2.x core (via OTA, no APK change needed).**
+  Physical-alias read/write (page-table walk + `ioremap_cache` — no GUP,
+  no `FOLL_FORCE`, no PTE dirty, no cache flush, no `mmap` locking, no
+  rate limiter) · minimal ioctl surface (RT `0x801/0x802/0x803`,
+  QX `0x801–0x805`) · neutral names (`dmsync_rt` / `dmsync_qx`, single
+  `/dev` node, zero `memacc`/`ksync` strings left).
+* **3.2.1:** the 32-bit compat modbase path now checks its second copy
+  (gcc-11 build fix, 64-bit path untouched).
 
-### Fixed (driver database, live immediately)
+### 🛠️ Fixed
 * **Rebuilt `rt/qx_4.14.113-25741605.ko` from the Samsung M31 source.**
-  The phone's kernel has no CRC table (`kcrctab=0`), so the old entry —
-  no CRCs but a `modversions` vermagic flag — could never load. The new
-  build carries the exact vermagic `4.14.113-25741605 SMP preempt
-  mod_unload aarch64` (no `modversions` token) with no `__versions`
-  section.
-* `rt/qx_4.9.337-DaisyForGaming.ko` updated to the same 3.2.0 core
+  The phone's kernel has no CRC table, so the old entry — no CRCs but a
+  `modversions` vermagic flag — could never load. The new build carries
+  the exact vermagic `4.14.113-25741605 SMP preempt mod_unload aarch64`.
+* **`rt/qx_4.9.337-DaisyForGaming.ko`** updated to the same 3.2.0 core
   (exact CRCs, phone-tested).
-
-### Fixed (release process)
-* Release tags must stay plain integers equal to `versionCode`
-  (`v5`, `v6`, …) — the updater parses the tag with `v?(\d+)`, so the
-  `v1.1` tag read as `1` and installed v1.0 apps reported "up to date".
-  Retagged as `v5`; rule documented in `scripts/publish_apk.ps1`.
-
-### Changed (app, same v1.1)
-* **LOAD reuses an already-loaded hidden driver** instead of failing with
-  `File exists` — the 3.2+ driver unlinks from `lsmod` on load, so a
-  second LOAD ran `insmod` into failure. The app now checks
-  `/sys/class/dmsync*` first and reuses the resident driver.
-* **Status shows LOADED BUT HIDDEN** when the module is live but invisible
-  in `lsmod` (new `hiddenLoaded` state, also set by refresh).
+* **Release-tag rule enforced.** The first `v1.1` tag parsed as `1`, so
+  installed v1.0 apps reported "up to date". Retagged as `v5` and
+  documented in `scripts/publish_apk.ps1`.
 
 ## [1.0] - 2026-10-11
 
@@ -317,21 +304,6 @@ semantic-ish version tags (`<major>.<minor>-<flavour>`).
 ### Fixed
 * Crash on reopening the app after it was backgrounded (libsu main shell was
   already created).
-
----
-
-## [Unreleased] — fast 4.9.337 drivers (no APK change)
-
-### Changed
-* **RT + QX 4.9.337 drivers use a cheaper read/write path.** Each page used
-  `ioremap` + `iounmap` (page-table alloc plus TLB-shootdown IPIs to every
-  CPU, thousands of times per second under an ESP loop) plus a `printk` on
-  every open. Reads and writes now go through `kmap_atomic` with a small
-  bounce buffer, and the per-open log is gone; create/remove logs stay. Same
-  structs, ioctls, return codes, node logic and skip-unmapped-page behavior.
-* Built against the current tree (`MODVERSIONS=n`).
-* 2026-10-05: rebuilt for kernel #8 (`MODVERSIONS=y`, CRC `0xc3cf050d`); same
-  fast path, no source change.
 
 ---
 
