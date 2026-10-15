@@ -82,7 +82,7 @@ if ($LASTEXITCODE -eq 0) {
 
 Write-Host ""
 Write-Host "Release published. Verifying..." -ForegroundColor Green
-& gh release view $Tag --repo $Repo --json tagName,name,isLatest,assets --jq '{tag: .tagName, title: .name, latest: .isLatest, assets: [.assets[].name]}'
+& gh release view $Tag --repo $Repo --json tagName,name,assets --jq '{tag: .tagName, title: .name, assets: [.assets[].name]}'
 Write-Host ""
 Write-Host "Latest API:" -ForegroundColor Green
 & gh api ("repos/{0}/releases/latest" -f $Repo) --jq '{tag: .tag_name, assets: [.assets[].name]}'
