@@ -169,13 +169,17 @@ class DriverViewModel : ViewModel() {
     fun setLoadedModule(name: String) {
         if (loadedModuleName.value != name) loadedModuleName.value = name
         driverLoaded.value = name.isNotBlank()
+        if (name.isNotBlank()) hiddenLoaded.value = false
     }
 
     fun markHiddenLoaded() {
         loadedModuleName.value = ""
         driverModule.value = ""
         driverLoaded.value = true
+        hiddenLoaded.value = true
     }
+
+    var hiddenLoaded = mutableStateOf(false)
 
     var appUpdate = mutableStateOf<AppUpdateChecker.UpdateInfo?>(null)
     var updateStatus = mutableStateOf("IDLE")     
@@ -1041,7 +1045,14 @@ class DriverViewModel : ViewModel() {
             val loaded = SafetyGuard.loadedModuleNames()
             val hit = knownDriverModules().filter { it in loaded }
             val nodePresent = Shell.cmd("test -e /dev/${preferredDevNode()} 2>/dev/null").exec().isSuccess
-            if (hit.isNotEmpty()) setLoadedModule(hit.first()) else setLoadedModule("")
+            if (hit.isNotEmpty()) {
+                setLoadedModule(hit.first())
+            } else if (nodePresent || SafetyGuard.hiddenDriverClass() != null) {
+                markHiddenLoaded()
+            } else {
+                setLoadedModule("")
+                hiddenLoaded.value = false
+            }
             driverLoaded.value = hit.isNotEmpty() || nodePresent
             driverModule.value = hit.joinToString(", ")
         }

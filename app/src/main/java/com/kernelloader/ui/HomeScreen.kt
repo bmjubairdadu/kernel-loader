@@ -169,6 +169,7 @@ fun HomeScreen(
     val updateProgress = viewModel.updateProgress.value
     val appUpdate = viewModel.appUpdate.value
     val loaded = viewModel.driverLoaded.value
+    val hidden = viewModel.hiddenLoaded.value
     val loadedModule = viewModel.driverModule.value.ifBlank { viewModel.loadedModuleName.value }
 
     LaunchedEffect(Unit) {
@@ -524,7 +525,9 @@ fun HomeScreen(
                     Spacer(Modifier.width(10.dp))
                     Column(Modifier.weight(1f)) {
                         Text(
-                            text = if (loaded) "LOADED · $loadedModule" else "NOT LOADED",
+                            text = if (loaded) {
+                                if (hidden) "LOADED BUT HIDDEN" else "LOADED · $loadedModule"
+                            } else "NOT LOADED",
                             style = MonoSmall,
                             color = if (loaded) StatusOk else TextSecondary
                         )

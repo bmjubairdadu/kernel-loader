@@ -6,16 +6,6 @@ semantic-ish version tags (`<major>.<minor>-<flavour>`).
 
 ---
 
-## [1.2] - 2026-10-15 (versionCode 6, tag v6)
-
-### Fixed
-* **LOAD no longer fails when the hidden driver is already resident.**
-  The 3.2+ driver unlinks from `lsmod` on load, so a second LOAD ran
-  `insmod` into `File exists` and reported failure even though a working
-  driver was live. The app now checks `/sys/class/dmsync*` first and
-  reuses the resident driver (node verified, same as a fresh load); the
-  built-in loader treats `File exists` as already-loaded too.
-
 ## [1.1] - 2026-10-15 (versionCode 5, tag v5)
 
 > **Stealth release.** The driver now hides one-way on load (list +
@@ -60,6 +50,14 @@ semantic-ish version tags (`<major>.<minor>-<flavour>`).
   (`v5`, `v6`, …) — the updater parses the tag with `v?(\d+)`, so the
   `v1.1` tag read as `1` and installed v1.0 apps reported "up to date".
   Retagged as `v5`; rule documented in `scripts/publish_apk.ps1`.
+
+### Changed (app, same v1.1)
+* **LOAD reuses an already-loaded hidden driver** instead of failing with
+  `File exists` — the 3.2+ driver unlinks from `lsmod` on load, so a
+  second LOAD ran `insmod` into failure. The app now checks
+  `/sys/class/dmsync*` first and reuses the resident driver.
+* **Status shows LOADED BUT HIDDEN** when the module is live but invisible
+  in `lsmod` (new `hiddenLoaded` state, also set by refresh).
 
 ## [1.0] - 2026-10-11
 
