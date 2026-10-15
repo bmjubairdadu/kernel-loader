@@ -349,6 +349,25 @@ static inline int kmem_write_process(pid_t pid, uintptr_t addr,
 	return kmem_rw_process(pid, addr, buf, size, 1);
 }
 
+static int kmem_rw_locked(struct task_struct *task, struct mm_struct *mm,
+			    uintptr_t addr, char *kbuf, size_t size, int is_write)
+{
+	size_t done = 0;
+
+	while (done < size) {
+		uintptr_t cur = addr + done;
+		size_t chunk = PAGE_SIZE - (cur & (PAGE_SIZE - 1));
+
+		if (chunk > size - done)
+			chunk = size - done;
+		if (!kmem_copy_user_page(task, mm, cur, kbuf + done, chunk,
+					 is_write))
+			break;
+		done += chunk;
+	}
+	return (done == size) ? 0 : -EIO;
+}
+
 static int kmem_batch_u32_locked(struct task_struct *task, struct mm_struct *mm,
 				 const __u64 *addr, __u32 *out, __u32 count)
 {
@@ -365,11 +384,18 @@ static int kmem_batch_u32_locked(struct task_struct *task, struct mm_struct *mm,
 			continue;
 		}
 
-		if (kmem_copy_user_page(task, mm, va, (char *)&val, sizeof(val), 0) == sizeof(val)) {
-			out[i] = val;
-		} else {
+		if (((va & (PAGE_SIZE - 1)) + sizeof(val)) <= PAGE_SIZE) {
+			if (kmem_copy_user_page(task, mm, va, (char *)&val, sizeof(val), 0) == sizeof(val)) {
+				out[i] = val;
+			} else {
+				out[i] = 0;
+				all_ok = 0;
+			}
+		} else if (kmem_rw_locked(task, mm, va, (char *)&val, sizeof(val), 0)) {
 			out[i] = 0;
 			all_ok = 0;
+		} else {
+			out[i] = val;
 		}
 	}
 	return all_ok ? 0 : -EIO;
@@ -401,22 +427,6 @@ static int kmem_batch_read_u32(kmem_batch_u32_t *b)
 	mmput(mm);
 	put_task_struct(task);
 	return rc;
-}
-
-static inline const char *kmem_strcasestr(const char *h, const char *n)
-{
-	size_t nlen;
-
-	if (!h || !n)
-		return NULL;
-	nlen = strlen(n);
-	if (!nlen)
-		return h;
-	for (; *h; h++) {
-		if (strncasecmp(h, n, nlen) == 0)
-			return h;
-	}
-	return NULL;
 }
 
 static uintptr_t kmem_get_modbase(pid_t pid, const char *name)
@@ -454,8 +464,7 @@ static uintptr_t kmem_get_modbase(pid_t pid, const char *name)
 		if (vma->vm_file && vma->vm_file->f_path.dentry) {
 			const unsigned char *dname = vma->vm_file->f_path.dentry->d_name.name;
 			if (dname) {
-				if (!strcasecmp((const char *)dname, base) ||
-				    kmem_strcasestr((const char *)dname, base)) {
+				if (!strcasecmp((const char *)dname, base)) {
 					found = vma->vm_start;
 					break;
 				}

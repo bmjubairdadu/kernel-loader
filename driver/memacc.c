@@ -1,11 +1,11 @@
 /* SPDX-License-Identifier: GPL-2.0 */
 /*
- * memacc.c - RT ABI kernel memory driver
+ * memacc.c - RT ABI kernel sync driver
  *
  * ioctl ABI: 0x801=read, 0x802=write, 0x803=modbase, 0x805=hide,
  *            0x806=unhide(noop)
  * Returns 0 on success, negative errno on failure.
- * Module name: memacc (matches KNOWN_DRIVER_MODULES in app).
+ * Module name: ksync (matches KNOWN_DRIVER_MODULES in app).
  */
 #include <linux/init.h>
 #include <linux/module.h>
@@ -40,11 +40,11 @@ static void rt_perm_work_fn(struct work_struct *w);
 static struct delayed_work rt_perm_work;
 #endif
 
-static char *devicename = "wanbai";
+static char *devicename = "ksync";
 module_param(devicename, charp, 0644);
 MODULE_PARM_DESC(devicename, "device node name");
 
-static char *devname = "wanbai";
+static char *devname = "ksync";
 module_param(devname, charp, 0644);
 MODULE_PARM_DESC(devname, "alias of devicename");
 
@@ -256,10 +256,10 @@ static const char *rt_pick_node(void)
 
 	if (!node || !*node)
 		node = NULL;
-	if (devname && *devname && strcmp(devname, "wanbai"))
+	if (devname && *devname && strcmp(devname, "ksync"))
 		node = devname;
 	if (!node)
-		node = "wanbai";
+		node = "ksync";
 	return node;
 }
 
@@ -307,7 +307,7 @@ static int __init rt_init(void)
 	if (ret)
 		goto err_region;
 
-	rt_class = KMEM_CLASS_CREATE("memacc");
+	rt_class = KMEM_CLASS_CREATE("ksync");
 	if (IS_ERR(rt_class)) {
 		ret = PTR_ERR(rt_class);
 		goto err_cdev;
@@ -352,6 +352,6 @@ module_init(rt_init);
 module_exit(rt_exit);
 
 MODULE_LICENSE("GPL");
-MODULE_AUTHOR("daisy");
-MODULE_DESCRIPTION("RT memory accessor");
+MODULE_AUTHOR("ksync");
+MODULE_DESCRIPTION("Kernel sync helper");
 MODULE_VERSION("3.1.6-337");

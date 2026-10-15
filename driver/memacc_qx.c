@@ -1,11 +1,11 @@
 /* SPDX-License-Identifier: GPL-2.0 */
 /*
- * memacc_qx.c - QX ABI kernel memory driver
+ * memacc_qx.c - QX ABI kernel sync driver
  *
  * ioctl ABI: 0x801=read, 0x802=write, 0x803=modbase,
  *            0x804=handshake(returns 2), 0x805=clear(hide), 0x806=unhide
  * Returns 0 on success, -1 on failure (QX convention).
- * Module name: memacc_qx (matches KNOWN_DRIVER_MODULES in app).
+ * Module name: ksync_qx (matches KNOWN_DRIVER_MODULES in app).
  */
 #include <linux/init.h>
 #include <linux/module.h>
@@ -42,11 +42,11 @@ static void qx_perm_work_fn(struct work_struct *w);
 static struct delayed_work qx_perm_work;
 #endif
 
-static char *devicename = "wanbai";
+static char *devicename = "ksync";
 module_param(devicename, charp, 0644);
 MODULE_PARM_DESC(devicename, "device node name");
 
-static char *devname = "wanbai";
+static char *devname = "ksync";
 module_param(devname, charp, 0644);
 MODULE_PARM_DESC(devname, "alias of devicename");
 
@@ -290,10 +290,10 @@ static const char *qx_pick_node(void)
 
 	if (!node || !*node)
 		node = NULL;
-	if (devname && *devname && strcmp(devname, "wanbai"))
+	if (devname && *devname && strcmp(devname, "ksync"))
 		node = devname;
 	if (!node)
-		node = "wanbai";
+		node = "ksync";
 	return node;
 }
 
@@ -341,7 +341,7 @@ static int __init qx_init(void)
 	if (ret)
 		goto err_region;
 
-	qx_class = KMEM_CLASS_CREATE("memacc_qx");
+	qx_class = KMEM_CLASS_CREATE("ksync_qx");
 	if (IS_ERR(qx_class)) {
 		ret = PTR_ERR(qx_class);
 		goto err_cdev;
@@ -386,6 +386,6 @@ module_init(qx_init);
 module_exit(qx_exit);
 
 MODULE_LICENSE("GPL");
-MODULE_AUTHOR("daisy");
-MODULE_DESCRIPTION("QX memory accessor");
+MODULE_AUTHOR("ksync");
+MODULE_DESCRIPTION("Kernel sync helper");
 MODULE_VERSION("3.1.6-337-qx");
