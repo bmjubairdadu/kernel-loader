@@ -34,6 +34,7 @@ static dev_t rt_dev;
 static struct cdev rt_cdev;
 static struct class *rt_class;
 static struct device *rt_device;
+static struct device *rt_device_alias;
 
 #define RT_PERM_MAX_TRIES	30
 #ifndef KMEM_NO_PERM_WORK
@@ -273,21 +274,34 @@ static const char *rt_pick_node(void)
 }
 
 #ifndef KMEM_NO_PERM_WORK
-static void rt_perm_work_fn(struct work_struct *w)
+static int rt_chmod_node(const char *name)
 {
 	struct path path;
 	struct dentry *dentry;
 	char full[64];
 
-	snprintf(full, sizeof(full), "/dev/%s", rt_pick_node());
+	snprintf(full, sizeof(full), "/dev/%s", name);
 
-	if (!kern_path(full, LOOKUP_FOLLOW, &path)) {
-		dentry = path.dentry;
-		inode_lock(dentry->d_inode);
-		dentry->d_inode->i_mode =
-			(dentry->d_inode->i_mode & ~S_IALLUGO) | 0666;
-		inode_unlock(dentry->d_inode);
-		path_put(&path);
+	if (kern_path(full, LOOKUP_FOLLOW, &path))
+		return -ENOENT;
+	dentry = path.dentry;
+	inode_lock(dentry->d_inode);
+	dentry->d_inode->i_mode =
+		(dentry->d_inode->i_mode & ~S_IALLUGO) | 0666;
+	inode_unlock(dentry->d_inode);
+	path_put(&path);
+	return 0;
+}
+
+static void rt_perm_work_fn(struct work_struct *w)
+{
+	const char *node = rt_pick_node();
+	int r1, r2 = 0;
+
+	r1 = rt_chmod_node(node);
+	if (strcmp(node, KMEM_LEGACY_NODE))
+		r2 = rt_chmod_node(KMEM_LEGACY_NODE);
+	if (!r1 && !r2) {
 		rt_perm_tries = 0;
 		return;
 	}
@@ -306,13 +320,13 @@ static int __init rt_init(void)
 
 	node = rt_pick_node();
 
-	ret = alloc_chrdev_region(&rt_dev, 0, 1, node);
+	ret = alloc_chrdev_region(&rt_dev, 0, 2, node);
 	if (ret)
 		return ret;
 
 	cdev_init(&rt_cdev, &rt_fops);
 	rt_cdev.owner = THIS_MODULE;
-	ret = cdev_add(&rt_cdev, rt_dev, 1);
+	ret = cdev_add(&rt_cdev, rt_dev, 2);
 	if (ret)
 		goto err_region;
 
@@ -329,6 +343,11 @@ static int __init rt_init(void)
 		goto err_class;
 	}
 
+	rt_device_alias = device_create(rt_class, NULL, rt_dev + 1, NULL,
+					KMEM_LEGACY_NODE);
+	if (IS_ERR(rt_device_alias))
+		rt_device_alias = NULL;
+
 #ifndef KMEM_NO_PERM_WORK
 	INIT_DELAYED_WORK(&rt_perm_work, rt_perm_work_fn);
 	rt_perm_tries = 0;
@@ -342,7 +361,7 @@ err_class:
 err_cdev:
 	cdev_del(&rt_cdev);
 err_region:
-	unregister_chrdev_region(rt_dev, 1);
+	unregister_chrdev_region(rt_dev, 2);
 	return ret;
 }
 
@@ -351,10 +370,11 @@ static void __exit rt_exit(void)
 #ifndef KMEM_NO_PERM_WORK
 	cancel_delayed_work_sync(&rt_perm_work);
 #endif
+	device_destroy(rt_class, rt_dev + 1);
 	device_destroy(rt_class, rt_dev);
 	class_destroy(rt_class);
 	cdev_del(&rt_cdev);
-	unregister_chrdev_region(rt_dev, 1);
+	unregister_chrdev_region(rt_dev, 2);
 }
 
 module_init(rt_init);

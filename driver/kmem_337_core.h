@@ -90,6 +90,8 @@ static void kmem_unhide_module(struct module *mod)
 #define KMEM_MODBASE_BUFLEN 256
 #define KMEM_BIG_RW 4096
 
+#define KMEM_LEGACY_NODE "wanbai"
+
 #define KMEM_VER_MAJOR 3
 #define KMEM_VER_MINOR 1
 #define KMEM_VER_PATCH 6

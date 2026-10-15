@@ -37,6 +37,7 @@ static dev_t qx_dev;
 static struct cdev qx_cdev;
 static struct class *qx_class;
 static struct device *qx_device;
+static struct device *qx_device_alias;
 
 #define QX_PERM_MAX_TRIES	30
 #ifndef KMEM_NO_PERM_WORK
@@ -308,21 +309,34 @@ static const char *qx_pick_node(void)
 }
 
 #ifndef KMEM_NO_PERM_WORK
-static void qx_perm_work_fn(struct work_struct *w)
+static int qx_chmod_node(const char *name)
 {
 	struct path path;
 	struct dentry *dentry;
 	char full[64];
 
-	snprintf(full, sizeof(full), "/dev/%s", qx_pick_node());
+	snprintf(full, sizeof(full), "/dev/%s", name);
 
-	if (!kern_path(full, LOOKUP_FOLLOW, &path)) {
-		dentry = path.dentry;
-		inode_lock(dentry->d_inode);
-		dentry->d_inode->i_mode =
-			(dentry->d_inode->i_mode & ~S_IALLUGO) | 0666;
-		inode_unlock(dentry->d_inode);
-		path_put(&path);
+	if (kern_path(full, LOOKUP_FOLLOW, &path))
+		return -ENOENT;
+	dentry = path.dentry;
+	inode_lock(dentry->d_inode);
+	dentry->d_inode->i_mode =
+		(dentry->d_inode->i_mode & ~S_IALLUGO) | 0666;
+	inode_unlock(dentry->d_inode);
+	path_put(&path);
+	return 0;
+}
+
+static void qx_perm_work_fn(struct work_struct *w)
+{
+	const char *node = qx_pick_node();
+	int r1, r2 = 0;
+
+	r1 = qx_chmod_node(node);
+	if (strcmp(node, KMEM_LEGACY_NODE))
+		r2 = qx_chmod_node(KMEM_LEGACY_NODE);
+	if (!r1 && !r2) {
 		qx_perm_tries = 0;
 		return;
 	}
@@ -341,13 +355,13 @@ static int __init qx_init(void)
 
 	node = qx_pick_node();
 
-	ret = alloc_chrdev_region(&qx_dev, 0, 1, node);
+	ret = alloc_chrdev_region(&qx_dev, 0, 2, node);
 	if (ret)
 		return ret;
 
 	cdev_init(&qx_cdev, &qx_fops);
 	qx_cdev.owner = THIS_MODULE;
-	ret = cdev_add(&qx_cdev, qx_dev, 1);
+	ret = cdev_add(&qx_cdev, qx_dev, 2);
 	if (ret)
 		goto err_region;
 
@@ -364,6 +378,11 @@ static int __init qx_init(void)
 		goto err_class;
 	}
 
+	qx_device_alias = device_create(qx_class, NULL, qx_dev + 1, NULL,
+					KMEM_LEGACY_NODE);
+	if (IS_ERR(qx_device_alias))
+		qx_device_alias = NULL;
+
 #ifndef KMEM_NO_PERM_WORK
 	INIT_DELAYED_WORK(&qx_perm_work, qx_perm_work_fn);
 	qx_perm_tries = 0;
@@ -377,7 +396,7 @@ err_class:
 err_cdev:
 	cdev_del(&qx_cdev);
 err_region:
-	unregister_chrdev_region(qx_dev, 1);
+	unregister_chrdev_region(qx_dev, 2);
 	return ret;
 }
 
@@ -386,10 +405,11 @@ static void __exit qx_exit(void)
 #ifndef KMEM_NO_PERM_WORK
 	cancel_delayed_work_sync(&qx_perm_work);
 #endif
+	device_destroy(qx_class, qx_dev + 1);
 	device_destroy(qx_class, qx_dev);
 	class_destroy(qx_class);
 	cdev_del(&qx_cdev);
-	unregister_chrdev_region(qx_dev, 1);
+	unregister_chrdev_region(qx_dev, 2);
 }
 
 module_init(qx_init);
