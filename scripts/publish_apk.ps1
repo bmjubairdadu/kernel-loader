@@ -69,7 +69,10 @@ if ([string]::IsNullOrWhiteSpace($Notes)) {
     $Notes = "Kernel Loader $Tag. OTA kernel loader with the RT → QX → built-in load pipeline and one-tap build reports."
 }
 
-$existing = & gh release view $Tag --repo $Repo --json tagName 2>$null
+# PS 5.1 + $ErrorActionPreference='Stop' turns the stderr of a missing
+# release into a terminating NativeCommandError - swallow it here.
+$existing = $null
+try { $existing = & gh release view $Tag --repo $Repo --json tagName 2>$null } catch { $existing = $null }
 if ($LASTEXITCODE -eq 0) {
     Write-Host "Release $Tag already exists - uploading asset (clobber)..."
     & gh release upload $Tag $assetPath --repo $Repo --clobber
