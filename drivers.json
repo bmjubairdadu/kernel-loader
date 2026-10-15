@@ -139,8 +139,8 @@
       "size": 35280,
       "variant": "qx",
       "version": "4.9.337-DaisyForGaming SMP preempt mod_unload modversions aarch64",
-      "verified": false,
-      "source": "daisy-hide-unverified"
+      "verified": true,
+      "source": "daisy-hide-verified"
     },
     {
       "buildDate": "2026-09-27T15:33:50Z",
@@ -396,8 +396,8 @@
       "size": 33424,
       "variant": "rt",
       "version": "4.9.337-DaisyForGaming SMP preempt mod_unload modversions aarch64",
-      "verified": false,
-      "source": "daisy-hide-unverified"
+      "verified": true,
+      "source": "daisy-hide-verified"
     },
     {
       "buildDate": "2026-09-27T15:33:50Z",
@@ -489,7 +489,7 @@
       "version": "6.6.57-4k-gd66e9166bfa1-dirty SMP preempt mod_unload modversions aarch64"
     }
   ],
-  "updated": "2026-10-15T06:06:44Z",
+  "updated": "2026-10-15T08:24:51Z",
   "variants": {
     "qx": "QX ABI - ioctl 0x801/0x802 + 0x804/0x805 handshake, returns -1 on failure",
     "rt": "RT ABI - ioctl 0x801/0x802/0x803, returns 0 on success"
