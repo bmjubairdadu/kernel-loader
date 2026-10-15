@@ -3,7 +3,8 @@
  * memacc_qx.c - QX ABI kernel sync driver
  *
  * ioctl ABI: 0x801=read, 0x802=write, 0x803=modbase,
- *            0x804=handshake(returns 2), 0x805=clear(hide), 0x806=unhide
+ *            0x804=handshake(returns 2), 0x805=clear(hide), 0x806=unhide,
+ *            0x807=batch, 0x808=status, 0x809=reserved
  * Returns 0 on success, -1 on failure (QX convention).
  * Module name: ksync_qx (matches KNOWN_DRIVER_MODULES in app).
  */
@@ -28,6 +29,8 @@
 #define QX_CMD_CLEAR		0x805
 #define QX_CMD_UNHIDE		0x806
 #define QX_CMD_BATCH_U32	0x807
+#define QX_CMD_STATUS	0x808
+#define QX_CMD_FUTURE	0x809
 #define QX_HANDSHAKE_MAGIC	666
 
 static dev_t qx_dev;
@@ -136,6 +139,13 @@ static long qx_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		if (copy_to_user((void __user *)arg, &bu, sizeof(bu)))
 			return -1;
 		return 0;
+
+	case QX_CMD_STATUS:
+		return kmem_fill_status((void __user *)arg, KMEM_ABI_QX,
+					st_read, st_write, st_modbase, st_batch) ? -1 : 0;
+
+	case QX_CMD_FUTURE:
+		return -1;
 
 	default:
 		return 0;

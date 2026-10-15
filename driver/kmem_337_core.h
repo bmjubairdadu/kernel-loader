@@ -90,6 +90,48 @@ static void kmem_unhide_module(struct module *mod)
 #define KMEM_MODBASE_BUFLEN 256
 #define KMEM_BIG_RW 4096
 
+#define KMEM_VER_MAJOR 3
+#define KMEM_VER_MINOR 1
+#define KMEM_VER_PATCH 6
+#define KMEM_ABI_RT 1
+#define KMEM_ABI_QX 2
+
+typedef struct {
+	__u32	ver_major;
+	__u32	ver_minor;
+	__u32	ver_patch;
+	__u32	abi_id;
+	__u32	hidden;
+	__u32	reserved;
+	unsigned long cnt_read;
+	unsigned long cnt_write;
+	unsigned long cnt_modbase;
+	unsigned long cnt_batch;
+} kmem_status_t;
+
+static inline int kmem_fill_status(void __user *uarg, int abi,
+				   unsigned long r, unsigned long w,
+				   unsigned long m, unsigned long b)
+{
+	kmem_status_t st;
+
+	if (!uarg)
+		return -EFAULT;
+	st.ver_major = KMEM_VER_MAJOR;
+	st.ver_minor = KMEM_VER_MINOR;
+	st.ver_patch = KMEM_VER_PATCH;
+	st.abi_id = (__u32)abi;
+	st.hidden = (unsigned int)kmem_hidden;
+	st.reserved = 0;
+	st.cnt_read = r;
+	st.cnt_write = w;
+	st.cnt_modbase = m;
+	st.cnt_batch = b;
+	if (copy_to_user(uarg, &st, sizeof(st)))
+		return -EFAULT;
+	return 0;
+}
+
 typedef struct {
 	pid_t		pid;
 	uintptr_t	addr;

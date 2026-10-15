@@ -3,7 +3,7 @@
  * memacc.c - RT ABI kernel sync driver
  *
  * ioctl ABI: 0x801=read, 0x802=write, 0x803=modbase, 0x805=hide,
- *            0x806=unhide(noop)
+ *            0x806=unhide, 0x807=batch, 0x808=status, 0x809=reserved
  * Returns 0 on success, negative errno on failure.
  * Module name: ksync (matches KNOWN_DRIVER_MODULES in app).
  */
@@ -26,6 +26,8 @@
 #define CMD_MOD_BASE	0x803
 #define CMD_UNHIDE	0x806
 #define CMD_HIDE	0x805
+#define CMD_STATUS	0x808
+#define CMD_FUTURE	0x809
 #define CMD_BATCH_U32	0x807
 
 static dev_t rt_dev;
@@ -121,6 +123,13 @@ static long rt_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		if (copy_to_user((void __user *)arg, &bu, sizeof(bu)))
 			return -EFAULT;
 		return ret ? -EIO : 0;
+
+	case CMD_STATUS:
+		return kmem_fill_status((void __user *)arg, KMEM_ABI_RT,
+					st_read, st_write, st_modbase, st_batch);
+
+	case CMD_FUTURE:
+		return -ENOTTY;
 
 	default:
 		return -EINVAL;
