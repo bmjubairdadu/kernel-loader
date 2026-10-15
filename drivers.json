@@ -135,12 +135,12 @@
       "buildDate": "2026-10-15",
       "file": "qx_4.9.337-DaisyForGaming.ko",
       "label": "4.9.337-DaisyForGaming",
-      "sha256": "f43b00bdc8389826e21943b4e27200f3eaa4706b46f96f7f39d10e0a1c5ec5c9",
-      "size": 34664,
+      "sha256": "fbd0be30ef8ef73b73c988190b6b1b8aa7c64fdff43c296586e391b17f8b14e7",
+      "size": 34416,
       "variant": "qx",
       "version": "4.9.337-DaisyForGaming SMP preempt mod_unload modversions aarch64",
       "verified": true,
-      "source": "daisy-hide-v3-verified"
+      "source": "daisy-ksync-verified"
     },
     {
       "buildDate": "2026-09-27T15:33:50Z",
@@ -392,12 +392,12 @@
       "buildDate": "2026-10-15",
       "file": "rt_4.9.337-DaisyForGaming.ko",
       "label": "4.9.337-DaisyForGaming",
-      "sha256": "8f9ad2da13fcecaa0058db96a6f01b822142e2b8c17e4b3d347c180a7dcdbd3d",
-      "size": 32832,
+      "sha256": "1e789041fe376652f227ce321d17053ccc487be98c7237f0073c3eb9cd000ac6",
+      "size": 32592,
       "variant": "rt",
       "version": "4.9.337-DaisyForGaming SMP preempt mod_unload modversions aarch64",
       "verified": true,
-      "source": "daisy-hide-v3-verified"
+      "source": "daisy-ksync-verified"
     },
     {
       "buildDate": "2026-09-27T15:33:50Z",
@@ -489,7 +489,7 @@
       "version": "6.6.57-4k-gd66e9166bfa1-dirty SMP preempt mod_unload modversions aarch64"
     }
   ],
-  "updated": "2026-10-15T09:00:08Z",
+  "updated": "2026-10-15T09:33:55Z",
   "variants": {
     "qx": "QX ABI - ioctl 0x801/0x802 + 0x804/0x805 handshake, returns -1 on failure",
     "rt": "RT ABI - ioctl 0x801/0x802/0x803, returns 0 on success"
