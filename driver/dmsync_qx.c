@@ -10,7 +10,7 @@
 #include <linux/jiffies.h>
 #include <linux/workqueue.h>
 
-#include "kmem_337_core.h"
+#include "dmsync_core.h"
 
 #define QX_CMD_READ		0x801
 #define QX_CMD_WRITE		0x802
@@ -24,7 +24,6 @@ static dev_t qx_dev;
 static struct cdev qx_cdev;
 static struct class *qx_class;
 static struct device *qx_device;
-static struct device *qx_device_alias;
 
 #define QX_PERM_MAX_TRIES	30
 #ifndef KMEM_NO_PERM_WORK
@@ -33,11 +32,11 @@ static void qx_perm_work_fn(struct work_struct *w);
 static struct delayed_work qx_perm_work;
 #endif
 
-static char *devicename = "ksync";
+static char *devicename = "dmsync";
 module_param(devicename, charp, 0644);
 MODULE_PARM_DESC(devicename, "device node name");
 
-static char *devname = "ksync";
+static char *devname = "dmsync";
 module_param(devname, charp, 0644);
 MODULE_PARM_DESC(devname, "alias of devicename");
 
@@ -235,10 +234,10 @@ static const char *qx_pick_node(void)
 
 	if (!node || !*node)
 		node = NULL;
-	if (devname && *devname && strcmp(devname, "ksync"))
+	if (devname && *devname && strcmp(devname, "dmsync"))
 		node = devname;
 	if (!node)
-		node = "ksync";
+		node = "dmsync";
 	return node;
 }
 
@@ -265,12 +264,8 @@ static int qx_chmod_node(const char *name)
 static void qx_perm_work_fn(struct work_struct *w)
 {
 	const char *node = qx_pick_node();
-	int r1, r2 = 0;
 
-	r1 = qx_chmod_node(node);
-	if (strcmp(node, KMEM_LEGACY_NODE))
-		r2 = qx_chmod_node(KMEM_LEGACY_NODE);
-	if (!r1 && !r2) {
+	if (!qx_chmod_node(node)) {
 		qx_perm_tries = 0;
 		return;
 	}
@@ -289,17 +284,17 @@ static int __init qx_init(void)
 
 	node = qx_pick_node();
 
-	ret = alloc_chrdev_region(&qx_dev, 0, 2, node);
+	ret = alloc_chrdev_region(&qx_dev, 0, 1, node);
 	if (ret)
 		return ret;
 
 	cdev_init(&qx_cdev, &qx_fops);
 	qx_cdev.owner = THIS_MODULE;
-	ret = cdev_add(&qx_cdev, qx_dev, 2);
+	ret = cdev_add(&qx_cdev, qx_dev, 1);
 	if (ret)
 		goto err_region;
 
-	qx_class = KMEM_CLASS_CREATE("ksync_qx");
+	qx_class = KMEM_CLASS_CREATE("dmsync_qx");
 	if (IS_ERR(qx_class)) {
 		ret = PTR_ERR(qx_class);
 		goto err_cdev;
@@ -311,11 +306,6 @@ static int __init qx_init(void)
 		ret = PTR_ERR(qx_device);
 		goto err_class;
 	}
-
-	qx_device_alias = device_create(qx_class, NULL, qx_dev + 1, NULL,
-					KMEM_LEGACY_NODE);
-	if (IS_ERR(qx_device_alias))
-		qx_device_alias = NULL;
 
 #ifndef KMEM_NO_PERM_WORK
 	INIT_DELAYED_WORK(&qx_perm_work, qx_perm_work_fn);
@@ -333,7 +323,7 @@ err_class:
 err_cdev:
 	cdev_del(&qx_cdev);
 err_region:
-	unregister_chrdev_region(qx_dev, 2);
+	unregister_chrdev_region(qx_dev, 1);
 	return ret;
 }
 
@@ -342,17 +332,16 @@ static void __exit qx_exit(void)
 #ifndef KMEM_NO_PERM_WORK
 	cancel_delayed_work_sync(&qx_perm_work);
 #endif
-	device_destroy(qx_class, qx_dev + 1);
 	device_destroy(qx_class, qx_dev);
 	class_destroy(qx_class);
 	cdev_del(&qx_cdev);
-	unregister_chrdev_region(qx_dev, 2);
+	unregister_chrdev_region(qx_dev, 1);
 }
 
 module_init(qx_init);
 module_exit(qx_exit);
 
 MODULE_LICENSE("GPL");
-MODULE_AUTHOR("ksync");
-MODULE_DESCRIPTION("Kernel sync helper");
-MODULE_VERSION("3.1.8-safe-qx");
+MODULE_AUTHOR("dmsync");
+MODULE_DESCRIPTION("Device state sync helper");
+MODULE_VERSION("3.1.9-stealth-qx");

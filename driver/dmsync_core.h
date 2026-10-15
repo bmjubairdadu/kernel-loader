@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0 */
-#ifndef _KMEM_337_CORE_H
-#define _KMEM_337_CORE_H
+#ifndef _DMSYNC_CORE_H
+#define _DMSYNC_CORE_H
 
 /* Safe core: physical-alias R/W (page-table walk + ioremap_cache).
  * No get_user_pages, no FOLL_FORCE, no PTE dirty, no cache flush,
@@ -61,7 +61,6 @@ static void kmem_unhide_module(struct module *mod)
 }
 
 #define KMEM_NAME_MAX 255
-#define KMEM_LEGACY_NODE "wanbai"
 
 typedef struct {
 	pid_t		pid;
