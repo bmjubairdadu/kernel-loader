@@ -145,7 +145,7 @@ object DeviceReportCollector {
         }
 
         val dmesgTail = cmdOut(
-            "dmesg 2>/dev/null | grep -iE 'insmod|module|vermagic|kmem|kloader|entryi|daisy|wanbai|symbol' | tail -n 20"
+            "dmesg 2>/dev/null | grep -iE 'insmod|module|vermagic|version magic|disagrees|Unknown symbol|format error|taint|kmem|kloader|entryi|daisy|wanbai|dmsync|symbol' | tail -n 20"
         )
             .lines()
             .map { it.trim() }

@@ -267,8 +267,11 @@ class DriverViewModel : ViewModel() {
         }
     }
 
+    // SimpleDateFormat is not thread-safe and these are reached from both the
+    // main thread and IO (load/verify paths) - serialize every format call
     private val dateFormat = SimpleDateFormat("HH:mm:ss.SSS", Locale.getDefault())
     private val timeFormat = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
+    private fun stamp(f: SimpleDateFormat): String = synchronized(f) { f.format(Date()) }
 
     companion object {
         private const val MAX_TERMINAL_LINES = 1200
@@ -279,7 +282,7 @@ class DriverViewModel : ViewModel() {
     fun tlog(text: String, type: String = "INFO", variant: String? = null) {
         val v = variant ?: activePipelineVariant.value
         viewModelScope.launch(Dispatchers.Main) {
-            terminalLines.add(TerminalLine(timeFormat.format(Date()), text, type, v))
+            terminalLines.add(TerminalLine(stamp(timeFormat), text, type, v))
             trimTerminal()
         }
     }
@@ -321,7 +324,7 @@ class DriverViewModel : ViewModel() {
 
     fun clearTerminal() { terminalLines.clear() }
 
-    fun nowString(): String = dateFormat.format(Date())
+    fun nowString(): String = stamp(dateFormat)
 
     fun setVerification(result: VerificationResult) {
         viewModelScope.launch(Dispatchers.Main) { verificationResult.value = result }
@@ -357,9 +360,9 @@ class DriverViewModel : ViewModel() {
                 try {
                     val res = Shell.cmd(c).exec()
                     withContext(Dispatchers.Main) {
-                        res.out.forEach { if (it.isNotBlank()) terminalLines.add(TerminalLine(timeFormat.format(Date()), it, "OUT")) }
-                        res.err.forEach { terminalLines.add(TerminalLine(timeFormat.format(Date()), it, "ERR")) }
-                        terminalLines.add(TerminalLine(timeFormat.format(Date()), "exit ${res.code}", if (res.isSuccess) "OK" else "ERR"))
+                        res.out.forEach { if (it.isNotBlank()) terminalLines.add(TerminalLine(stamp(timeFormat), it, "OUT")) }
+                        res.err.forEach { terminalLines.add(TerminalLine(stamp(timeFormat), it, "ERR")) }
+                        terminalLines.add(TerminalLine(stamp(timeFormat), "exit ${res.code}", if (res.isSuccess) "OK" else "ERR"))
                         trimTerminal()
                     }
                     addLog(c, res.out, res.err, res.code)
@@ -442,6 +445,9 @@ class DriverViewModel : ViewModel() {
         if (!res.isSuccess) {
             val force = Shell.cmd("insmod -f $koPath devname=$devNode 2>/dev/null || insmod -f $koPath devicename=$devNode 2>/dev/null || insmod -f $koPath 2>/dev/null").exec()
             if (force.isSuccess) return force
+            (force.out + force.err).firstOrNull { it.isNotBlank() }?.let {
+                tlog("insmod -f: ${it.trim()}", "ERR")
+            }
         }
         return res
     }
@@ -558,7 +564,7 @@ class DriverViewModel : ViewModel() {
                 return false
             }
             tlog("Load OK", "OK")
-            withContext(Dispatchers.Main) { verifyModule() }
+            verifyModuleNow()
             val nodeOk = prepareAndVerifyDeviceNode(devNode)
             if (!nodeOk) {
                 withContext(Dispatchers.Main) {
@@ -568,10 +574,11 @@ class DriverViewModel : ViewModel() {
                 }
                 return false
             }
+            val mods = SafetyGuard.loadedModuleNames()
+            val ours = knownDriverModules().filter { it in mods }
             withContext(Dispatchers.Main) {
-                val mods = SafetyGuard.loadedModuleNames()
-                val ours = knownDriverModules().filter { it in mods }
                 if (ours.isNotEmpty()) setLoadedModule(ours.first())
+                else markHiddenLoaded()
             }
             UniversalKernelLoader.stageForBoot(this@DriverViewModel, context, "", devNode, staged)
             true
@@ -674,8 +681,8 @@ class DriverViewModel : ViewModel() {
                 }
 
                 Shell.cmd(
-                    "dmesg 2>/dev/null | grep -i -E 'kmem|module|insmod' | tail -n 5"
-                ).exec().out.filter { it.isNotBlank() }.take(3)
+                    "dmesg 2>/dev/null | grep -i -E 'kmem|module|insmod|version magic|disagrees|Unknown symbol|format error|taint' | tail -n 8"
+                ).exec().out.filter { it.isNotBlank() }.take(5)
                     .forEach { tlog("dmesg: $it", "INFO") }
 
                 if (errText.contains("Invalid module format", true) ||
@@ -691,7 +698,7 @@ class DriverViewModel : ViewModel() {
             }
 
             tlog("Load OK", "OK")
-            withContext(Dispatchers.Main) { verifyModule() }
+            verifyModuleNow()
             val nodeOk = prepareAndVerifyDeviceNode(devNode)
             if (!nodeOk) {
                 withContext(Dispatchers.Main) {
@@ -701,10 +708,11 @@ class DriverViewModel : ViewModel() {
                 }
                 return false
             }
+            val mods = SafetyGuard.loadedModuleNames()
+            val ours = knownDriverModules().filter { it in mods }
             withContext(Dispatchers.Main) {
-                val mods = SafetyGuard.loadedModuleNames()
-                val ours = knownDriverModules().filter { it in mods }
                 if (ours.isNotEmpty()) setLoadedModule(ours.first())
+                else markHiddenLoaded()
             }
             UniversalKernelLoader.stageForBoot(this@DriverViewModel, context, entry.variant, devNode, staged)
             return true
@@ -823,7 +831,7 @@ class DriverViewModel : ViewModel() {
     }
 
     private fun addLog(command: String, stdout: List<String>, stderr: List<String>, exitCode: Int) {
-        val timestamp = dateFormat.format(Date())
+        val timestamp = stamp(dateFormat)
         val entry = LogEntry(timestamp, command, stdout, stderr, exitCode)
         viewModelScope.launch(Dispatchers.Main) {
             logs.add(entry)
@@ -832,7 +840,15 @@ class DriverViewModel : ViewModel() {
     }
 
     fun verifyModule() {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.Main) { verifyModuleNow() }
+    }
+
+    /**
+     * Awaited by the load pipeline so the loaded/hidden verdict is settled
+     * before the next step runs. Every line here is a root-shell round trip:
+     * this must never be called on the main thread.
+     */
+    private suspend fun verifyModuleNow() = withContext(Dispatchers.IO) {
             val kernelRelease = try {
                 Shell.cmd("uname -r").exec().out.firstOrNull()?.trim() ?: ""
             } catch (e: Exception) { "" }
@@ -856,7 +872,7 @@ class DriverViewModel : ViewModel() {
                 "dmesg | grep -i -E 'kmem|kloader|entryi|module|vermagic|insmod|misc|driver' | tail -n 8"
             ).exec()
 
-            val timestamp = dateFormat.format(Date())
+            val timestamp = stamp(dateFormat)
             verificationResult.value = VerificationResult(
                 lsmod = lsmodRes.out,
                 deviceNodeFound = devRes.out.any { it.isNotBlank() },
@@ -872,10 +888,17 @@ class DriverViewModel : ViewModel() {
                 driverModule.value = ours.joinToString(", ")
                 tlog("${ours.first()} loaded", "OK", variant = variantOfModule(ours.first()))
             } else {
-                setLoadedModule("")
-                tlog("No driver loaded", "WARN")
+                // 3.2+ drivers unlink themselves from /proc/modules on load:
+                // an empty lsmod next to a live sysfs class means "loaded and
+                // hidden", which is the normal success state, not a failure
+                val hiddenClass = SafetyGuard.hiddenDriverClass()
+                if (hiddenClass != null) {
+                    tlog("Driver hidden (class $hiddenClass live, not in lsmod)", "OK")
+                } else {
+                    setLoadedModule("")
+                    tlog("No driver loaded", "WARN")
+                }
             }
-        }
     }
 
     fun onFilePicked(context: Context, uri: Uri) {

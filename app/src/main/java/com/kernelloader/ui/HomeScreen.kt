@@ -81,14 +81,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -182,34 +181,45 @@ fun HomeScreen(
     }
 
     var family by remember { mutableStateOf("") }
-    val exact = manifest?.let {
-        if (family.isBlank()) {
-            OtaDriverStore.exactFor(it, kernelRelease, OtaDriverStore.RT)
-                ?: OtaDriverStore.exactFor(it, kernelRelease, OtaDriverStore.QX)
-        } else {
-            OtaDriverStore.exactFor(it, kernelRelease, family)
+    val kernelShort = remember(kernelRelease) {
+        RootChecker.kernelShortVersion(kernelRelease)
+    }
+
+    // these lists are heavy (partition + regex per entry) and used to be
+    // rebuilt on every recomposition - and the status-dot glow animates this
+    // scope once per frame, so that meant rebuilding them 60x per second
+    val exact = remember(manifest, family, kernelRelease) {
+        manifest?.let {
+            if (family.isBlank()) {
+                OtaDriverStore.exactFor(it, kernelRelease, OtaDriverStore.RT)
+                    ?: OtaDriverStore.exactFor(it, kernelRelease, OtaDriverStore.QX)
+            } else {
+                OtaDriverStore.exactFor(it, kernelRelease, family)
+            }
         }
     }
 
-    val kernelShort = RootChecker.kernelShortVersion(kernelRelease)
+    val rtSupported = remember(manifest, kernelShort) {
+        manifest?.let {
+            OtaDriverStore.supportedEntries(it, OtaDriverStore.RT)
+        }?.let { list ->
+            val (mine, others) = list.partition {
+                RootChecker.kernelShortVersion(it.version) == kernelShort
+            }
+            mine + others
+        } ?: emptyList()
+    }
 
-    val rtSupported = manifest?.let {
-        OtaDriverStore.supportedEntries(it, OtaDriverStore.RT)
-    }?.let { list ->
-        val (mine, others) = list.partition {
-            RootChecker.kernelShortVersion(it.version) == kernelShort
-        }
-        mine + others
-    } ?: emptyList()
-
-    val qxSupported = manifest?.let {
-        OtaDriverStore.supportedEntries(it, OtaDriverStore.QX)
-    }?.let { list ->
-        val (mine, others) = list.partition {
-            RootChecker.kernelShortVersion(it.version) == kernelShort
-        }
-        mine + others
-    } ?: emptyList()
+    val qxSupported = remember(manifest, kernelShort) {
+        manifest?.let {
+            OtaDriverStore.supportedEntries(it, OtaDriverStore.QX)
+        }?.let { list ->
+            val (mine, others) = list.partition {
+                RootChecker.kernelShortVersion(it.version) == kernelShort
+            }
+            mine + others
+        } ?: emptyList()
+    }
 
     AppBackground {
         Column(
@@ -224,6 +234,7 @@ fun HomeScreen(
 
             HomeHeader(
                 version = "v${BuildConfig.VERSION_NAME}",
+                busy = busy,
                 onConsole = onNavigateToConsole,
                 onCredits = onNavigateToCredits
             )
@@ -483,15 +494,6 @@ fun HomeScreen(
 
             Spacer(Modifier.height(12.dp))
 
-            val loadedGlow by rememberInfiniteTransition(label = "glow").animateFloat(
-                initialValue = 0.4f,
-                targetValue = 1f,
-                animationSpec = infiniteRepeatable(
-                    animation = tween(1200, easing = FastOutSlowInEasing),
-                    repeatMode = RepeatMode.Reverse
-                ),
-                label = "glowA"
-            )
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = Surface1),
@@ -511,17 +513,7 @@ fun HomeScreen(
                         .padding(horizontal = 12.dp, vertical = 11.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(9.dp)
-                            .clip(CircleShape)
-                            .background(if (loaded) StatusOk.copy(alpha = loadedGlow) else StatusIdle)
-                            .border(
-                                2.dp,
-                                if (loaded) StatusOk.copy(alpha = loadedGlow * 0.35f) else Color.Transparent,
-                                CircleShape
-                            )
-                    )
+                    StatusDot(loaded = loaded)
                     Spacer(Modifier.width(10.dp))
                     Column(Modifier.weight(1f)) {
                         Text(
@@ -752,42 +744,44 @@ fun HomeScreen(
 @Composable
 private fun HomeHeader(
     version: String,
+    busy: Boolean,
     onConsole: () -> Unit,
     onCredits: () -> Unit
 ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Box(modifier = Modifier.size(50.dp), contentAlignment = Alignment.Center) {
-            val spin by rememberInfiniteTransition(label = "logoSpin").animateFloat(
-                initialValue = 0f,
-                targetValue = 360f,
-                animationSpec = infiniteRepeatable(
-                    animation = tween(9000, easing = LinearEasing)
-                ),
-                label = "logoSpinA"
-            )
-            val breathe by rememberInfiniteTransition(label = "logoBreathe").animateFloat(
-                initialValue = 0.96f,
-                targetValue = 1.04f,
-                animationSpec = infiniteRepeatable(
-                    animation = tween(1800, easing = FastOutSlowInEasing),
-                    repeatMode = RepeatMode.Reverse
-                ),
-                label = "logoBreatheA"
-            )
-            Canvas(modifier = Modifier.fillMaxSize()) {
+            // the logo ring only spins during a load: an always-on animation
+            // forced a full-window repaint every single frame
+            val spin = if (busy) {
+                val transition = rememberInfiniteTransition(label = "logoSpin")
+                val value by transition.animateFloat(
+                    initialValue = 0f,
+                    targetValue = 360f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(9000, easing = LinearEasing)
+                    ),
+                    label = "logoSpinA"
+                )
+                value
+            } else {
+                0f
+            }
+            Canvas(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer { rotationZ = spin }
+            ) {
                 val stroke = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round)
                 val diameter = size.minDimension - stroke.width
                 val topLeft = Offset((size.width - diameter) / 2f, (size.height - diameter) / 2f)
                 val arcSize = Size(diameter, diameter)
-                rotate(spin) {
-                    drawArc(
-                        brush = Brush.sweepGradient(
-                            listOf(GradientRtStart, GradientQxEnd, GradientRtStart)
-                        ),
-                        startAngle = 0f, sweepAngle = 280f, useCenter = false,
-                        topLeft = topLeft, size = arcSize, style = stroke, alpha = 0.9f
-                    )
-                }
+                drawArc(
+                    brush = Brush.sweepGradient(
+                        listOf(GradientRtStart, GradientQxEnd, GradientRtStart)
+                    ),
+                    startAngle = 0f, sweepAngle = 280f, useCenter = false,
+                    topLeft = topLeft, size = arcSize, style = stroke, alpha = 0.9f
+                )
             }
             Image(
                 painter = painterResource(id = R.drawable.app_logo),
@@ -795,7 +789,6 @@ private fun HomeHeader(
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .size(42.dp)
-                    .scale(breathe)
                     .clip(CircleShape)
                     .border(1.dp, BorderSubtle, CircleShape)
             )
@@ -891,7 +884,14 @@ private fun VariantConsoleCard(
 ) {
     val listState = rememberLazyListState()
     LaunchedEffect(lines.size) {
-        if (lines.isNotEmpty()) listState.animateScrollToItem(lines.size - 1)
+        if (lines.isEmpty()) return@LaunchedEffect
+        // jump instead of animating: a load drops dozens of lines in a burst
+        // and every restart queued another scroll animation on the main
+        // thread. Follow along only while the user is already at the bottom.
+        val last = lines.size - 1
+        val visible = listState.layoutInfo.visibleItemsInfo
+        val atBottom = visible.isEmpty() || visible.last().index >= last - 2
+        if (atBottom) listState.scrollToItem(last)
     }
     Card(
         modifier = Modifier
@@ -1043,6 +1043,26 @@ private fun KernelListSection(
     }
 }
 
+/**
+ * Static status dot. It used to pulse forever while a driver was loaded,
+ * which kept the whole window repainting every frame; a steady indicator
+ * costs nothing and the text carries the state anyway.
+ */
+@Composable
+private fun StatusDot(loaded: Boolean) {
+    Box(
+        modifier = Modifier
+            .size(9.dp)
+            .clip(CircleShape)
+            .background(if (loaded) StatusOk else StatusIdle)
+            .border(
+                2.dp,
+                if (loaded) StatusOk.copy(alpha = 0.35f) else Color.Transparent,
+                CircleShape
+            )
+    )
+}
+
 @Composable
 private fun SectionTitle(
     title: String,
@@ -1123,56 +1143,74 @@ private fun RingButton(
     onClick: () -> Unit,
     content: @Composable ColumnScope.() -> Unit
 ) {
-    val breathe by rememberInfiniteTransition(label = "ring-breathe").animateFloat(
-        initialValue = 0.97f,
-        targetValue = 1.03f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1600, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "breathe"
-    )
-    val spin by rememberInfiniteTransition(label = "ring-spin").animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(if (busy) 900 else 5200, easing = LinearEasing)
-        ),
-        label = "spin"
-    )
-    val scale = breathe * (if (busy) 1.05f else 1f)
+    // Spin and breathe run only while a load is in flight. A perpetual
+    // animation kept the whole window re-rendering every frame (~19ms on this
+    // GPU) even when the app was idle - that constant load is what made the
+    // screen feel sluggish. Idle now draws a single static frame.
+    val breathe: Float
+    val spin: Float
+    if (busy) {
+        val transition = rememberInfiniteTransition(label = "ring")
+        val breatheState by transition.animateFloat(
+            initialValue = 0.97f,
+            targetValue = 1.03f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(1600, easing = FastOutSlowInEasing),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "breathe"
+        )
+        val spinState by transition.animateFloat(
+            initialValue = 0f,
+            targetValue = 360f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(900, easing = LinearEasing)
+            ),
+            label = "spin"
+        )
+        breathe = breatheState
+        spin = spinState
+    } else {
+        breathe = 1f
+        spin = 0f
+    }
+    val scaleSpec = if (busy) 1.05f else 1f
     val ringBrush = Brush.sweepGradient(
         listOf(accentEnd, accentStart, accentEnd.copy(alpha = 0.2f), accentEnd)
     )
     val hot = enabled || busy
 
     Box(modifier = Modifier.size(148.dp), contentAlignment = Alignment.Center) {
-        Canvas(modifier = Modifier.fillMaxSize()) {
+        Canvas(
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer { rotationZ = spin }
+        ) {
             val stroke = Stroke(width = 5.dp.toPx(), cap = StrokeCap.Round)
             val glow = Stroke(width = 12.dp.toPx(), cap = StrokeCap.Round)
             val diameter = size.minDimension - stroke.width
             val topLeft = Offset((size.width - diameter) / 2f, (size.height - diameter) / 2f)
             val arcSize = Size(diameter, diameter)
+            // the base ring is a full circle: rotating the whole canvas via
+            // the layer keeps it identical without a draw-phase state read
             drawArc(
                 color = accentStart.copy(alpha = if (hot) 0.20f else 0.10f),
                 startAngle = 0f, sweepAngle = 360f, useCenter = false,
                 topLeft = topLeft, size = arcSize, style = stroke
             )
-            rotate(spin) {
-                if (hot) {
-                    drawArc(
-                        brush = ringBrush,
-                        startAngle = 0f, sweepAngle = 110f, useCenter = false,
-                        topLeft = topLeft, size = arcSize, style = glow, alpha = 0.16f
-                    )
-                }
+            if (hot) {
                 drawArc(
                     brush = ringBrush,
                     startAngle = 0f, sweepAngle = 110f, useCenter = false,
-                    topLeft = topLeft, size = arcSize, style = stroke,
-                    alpha = if (hot) 0.95f else 0.4f
+                    topLeft = topLeft, size = arcSize, style = glow, alpha = 0.16f
                 )
             }
+            drawArc(
+                brush = ringBrush,
+                startAngle = 0f, sweepAngle = 110f, useCenter = false,
+                topLeft = topLeft, size = arcSize, style = stroke,
+                alpha = if (hot) 0.95f else 0.4f
+            )
         }
 
         Button(
@@ -1192,7 +1230,13 @@ private fun RingButton(
             contentPadding = PaddingValues(0.dp),
             modifier = Modifier
                 .size(114.dp)
-                .scale(scale)
+                .graphicsLayer {
+                    // breathe is read in the layer block, not in composition:
+                    // the ring keeps pulsing without recomposing the button
+                    val s = scaleSpec * breathe
+                    scaleX = s
+                    scaleY = s
+                }
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally, content = content)
         }

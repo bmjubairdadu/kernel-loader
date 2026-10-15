@@ -111,11 +111,16 @@ fun ConsoleScreen(
     // root check is a root-shell call - async so the screen paints first,
     // and the chips light up as soon as the shell resolves
     var rootAvailable by remember { mutableStateOf(false) }
-    val kernelVersion = remember { RootChecker.getKernelVersion() }
+    // uname is a forked process - run it off the main thread, the screen
+    // paints first and the pill fills in when the answer lands
+    var kernelVersion by remember { mutableStateOf("") }
     LaunchedEffect(Unit) {
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-            RootChecker.isRootAvailable()
-        }.let { rootAvailable = it }
+            RootChecker.isRootAvailable() to RootChecker.getKernelVersion()
+        }.let { (root, kver) ->
+            rootAvailable = root
+            kernelVersion = kver
+        }
     }
 
     val shown = when (filter) {
@@ -126,9 +131,13 @@ fun ConsoleScreen(
     }
 
     LaunchedEffect(shown.size, filter) {
-        if (shown.isNotEmpty()) {
-            listState.animateScrollToItem(shown.size - 1)
-        }
+        if (shown.isEmpty()) return@LaunchedEffect
+        // instant jump: animating here stacked a new scroll animation for
+        // every incoming line and janked the console during loads
+        val last = shown.size - 1
+        val visible = listState.layoutInfo.visibleItemsInfo
+        val atBottom = visible.isEmpty() || visible.last().index >= last - 2
+        if (atBottom) listState.scrollToItem(last)
     }
 
     AppBackground {
