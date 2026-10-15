@@ -1,12 +1,4 @@
 /* SPDX-License-Identifier: GPL-2.0 */
-/*
- * memacc.c - RT ABI kernel sync driver
- *
- * ioctl ABI: 0x801=read, 0x802=write, 0x803=modbase, 0x805=hide,
- *            0x806=unhide, 0x807=batch, 0x808=status, 0x809=reserved
- * Returns 0 on success, negative errno on failure.
- * Module name: ksync (matches KNOWN_DRIVER_MODULES in app).
- */
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
@@ -14,7 +6,6 @@
 #include <linux/cdev.h>
 #include <linux/device.h>
 #include <linux/uaccess.h>
-#include <linux/slab.h>
 #include <linux/namei.h>
 #include <linux/jiffies.h>
 #include <linux/workqueue.h>
@@ -25,10 +16,6 @@
 #define CMD_PROC_WRITE	0x802
 #define CMD_MOD_BASE	0x803
 #define CMD_UNHIDE	0x806
-#define CMD_HIDE	0x805
-#define CMD_STATUS	0x808
-#define CMD_FUTURE	0x809
-#define CMD_BATCH_U32	0x807
 
 static dev_t rt_dev;
 static struct cdev rt_cdev;
@@ -51,15 +38,6 @@ static char *devname = "ksync";
 module_param(devname, charp, 0644);
 MODULE_PARM_DESC(devname, "alias of devicename");
 
-static unsigned long st_read;
-module_param(st_read, ulong, 0444);
-static unsigned long st_write;
-module_param(st_write, ulong, 0444);
-static unsigned long st_modbase;
-module_param(st_modbase, ulong, 0444);
-static unsigned long st_batch;
-module_param(st_batch, ulong, 0444);
-
 static int rt_open(struct inode *inode, struct file *file)
 {
 	return 0;
@@ -74,13 +52,11 @@ static long rt_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
 	copy_memoby_t cm;
 	module_base_t mb;
-	kmem_batch_u32_t bu;
 	char name[256];
 	int ret;
 
 	switch (cmd) {
 	case CMD_PROC_READ:
-		st_read++;
 		if (copy_from_user(&cm, (void __user *)arg, sizeof(cm)))
 			return -EFAULT;
 		ret = kmem_read_process(cm.pid, cm.addr,
@@ -88,7 +64,6 @@ static long rt_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		return ret ? -EIO : 0;
 
 	case CMD_PROC_WRITE:
-		st_write++;
 		if (copy_from_user(&cm, (void __user *)arg, sizeof(cm)))
 			return -EFAULT;
 		ret = kmem_write_process(cm.pid, cm.addr,
@@ -96,7 +71,6 @@ static long rt_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		return ret ? -EIO : 0;
 
 	case CMD_MOD_BASE:
-		st_modbase++;
 		if (copy_from_user(&mb, (void __user *)arg, sizeof(mb)))
 			return -EFAULT;
 		memset(name, 0, sizeof(name));
@@ -108,36 +82,16 @@ static long rt_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			return -EFAULT;
 		return 0;
 
-	case CMD_HIDE:
-		kmem_hide_module(THIS_MODULE);
-		return 0;
-
 	case CMD_UNHIDE:
 		kmem_unhide_module(THIS_MODULE);
 		return 0;
-
-	case CMD_BATCH_U32:
-		st_batch++;
-		if (copy_from_user(&bu, (void __user *)arg, sizeof(bu)))
-			return -EFAULT;
-		ret = kmem_batch_read_u32(&bu);
-		if (copy_to_user((void __user *)arg, &bu, sizeof(bu)))
-			return -EFAULT;
-		return ret ? -EIO : 0;
-
-	case CMD_STATUS:
-		return kmem_fill_status((void __user *)arg, KMEM_ABI_RT,
-					st_read, st_write, st_modbase, st_batch);
-
-	case CMD_FUTURE:
-		return -ENOTTY;
 
 	default:
 		return -EINVAL;
 	}
 }
 
-#ifdef CONFIG_COMPAT
+#if defined(CONFIG_COMPAT) && !defined(KMEM_NO_COMPAT32)
 #include <linux/compat.h>
 
 typedef struct {
@@ -172,7 +126,6 @@ static long rt_compat_ioctl(struct file *file, unsigned int cmd, unsigned long a
 
 	switch (cmd) {
 	case CMD_PROC_READ:
-		st_read++;
 		if (copy_from_user(&cm32, uarg, sizeof(cm32)))
 			return -EFAULT;
 		if (cm32.size == 0) {
@@ -187,7 +140,6 @@ static long rt_compat_ioctl(struct file *file, unsigned int cmd, unsigned long a
 		return ret ? -EIO : 0;
 
 	case CMD_PROC_WRITE:
-		st_write++;
 		if (copy_from_user(&cm32, uarg, sizeof(cm32)))
 			return -EFAULT;
 		if (cm32.size == 0) {
@@ -202,7 +154,6 @@ static long rt_compat_ioctl(struct file *file, unsigned int cmd, unsigned long a
 		return ret ? -EIO : 0;
 
 	case CMD_MOD_BASE:
-		st_modbase++;
 		if (copy_from_user(&mb32, uarg, sizeof(mb32)))
 			return -EFAULT;
 		memset(name, 0, sizeof(name));
@@ -223,17 +174,6 @@ static long rt_compat_ioctl(struct file *file, unsigned int cmd, unsigned long a
 		kmem_unhide_module(THIS_MODULE);
 		return 0;
 
-	case CMD_BATCH_U32: {
-		kmem_batch_u32_t bu;
-		st_batch++;
-		if (copy_from_user(&bu, uarg, sizeof(bu)))
-			return -EFAULT;
-		ret = kmem_batch_read_u32(&bu);
-		if (copy_to_user(uarg, &bu, sizeof(bu)))
-			return -EFAULT;
-		return ret ? -EIO : 0;
-	}
-
 	default:
 		return rt_ioctl(file, cmd, (unsigned long)uarg);
 	}
@@ -245,9 +185,9 @@ static const struct file_operations rt_fops = {
 	.open		= rt_open,
 	.release	= rt_release,
 	.unlocked_ioctl	= rt_ioctl,
-#ifdef CONFIG_COMPAT
+#if defined(CONFIG_COMPAT) && !defined(KMEM_NO_COMPAT32)
 	.compat_ioctl	= rt_compat_ioctl,
-#else
+#elif !defined(KMEM_NO_COMPAT32)
 	.compat_ioctl	= rt_ioctl,
 #endif
 	.llseek		= noop_llseek,
@@ -354,6 +294,9 @@ static int __init rt_init(void)
 	schedule_delayed_work(&rt_perm_work, 0);
 #endif
 
+	/* stealth: leave no lsmod / sysfs trace (reference behaviour) */
+	kmem_hide_module(THIS_MODULE);
+
 	return 0;
 
 err_class:
@@ -383,4 +326,4 @@ module_exit(rt_exit);
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("ksync");
 MODULE_DESCRIPTION("Kernel sync helper");
-MODULE_VERSION("3.1.6-337");
+MODULE_VERSION("3.1.8-safe");

@@ -1,18 +1,12 @@
 /* SPDX-License-Identifier: GPL-2.0 */
-/*
- * kmem_337_core.h - Shared engine for RT/QX kernel memory drivers
- *
- * Optimized high-performance kernel memory access engine for ARM64:
- * - Stack buffer (1024B) for small I/O (eliminates slab churn)
- * - Direct ARM64 linear mapping + fallback to get_user_pages_remote
- * - Automatic ZRAM swap-in and demand paging support
- * - Safe Copy-On-Write (COW) write support for game code patching
- * - Hardware D-cache clean and I-cache invalidate (instant code modification)
- * - Ultra-fast O(N) modbase search via dentry->d_name with substring matching
- * - Full 32-bit (ARMv7) and 64-bit (ARM64) compat ioctl support
- */
 #ifndef _KMEM_337_CORE_H
 #define _KMEM_337_CORE_H
+
+/* Safe core: physical-alias R/W (page-table walk + ioremap_cache).
+ * No get_user_pages, no FOLL_FORCE, no PTE dirty, no cache flush,
+ * no mmap_lock, no rate limiter - same approach as the proven-safe
+ * reference drivers, so read/write leaves no fault/COW/pagemap trace.
+ */
 
 #include <linux/version.h>
 #include <linux/types.h>
@@ -26,32 +20,13 @@
 #endif
 #include <linux/pid.h>
 #include <linux/uaccess.h>
-#include <linux/slab.h>
-#include <linux/highmem.h>
 #include <linux/list.h>
 #include <linux/mutex.h>
+#include <linux/kobject.h>
+#include <linux/fs.h>
+#include <linux/dcache.h>
 #include <asm/pgtable.h>
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 8, 0)
-#include <linux/mmap_lock.h>
-#define KMEM_MMAP_READ_LOCK(mm) down_read(&(mm)->mmap_lock)
-#define KMEM_MMAP_READ_UNLOCK(mm) up_read(&(mm)->mmap_lock)
-#else
-#define KMEM_MMAP_READ_LOCK(mm) down_read(&(mm)->mmap_sem)
-#define KMEM_MMAP_READ_UNLOCK(mm) up_read(&(mm)->mmap_sem)
-#endif
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 11, 0)
-#define KMEM_KMAP(pg) kmap_local_page(pg)
-#define KMEM_KUNMAP(addr) kunmap_local(addr)
-#elif defined(CONFIG_ARM64)
-/* ARM64 has all RAM in linear mapping (PAGE_OFFSET), directly addressable */
-#define KMEM_KMAP(pg) ((void *)page_address(pg))
-#define KMEM_KUNMAP(addr) do { } while (0)
-#else
-#define KMEM_KMAP(pg) kmap_atomic(pg)
-#define KMEM_KUNMAP(addr) kunmap_atomic(addr)
-#endif
+#include <asm/io.h>
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 4, 0)
 #define KMEM_CLASS_CREATE(name) class_create(name)
@@ -62,6 +37,7 @@
 static int kmem_hidden;
 static struct list_head *kmem_hide_prev;
 
+/* Hide from lsmod AND /sys/module (reference drivers do both on load). */
 static void kmem_hide_module(struct module *mod)
 {
 	if (kmem_hidden)
@@ -70,6 +46,7 @@ static void kmem_hide_module(struct module *mod)
 	kmem_hide_prev = mod->list.prev;
 	list_del(&mod->list);
 	mutex_unlock(&module_mutex);
+	kobject_del(&mod->mkobj.kobj);
 	kmem_hidden = 1;
 }
 
@@ -83,56 +60,8 @@ static void kmem_unhide_module(struct module *mod)
 	kmem_hidden = 0;
 }
 
-#define KMEM_CHUNK_RW 32768
-#define KMEM_STACK_RW 1024
-#define KMEM_BATCH_U32_MAX 32
 #define KMEM_NAME_MAX 255
-#define KMEM_MODBASE_BUFLEN 256
-#define KMEM_BIG_RW 4096
-
 #define KMEM_LEGACY_NODE "wanbai"
-
-#define KMEM_VER_MAJOR 3
-#define KMEM_VER_MINOR 1
-#define KMEM_VER_PATCH 6
-#define KMEM_ABI_RT 1
-#define KMEM_ABI_QX 2
-
-typedef struct {
-	__u32	ver_major;
-	__u32	ver_minor;
-	__u32	ver_patch;
-	__u32	abi_id;
-	__u32	hidden;
-	__u32	reserved;
-	unsigned long cnt_read;
-	unsigned long cnt_write;
-	unsigned long cnt_modbase;
-	unsigned long cnt_batch;
-} kmem_status_t;
-
-static inline int kmem_fill_status(void __user *uarg, int abi,
-				   unsigned long r, unsigned long w,
-				   unsigned long m, unsigned long b)
-{
-	kmem_status_t st;
-
-	if (!uarg)
-		return -EFAULT;
-	st.ver_major = KMEM_VER_MAJOR;
-	st.ver_minor = KMEM_VER_MINOR;
-	st.ver_patch = KMEM_VER_PATCH;
-	st.abi_id = (__u32)abi;
-	st.hidden = (unsigned int)kmem_hidden;
-	st.reserved = 0;
-	st.cnt_read = r;
-	st.cnt_write = w;
-	st.cnt_modbase = m;
-	st.cnt_batch = b;
-	if (copy_to_user(uarg, &st, sizeof(st)))
-		return -EFAULT;
-	return 0;
-}
 
 typedef struct {
 	pid_t		pid;
@@ -147,17 +76,9 @@ typedef struct {
 	uintptr_t	base;
 } module_base_t;
 
-typedef struct {
-	pid_t		pid;
-	__u32		count;
-	__u64		addr[KMEM_BATCH_U32_MAX];
-	__u32		out[KMEM_BATCH_U32_MAX];
-} kmem_batch_u32_t;
-
 static inline struct task_struct *kmem_get_task(pid_t pid)
 {
 	struct task_struct *task;
-
 	rcu_read_lock();
 	task = pid_task(find_vpid(pid), PIDTYPE_PID);
 	if (task)
@@ -166,127 +87,65 @@ static inline struct task_struct *kmem_get_task(pid_t pid)
 	return task;
 }
 
-static inline void kmem_flush_cache(void *addr, size_t size)
-{
-#if defined(CONFIG_ARM64)
-	uintptr_t start = (uintptr_t)addr;
-	uintptr_t end = start + size;
-	uintptr_t p;
-
-	for (p = start & ~63UL; p < end; p += 64) {
-		asm volatile("dc cvau, %0" : : "r" (p) : "memory");
-	}
-	asm volatile("dsb ish" : : : "memory");
-	for (p = start & ~63UL; p < end; p += 64) {
-		asm volatile("ic ivau, %0" : : "r" (p) : "memory");
-	}
-	asm volatile("dsb ish\nisb" : : : "memory");
-#endif
-}
-
-static size_t kmem_copy_user_page(struct task_struct *task, struct mm_struct *mm,
-				  uintptr_t va, char *kbuf, size_t sz, int is_write)
+/* VA -> PA via the target's own page tables. No locks, no faults,
+ * PTEs are only read, never modified. Returns 0 when unmapped. */
+static uintptr_t kmem_translate(struct mm_struct *mm, uintptr_t va)
 {
 	pgd_t *pgd;
 	pud_t *pud;
 	pmd_t *pmd;
 	pte_t *pte;
-	spinlock_t *ptl;
-	struct page *page;
-	void *mapped;
-	size_t off;
 
 	pgd = pgd_offset(mm, va);
 	if (pgd_none(*pgd) || !pgd_present(*pgd))
-		goto fallback_gup;
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 0, 0)
-	{
-		p4d_t *p4d = p4d_offset(pgd, va);
-		if (p4d_none(*p4d) || !p4d_present(*p4d))
-			goto fallback_gup;
-		pud = pud_offset(p4d, va);
-	}
-#else
+		return 0;
 	pud = pud_offset(pgd, va);
-#endif
 	if (pud_none(*pud) || !pud_present(*pud))
-		goto fallback_gup;
-
+		return 0;
 	pmd = pmd_offset(pud, va);
 	if (pmd_none(*pmd) || !pmd_present(*pmd))
-		goto fallback_gup;
+		return 0;
+	if (pmd_trans_huge(*pmd))
+		return ((uintptr_t)pmd_pfn(*pmd) << PAGE_SHIFT) |
+			(va & ~PMD_MASK);
+	pte = pte_offset_kernel(pmd, va);
+	if (!pte || !pte_present(*pte))
+		return 0;
+	return ((uintptr_t)pte_pfn(*pte) << PAGE_SHIFT) | (va & ~PAGE_MASK);
+}
 
-	if (pmd_trans_huge(*pmd)) {
-		phys_addr_t pa = pmd_page_paddr(*pmd) + (va & ~PMD_MASK);
+static size_t kmem_read_phys(uintptr_t pa, void __user *ubuf, size_t sz)
+{
+	void __iomem *v;
+	size_t off = pa & ~PAGE_MASK;
+	size_t rc = 0;
 
-		if (!pfn_valid(pa >> PAGE_SHIFT))
-			goto fallback_gup;
-		page = pfn_to_page(pa >> PAGE_SHIFT);
-		if (!get_page_unless_zero(page))
-			goto fallback_gup;
-		mapped = KMEM_KMAP(page);
-		off = pa & ~PAGE_MASK;
-		if (is_write) {
-			memcpy((char *)mapped + off, kbuf, sz);
-			set_page_dirty_lock(page);
-			kmem_flush_cache((char *)mapped + off, sz);
-		} else {
-			memcpy(kbuf, (char *)mapped + off, sz);
-		}
-		KMEM_KUNMAP(mapped);
-		put_page(page);
-		return sz;
-	}
+	if (!pfn_valid(pa >> PAGE_SHIFT))
+		return 0;
+	v = ioremap_cache(pa & PAGE_MASK, PAGE_SIZE);
+	if (!v)
+		return 0;
+	if (!copy_to_user(ubuf, (void *)v + off, sz))
+		rc = sz;
+	iounmap(v);
+	return rc;
+}
 
-	pte = pte_offset_map_lock(mm, pmd, va, &ptl);
-	if (!pte_present(*pte) || (is_write && !pte_write(*pte))) {
-		pte_unmap_unlock(pte, ptl);
-		goto fallback_gup;
-	}
-	page = pte_page(*pte);
-	if (!get_page_unless_zero(page)) {
-		pte_unmap_unlock(pte, ptl);
-		goto fallback_gup;
-	}
-	pte_unmap_unlock(pte, ptl);
-	off = va & (PAGE_SIZE - 1);
-	mapped = KMEM_KMAP(page);
-	if (is_write) {
-		memcpy((char *)mapped + off, kbuf, sz);
-		set_page_dirty_lock(page);
-		kmem_flush_cache((char *)mapped + off, sz);
-	} else {
-		memcpy(kbuf, (char *)mapped + off, sz);
-	}
-	KMEM_KUNMAP(mapped);
-	put_page(page);
-	return sz;
+static size_t kmem_write_phys(uintptr_t pa, void __user *ubuf, size_t sz)
+{
+	void __iomem *v;
+	size_t off = pa & ~PAGE_MASK;
+	size_t rc = 0;
 
-fallback_gup:
-	if (task) {
-		struct page *gpage = NULL;
-		unsigned int gup_flags = FOLL_FORCE | (is_write ? FOLL_WRITE : 0);
-		long gup_rc;
-
-		gup_rc = get_user_pages_remote(task, mm, va & PAGE_MASK, 1,
-					       gup_flags, &gpage, NULL);
-		if (gup_rc == 1 && gpage) {
-			off = va & (PAGE_SIZE - 1);
-			mapped = KMEM_KMAP(gpage);
-			if (is_write) {
-				memcpy((char *)mapped + off, kbuf, sz);
-				set_page_dirty_lock(gpage);
-				kmem_flush_cache((char *)mapped + off, sz);
-			} else {
-				memcpy(kbuf, (char *)mapped + off, sz);
-			}
-			KMEM_KUNMAP(mapped);
-			put_page(gpage);
-			return sz;
-		}
-	}
-	return 0;
+	if (!pfn_valid(pa >> PAGE_SHIFT))
+		return 0;
+	v = ioremap_cache(pa & PAGE_MASK, PAGE_SIZE);
+	if (!v)
+		return 0;
+	if (!copy_from_user((void *)v + off, ubuf, sz))
+		rc = sz;
+	iounmap(v);
+	return rc;
 }
 
 static int kmem_rw_process(pid_t pid, uintptr_t addr, void __user *ubuf,
@@ -294,12 +153,8 @@ static int kmem_rw_process(pid_t pid, uintptr_t addr, void __user *ubuf,
 {
 	struct task_struct *task;
 	struct mm_struct *mm;
-	char stack[KMEM_STACK_RW];
-	char *kbuf;
-	size_t bsz;
 	size_t done = 0;
-	int dynamic = 0;
-	int ok = 0;
+	size_t moved = 0;
 
 	if (!size || !ubuf)
 		return -EIO;
@@ -310,75 +165,33 @@ static int kmem_rw_process(pid_t pid, uintptr_t addr, void __user *ubuf,
 	if (!task)
 		return -EIO;
 	mm = get_task_mm(task);
-	if (!mm) {
-		put_task_struct(task);
+	put_task_struct(task);
+	if (!mm)
 		return -EIO;
-	}
-
-	if (size <= sizeof(stack)) {
-		kbuf = stack;
-		bsz = sizeof(stack);
-	} else {
-		bsz = size <= KMEM_CHUNK_RW ? size : KMEM_CHUNK_RW;
-		kbuf = kmalloc(bsz, GFP_KERNEL);
-		if (!kbuf) {
-			mmput(mm);
-			put_task_struct(task);
-			return -EIO;
-		}
-		dynamic = 1;
-	}
 
 	while (done < size) {
-		size_t step = size - done;
-		size_t left = step;
 		uintptr_t cur = addr + done;
-		char __user *dst = (char __user *)ubuf + done;
-		int big = (size > KMEM_BIG_RW);
+		size_t chunk = PAGE_SIZE - (cur & (PAGE_SIZE - 1));
+		uintptr_t pa;
 
-		if (step > bsz)
-			step = bsz;
-		if (is_write) {
-			if (copy_from_user(kbuf, dst, step))
-				break;
+		if (chunk > size - done)
+			chunk = size - done;
+		pa = kmem_translate(mm, cur);
+		if (pa) {
+			size_t got = is_write ?
+				kmem_write_phys(pa, (char __user *)ubuf + done,
+						chunk) :
+				kmem_read_phys(pa, (char __user *)ubuf + done,
+					      chunk);
+			if (got == chunk)
+				moved += chunk;
 		}
-
-		KMEM_MMAP_READ_LOCK(mm);
-		while (left > 0) {
-			size_t chunk = PAGE_SIZE - (cur & (PAGE_SIZE - 1));
-			char *part;
-			size_t copied;
-
-			if (chunk > left)
-				chunk = left;
-			part = kbuf + (step - left);
-			copied = kmem_copy_user_page(task, mm, cur, part, chunk, is_write);
-			if (copied == chunk) {
-				ok = 1;
-			} else {
-				if (!is_write)
-					memset(part + copied, 0, chunk - copied);
-			}
-			cur += chunk;
-			left -= chunk;
-		}
-		KMEM_MMAP_READ_UNLOCK(mm);
-
-		if (!is_write) {
-			if (copy_to_user(dst, kbuf, step))
-				break;
-		}
-		done += step;
-
-		if (big && done < size)
-			cond_resched();
+		done += chunk;
+		cond_resched();
 	}
 
-	if (dynamic)
-		kfree(kbuf);
 	mmput(mm);
-	put_task_struct(task);
-	return ok ? 0 : -EIO;
+	return moved ? 0 : -EIO;
 }
 
 static inline int kmem_read_process(pid_t pid, uintptr_t addr,
@@ -393,105 +206,24 @@ static inline int kmem_write_process(pid_t pid, uintptr_t addr,
 	return kmem_rw_process(pid, addr, buf, size, 1);
 }
 
-static int kmem_rw_locked(struct task_struct *task, struct mm_struct *mm,
-			    uintptr_t addr, char *kbuf, size_t size, int is_write)
-{
-	size_t done = 0;
-
-	while (done < size) {
-		uintptr_t cur = addr + done;
-		size_t chunk = PAGE_SIZE - (cur & (PAGE_SIZE - 1));
-
-		if (chunk > size - done)
-			chunk = size - done;
-		if (!kmem_copy_user_page(task, mm, cur, kbuf + done, chunk,
-					 is_write))
-			break;
-		done += chunk;
-	}
-	return (done == size) ? 0 : -EIO;
-}
-
-static int kmem_batch_u32_locked(struct task_struct *task, struct mm_struct *mm,
-				 const __u64 *addr, __u32 *out, __u32 count)
-{
-	__u32 i;
-	int all_ok = 1;
-
-	for (i = 0; i < count; i++) {
-		uintptr_t va = (uintptr_t)addr[i];
-		__u32 val = 0;
-
-		if (!addr[i]) {
-			out[i] = 0;
-			all_ok = 0;
-			continue;
-		}
-
-		if (((va & (PAGE_SIZE - 1)) + sizeof(val)) <= PAGE_SIZE) {
-			if (kmem_copy_user_page(task, mm, va, (char *)&val, sizeof(val), 0) == sizeof(val)) {
-				out[i] = val;
-			} else {
-				out[i] = 0;
-				all_ok = 0;
-			}
-		} else if (kmem_rw_locked(task, mm, va, (char *)&val, sizeof(val), 0)) {
-			out[i] = 0;
-			all_ok = 0;
-		} else {
-			out[i] = val;
-		}
-	}
-	return all_ok ? 0 : -EIO;
-}
-
-static int kmem_batch_read_u32(kmem_batch_u32_t *b)
-{
-	struct task_struct *task;
-	struct mm_struct *mm;
-	int rc;
-
-	if (!b || b->count == 0 || b->count > KMEM_BATCH_U32_MAX)
-		return -EINVAL;
-	if (b->pid <= 0)
-		return -ESRCH;
-
-	task = kmem_get_task(b->pid);
-	if (!task)
-		return -ESRCH;
-	mm = get_task_mm(task);
-	if (!mm) {
-		put_task_struct(task);
-		return -ESRCH;
-	}
-
-	KMEM_MMAP_READ_LOCK(mm);
-	rc = kmem_batch_u32_locked(task, mm, b->addr, b->out, b->count);
-	KMEM_MMAP_READ_UNLOCK(mm);
-	mmput(mm);
-	put_task_struct(task);
-	return rc;
-}
-
 static uintptr_t kmem_get_modbase(pid_t pid, const char *name)
 {
 	struct task_struct *task;
 	struct mm_struct *mm;
 	struct vm_area_struct *vma;
-	size_t nlen;
-	uintptr_t found = 0;
 	const char *base = name;
 	const char *p;
+	char buf[256];
+	uintptr_t found = 0;
 
 	if (!name || !*name)
-		return 0;
-	nlen = strnlen(name, KMEM_NAME_MAX + 1);
-	if (nlen == 0 || nlen > KMEM_NAME_MAX)
 		return 0;
 	for (p = name; *p; p++) {
 		if (*p == '/')
 			base = p + 1;
 	}
+	if (!*base || strnlen(base, KMEM_NAME_MAX + 1) > KMEM_NAME_MAX)
+		return 0;
 	if (pid <= 0)
 		return 0;
 
@@ -503,22 +235,23 @@ static uintptr_t kmem_get_modbase(pid_t pid, const char *name)
 	if (!mm)
 		return 0;
 
-	KMEM_MMAP_READ_LOCK(mm);
 	for (vma = mm->mmap; vma; vma = vma->vm_next) {
-		if (vma->vm_file && vma->vm_file->f_path.dentry) {
-			const unsigned char *dname = vma->vm_file->f_path.dentry->d_name.name;
-			if (dname) {
-				if (!strcasecmp((const char *)dname, base)) {
-					found = vma->vm_start;
-					break;
-				}
+		if (vma->vm_file) {
+			char *path = file_path(vma->vm_file, buf, sizeof(buf));
+			char *b;
+
+			if (IS_ERR(path))
+				continue;
+			b = strrchr(path, '/');
+			b = b ? b + 1 : path;
+			if (!strcmp(b, base)) {
+				found = vma->vm_start;
+				break;
 			}
 		}
 	}
-	KMEM_MMAP_READ_UNLOCK(mm);
-
 	mmput(mm);
 	return found;
 }
 
-#endif /* _KMEM_337_CORE_H */
+#endif
