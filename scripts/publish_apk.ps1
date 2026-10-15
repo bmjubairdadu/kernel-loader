@@ -8,6 +8,11 @@
 # The asset is uploaded as "Kernel-Loader-v<versionName>.apk" (the versionName
 # is read from app/build.gradle.kts). The in-app auto-updater
 # (AppUpdateChecker -> releases/latest API) accepts any .apk asset.
+#
+# IMPORTANT: -Tag MUST be a plain integer equal to the app versionCode
+# (v5, v6, ...). The updater parses the tag with v?(\d+) and compares it
+# against the installed versionCode - a semver tag like "v1.1" parses as 1
+# and installed apps will wrongly report "up to date".
 param(
     [string]$Tag = "v8",
     [string]$ApkPath = "",
