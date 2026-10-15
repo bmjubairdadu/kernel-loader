@@ -385,6 +385,7 @@ fun HomeScreen(
                         accentEnd = if (running) GradientAmberEnd else GradientRtEnd,
                         busy = running,
                         enabled = loadsTapable && !busy && rootAvailable,
+                        animated = loadsTapable && !busy && rootAvailable,
                         onClick = {
                             family = ""
                             viewModel.autoLoadUniversal(context, preferOta = true, variant = "")
