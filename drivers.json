@@ -4,14 +4,14 @@
   "count": 51,
   "drivers": [
     {
-      "version": "4.14.113-25741605 SMP preempt mod_unload modversions aarch64",
+      "version": "4.14.113-25741605 SMP preempt mod_unload aarch64",
       "file": "qx_4.14.113-25741605.ko",
       "variant": "qx",
       "label": "4.14.113-25741605",
-      "sha256": "03868ce9f12d75c376acf2da6e73201df054f0eaa7e121a38783db9eae06e577",
-      "size": 233440,
-      "buildDate": "2026-10-14",
-      "source": "mainline-414-unverified-tolerant",
+      "sha256": "2932820ed7bb67ea11752bc108f588c45c7d09f1e413a8c058d098434dd84f4b",
+      "size": 256440,
+      "buildDate": "2026-10-15T14:16:52Z",
+      "source": "samsung-m31-exynos9611",
       "verified": false
     },
     {
@@ -235,14 +235,14 @@
       "verified": false
     },
     {
-      "version": "4.14.113-25741605 SMP preempt mod_unload modversions aarch64",
+      "version": "4.14.113-25741605 SMP preempt mod_unload aarch64",
       "file": "rt_4.14.113-25741605.ko",
       "variant": "rt",
       "label": "4.14.113-25741605",
-      "sha256": "2588831e5f838e9d0e9829fcc257ebb9f7cc056789d00de5505ab2e6bbb5a8a1",
-      "size": 229544,
-      "buildDate": "2026-10-14",
-      "source": "mainline-414-unverified-tolerant",
+      "sha256": "5696aac09ef91dfbff31a79c8bea71f9bfb61508415060b52eb1a23280b83827",
+      "size": 251320,
+      "buildDate": "2026-10-15T14:16:52Z",
+      "source": "samsung-m31-exynos9611",
       "verified": false
     },
     {
@@ -489,7 +489,7 @@
       "version": "6.6.57-4k-gd66e9166bfa1-dirty SMP preempt mod_unload modversions aarch64"
     }
   ],
-  "updated": "2026-10-15T13:38:54Z",
+  "updated": "2026-10-15T14:16:52Z",
   "variants": {
     "qx": "QX ABI - ioctl 0x801/0x802 + 0x804/0x805 handshake, returns -1 on failure",
     "rt": "RT ABI - ioctl 0x801/0x802/0x803, returns 0 on success"
