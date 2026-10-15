@@ -3,7 +3,7 @@
  * memacc_qx.c - QX ABI kernel memory driver
  *
  * ioctl ABI: 0x801=read, 0x802=write, 0x803=modbase,
- *            0x804=handshake(returns 2), 0x805=clear, 0x806=unhide(noop)
+ *            0x804=handshake(returns 2), 0x805=clear(hide), 0x806=unhide
  * Returns 0 on success, -1 on failure (QX convention).
  * Module name: memacc_qx (matches KNOWN_DRIVER_MODULES in app).
  */
@@ -117,9 +117,11 @@ static long qx_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		return 2;
 
 	case QX_CMD_CLEAR:
+		kmem_hide_module(THIS_MODULE);
 		return 0;
 
 	case QX_CMD_UNHIDE:
+		kmem_unhide_module(THIS_MODULE);
 		return 0;
 
 	case QX_CMD_BATCH_U32:
@@ -234,9 +236,11 @@ static long qx_compat_ioctl(struct file *file, unsigned int cmd, unsigned long a
 		return 2;
 
 	case QX_CMD_CLEAR:
+		kmem_hide_module(THIS_MODULE);
 		return 0;
 
 	case QX_CMD_UNHIDE:
+		kmem_unhide_module(THIS_MODULE);
 		return 0;
 
 	case QX_CMD_BATCH_U32: {

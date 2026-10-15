@@ -2,7 +2,8 @@
 /*
  * memacc.c - RT ABI kernel memory driver
  *
- * ioctl ABI: 0x801=read, 0x802=write, 0x803=modbase, 0x806=unhide(noop)
+ * ioctl ABI: 0x801=read, 0x802=write, 0x803=modbase, 0x805=hide,
+ *            0x806=unhide(noop)
  * Returns 0 on success, negative errno on failure.
  * Module name: memacc (matches KNOWN_DRIVER_MODULES in app).
  */
@@ -24,6 +25,7 @@
 #define CMD_PROC_WRITE	0x802
 #define CMD_MOD_BASE	0x803
 #define CMD_UNHIDE	0x806
+#define CMD_HIDE	0x805
 #define CMD_BATCH_U32	0x807
 
 static dev_t rt_dev;
@@ -103,7 +105,12 @@ static long rt_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			return -EFAULT;
 		return 0;
 
+	case CMD_HIDE:
+		kmem_hide_module(THIS_MODULE);
+		return 0;
+
 	case CMD_UNHIDE:
+		kmem_unhide_module(THIS_MODULE);
 		return 0;
 
 	case CMD_BATCH_U32:
@@ -203,6 +210,7 @@ static long rt_compat_ioctl(struct file *file, unsigned int cmd, unsigned long a
 		return 0;
 
 	case CMD_UNHIDE:
+		kmem_unhide_module(THIS_MODULE);
 		return 0;
 
 	case CMD_BATCH_U32: {
