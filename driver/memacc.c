@@ -205,6 +205,17 @@ static long rt_compat_ioctl(struct file *file, unsigned int cmd, unsigned long a
 	case CMD_UNHIDE:
 		return 0;
 
+	case CMD_BATCH_U32: {
+		kmem_batch_u32_t bu;
+		st_batch++;
+		if (copy_from_user(&bu, uarg, sizeof(bu)))
+			return -EFAULT;
+		ret = kmem_batch_read_u32(&bu);
+		if (copy_to_user(uarg, &bu, sizeof(bu)))
+			return -EFAULT;
+		return ret ? -EIO : 0;
+	}
+
 	default:
 		return rt_ioctl(file, cmd, (unsigned long)uarg);
 	}

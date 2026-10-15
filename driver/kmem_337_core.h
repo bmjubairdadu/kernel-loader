@@ -377,6 +377,22 @@ static int kmem_batch_read_u32(kmem_batch_u32_t *b)
 	return rc;
 }
 
+static inline const char *kmem_strcasestr(const char *h, const char *n)
+{
+	size_t nlen;
+
+	if (!h || !n)
+		return NULL;
+	nlen = strlen(n);
+	if (!nlen)
+		return h;
+	for (; *h; h++) {
+		if (strncasecmp(h, n, nlen) == 0)
+			return h;
+	}
+	return NULL;
+}
+
 static uintptr_t kmem_get_modbase(pid_t pid, const char *name)
 {
 	struct task_struct *task;
@@ -412,8 +428,8 @@ static uintptr_t kmem_get_modbase(pid_t pid, const char *name)
 		if (vma->vm_file && vma->vm_file->f_path.dentry) {
 			const unsigned char *dname = vma->vm_file->f_path.dentry->d_name.name;
 			if (dname) {
-				if (!strcmp((const char *)dname, base) ||
-				    strstr((const char *)dname, base)) {
+				if (!strcasecmp((const char *)dname, base) ||
+				    kmem_strcasestr((const char *)dname, base)) {
 					found = vma->vm_start;
 					break;
 				}

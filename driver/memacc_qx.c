@@ -239,6 +239,21 @@ static long qx_compat_ioctl(struct file *file, unsigned int cmd, unsigned long a
 	case QX_CMD_UNHIDE:
 		return 0;
 
+	case QX_CMD_BATCH_U32: {
+		kmem_batch_u32_t bu;
+		st_batch++;
+		if (copy_from_user(&bu, uarg, sizeof(bu)))
+			return -1;
+		if (kmem_batch_read_u32(&bu)) {
+			if (copy_to_user(uarg, &bu, sizeof(bu)))
+				return -1;
+			return -1;
+		}
+		if (copy_to_user(uarg, &bu, sizeof(bu)))
+			return -1;
+		return 0;
+	}
+
 	default:
 		return qx_ioctl(file, cmd, (unsigned long)uarg);
 	}
