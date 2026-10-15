@@ -926,20 +926,26 @@ class DriverViewModel : ViewModel() {
         if (safe.isNotBlank() && safe != DEFAULT_DEV_NODE) devNodeOverride.value = safe
     }
 
-    fun unloadDriver(context: Context) {
+    fun rebootDevice(context: Context) {
         if (isBusy.value) return
         isBusy.value = true
-        busyStep.value = "Starting..."
+        busyStep.value = "Rebooting..."
         loadJob = viewModelScope.launch(Dispatchers.IO) {
             try {
-                UniversalKernelLoader.unloadDriver(this@DriverViewModel, context)
+                // the driver hides on load and offers no unhide -
+                // only a reboot unloads it (same as reference drivers)
+                tlog("Rebooting to unload driver...", "INFO")
+                val res = Shell.cmd("reboot 2>/dev/null || svc power reboot 2>/dev/null").exec()
+                if (!res.isSuccess) {
+                    tlog("Reboot command failed - reboot manually", "ERR")
+                    autoLoadStatus.value = "Reboot manually to unload driver"
+                }
             } catch (e: CancellationException) {
             } catch (e: Exception) {
-                tlog("UNLOAD FATAL: ${e.message}", "ERR")
+                tlog("REBOOT FATAL: ${e.message}", "ERR")
                 autoLoadOk.value = false
-                autoLoadStatus.value = "Unload failed: ${e.message}"
+                autoLoadStatus.value = "Reboot failed: ${e.message}"
             } finally {
-                refreshDriverState(context)
                 viewModelScope.launch(Dispatchers.Main) {
                     isBusy.value = false
                     busyStep.value = ""

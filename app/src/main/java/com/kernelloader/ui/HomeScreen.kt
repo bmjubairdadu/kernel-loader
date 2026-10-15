@@ -476,7 +476,7 @@ fun HomeScreen(
                     visible = toUnload,
                     moduleName = loadedModule,
                     enabled = loaded && !busy && rootAvailable,
-                    onUnload = { viewModel.unloadDriver(context) }
+                    onUnload = { viewModel.rebootDevice(context) }
                 )
             }
 
@@ -530,7 +530,7 @@ fun HomeScreen(
                         )
                         Text(
                             text = if (loaded)
-                                "a module stays loaded until reboot or unload"
+                                "a module stays loaded until reboot"
                             else "tap LOAD above to detect and load the driver",
                             style = MaterialTheme.typography.bodySmall,
                             color = TextMuted
@@ -1534,14 +1534,14 @@ private fun UnloadPanel(
             onClick = onUnload
         ) {
             Icon(
-                Icons.Default.Delete,
+                Icons.Default.Refresh,
                 contentDescription = null,
                 tint = if (enabled) GradientRedStart else TextDisabled,
                 modifier = Modifier.size(28.dp)
             )
             Spacer(Modifier.height(5.dp))
             Text(
-                text = "UNLOAD",
+                text = "RESTART",
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold,
                 color = if (enabled) TextPrimary else TextDisabled
@@ -1549,7 +1549,7 @@ private fun UnloadPanel(
         }
         Spacer(Modifier.height(6.dp))
         Text(
-            text = if (moduleName.isNotBlank()) "removes $moduleName" else "removes the driver",
+            text = if (moduleName.isNotBlank()) "reboots to unload $moduleName" else "reboots to unload the driver",
             style = MonoTiny,
             color = AccentRed,
             textAlign = TextAlign.Center,

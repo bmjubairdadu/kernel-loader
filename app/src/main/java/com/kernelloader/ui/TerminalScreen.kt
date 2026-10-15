@@ -303,11 +303,11 @@ fun ConsoleScreen(
                     modifier = Modifier.weight(1f)
                 ) { viewModel.verifyModule() }
                 ActionChip(
-                    label = "UNLOAD",
+                    label = "REBOOT",
                     tint = AccentRed,
                     enabled = !viewModel.isBusy.value && rootAvailable,
                     modifier = Modifier.weight(1f)
-                ) { viewModel.unloadDriver(context) }
+                ) { viewModel.rebootDevice(context) }
                 ActionChip(
                     label = "MEM TEST",
                     tint = AccentViolet,
