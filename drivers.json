@@ -1,7 +1,7 @@
 {
   "baseUrl": "https://raw.githubusercontent.com/bmjubairdadu/kernel-loader/drivers",
   "branch": "drivers",
-  "count": 51,
+  "count": 53,
   "drivers": [
     {
       "version": "4.14.113-25741605 SMP preempt mod_unload aarch64",
@@ -130,6 +130,17 @@
       "size": 12352,
       "variant": "qx",
       "version": "4.9.186-perf SMP preempt mod_unload modversions aarch64"
+    },
+    {
+      "version": "4.9.309-Chidori-Kernel SMP preempt mod_unload modversions aarch64",
+      "file": "qx_4.9.309-Chidori-Kernel.ko",
+      "variant": "qx",
+      "label": "4.9.309-Chidori-Kernel",
+      "sha256": "91996665e6085e05cd55f9199a952c884b19c200dcbbce293ef21cb06e4d1c5a",
+      "size": 228312,
+      "buildDate": "2026-10-16",
+      "verified": true,
+      "source": "onc-chidori-verified"
     },
     {
       "buildDate": "2026-10-15",
@@ -389,6 +400,17 @@
       "version": "4.9.186-perf-gdcfb1676-dirty SMP preempt mod_unload modversions aarch64"
     },
     {
+      "version": "4.9.309-Chidori-Kernel SMP preempt mod_unload modversions aarch64",
+      "file": "rt_4.9.309-Chidori-Kernel.ko",
+      "variant": "rt",
+      "label": "4.9.309-Chidori-Kernel",
+      "sha256": "b9a8dda6c9969d40d9addce01aca5f3afafc145b574e7c9f9d55f4a9bfdeeb4e",
+      "size": 226248,
+      "buildDate": "2026-10-16",
+      "verified": true,
+      "source": "onc-chidori-verified"
+    },
+    {
       "buildDate": "2026-10-15",
       "file": "rt_4.9.337-DaisyForGaming.ko",
       "label": "4.9.337-DaisyForGaming",
@@ -489,7 +511,7 @@
       "version": "6.6.57-4k-gd66e9166bfa1-dirty SMP preempt mod_unload modversions aarch64"
     }
   ],
-  "updated": "2026-10-15T14:16:52Z",
+  "updated": "2026-10-16T15:03:33Z",
   "variants": {
     "qx": "QX ABI - ioctl 0x801/0x802 + 0x804/0x805 handshake, returns -1 on failure",
     "rt": "RT ABI - ioctl 0x801/0x802/0x803, returns 0 on success"
