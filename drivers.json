@@ -1,8 +1,30 @@
 {
   "baseUrl": "https://raw.githubusercontent.com/bmjubairdadu/kernel-loader/drivers",
   "branch": "drivers",
-  "count": 53,
+  "count": 55,
   "drivers": [
+    {
+      "version": "4.14.264-GrassKSU@c717269a78 SMP preempt mod_unload modversions aarch64",
+      "file": "qx_4.14.264-GrassKSU.ko",
+      "variant": "qx",
+      "label": "4.14.264-GrassKSU@c717269a78",
+      "sha256": "1eb5788e07b71f0a81d6efa6e968a1e2afb286dfecc84576956616d5caebb4b3",
+      "size": 190856,
+      "buildDate": "2026-10-17T14:57:50Z",
+      "source": "samsung-universal9611-grass",
+      "verified": false
+    },
+    {
+      "version": "4.14.264-GrassKSU@c717269a78 SMP preempt mod_unload modversions aarch64",
+      "file": "rt_4.14.264-GrassKSU.ko",
+      "variant": "rt",
+      "label": "4.14.264-GrassKSU@c717269a78",
+      "sha256": "18ab3f8143eb6924a493f61a337b5b3695cbf4bf8a55a5e303b974e546ac1ca4",
+      "size": 188560,
+      "buildDate": "2026-10-17T14:57:50Z",
+      "source": "samsung-universal9611-grass",
+      "verified": false
+    },
     {
       "version": "4.14.113-25741605 SMP preempt mod_unload aarch64",
       "file": "qx_4.14.113-25741605.ko",
