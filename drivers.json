@@ -12,7 +12,10 @@
       "size": 190856,
       "buildDate": "2026-10-17T14:57:50Z",
       "source": "samsung-universal9611-grass",
-      "verified": false
+      "verified": true,
+      "testStatus": "qemu-pass",
+      "testDate": "2026-10-19T16:53:53Z",
+      "testDetails": "QEMU 4.14.264 phone-identical kernel: load OK, node 0666 OK, read/write/cross-page/multipage OK, cross-process child R/W OK, EIO/EINVAL OK, 32-bit compat 5/5 OK, stress-race 2500x = 2500/2500 0 err; 403s stable, no crash/oops"
     },
     {
       "version": "4.14.264-GrassKSU@c717269a78 SMP preempt mod_unload modversions aarch64",
@@ -23,7 +26,10 @@
       "size": 188560,
       "buildDate": "2026-10-17T14:57:50Z",
       "source": "samsung-universal9611-grass",
-      "verified": false
+      "verified": true,
+      "testStatus": "qemu-pass",
+      "testDate": "2026-10-19T16:53:53Z",
+      "testDetails": "QEMU 4.14.264 phone-identical kernel: load OK, node 0666 OK, read/write/cross-page/multipage OK, cross-process child R/W OK, EIO/EINVAL OK, 32-bit compat 5/5 OK, stress-race 2500x = 2500/2500 0 err; 403s stable, no crash/oops"
     },
     {
       "version": "4.14.113-25741605 SMP preempt mod_unload aarch64",
@@ -165,15 +171,18 @@
       "source": "onc-chidori-verified"
     },
     {
-      "buildDate": "2026-10-15",
+      "buildDate": "2026-10-19T18:48:51Z",
       "file": "qx_4.9.337-DaisyForGaming.ko",
       "label": "4.9.337-DaisyForGaming",
-      "sha256": "df816f64d5fac728472a0291960d84b48d88a161ba3d0dce1e58ed5c8b6f2d0a",
-      "size": 24272,
+      "sha256": "270e255e20020eebfa0c62a179e582762e0d16d51d3884de5e37ba6cacb49d99",
+      "size": 24368,
       "variant": "qx",
       "version": "4.9.337-DaisyForGaming SMP preempt mod_unload modversions aarch64",
       "verified": true,
-      "source": "daisy-alias-verified"
+      "source": "daisy-alias-verified",
+      "testStatus": "live-pass",
+      "testDate": "2026-10-19T18:48:51Z",
+      "testDetails": "LIVE daisy phone (4.9.337-DaisyForGaming #12, Magisk root): insmod OK, /dev/wanbai 0666 OK, dmtest 15/15 PASS (modbase init/libc/linker, read/write own, cross-process R/W, cross-page, child modbase) \u2014 RT and QX both"
     },
     {
       "buildDate": "2026-09-27T15:33:50Z",
@@ -433,15 +442,18 @@
       "source": "onc-chidori-verified"
     },
     {
-      "buildDate": "2026-10-15",
+      "buildDate": "2026-10-19T18:48:51Z",
       "file": "rt_4.9.337-DaisyForGaming.ko",
       "label": "4.9.337-DaisyForGaming",
-      "sha256": "2ca3e621766d0da4f413ab10689f86ac7c77c4242045de60065ef5976d363412",
-      "size": 23472,
+      "sha256": "aff9d4af7f33f4f7d426c774da8e898c7630fcf2c1cf9d6db2bbc32c300f5a8d",
+      "size": 23520,
       "variant": "rt",
       "version": "4.9.337-DaisyForGaming SMP preempt mod_unload modversions aarch64",
       "verified": true,
-      "source": "daisy-alias-verified"
+      "source": "daisy-alias-verified",
+      "testStatus": "live-pass",
+      "testDate": "2026-10-19T18:48:51Z",
+      "testDetails": "LIVE daisy phone (4.9.337-DaisyForGaming #12, Magisk root): insmod OK, /dev/wanbai 0666 OK, dmtest 15/15 PASS (modbase init/libc/linker, read/write own, cross-process R/W, cross-page, child modbase) \u2014 RT and QX both"
     },
     {
       "buildDate": "2026-09-27T15:33:50Z",
@@ -533,7 +545,7 @@
       "version": "6.6.57-4k-gd66e9166bfa1-dirty SMP preempt mod_unload modversions aarch64"
     }
   ],
-  "updated": "2026-10-16T15:03:33Z",
+  "updated": "2026-10-19T18:48:51Z",
   "variants": {
     "qx": "QX ABI - ioctl 0x801/0x802 + 0x804/0x805 handshake, returns -1 on failure",
     "rt": "RT ABI - ioctl 0x801/0x802/0x803, returns 0 on success"
