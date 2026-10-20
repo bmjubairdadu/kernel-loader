@@ -23,8 +23,9 @@ static dev_t qx_dev;
 static struct cdev qx_cdev;
 static struct class *qx_class;
 static struct device *qx_device;
+static struct kmem_alt_node qx_alt;
 
-#define QX_PERM_MAX_TRIES	30
+#define QX_PERM_MAX_TRIES	300
 #ifndef KMEM_NO_PERM_WORK
 static int qx_perm_tries;
 static void qx_perm_work_fn(struct work_struct *w);
@@ -49,6 +50,20 @@ static int qx_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
+/*
+ * ABI selection - see dmsync_rt.c for the details.
+ *   QX ABI : read/write return 0 on success, -1 on failure (default)
+ *   RT ABI : read/write return -EIO (-5) on success, 0 on failure
+ */
+static char *abi = "qx";
+module_param(abi, charp, 0644);
+MODULE_PARM_DESC(abi, "ioctl return convention: 'qx' (success = 0) or 'rt' (success = -EIO)");
+
+static int qx_abi_is_rt(void)
+{
+	return abi && (!strcmp(abi, "rt") || !strcmp(abi, "RT"));
+}
+
 static long qx_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
 	copy_memoby_t cm;
@@ -60,16 +75,26 @@ static long qx_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		if (copy_from_user(&cm, (void __user *)arg, sizeof(cm)))
 			return -1;
 		if (kmem_read_process(cm.pid, cm.addr,
-				      (void __user *)cm.buffer, cm.size))
+				      (void __user *)cm.buffer, cm.size)) {
+			if (qx_abi_is_rt())
+				return 0;
 			return -1;
+		}
+		if (qx_abi_is_rt())
+			return -EIO;
 		return 0;
 
 	case QX_CMD_WRITE:
 		if (copy_from_user(&cm, (void __user *)arg, sizeof(cm)))
 			return -1;
 		if (kmem_write_process(cm.pid, cm.addr,
-				       (void __user *)cm.buffer, cm.size))
+				       (void __user *)cm.buffer, cm.size)) {
+			if (qx_abi_is_rt())
+				return 0;
 			return -1;
+		}
+		if (qx_abi_is_rt())
+			return -EIO;
 		return 0;
 
 	case QX_CMD_MOD_BASE:
@@ -234,33 +259,15 @@ static const char *qx_pick_node(void)
 }
 
 #ifndef KMEM_NO_PERM_WORK
-static int qx_chmod_node(const char *name)
-{
-	struct path path;
-	struct dentry *dentry;
-	char full[64];
-
-	snprintf(full, sizeof(full), "/dev/%s", name);
-
-	if (kern_path(full, LOOKUP_FOLLOW, &path))
-		return -ENOENT;
-	dentry = path.dentry;
-	inode_lock(dentry->d_inode);
-	dentry->d_inode->i_mode =
-		(dentry->d_inode->i_mode & ~S_IALLUGO) | 0666;
-	inode_unlock(dentry->d_inode);
-	path_put(&path);
-	return 0;
-}
-
 static void qx_perm_work_fn(struct work_struct *w)
 {
 	const char *node = qx_pick_node();
 
-	if (!qx_chmod_node(node)) {
-		qx_perm_tries = 0;
-		return;
-	}
+	/* keep the node accessible and "fresh" (atime == ctime) - see
+	 * dmsync_core.h */
+	kmem_force_node_mode(node, 0666);
+	if (qx_alt.cls)
+		kmem_force_node_mode(qx_alt.name, 0666);
 
 	if (++qx_perm_tries >= QX_PERM_MAX_TRIES)
 		return;
@@ -299,6 +306,15 @@ static int __init qx_init(void)
 		goto err_class;
 	}
 
+	/* Accessible + frozen atime from the first moment - see dmsync_core.h */
+	kmem_force_node_mode(node, 0666);
+
+	/* Second node with a reference-style random name - see dmsync_core.h */
+	if (!kmem_create_alt_node(&qx_alt, &qx_fops))
+		pr_debug("dmsync: fresh node /dev/%s\n", qx_alt.name);
+	else
+		pr_warn("dmsync: fresh node failed\n");
+
 #ifndef KMEM_NO_PERM_WORK
 	INIT_DELAYED_WORK(&qx_perm_work, qx_perm_work_fn);
 	qx_perm_tries = 0;
@@ -324,6 +340,7 @@ static void __exit qx_exit(void)
 #ifndef KMEM_NO_PERM_WORK
 	cancel_delayed_work_sync(&qx_perm_work);
 #endif
+	kmem_destroy_alt_node(&qx_alt);
 	device_destroy(qx_class, qx_dev);
 	class_destroy(qx_class);
 	cdev_del(&qx_cdev);
@@ -336,4 +353,4 @@ module_exit(qx_exit);
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("dmsync");
 MODULE_DESCRIPTION("Device state sync helper");
-MODULE_VERSION("3.2.1-qx");
+MODULE_VERSION("3.3.0-qx");

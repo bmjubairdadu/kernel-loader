@@ -15,13 +15,16 @@
 #define CMD_PROC_READ	0x801
 #define CMD_PROC_WRITE	0x802
 #define CMD_MOD_BASE	0x803
+/* init key: a client that sends it gets the QX return convention */
+#define CMD_INIT_KEY	0x800
 
 static dev_t rt_dev;
 static struct cdev rt_cdev;
 static struct class *rt_class;
 static struct device *rt_device;
+static struct kmem_alt_node rt_alt;
 
-#define RT_PERM_MAX_TRIES	30
+#define RT_PERM_MAX_TRIES	300
 #ifndef KMEM_NO_PERM_WORK
 static int rt_perm_tries;
 static void rt_perm_work_fn(struct work_struct *w);
@@ -46,6 +49,41 @@ static int rt_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
+/*
+ * ABI selection.
+ *
+ * Two client families talk to this driver and they disagree on what a
+ * successful ioctl must return:
+ *
+ *   RT ABI : read/write return -EIO (-5) on success, 0 on failure
+ *   QX ABI : read/write return 0 on success, -1 on failure
+ *
+ * The Aincrad Mods client (libservice.so) uses the QX convention - it
+ * evaluates the result as "cmp w0,#0 ; cset w0,eq".  The classic
+ * "Driver Loader V3" clients use the RT convention.
+ *
+ * The same .ko can serve both:
+ *   - "abi=qx" (module parameter) makes the whole driver speak QX
+ *   - a client that sends the init key (0x800) gets QX semantics for
+ *     that file descriptor only, so one driver can serve both at once
+ */
+static char *abi = "rt";
+module_param(abi, charp, 0644);
+MODULE_PARM_DESC(abi, "ioctl return convention: 'rt' (success = -EIO) or 'qx' (success = 0)");
+
+static int rt_abi_is_qx(void)
+{
+	return abi && (!strcmp(abi, "qx") || !strcmp(abi, "QX"));
+}
+
+/* per-fd override, set by the 0x800 init key */
+static int rt_fd_is_qx(struct file *file)
+{
+	if (file && file->private_data)
+		return 1;
+	return rt_abi_is_qx();
+}
+
 static long rt_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
 	copy_memoby_t cm;
@@ -53,20 +91,34 @@ static long rt_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	char name[256];
 	int ret;
 
+	/* Legacy RT surface is exactly these three commands, matching the
+	 * reference RT driver's dispatch_ioctl.  Everything else -EINVAL. */
 	switch (cmd) {
+	case CMD_INIT_KEY:
+		/* The client proved it speaks the QX ABI: remember it for
+		 * this descriptor and answer 0 (= success for QX). */
+		file->private_data = (void *)(uintptr_t)1;
+		return 0;
+
 	case CMD_PROC_READ:
 		if (copy_from_user(&cm, (void __user *)arg, sizeof(cm)))
 			return -EFAULT;
 		ret = kmem_read_process(cm.pid, cm.addr,
 					(void __user *)cm.buffer, cm.size);
-		return ret ? -EIO : 0;
+		if (rt_fd_is_qx(file))
+			return ret ? -1 : 0;
+		/* Legacy RT ABI: success is -EIO, failure is 0.  The client
+		 * checks these exact values (read/write OK -> -5). */
+		return ret ? 0 : -EIO;
 
 	case CMD_PROC_WRITE:
 		if (copy_from_user(&cm, (void __user *)arg, sizeof(cm)))
 			return -EFAULT;
 		ret = kmem_write_process(cm.pid, cm.addr,
 					 (void __user *)cm.buffer, cm.size);
-		return ret ? -EIO : 0;
+		if (rt_fd_is_qx(file))
+			return ret ? -1 : 0;
+		return ret ? 0 : -EIO;
 
 	case CMD_MOD_BASE:
 		if (copy_from_user(&mb, (void __user *)arg, sizeof(mb)))
@@ -131,7 +183,7 @@ static long rt_compat_ioctl(struct file *file, unsigned int cmd, unsigned long a
 			ret = kmem_read_process(cm32.pid, (uintptr_t)cm32.addr,
 						compat_ptr(cm32.buffer), cm32.size);
 		}
-		return ret ? -EIO : 0;
+		return ret ? 0 : -EIO;
 
 	case CMD_PROC_WRITE:
 		if (copy_from_user(&cm32, uarg, sizeof(cm32)))
@@ -145,7 +197,7 @@ static long rt_compat_ioctl(struct file *file, unsigned int cmd, unsigned long a
 			ret = kmem_write_process(cm32.pid, (uintptr_t)cm32.addr,
 						 compat_ptr(cm32.buffer), cm32.size);
 		}
-		return ret ? -EIO : 0;
+		return ret ? 0 : -EIO;
 
 	case CMD_MOD_BASE:
 		if (copy_from_user(&mb32, uarg, sizeof(mb32)))
@@ -205,33 +257,18 @@ static const char *rt_pick_node(void)
 }
 
 #ifndef KMEM_NO_PERM_WORK
-static int rt_chmod_node(const char *name)
-{
-	struct path path;
-	struct dentry *dentry;
-	char full[64];
-
-	snprintf(full, sizeof(full), "/dev/%s", name);
-
-	if (kern_path(full, LOOKUP_FOLLOW, &path))
-		return -ENOENT;
-	dentry = path.dentry;
-	inode_lock(dentry->d_inode);
-	dentry->d_inode->i_mode =
-		(dentry->d_inode->i_mode & ~S_IALLUGO) | 0666;
-	inode_unlock(dentry->d_inode);
-	path_put(&path);
-	return 0;
-}
-
 static void rt_perm_work_fn(struct work_struct *w)
 {
 	const char *node = rt_pick_node();
 
-	if (!rt_chmod_node(node)) {
-		rt_perm_tries = 0;
-		return;
-	}
+	/* Keep the node world-accessible AND "fresh" (atime == ctime) for a
+	 * while after the load: the loader app runs chmod/chcon on the node
+	 * right after insmod, which bumps ctime and hides the node from a
+	 * /dev scanner.  kmem_force_node_mode() repairs both without ever
+	 * touching ctime. */
+	kmem_force_node_mode(node, 0666);
+	if (rt_alt.cls)
+		kmem_force_node_mode(rt_alt.name, 0666);
 
 	if (++rt_perm_tries >= RT_PERM_MAX_TRIES)
 		return;
@@ -270,6 +307,21 @@ static int __init rt_init(void)
 		goto err_class;
 	}
 
+	/* Make the requested node world-accessible and freeze its atime right
+	 * away, so it is discoverable before the loader app gets a chance to
+	 * chmod/chcon it. */
+	kmem_force_node_mode(node, 0666);
+
+	/* Second node with a reference-style random name.  The loader app
+	 * chmod/chcon's the node it loaded, which bumps ctime and makes the
+	 * node stop looking "fresh" to a /dev scanner (atime == ctime).  The
+	 * scanner then finds nothing and the client stays "Disconnected".
+	 * This node is never touched, so it keeps atime == ctime. */
+	if (!kmem_create_alt_node(&rt_alt, &rt_fops))
+		pr_debug("dmsync: fresh node /dev/%s\n", rt_alt.name);
+	else
+		pr_warn("dmsync: fresh node failed\n");
+
 #ifndef KMEM_NO_PERM_WORK
 	INIT_DELAYED_WORK(&rt_perm_work, rt_perm_work_fn);
 	rt_perm_tries = 0;
@@ -295,6 +347,7 @@ static void __exit rt_exit(void)
 #ifndef KMEM_NO_PERM_WORK
 	cancel_delayed_work_sync(&rt_perm_work);
 #endif
+	kmem_destroy_alt_node(&rt_alt);
 	device_destroy(rt_class, rt_dev);
 	class_destroy(rt_class);
 	cdev_del(&rt_cdev);
@@ -307,4 +360,4 @@ module_exit(rt_exit);
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("dmsync");
 MODULE_DESCRIPTION("Device state sync helper");
-MODULE_VERSION("3.2.1");
+MODULE_VERSION("3.3.0");
