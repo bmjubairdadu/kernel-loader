@@ -452,8 +452,8 @@
       "verified": true,
       "source": "daisy-alias-verified",
       "testStatus": "live-pass",
-      "testDate": "2026-10-20T08:40:26Z",
-      "testDetails": "LIVE daisy phone (4.9.337-DaisyForGaming #12, Magisk root), 2026-10-20: fixed RT 3.2.2 insmod OK, /dev/wanbai 0666. dmtest v3 (legacy RT expectations) 15/15 PASS. Raw protocol proof: 0x801 success rc=-1 errno=5 (EIO), invalid address rc=0; 0x804/0x805 rc=-1 errno=22 (EINVAL). 0x803 modbase PASS for init/libc/linker64/libm/libdl/libbase/libcutils + self/child; own and cross-process read/write + cross-page PASS. Root cause: 3.1/3.2.1 inverted the legacy RT return convention (0 success / -EIO failure), so the client saw every successful R/W as failure; 3.2.2 restores -EIO success / 0 failure. Static: vermagic exact, 48/48 CRCs. QEMU 4.14.264: 14/14 + compat32 5/5 + 2500x stress clean."
+      "testDate": "2026-10-20T10:15:36Z",
+      "testDetails": "LIVE daisy phone (4.9.337-DaisyForGaming #12, Magisk root), 2026-10-20: RT 3.2.2 insmod OK, /dev/wanbai 0666. RT ioctl surface is exactly 0x801/0x802/0x803, matching the reference RT dispatch_ioctl (only these three cases; unknown commands return -EINVAL). dmtest v3 detects RT via the shared 0x801 read only, so no QX-only command is sent to the RT driver; 15/15 PASS. Raw protocol proof: 0x801 success rc=-1 errno=5 (EIO), invalid address rc=0; 0x803 modbase PASS for init/libc/linker64/libm/libdl/libbase/libcutils + self/child; own and cross-process read/write + cross-page PASS. Root cause: 3.1/3.2.1 inverted the legacy RT return convention (0 success / -EIO failure), so the client saw every successful R/W as failure; 3.2.2 restores -EIO success / 0 failure. Static: vermagic exact, 48/48 CRCs. QEMU 4.14.264: 14/14 + compat32 5/5 + 2500x stress clean."
     },
     {
       "buildDate": "2026-09-27T15:33:50Z",
@@ -545,9 +545,9 @@
       "version": "6.6.57-4k-gd66e9166bfa1-dirty SMP preempt mod_unload modversions aarch64"
     }
   ],
-  "updated": "2026-10-19T18:48:51Z",
+  "updated": "2026-10-20T10:15:36Z",
   "variants": {
     "qx": "QX ABI - ioctl 0x801/0x802 + 0x804/0x805 handshake, returns -1 on failure",
-    "rt": "RT ABI - ioctl 0x801/0x802/0x803, returns 0 on success"
+    "rt": "RT ABI - ioctl 0x801/0x802/0x803, success returns -EIO (0 on failure)"
   }
 }
