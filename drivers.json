@@ -182,7 +182,7 @@
       "source": "daisy-alias-verified",
       "testStatus": "live-pass",
       "testDate": "2026-10-19T18:48:51Z",
-      "testDetails": "LIVE daisy phone (4.9.337-DaisyForGaming #12, Magisk root): insmod OK, /dev/wanbai 0666 OK, dmtest 15/15 PASS (modbase init/libc/linker, read/write own, cross-process R/W, cross-page, child modbase) \u2014 RT and QX both"
+      "testDetails": "LIVE daisy phone (4.9.337-DaisyForGaming #12, Magisk root): QX 3.2.1 insmod OK, /dev/wanbai 0666 OK, dmtest 15/15 PASS under the QX protocol (0=success). QX only. RT 3.2.2 is a separate legacy-ABI fix and is pending its own live retest."
     },
     {
       "buildDate": "2026-09-27T15:33:50Z",
@@ -442,18 +442,18 @@
       "source": "onc-chidori-verified"
     },
     {
-      "buildDate": "2026-10-19T18:48:51Z",
+      "buildDate": "2026-10-20T08:23:53Z",
       "file": "rt_4.9.337-DaisyForGaming.ko",
       "label": "4.9.337-DaisyForGaming",
-      "sha256": "aff9d4af7f33f4f7d426c774da8e898c7630fcf2c1cf9d6db2bbc32c300f5a8d",
-      "size": 23520,
+      "sha256": "6076895729d26e0b937db48293b34a232f077bc350d0650b30d5b73863d8d55b",
+      "size": 23616,
       "variant": "rt",
       "version": "4.9.337-DaisyForGaming SMP preempt mod_unload modversions aarch64",
       "verified": true,
       "source": "daisy-alias-verified",
       "testStatus": "live-pass",
-      "testDate": "2026-10-19T18:48:51Z",
-      "testDetails": "LIVE daisy phone (4.9.337-DaisyForGaming #12, Magisk root): insmod OK, /dev/wanbai 0666 OK, dmtest 15/15 PASS (modbase init/libc/linker, read/write own, cross-process R/W, cross-page, child modbase) \u2014 RT and QX both"
+      "testDate": "2026-10-20T08:40:26Z",
+      "testDetails": "LIVE daisy phone (4.9.337-DaisyForGaming #12, Magisk root), 2026-10-20: fixed RT 3.2.2 insmod OK, /dev/wanbai 0666. dmtest v3 (legacy RT expectations) 15/15 PASS. Raw protocol proof: 0x801 success rc=-1 errno=5 (EIO), invalid address rc=0; 0x804/0x805 rc=-1 errno=22 (EINVAL). 0x803 modbase PASS for init/libc/linker64/libm/libdl/libbase/libcutils + self/child; own and cross-process read/write + cross-page PASS. Root cause: 3.1/3.2.1 inverted the legacy RT return convention (0 success / -EIO failure), so the client saw every successful R/W as failure; 3.2.2 restores -EIO success / 0 failure. Static: vermagic exact, 48/48 CRCs. QEMU 4.14.264: 14/14 + compat32 5/5 + 2500x stress clean."
     },
     {
       "buildDate": "2026-09-27T15:33:50Z",
