@@ -4,34 +4,6 @@
   "count": 55,
   "drivers": [
     {
-      "version": "4.14.264-GrassKSU@c717269a78 SMP preempt mod_unload modversions aarch64",
-      "file": "qx_4.14.264-GrassKSU.ko",
-      "variant": "qx",
-      "label": "4.14.264-GrassKSU@c717269a78",
-      "sha256": "1eb5788e07b71f0a81d6efa6e968a1e2afb286dfecc84576956616d5caebb4b3",
-      "size": 190856,
-      "buildDate": "2026-10-17T14:57:50Z",
-      "source": "samsung-universal9611-grass",
-      "verified": true,
-      "testStatus": "qemu-pass",
-      "testDate": "2026-10-19T16:53:53Z",
-      "testDetails": "QEMU 4.14.264 phone-identical kernel: load OK, node 0666 OK, read/write/cross-page/multipage OK, cross-process child R/W OK, EIO/EINVAL OK, 32-bit compat 5/5 OK, stress-race 2500x = 2500/2500 0 err; 403s stable, no crash/oops"
-    },
-    {
-      "version": "4.14.264-GrassKSU@c717269a78 SMP preempt mod_unload modversions aarch64",
-      "file": "rt_4.14.264-GrassKSU.ko",
-      "variant": "rt",
-      "label": "4.14.264-GrassKSU@c717269a78",
-      "sha256": "18ab3f8143eb6924a493f61a337b5b3695cbf4bf8a55a5e303b974e546ac1ca4",
-      "size": 188560,
-      "buildDate": "2026-10-17T14:57:50Z",
-      "source": "samsung-universal9611-grass",
-      "verified": true,
-      "testStatus": "qemu-pass",
-      "testDate": "2026-10-19T16:53:53Z",
-      "testDetails": "QEMU 4.14.264 phone-identical kernel: load OK, node 0666 OK, read/write/cross-page/multipage OK, cross-process child R/W OK, EIO/EINVAL OK, 32-bit compat 5/5 OK, stress-race 2500x = 2500/2500 0 err; 403s stable, no crash/oops"
-    },
-    {
       "version": "4.14.113-25741605 SMP preempt mod_unload aarch64",
       "file": "qx_4.14.113-25741605.ko",
       "variant": "qx",
@@ -86,6 +58,20 @@
       "size": 19456,
       "variant": "qx",
       "version": "4.14.186-perf SMP preempt mod_unload modversions aarch64"
+    },
+    {
+      "version": "4.14.264-GrassKSU@c717269a78 SMP preempt mod_unload modversions aarch64",
+      "file": "qx_4.14.264-GrassKSU.ko",
+      "variant": "qx",
+      "label": "4.14.264-GrassKSU@c717269a78",
+      "sha256": "1eb5788e07b71f0a81d6efa6e968a1e2afb286dfecc84576956616d5caebb4b3",
+      "size": 190856,
+      "buildDate": "2026-10-17T14:57:50Z",
+      "source": "samsung-universal9611-grass",
+      "verified": true,
+      "testStatus": "qemu-pass",
+      "testDate": "2026-10-19T16:53:53Z",
+      "testDetails": "QEMU 4.14.264 phone-identical kernel: load OK, node 0666 OK, read/write/cross-page/multipage OK, cross-process child R/W OK, EIO/EINVAL OK, 32-bit compat 5/5 OK, stress-race 2500x = 2500/2500 0 err; 403s stable, no crash/oops"
     },
     {
       "buildDate": "2026-09-27T15:33:50Z",
@@ -171,11 +157,11 @@
       "source": "onc-chidori-verified"
     },
     {
-      "buildDate": "2026-10-19T18:48:51Z",
+      "buildDate": "2026-10-20",
       "file": "qx_4.9.337-DaisyForGaming.ko",
       "label": "4.9.337-DaisyForGaming",
-      "sha256": "270e255e20020eebfa0c62a179e582762e0d16d51d3884de5e37ba6cacb49d99",
-      "size": 24368,
+      "sha256": "e1ffaaf5d335f494a2fd3c9e209f5d942c9ced793735c13b11c4b67837abce9d",
+      "size": 24592,
       "variant": "qx",
       "version": "4.9.337-DaisyForGaming SMP preempt mod_unload modversions aarch64",
       "verified": true,
@@ -357,6 +343,20 @@
       "verified": false
     },
     {
+      "version": "4.14.264-GrassKSU@c717269a78 SMP preempt mod_unload modversions aarch64",
+      "file": "rt_4.14.264-GrassKSU.ko",
+      "variant": "rt",
+      "label": "4.14.264-GrassKSU@c717269a78",
+      "sha256": "18ab3f8143eb6924a493f61a337b5b3695cbf4bf8a55a5e303b974e546ac1ca4",
+      "size": 188560,
+      "buildDate": "2026-10-17T14:57:50Z",
+      "source": "samsung-universal9611-grass",
+      "verified": true,
+      "testStatus": "qemu-pass",
+      "testDate": "2026-10-19T16:53:53Z",
+      "testDetails": "QEMU 4.14.264 phone-identical kernel: load OK, node 0666 OK, read/write/cross-page/multipage OK, cross-process child R/W OK, EIO/EINVAL OK, 32-bit compat 5/5 OK, stress-race 2500x = 2500/2500 0 err; 403s stable, no crash/oops"
+    },
+    {
       "buildDate": "2026-09-27T15:33:49Z",
       "file": "rt_4.19.113.ko",
       "label": "4.19.113",
@@ -442,7 +442,7 @@
       "source": "onc-chidori-verified"
     },
     {
-      "buildDate": "2026-10-20T08:23:53Z",
+      "buildDate": "2026-10-20",
       "file": "rt_4.9.337-DaisyForGaming.ko",
       "label": "4.9.337-DaisyForGaming",
       "sha256": "6076895729d26e0b937db48293b34a232f077bc350d0650b30d5b73863d8d55b",
@@ -545,7 +545,7 @@
       "version": "6.6.57-4k-gd66e9166bfa1-dirty SMP preempt mod_unload modversions aarch64"
     }
   ],
-  "updated": "2026-10-20T10:15:36Z",
+  "updated": "2026-10-20T14:42:04Z",
   "variants": {
     "qx": "QX ABI - ioctl 0x801/0x802 + 0x804/0x805 handshake, returns -1 on failure",
     "rt": "RT ABI - ioctl 0x801/0x802/0x803, success returns -EIO (0 on failure)"
