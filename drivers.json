@@ -157,11 +157,11 @@
       "source": "onc-chidori-verified"
     },
     {
-      "buildDate": "2026-10-20",
+      "buildDate": "2026-10-21",
       "file": "qx_4.9.337-DaisyForGaming.ko",
       "label": "4.9.337-DaisyForGaming",
-      "sha256": "e1ffaaf5d335f494a2fd3c9e209f5d942c9ced793735c13b11c4b67837abce9d",
-      "size": 24592,
+      "sha256": "4ffff10f45e140adc9a338fb62539e6b9b2ea5e4cff6c0e4815780615ffaba90",
+      "size": 27768,
       "variant": "qx",
       "version": "4.9.337-DaisyForGaming SMP preempt mod_unload modversions aarch64",
       "verified": true,
@@ -442,11 +442,11 @@
       "source": "onc-chidori-verified"
     },
     {
-      "buildDate": "2026-10-20",
+      "buildDate": "2026-10-21",
       "file": "rt_4.9.337-DaisyForGaming.ko",
       "label": "4.9.337-DaisyForGaming",
-      "sha256": "6076895729d26e0b937db48293b34a232f077bc350d0650b30d5b73863d8d55b",
-      "size": 23616,
+      "sha256": "b6dc68a9e10d40e2ba5ac6cd08e99dd66ab88a41072890c559353825433b675c",
+      "size": 26792,
       "variant": "rt",
       "version": "4.9.337-DaisyForGaming SMP preempt mod_unload modversions aarch64",
       "verified": true,
@@ -545,7 +545,7 @@
       "version": "6.6.57-4k-gd66e9166bfa1-dirty SMP preempt mod_unload modversions aarch64"
     }
   ],
-  "updated": "2026-10-20T17:04:41Z",
+  "updated": "2026-10-20T18:25:08Z",
   "variants": {
     "qx": "QX ABI - ioctl 0x801/0x802 + 0x804/0x805 handshake, returns -1 on failure",
     "rt": "RT ABI - ioctl 0x801/0x802/0x803, success returns -EIO (0 on failure)"
