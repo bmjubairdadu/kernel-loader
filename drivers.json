@@ -165,10 +165,10 @@
       "variant": "qx",
       "version": "4.9.337-DaisyForGaming SMP preempt mod_unload modversions aarch64",
       "verified": true,
-      "source": "daisy-on-device-3.3.0",
+      "source": "daisy-on-device-3.3.1-rtcompat",
       "testStatus": "live-pass",
-      "testDate": "2026-10-20T20:41:49Z",
-      "testDetails": "3.3.0 verified on a LIVE Mi A2 Lite daisy (4.9.337-DaisyForGaming #12, Magisk root). module_layout 0x7f49eb51 matches the phone CRC; insmod OK; node mode=666 and atime==ctime still true after repeated opens (S_NOATIME). Cross-process reads correct vs /proc/965/mem and /proc/1/mem. RT ABI returns -EIO on success and ioctl 0x800 switches that fd to the QX convention; unknown cmd EINVAL; modbase(NULL) EFAULT. dmbench: 64 B 0.85 us, 4 KiB 1.23 us, 1 MiB 783 us, write 64 B 0.76 us - level with 3.2.4, so the driver is not a lag source. No dmesg fingerprint on load."
+      "testDate": "2026-10-21T06:08:52Z",
+      "testDetails": "RT default restored to success=0 (3.2.x compat, exactly the behaviour that worked before); 0x800 QX flip kept; abi=rt still available for -EIO; QX unchanged. module_layout 0x7f49eb51."
     },
     {
       "buildDate": "2026-09-27T15:33:50Z",
@@ -445,15 +445,15 @@
       "buildDate": "2026-10-21",
       "file": "rt_4.9.337-DaisyForGaming.ko",
       "label": "4.9.337-DaisyForGaming",
-      "sha256": "1fad90c911d6bf99f86f4919dfe6bd77a36c0ff27c9daea8f7296e5ad46e9e7d",
-      "size": 30048,
+      "sha256": "8e7f47f48532a35c25484f607dd732a5f94f87b83ebed36426639ee11efda959",
+      "size": 30936,
       "variant": "rt",
       "version": "4.9.337-DaisyForGaming SMP preempt mod_unload modversions aarch64",
       "verified": true,
-      "source": "daisy-on-device-3.3.0",
+      "source": "daisy-on-device-3.3.1-rtcompat",
       "testStatus": "live-pass",
-      "testDate": "2026-10-20T20:41:49Z",
-      "testDetails": "3.3.0 verified on a LIVE Mi A2 Lite daisy (4.9.337-DaisyForGaming #12, Magisk root). module_layout 0x7f49eb51 matches the phone CRC; insmod OK; node mode=666 and atime==ctime still true after repeated opens (S_NOATIME). Cross-process reads correct vs /proc/965/mem and /proc/1/mem. RT ABI returns -EIO on success and ioctl 0x800 switches that fd to the QX convention; unknown cmd EINVAL; modbase(NULL) EFAULT. dmbench: 64 B 0.85 us, 4 KiB 1.23 us, 1 MiB 783 us, write 64 B 0.76 us - level with 3.2.4, so the driver is not a lag source. No dmesg fingerprint on load."
+      "testDate": "2026-10-21T06:08:52Z",
+      "testDetails": "RT default restored to success=0 (3.2.x compat, exactly the behaviour that worked before); 0x800 QX flip kept; abi=rt still available for -EIO; QX unchanged. module_layout 0x7f49eb51."
     },
     {
       "buildDate": "2026-09-27T15:33:50Z",
@@ -545,7 +545,7 @@
       "version": "6.6.57-4k-gd66e9166bfa1-dirty SMP preempt mod_unload modversions aarch64"
     }
   ],
-  "updated": "2026-10-20T20:41:49Z",
+  "updated": "2026-10-21T06:08:52Z",
   "variants": {
     "qx": "QX ABI - ioctl 0x801/0x802 + 0x804/0x805 handshake, returns -1 on failure",
     "rt": "RT ABI - ioctl 0x801/0x802/0x803, success returns -EIO (0 on failure)"
