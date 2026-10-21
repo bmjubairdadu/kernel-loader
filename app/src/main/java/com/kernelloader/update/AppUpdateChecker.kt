@@ -43,16 +43,22 @@ object AppUpdateChecker {
         return checkFromApi(apiUrlFromPage(releasesPageUrl), currentVersionCode)
     }
 
+    private fun extractVersionCode(tag: String, text: String = ""): Int? {
+        val vcRegex = Regex("""(?:versionCode|vc|build)[\s:=]+(\d+)""", RegexOption.IGNORE_CASE)
+        vcRegex.find(text)?.groupValues?.get(1)?.toIntOrNull()?.let { return it }
+        Regex("""^v?(\d+)$""").find(tag.trim())?.groupValues?.get(1)?.toIntOrNull()?.let { return it }
+        return Regex("""\b(\d+)\b""").find(tag)?.groupValues?.get(1)?.toIntOrNull()
+    }
+
     private fun checkFromReleasePage(pageUrl: String, currentVersionCode: Int): UpdateCheck? {
         val page = pageUrl.trimEnd('/')
         // only the final redirect URL matters here; the page body does not
         val (_, finalUrl) = fetch("$page/latest") ?: return null
         val tag = latestTagFromUrl(finalUrl) ?: return null
-        val code = Regex("""v?(\d+)""").find(tag)?.groupValues?.last()?.toIntOrNull()
-            ?: return null
+        val assetsBody = fetch("$page/expanded_assets/$tag")?.first ?: ""
+        val code = extractVersionCode(tag, assetsBody) ?: return null
         if (code <= currentVersionCode) return UpdateCheck.UpToDate
 
-        val assetsBody = fetch("$page/expanded_assets/$tag")?.first ?: return null
         val apkHref = Regex("""href="([^"]+/releases/download/[^"]+\.apk)"""")
             .findAll(assetsBody)
             .firstOrNull()?.groupValues?.get(1)
@@ -135,8 +141,10 @@ object AppUpdateChecker {
         return try {
             val rel = JSONObject(text)
             val tag = rel.optString("tag_name", "")
+            val name = rel.optString("name", "")
+            val body = rel.optString("body", "")
 
-            val code = Regex("""v?(\d+)""").find(tag)?.groupValues?.last()?.toIntOrNull()
+            val code = extractVersionCode(tag, "$name\n$body")
                 ?: rel.optInt("id", 0)
             if (code <= currentVersionCode) return UpdateCheck.UpToDate
 
@@ -173,50 +181,99 @@ object AppUpdateChecker {
         }
     }
 
-    fun downloadAndInstall(context: Context, info: UpdateInfo, onProgress: (Int) -> Unit = {}): String {
-        return try {
-            val dir = File(context.cacheDir, "updates").apply { mkdirs() }
-            // drop APKs from previous update attempts before pulling a new one
-            dir.listFiles()?.forEach { it.delete() }
-            val out = File(dir, "kloader_update_${info.versionCode}.apk")
-            val conn = (URL(info.apkUrl).openConnection() as HttpURLConnection).apply {
-                connectTimeout = 15000; readTimeout = 30000
-                instanceFollowRedirects = true
-                setRequestProperty("User-Agent", UA)
+    fun getDownloadedApk(context: Context, info: UpdateInfo): File? {
+        val dir = File(context.cacheDir, "updates")
+        val file = File(dir, "kloader_update_${info.versionCode}.apk")
+        if (file.exists() && file.isFile && file.length() >= 1024L) {
+            if (info.apkSize > 0 && file.length() != info.apkSize) {
+                return null
             }
-            conn.connect()
-            val httpCode = conn.responseCode
-            if (httpCode !in 200..299) {
-                conn.disconnect()
-                return "UPDATE: download failed (HTTP $httpCode)"
+            return file
+        }
+        return null
+    }
+
+    fun downloadApk(
+        context: Context,
+        info: UpdateInfo,
+        onProgress: (Int) -> Unit = {}
+    ): Result<File> = runCatching {
+        getDownloadedApk(context, info)?.let { return@runCatching it }
+
+        val dir = File(context.cacheDir, "updates").apply { mkdirs() }
+        dir.listFiles()?.forEach { file ->
+            if (file.name != "kloader_update_${info.versionCode}.apk") {
+                file.delete()
             }
-            val total = conn.contentLengthLong.takeIf { it > 0 } ?: info.apkSize
-            conn.inputStream.use { input ->
-                FileOutputStream(out).use { output ->
-                    val buf = ByteArray(64 * 1024)
-                    var read = 0L
-                    var n: Int
-                    var lastPct = -1
-                    while (input.read(buf).also { n = it } != -1) {
-                        output.write(buf, 0, n)
-                        read += n
-                        if (total > 0) {
-                            val pct = ((read * 100) / total).toInt()
-                            if (pct != lastPct) { lastPct = pct; onProgress(pct) }
+        }
+
+        val finalFile = File(dir, "kloader_update_${info.versionCode}.apk")
+        val tempFile = File(dir, "kloader_update_${info.versionCode}.apk.part")
+        if (tempFile.exists()) tempFile.delete()
+
+        val conn = (URL(info.apkUrl).openConnection() as HttpURLConnection).apply {
+            connectTimeout = 15000; readTimeout = 30000
+            instanceFollowRedirects = true
+            setRequestProperty("User-Agent", UA)
+        }
+        conn.connect()
+        val httpCode = conn.responseCode
+        if (httpCode !in 200..299) {
+            conn.disconnect()
+            throw IllegalStateException("HTTP $httpCode")
+        }
+
+        val total = conn.contentLengthLong.takeIf { it > 0 } ?: info.apkSize
+        conn.inputStream.use { input ->
+            FileOutputStream(tempFile).use { output ->
+                val buf = ByteArray(64 * 1024)
+                var read = 0L
+                var n: Int
+                var lastPct = -1
+                while (input.read(buf).also { n = it } != -1) {
+                    output.write(buf, 0, n)
+                    read += n
+                    if (total > 0) {
+                        val pct = ((read * 100) / total).toInt().coerceIn(0, 100)
+                        if (pct != lastPct) {
+                            lastPct = pct
+                            onProgress(pct)
                         }
                     }
                 }
             }
-            conn.disconnect()
-            if (out.length() < 1024L) {
-                out.delete()
-                return "UPDATE: downloaded file too small - invalid APK"
-            }
-            installApk(context, out)
-            "UPDATE: APK downloaded (${out.length() / 1024} KB) - installer opened"
-        } catch (e: Exception) {
-            "UPDATE: download error - ${e.message}"
         }
+        conn.disconnect()
+
+        if (tempFile.length() < 1024L) {
+            tempFile.delete()
+            throw IllegalStateException("Downloaded file too small")
+        }
+        if (info.apkSize > 0 && tempFile.length() != info.apkSize) {
+            tempFile.delete()
+            throw IllegalStateException("Size mismatch (expected ${info.apkSize}, got ${tempFile.length()})")
+        }
+
+        if (finalFile.exists()) finalFile.delete()
+        if (!tempFile.renameTo(finalFile)) {
+            tempFile.copyTo(finalFile, overwrite = true)
+            tempFile.delete()
+        }
+        onProgress(100)
+        finalFile
+    }
+
+    fun downloadAndInstall(context: Context, info: UpdateInfo, onProgress: (Int) -> Unit = {}): String {
+        val result = downloadApk(context, info, onProgress)
+        return result.fold(
+            onSuccess = { out ->
+                installApk(context, out)
+                "UPDATE: APK downloaded (${out.length() / 1024} KB) - installer opened"
+            },
+            onFailure = { e ->
+                "UPDATE: download error - ${e.message}"
+            }
+        )
     }
 
     fun installApk(context: Context, apk: File) {

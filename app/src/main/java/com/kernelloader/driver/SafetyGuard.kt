@@ -25,7 +25,7 @@ object SafetyGuard {
     fun hiddenDriverClass(): String? = try {
         Shell.cmd("ls /sys/class 2>/dev/null").exec().out
             .map { it.trim() }
-            .firstOrNull { it == "dmsync" || it == "dmsync_qx" }
+            .firstOrNull { it.startsWith("dmsync") || it.startsWith("kmem") || it.startsWith("memacc") }
     } catch (e: Exception) {
         null
     }

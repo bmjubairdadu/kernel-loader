@@ -73,12 +73,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -165,8 +163,6 @@ fun HomeScreen(
     val busy = viewModel.isBusy.value
     val busyStep = viewModel.busyStep.value
     val rebooting = viewModel.rebooting.value
-    val autoOk = viewModel.autoLoadOk.value
-    val autoStatus = viewModel.autoLoadStatus.value
     val terminalLines = viewModel.terminalLines
     val updateStatus = viewModel.updateStatus.value
     val updateProgress = viewModel.updateProgress.value
@@ -176,6 +172,7 @@ fun HomeScreen(
     val loadedModule = viewModel.driverModule.value.ifBlank { viewModel.loadedModuleName.value }
 
     LaunchedEffect(Unit) {
+        viewModel.initLogStore(context)
         // backstop: no report residue may survive an app restart
         withContext(Dispatchers.IO) { ReportPackBuilder.wipeReportDir(context) }
         viewModel.refreshManifest()
@@ -276,12 +273,16 @@ fun HomeScreen(
                     icon = Icons.Default.Refresh,
                     description = "Refresh driver database",
                     tint = AccentGreen,
-                    onClick = { viewModel.refreshManifest() }
+                    onClick = {
+                        viewModel.refreshManifest()
+                        viewModel.checkForAppUpdate()
+                    }
                 )
             }
 
             when {
-                updateStatus == "AVAILABLE" && appUpdate != null -> {
+                (updateStatus == "READY_TO_INSTALL" || updateStatus == "AVAILABLE") && appUpdate != null -> {
+                    val isReady = updateStatus == "READY_TO_INSTALL"
                     val pulse = rememberInfiniteTransition(label = "updatePulse")
                     val glow by pulse.animateFloat(
                         initialValue = 0.55f,
@@ -298,37 +299,43 @@ fun HomeScreen(
                             .padding(top = 8.dp)
                             .clickable { viewModel.installAppUpdate(context) },
                         colors = CardDefaults.cardColors(containerColor = Surface2),
-                        border = BorderStroke(1.dp, AccentGreen.copy(alpha = glow))
+                        border = BorderStroke(1.dp, (if (isReady) AccentGreen else AccentAmber).copy(alpha = glow))
                     ) {
                         Row(
                             modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 9.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(
-                                Icons.Default.SystemUpdate,
+                                if (isReady) Icons.Default.CheckCircle else Icons.Default.SystemUpdate,
                                 contentDescription = null,
-                                tint = AccentGreen,
+                                tint = if (isReady) AccentGreen else AccentAmber,
                                 modifier = Modifier.size(18.dp)
                             )
                             Spacer(Modifier.width(8.dp))
                             Column(Modifier.weight(1f)) {
                                 Text(
-                                    text = "UPDATE v${appUpdate.versionCode} · ${appUpdate.versionName}",
+                                    text = if (isReady) "UPDATE v${appUpdate.versionName} READY"
+                                           else "UPDATE v${appUpdate.versionCode} · ${appUpdate.versionName}",
                                     style = MaterialTheme.typography.labelMedium,
-                                    color = AccentGreen,
+                                    color = if (isReady) AccentGreen else AccentAmber,
                                     fontWeight = FontWeight.Bold
                                 )
                                 Text(
-                                    text = "tap to download & install" +
-                                            if (appUpdate.apkSize > 0) " (${appUpdate.apkSize / 1024} KB)" else "",
+                                    text = if (isReady) {
+                                        "Downloaded in background" +
+                                                (if (appUpdate.apkSize > 0) " (${appUpdate.apkSize / 1024} KB)" else "") +
+                                                " · tap to install"
+                                    } else {
+                                        "Download failed or pending · tap to retry"
+                                    },
                                     style = MonoTiny,
                                     color = TextMuted
                                 )
                             }
                             Text(
-                                text = "INSTALL ↗",
+                                text = if (isReady) "INSTALL NOW ↗" else "RETRY ⟳",
                                 style = MaterialTheme.typography.labelMedium,
-                                color = AccentGreen,
+                                color = if (isReady) AccentGreen else AccentAmber,
                                 fontWeight = FontWeight.Bold
                             )
                         }
@@ -337,15 +344,28 @@ fun HomeScreen(
                 updateStatus == "DOWNLOADING" -> {
                     Card(
                         modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                        colors = CardDefaults.cardColors(containerColor = Surface2)
+                        colors = CardDefaults.cardColors(containerColor = Surface2),
+                        border = BorderStroke(1.dp, AccentGreen.copy(alpha = 0.4f))
                     ) {
                         Column(Modifier.fillMaxWidth().padding(12.dp)) {
-                            Text(
-                                text = "DOWNLOADING UPDATE... ${if (updateProgress >= 0) "$updateProgress%" else ""}",
-                                style = MonoTiny,
-                                color = AccentGreen,
-                                fontWeight = FontWeight.Bold
-                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    Icons.Default.SystemUpdate,
+                                    contentDescription = null,
+                                    tint = AccentGreen,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(Modifier.width(6.dp))
+                                Text(
+                                    text = "AUTO-DOWNLOADING v${appUpdate?.versionName ?: ""} IN BACKGROUND... ${if (updateProgress >= 0) "$updateProgress%" else ""}",
+                                    style = MonoTiny,
+                                    color = AccentGreen,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
                             Spacer(Modifier.height(6.dp))
                             LinearProgressIndicator(
                                 progress = { if (updateProgress >= 0) updateProgress / 100f else 0f },
@@ -385,7 +405,7 @@ fun HomeScreen(
                         accentEnd = if (running) GradientAmberEnd else GradientRtEnd,
                         busy = running,
                         enabled = loadsTapable && !busy && rootAvailable,
-                        animated = loadsTapable && !busy && rootAvailable,
+                        animated = true,
                         onClick = {
                             family = ""
                             viewModel.autoLoadUniversal(context, preferOta = true, variant = "")
@@ -633,53 +653,6 @@ fun HomeScreen(
             }
             Spacer(Modifier.height(8.dp))
 
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = Surface1),
-                border = BorderStroke(
-                    1.dp,
-                    if (viewModel.autoloadEnabled.value) AccentGreen.copy(alpha = 0.45f)
-                    else BorderSubtle
-                )
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(Modifier.weight(1f)) {
-                        Text(
-                            text = "Load at every boot",
-                            style = MaterialTheme.typography.titleSmall,
-                            color = TextPrimary
-                        )
-                        Spacer(Modifier.height(2.dp))
-                        Text(
-                            text = if (viewModel.autoloadEnabled.value)
-                                "ON · the driver returns by itself after a restart"
-                            else "OFF · you must tap a load button after a restart",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = if (viewModel.autoloadEnabled.value) AccentGreen else TextMuted
-                        )
-                    }
-                    Spacer(Modifier.width(8.dp))
-                    Switch(
-                        checked = viewModel.autoloadEnabled.value,
-                        onCheckedChange = { on -> viewModel.setBootAutoload(context, on) },
-                        enabled = !busy && rootAvailable,
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = TextOnAccent,
-                            checkedTrackColor = AccentGreen,
-                            uncheckedThumbColor = TextMuted,
-                            uncheckedTrackColor = Surface3,
-                            uncheckedBorderColor = BorderSubtle
-                        )
-                    )
-                }
-            }
-            Spacer(Modifier.height(8.dp))
-
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(10.dp),
@@ -689,7 +662,7 @@ fun HomeScreen(
                 Text(
                     text = when {
                         busyStep.isNotBlank() -> busyStep
-                        autoStatus.isNotBlank() -> autoStatus
+                        viewModel.autoLoadStatus.value.isNotBlank() -> viewModel.autoLoadStatus.value
                         exact != null ->
                             "Ready: ${exact.version} ${OtaDriverStore.variantLabel(exact.variant)} loader on GitHub"
                         else -> "Tap LOAD · detect kernel + download loader"
@@ -701,6 +674,56 @@ fun HomeScreen(
                         .fillMaxWidth()
                         .padding(horizontal = 10.dp, vertical = 9.dp)
                 )
+            }
+
+            Spacer(Modifier.height(14.dp))
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = Surface1),
+                border = BorderStroke(1.dp, AccentGreen.copy(alpha = 0.4f))
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            text = "Driver R/W Status",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = TextPrimary
+                        )
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            text = "read/write check (0x801/0x802/0x803) & clients",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextMuted
+                        )
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    Button(
+                        onClick = { viewModel.checkDriverActivity(context) },
+                        enabled = !busy && rootAvailable,
+                        colors = ButtonDefaults.buttonColors(containerColor = AccentGreen),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.BugReport,
+                            contentDescription = null,
+                            tint = TextOnAccent,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            text = "CHECK R/W",
+                            color = TextOnAccent,
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
             }
 
             Spacer(Modifier.height(14.dp))
@@ -734,11 +757,11 @@ fun HomeScreen(
 
             SupportCard(
                 viewModel = viewModel,
-                loadFailed = autoOk == false,
+                loadFailed = viewModel.autoLoadOk.value == false,
                 hasExact = exact != null,
                 appVersion = "v${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
                 resultText = viewModel.lastLoadError.value.ifBlank {
-                    autoStatus.ifBlank { "load failed / no exact loader" }
+                    viewModel.autoLoadStatus.value.ifBlank { "load failed / no exact loader" }
                 },
                 loadedModule = loadedModule,
                 getLog = { viewModel.getTerminalText() }
@@ -756,22 +779,24 @@ private fun HomeHeader(
 ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Box(modifier = Modifier.size(50.dp), contentAlignment = Alignment.Center) {
-            // the logo ring only spins during a load: an always-on animation
-            // forced a full-window repaint every single frame
-            val spin = if (busy) {
-                val transition = rememberInfiniteTransition(label = "logoSpin")
-                val value by transition.animateFloat(
-                    initialValue = 0f,
-                    targetValue = 360f,
-                    animationSpec = infiniteRepeatable(
-                        animation = tween(9000, easing = LinearEasing)
-                    ),
-                    label = "logoSpinA"
-                )
-                value
-            } else {
-                0f
-            }
+            val transition = rememberInfiniteTransition(label = "logoAnim")
+            val spin by transition.animateFloat(
+                initialValue = 0f,
+                targetValue = 360f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(if (busy) 1200 else 7000, easing = LinearEasing)
+                ),
+                label = "logoSpin"
+            )
+            val breathe by transition.animateFloat(
+                initialValue = 0.95f,
+                targetValue = 1.05f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(if (busy) 800 else 2200, easing = FastOutSlowInEasing),
+                    repeatMode = RepeatMode.Reverse
+                ),
+                label = "logoBreathe"
+            )
             Canvas(
                 modifier = Modifier
                     .fillMaxSize()
@@ -795,6 +820,10 @@ private fun HomeHeader(
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .size(42.dp)
+                    .graphicsLayer {
+                        scaleX = breathe
+                        scaleY = breathe
+                    }
                     .clip(CircleShape)
                     .border(1.dp, BorderSubtle, CircleShape)
             )
@@ -891,13 +920,16 @@ private fun VariantConsoleCard(
     val listState = rememberLazyListState()
     LaunchedEffect(lines.size) {
         if (lines.isEmpty()) return@LaunchedEffect
-        // jump instead of animating: a load drops dozens of lines in a burst
-        // and every restart queued another scroll animation on the main
-        // thread. Follow along only while the user is already at the bottom.
         val last = lines.size - 1
         val visible = listState.layoutInfo.visibleItemsInfo
         val atBottom = visible.isEmpty() || visible.last().index >= last - 2
-        if (atBottom) listState.scrollToItem(last)
+        if (atBottom) {
+            try {
+                listState.animateScrollToItem(last)
+            } catch (_: Exception) {
+                listState.scrollToItem(last)
+            }
+        }
     }
     Card(
         modifier = Modifier
@@ -1049,24 +1081,63 @@ private fun KernelListSection(
     }
 }
 
-/**
- * Static status dot. It used to pulse forever while a driver was loaded,
- * which kept the whole window repainting every frame; a steady indicator
- * costs nothing and the text carries the state anyway.
- */
 @Composable
 private fun StatusDot(loaded: Boolean) {
-    Box(
-        modifier = Modifier
-            .size(9.dp)
-            .clip(CircleShape)
-            .background(if (loaded) StatusOk else StatusIdle)
-            .border(
-                2.dp,
-                if (loaded) StatusOk.copy(alpha = 0.35f) else Color.Transparent,
-                CircleShape
+    if (loaded) {
+        val transition = rememberInfiniteTransition(label = "statusDotPulse")
+        val glow by transition.animateFloat(
+            initialValue = 0.35f,
+            targetValue = 1.0f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(1200, easing = FastOutSlowInEasing),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "statusDotGlow"
+        )
+        val scale by transition.animateFloat(
+            initialValue = 0.9f,
+            targetValue = 1.15f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(1200, easing = FastOutSlowInEasing),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "statusDotScale"
+        )
+        Box(
+            modifier = Modifier.size(12.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(12.dp)
+                    .graphicsLayer {
+                        scaleX = scale
+                        scaleY = scale
+                        alpha = glow * 0.45f
+                    }
+                    .clip(CircleShape)
+                    .background(StatusOk)
             )
-    )
+            Box(
+                modifier = Modifier
+                    .size(8.dp)
+                    .graphicsLayer {
+                        alpha = glow
+                    }
+                    .clip(CircleShape)
+                    .background(StatusOk)
+                    .border(1.5.dp, StatusOk.copy(alpha = glow * 0.7f), CircleShape)
+            )
+        }
+    } else {
+        Box(
+            modifier = Modifier
+                .size(9.dp)
+                .clip(CircleShape)
+                .background(StatusIdle)
+                .border(2.dp, Color.Transparent, CircleShape)
+        )
+    }
 }
 
 @Composable
@@ -1146,42 +1217,28 @@ private fun RingButton(
     accentEnd: Color,
     busy: Boolean,
     enabled: Boolean,
-    animated: Boolean = false,
+    animated: Boolean = true,
     onClick: () -> Unit,
     content: @Composable ColumnScope.() -> Unit
 ) {
-    // Ring motion runs only while a load is in flight or when the caller asked
-    // for the slow idle spin (the restart ring). While busy the states follow
-    // every frame; idle updates are gated to ~20 per second - a 5.2s turn is
-    // only ~3.5 degrees per tick, so it still reads as a smooth spin, but the
-    // window renders a third of the frames (an idle 60fps spin burned ~85% of
-    // a core + ~20ms gpu per frame on the dev phone). The values are plain
-    // float states read only inside the graphicsLayer blocks below, so one
-    // update touches the two layer transforms and nothing else - no
-    // recomposition, no relayout, no re-recorded draw commands.
-    val spinState = remember { mutableFloatStateOf(0f) }
-    val breatheState = remember { mutableFloatStateOf(1f) }
-    LaunchedEffect(busy, animated) {
-        if (!busy && !animated) {
-            spinState.floatValue = 0f
-            breatheState.floatValue = 1f
-            return@LaunchedEffect
-        }
-        val spinPeriodMs = if (busy) 900f else 5200f
-        val breathePeriodMs = if (busy) 3200f else 4000f
-        val idleGapMs = if (busy) 0L else 45L
-        var baseNs = 0L
-        while (true) {
-            val nowNs = withFrameNanos { it }
-            if (baseNs == 0L) baseNs = nowNs
-            val tMs = (nowNs - baseNs) / 1_000_000f
-            spinState.floatValue = (tMs / spinPeriodMs * 360f) % 360f
-            val phase = (tMs % breathePeriodMs) / breathePeriodMs
-            val tri = if (phase < 0.5f) phase * 2f else 2f - phase * 2f
-            breatheState.floatValue = 0.97f + 0.06f * tri
-            if (idleGapMs > 0) delay(idleGapMs)
-        }
-    }
+    val transition = rememberInfiniteTransition(label = "ringTransition")
+    val spin by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(if (busy) 900 else 5200, easing = LinearEasing)
+        ),
+        label = "ringSpin"
+    )
+    val breathe by transition.animateFloat(
+        initialValue = 0.97f,
+        targetValue = 1.03f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(if (busy) 1600 else 3200, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "ringBreathe"
+    )
     val scaleSpec = if (busy) 1.05f else 1f
     val ringBrush = Brush.sweepGradient(
         listOf(accentEnd, accentStart, accentEnd.copy(alpha = 0.2f), accentEnd)
@@ -1192,15 +1249,13 @@ private fun RingButton(
         Canvas(
             modifier = Modifier
                 .fillMaxSize()
-                .graphicsLayer { rotationZ = spinState.floatValue }
+                .graphicsLayer { rotationZ = if (animated || busy) spin else 0f }
         ) {
             val stroke = Stroke(width = 5.dp.toPx(), cap = StrokeCap.Round)
             val glow = Stroke(width = 12.dp.toPx(), cap = StrokeCap.Round)
             val diameter = size.minDimension - stroke.width
             val topLeft = Offset((size.width - diameter) / 2f, (size.height - diameter) / 2f)
             val arcSize = Size(diameter, diameter)
-            // the base ring is a full circle: rotating the whole canvas via
-            // the layer keeps it identical without a draw-phase state read
             drawArc(
                 color = accentStart.copy(alpha = if (hot) 0.20f else 0.10f),
                 startAngle = 0f, sweepAngle = 360f, useCenter = false,
@@ -1239,9 +1294,8 @@ private fun RingButton(
             modifier = Modifier
                 .size(114.dp)
                 .graphicsLayer {
-                    // breathe is read in the layer block, not in composition:
-                    // the ring keeps pulsing without recomposing the button
-                    val s = scaleSpec * breatheState.floatValue
+                    val b = if (animated || busy) breathe else 1f
+                    val s = scaleSpec * b
                     scaleX = s
                     scaleY = s
                 }
@@ -1439,19 +1493,44 @@ private fun SupportCard(
                             if (preparing) return@IconButton
                             scope.launch {
                                 preparing = true
+                                stepText = "Collecting device info..."
                                 try {
-                                    val report = withContext(Dispatchers.IO) { collectReport() }
-                                    val text = buildReportText(report)
-                                    context.startActivity(
-                                        Intent(
-                                            Intent.ACTION_VIEW,
-                                            Uri.parse(
-                                                SupportContact.issueUrlFromReport(
-                                                    text, report.issueTitle
-                                                )
+                                    val pack = withContext(Dispatchers.IO) {
+                                        ReportPackBuilder.buildPack(
+                                            context = context,
+                                            rootAvailable = RootChecker.isRootAvailable(),
+                                            loadedModule = loadedModule,
+                                            bundleTried = viewModel.lastBundleTried.value,
+                                            matchStatus = matchStatus,
+                                            resultText = resultText,
+                                            logText = getLog(),
+                                            onStep = { stepText = it }
+                                        )
+                                    }
+                                    clipboard.setText(AnnotatedString(SupportContact.TELEGRAM_HANDLE))
+                                    val sent = pack.zipFile?.let {
+                                        SupportContact.sendZipViaTelegram(context, it, pack.caption)
+                                    } ?: false
+                                    wipeOnResume = true
+                                    if (!sent) {
+                                        context.startActivity(
+                                            Intent(
+                                                Intent.ACTION_VIEW,
+                                                Uri.parse(SupportContact.telegramDirectUrl())
                                             )
                                         )
-                                    )
+                                        Toast.makeText(
+                                            context,
+                                            "Telegram opened (@Jubairdadubm copied)",
+                                            Toast.LENGTH_LONG
+                                        ).show()
+                                    } else {
+                                        Toast.makeText(
+                                            context,
+                                            "Sending report to @Jubairdadubm",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                    }
                                 } catch (e: Exception) {
                                     Toast.makeText(
                                         context,
@@ -1467,19 +1546,18 @@ private fun SupportCard(
                         modifier = Modifier
                             .size(60.dp)
                             .clip(CircleShape)
-                            .background(Surface3)
-                            .border(1.5.dp, AccentBlue.copy(alpha = 0.6f), CircleShape)
+                            .background(Color(0xFF24A1DE))
                     ) {
                         Icon(
-                            Icons.Default.BugReport,
-                            contentDescription = "Post auto build report to GitHub",
-                            tint = AccentBlue,
-                            modifier = Modifier.size(30.dp)
+                            painter = painterResource(id = R.drawable.ic_telegram),
+                            contentDescription = "Send report ZIP on Telegram (@Jubairdadubm)",
+                            tint = Color.White,
+                            modifier = Modifier.size(28.dp)
                         )
                     }
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        text = "Report",
+                        text = "Telegram",
                         style = MaterialTheme.typography.labelSmall,
                         color = TextSecondary,
                         fontWeight = FontWeight.Bold
@@ -1519,7 +1597,7 @@ private fun SupportCard(
                 )
             }
             Text(
-                text = "ZIP goes to the dev's WhatsApp — everything needed to build your .ko is inside",
+                text = "ZIP goes to dev via WhatsApp or Telegram (@Jubairdadubm) — everything needed to build your .ko is inside",
                 style = MaterialTheme.typography.bodySmall,
                 color = TextMuted,
                 textAlign = TextAlign.Center,
@@ -1588,7 +1666,7 @@ private fun UnloadPanel(
             accentEnd = if (hot) GradientRedEnd else TextDisabled,
             busy = busy,
             enabled = enabled,
-            animated = enabled && !busy,
+            animated = true,
             onClick = onUnload
         ) {
             if (busy) {

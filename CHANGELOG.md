@@ -7,6 +7,69 @@ the in-app updater parses the tag number, so dotted tags never trigger updates.
 
 ---
 
+## [1.2] — 2026-10-21 (versionCode 6, tag `v6`) 🚀 Auto-Update & Persistence Release
+
+> Seamless background auto-updates, persistent terminal logs across app clears, direct Telegram issue reports with device diagnostics, universal device node symlinks, and enhanced resident stealth driver detection.
+
+### ✨ Added
+* **Automatic Background Update Download.** When a new release is detected on GitHub, the APK is automatically downloaded in the background. The update card shows download progress and switches to "UPDATE READY TO INSTALL", allowing instant installation with a single tap without download delays.
+* **Periodic Background Update Checks.** Checks for new updates automatically every 15 minutes while the app is active, as well as on manual database refresh.
+* **Direct Telegram Reporting (@Jubairdadubm).** Replaced GitHub issue reporting with one-tap Telegram report submission. Packs `report.txt`, `Module.symvers.txt` (CRC table), `config.txt`, `dmesg.txt`, and `applog.txt` into a ZIP and attaches it directly to Telegram for `@Jubairdadubm`.
+* **Universal Device Node Symlinks.** When a driver loads, all standard candidate nodes (`/dev/wanbai`, `/dev/dmsync`, `/dev/dmsync_rt`, `/dev/dmsync_qx`, `/dev/memacc`, `/dev/entryi`, `/dev/kmem_337`, `/dev/CheckMe`, `/dev/lanran`, `/dev/video188`) are automatically symlinked and given `0666` permissions so any third-party tool finds its expected node immediately.
+* **Detailed Module Operation Logging.** Added granular, real-time stage logging for every step of the kernel module insertion and validation pipeline.
+
+### 🛠️ Fixed
+* **Terminal Log Persistence Across App Clear/Kill.** Converted `DriverViewModel` to an `AndroidViewModel` and implemented synchronous disk log persistence (`files/console_history.log`) so terminal logs survive background app termination and app restarts.
+* **Resident Hidden Driver Detection.** `SafetyGuard.hiddenDriverClass()` now recognizes all prefix patterns (`dmsync*`, `kmem*`, `memacc*`) so resident drivers in memory are gracefully reused without triggering `File exists` errors on reload.
+* **Flexible Version Code Extraction.** `AppUpdateChecker` now parses `versionCode` from release body, titles, and tags (`extractVersionCode`), preventing version detection failures on non-integer tags.
+* **Chooser Flag Crash Guard.** Added `FLAG_ACTIVITY_NEW_TASK` to `Intent.createChooser` in `SupportContact` to avoid potential runtime exceptions on non-Activity contexts.
+
+### 🔄 Changed
+* Built with `versionCode 6` and `versionName 1.2`.
+
+---
+
+## [Driver 3.2.2] — 2026-10-20 (OTA, no APK change needed) 🛠️ RT ABI hotfix
+
+> **"Loads but does nothing" root cause fixed.** The 3.1/3.2.1 RT builds
+> returned `0` for a successful read/write and `-EIO` for a failure — the
+> exact inverse of the legacy RT protocol used by the reference
+> `kmem_337.c`, the embedded 3.0-337 driver, and the real client. Every
+> successful access was therefore reported to the client as a failure.
+> 3.2.2 restores the legacy convention.
+
+### 🛠️ Fixed
+* **RT read/write return convention restored (live-proven).** `0x801`
+  read and `0x802` write now return `-EIO` (userspace `-1`, `errno=5`) on
+  success and `0` on failure, exactly like the legacy RT drivers. QX is
+  unchanged (`0` success / `-1` failure). The two conventions are
+  mutually exclusive, so a single dual-ABI binary is not possible; the RT
+  and QX variants stay separate.
+* **Modbase path buffer 256 → 1024 bytes.** `d_path()` can now resolve
+  deeply nested Android executable paths instead of failing with
+  `-ENAMETOOLONG` and silently returning `0`.
+* **Exact legacy RT ioctl surface.** RT implements only `0x801` read,
+  `0x802` write and `0x803` modbase; any other command returns `-EINVAL`,
+  matching the reference RT `dispatch_ioctl`. `0x803` still returns `0`
+  and fills `base`.
+
+### ✅ Verified
+* **Live daisy phone** (`4.9.337-DaisyForGaming #12`, Magisk root):
+  insmod OK, `/dev/wanbai` 0666, `dmtest` v3 **15/15 PASS**; the RT report
+  exercises only `0x801`/`0x802`/`0x803`. Raw proof: `0x801` success
+  `rc=-1 errno=5 (EIO)`, invalid address `rc=0`; modbase
+  init/libc/linker64/libm/libdl/libbase/libcutils + self/child PASS; own/
+  cross-process R/W and cross-page PASS.
+* **QEMU 4.14.264 ABI harness:** 14/14 + compat32 5/5 + 2500× stress clean
+  with the legacy `-EIO` expectations.
+* Static: exact vermagic and 48/48 imported CRCs against the daisy
+  `Module.symvers`.
+* OTA DB entry replaced with the fixed binary and marked
+  `verified:true`, `testStatus:"live-pass"`. QX remains the live-verified
+  3.2.1 build.
+
+---
+
 ## [1.1] — 2026-10-15 (versionCode 5, tag `v5`) 🥷 Stealth release
 
 > The driver now hides one-way on load — exactly like the reference RT

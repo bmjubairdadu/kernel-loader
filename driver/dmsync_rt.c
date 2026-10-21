@@ -67,13 +67,20 @@ static int rt_release(struct inode *inode, struct file *file)
  *   - a client that sends the init key (0x800) gets QX semantics for
  *     that file descriptor only, so one driver can serve both at once
  */
-static char *abi = "rt";
+static char *abi = "compat";
 module_param(abi, charp, 0644);
-MODULE_PARM_DESC(abi, "ioctl return convention: 'rt' (success = -EIO) or 'qx' (success = 0)");
+MODULE_PARM_DESC(abi, "ioctl return convention: 'compat' (success = 0, 3.2.x behaviour), 'rt' (success = -EIO), 'qx' (success = 0)");
 
 static int rt_abi_is_qx(void)
 {
 	return abi && (!strcmp(abi, "qx") || !strcmp(abi, "QX"));
+}
+
+/* strict reference RT: success is -EIO.  Opt-in only (abi=rt), because
+ * the shipped clients of this tree expect success = 0. */
+static int rt_abi_is_strict(void)
+{
+	return abi && (!strcmp(abi, "rt") || !strcmp(abi, "RT"));
 }
 
 /* per-fd override, set by the 0x800 init key */
@@ -107,9 +114,11 @@ static long rt_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 					(void __user *)cm.buffer, cm.size);
 		if (rt_fd_is_qx(file))
 			return ret ? -1 : 0;
-		/* Legacy RT ABI: success is -EIO, failure is 0.  The client
-		 * checks these exact values (read/write OK -> -5). */
-		return ret ? 0 : -EIO;
+		if (rt_abi_is_strict())
+			return ret ? 0 : -EIO;
+		/* 3.2.x compatibility (default): success is 0, failure -EIO.
+		 * This is the convention the shipped clients expect. */
+		return ret ? -EIO : 0;
 
 	case CMD_PROC_WRITE:
 		if (copy_from_user(&cm, (void __user *)arg, sizeof(cm)))
@@ -118,7 +127,9 @@ static long rt_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 					 (void __user *)cm.buffer, cm.size);
 		if (rt_fd_is_qx(file))
 			return ret ? -1 : 0;
-		return ret ? 0 : -EIO;
+		if (rt_abi_is_strict())
+			return ret ? 0 : -EIO;
+		return ret ? -EIO : 0;
 
 	case CMD_MOD_BASE:
 		if (copy_from_user(&mb, (void __user *)arg, sizeof(mb)))

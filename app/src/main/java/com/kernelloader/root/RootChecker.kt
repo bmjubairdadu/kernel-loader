@@ -19,9 +19,8 @@ object RootChecker {
     fun getKernelVersion(): String {
         return try {
             val process = Runtime.getRuntime().exec("uname -r")
-            val reader = BufferedReader(InputStreamReader(process.inputStream))
-            val version = reader.readLine()
-            reader.close()
+            val version = process.inputStream.bufferedReader().use { it.readLine() }
+            process.destroy()
             version ?: "Unknown"
         } catch (e: Exception) {
             "Error: ${e.message}"
@@ -63,9 +62,9 @@ object RootChecker {
         val v = getKernelVersion()
         val short = kernelShortVersion(v)
         return when {
-            exactMatch == true -> "OK: $v - exact driver available ($short) - AUTO LOAD works"
+            exactMatch == true -> "OK: $v - exact driver available ($short) - ready to load"
             exactMatch == false -> "UNIVERSAL: $v - no exact driver, best match + vermagic auto-patch + force-load"
-            driverCount > 0 -> "UNIVERSAL: $v - $driverCount driver(s) bundled - AUTO LOAD auto-selects best match"
+            driverCount > 0 -> "UNIVERSAL: $v - $driverCount driver(s) bundled - auto-selects best match"
             else -> "UNIVERSAL: $v - pick any .ko (any device / any model / old & new kernels)"
         }
     }

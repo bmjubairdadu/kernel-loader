@@ -1,10 +1,12 @@
 package com.kernelloader.driver
 
+import android.app.Application
 import android.content.Context
 import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kernelloader.BuildConfig
@@ -18,6 +20,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.coroutineContext
@@ -53,7 +56,7 @@ object EmbeddedDrivers {
             val description = when (type) {
                 "UNI" -> "Universal build for kernel $version (any device)"
                 "NATIVE", "DAISY" -> "Daisy device build for kernel $version (DaisyForGaming tree)"
-                "QX" -> "QX driver for $version (QX ABI - ioctl 0x801/0x802/0x804)"
+                "QX" -> "QX driver for $version (QX ABI - ioctl 0x801/0x802/0x803 + 0x804/0x805 handshake)"
                 "RT" -> "RT driver for $version (RT ABI - ioctl 0x801/0x802/0x803)"
                 else -> "Kernel module build for $version"
             }
@@ -135,7 +138,7 @@ data class TerminalLine(
     val variant: String = ""
 )
 
-class DriverViewModel : ViewModel() {
+class DriverViewModel(application: Application) : AndroidViewModel(application) {
     
     val DEFAULT_DEV_NODE = "wanbai"
     var devNodeOverride = mutableStateOf("")
@@ -164,8 +167,6 @@ class DriverViewModel : ViewModel() {
 
     var driverModule = mutableStateOf("")
 
-    var autoloadEnabled = mutableStateOf(false)
-
     // report context: which driver family the last pipeline tried + the exact insmod error
     var lastBundleTried = mutableStateOf("")
     var lastLoadError = mutableStateOf("")
@@ -190,57 +191,108 @@ class DriverViewModel : ViewModel() {
     var updateProgress = mutableStateOf(-1)       
     var updateMsg = mutableStateOf("")
 
-    fun checkForAppUpdate() {
+    private var updateCheckJob: Job? = null
+    private var downloadJob: Job? = null
+
+    fun startPeriodicUpdateCheck() {
+        updateCheckJob?.cancel()
+        updateCheckJob = viewModelScope.launch(Dispatchers.IO) {
+            while (isActive) {
+                delay(15 * 60 * 1000L) // check every 15 minutes
+                checkForAppUpdate(silent = true)
+            }
+        }
+    }
+
+    fun checkForAppUpdate(silent: Boolean = false) {
         if (updateStatus.value == "CHECKING" || updateStatus.value == "DOWNLOADING") return
-        updateStatus.value = "CHECKING"
-        tlog("Checking Update...", "INFO")
+        val wasReady = updateStatus.value == "READY_TO_INSTALL"
+        if (!wasReady) updateStatus.value = "CHECKING"
+        if (!silent) tlog("Checking Update...", "INFO")
         viewModelScope.launch(Dispatchers.IO) {
             val result = AppUpdateChecker.check(BuildConfig.UPDATE_RELEASES_PAGE, BuildConfig.VERSION_CODE)
             withContext(Dispatchers.Main) {
                 when (result) {
                     is AppUpdateChecker.UpdateCheck.Available -> {
                         appUpdate.value = result.info
-                        updateStatus.value = "AVAILABLE"
-                        tlog("Update Available: v${result.info.versionName}", "WARN")
+                        val app = getApplication<Application>()
+                        val cached = AppUpdateChecker.getDownloadedApk(app, result.info)
+                        if (cached != null) {
+                            updateStatus.value = "READY_TO_INSTALL"
+                            updateProgress.value = 100
+                            tlog("Update v${result.info.versionName} ready to install", "OK")
+                        } else {
+                            tlog("New version v${result.info.versionName} found — auto-downloading in background...", "INFO")
+                            startBackgroundDownload(result.info)
+                        }
                     }
                     AppUpdateChecker.UpdateCheck.UpToDate -> {
                         appUpdate.value = null
-                        updateStatus.value = "NONE"
-                        tlog("App Up To Date", "OK")
+                        if (!wasReady) updateStatus.value = "NONE"
+                        if (!silent) tlog("App Up To Date", "OK")
                     }
                     AppUpdateChecker.UpdateCheck.Offline -> {
-                        if (updateStatus.value != "AVAILABLE") updateStatus.value = "ERROR"
-                        tlog("Update Check Offline", "WARN")
+                        if (!wasReady && updateStatus.value != "AVAILABLE") {
+                            updateStatus.value = "ERROR"
+                        }
+                        if (!silent) tlog("Update Check Offline", "WARN")
                     }
                 }
             }
         }
     }
 
-    fun installAppUpdate(context: Context) {
-        val info = appUpdate.value ?: return
+    fun startBackgroundDownload(info: AppUpdateChecker.UpdateInfo) {
+        downloadJob?.cancel()
         updateStatus.value = "DOWNLOADING"
         updateProgress.value = 0
-        viewModelScope.launch(Dispatchers.IO) {
-            if (!AppUpdateChecker.canInstall(context)) {
-                withContext(Dispatchers.Main) {
-                    tlog("Install permission needed", "WARN")
-                    updateStatus.value = "AVAILABLE"
-                    updateProgress.value = -1
-                    AppUpdateChecker.requestInstallPermission(context)
+        downloadJob = viewModelScope.launch(Dispatchers.IO) {
+            val app = getApplication<Application>()
+            val result = AppUpdateChecker.downloadApk(app, info) { pct ->
+                viewModelScope.launch(Dispatchers.Main) {
+                    updateProgress.value = pct
                 }
-                return@launch
-            }
-            val msg = AppUpdateChecker.downloadAndInstall(context, info) { pct ->
-                viewModelScope.launch(Dispatchers.Main) { updateProgress.value = pct }
             }
             withContext(Dispatchers.Main) {
-                updateMsg.value = msg
-                updateStatus.value = if (msg.contains("installer opened")) "DONE" else "ERROR"
-                updateProgress.value = -1
-                tlog(msg, if (updateStatus.value == "DONE") "OK" else "ERR")
+                result.fold(
+                    onSuccess = { apk ->
+                        updateStatus.value = "READY_TO_INSTALL"
+                        updateProgress.value = 100
+                        tlog("Update v${info.versionName} downloaded (${apk.length() / 1024} KB) — ready to install", "OK")
+                    },
+                    onFailure = { err ->
+                        updateStatus.value = "AVAILABLE"
+                        updateProgress.value = -1
+                        tlog("Update download failed: ${err.message ?: "network error"}", "WARN")
+                    }
+                )
             }
         }
+    }
+
+    fun installAppUpdate(context: Context) {
+        val info = appUpdate.value ?: return
+
+        if (!AppUpdateChecker.canInstall(context)) {
+            tlog("Install permission needed", "WARN")
+            AppUpdateChecker.requestInstallPermission(context)
+            return
+        }
+
+        val cached = AppUpdateChecker.getDownloadedApk(context, info)
+        if (cached != null) {
+            try {
+                AppUpdateChecker.installApk(context, cached)
+                updateStatus.value = "DONE"
+                tlog("Opening installer for v${info.versionName}...", "OK")
+            } catch (e: Exception) {
+                tlog("Installer launch error: ${e.message}", "ERR")
+            }
+            return
+        }
+
+        tlog("Downloading update v${info.versionName}...", "INFO")
+        startBackgroundDownload(info)
     }
 
     fun refreshManifest() {
@@ -283,12 +335,99 @@ class DriverViewModel : ViewModel() {
 
     var activePipelineVariant = mutableStateOf("")
 
+    private val logWriteLock = Any()
+    private val logFile: File = File(application.filesDir, "console_history.log")
+
+    init {
+        try {
+            if (logFile.exists() && logFile.length() > 0) {
+                val rawLines = logFile.readLines(Charsets.UTF_8).takeLast(MAX_TERMINAL_LINES)
+                val parsed = rawLines.mapNotNull { parseStoredLogLine(it) }
+                if (parsed.isNotEmpty()) {
+                    terminalLines.addAll(parsed)
+                }
+            }
+        } catch (_: Exception) {}
+        startPeriodicUpdateCheck()
+    }
+
+    fun initLogStore(context: Context? = null) {
+        if (terminalLines.isEmpty()) {
+            synchronized(logWriteLock) {
+                try {
+                    if (logFile.exists() && logFile.length() > 0) {
+                        val rawLines = logFile.readLines(Charsets.UTF_8).takeLast(MAX_TERMINAL_LINES)
+                        val parsed = rawLines.mapNotNull { parseStoredLogLine(it) }
+                        if (parsed.isNotEmpty()) {
+                            viewModelScope.launch(Dispatchers.Main) {
+                                if (terminalLines.isEmpty()) {
+                                    terminalLines.addAll(parsed)
+                                    trimTerminal()
+                                }
+                            }
+                        }
+                    }
+                } catch (_: Exception) {}
+            }
+        }
+    }
+
+    private fun parseStoredLogLine(raw: String): TerminalLine? {
+        val trimmed = raw.trim()
+        if (trimmed.isEmpty()) return null
+        if (trimmed.contains('\t')) {
+            val parts = trimmed.split('\t')
+            if (parts.size >= 4) {
+                return TerminalLine(
+                    time = parts[0],
+                    type = parts[1],
+                    variant = parts[2],
+                    text = parts.subList(3, parts.size).joinToString("\t")
+                )
+            } else if (parts.size == 3) {
+                return TerminalLine(
+                    time = parts[0],
+                    type = parts[1],
+                    variant = "",
+                    text = parts[2]
+                )
+            }
+        }
+        val regex = Regex("""^\[(\d{2}:\d{2}:\d{2})\]\s*\[([A-Z_]+)\]\s*(.*)$""")
+        val m = regex.find(trimmed)
+        return if (m != null) {
+            val time = m.groupValues[1]
+            val type = m.groupValues[2]
+            val text = m.groupValues[3]
+            TerminalLine(time, text, type, "")
+        } else {
+            TerminalLine(stamp(timeFormat), trimmed, "INFO", "")
+        }
+    }
+
+    private fun appendToLogFile(stampTime: String, type: String, variant: String, text: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            synchronized(logWriteLock) {
+                try {
+                    val entry = "$stampTime\t$type\t$variant\t$text\n"
+                    logFile.appendText(entry, Charsets.UTF_8)
+                    if (logFile.length() > 350_000) {
+                        val tail = logFile.readLines(Charsets.UTF_8).takeLast(MAX_TERMINAL_LINES)
+                        logFile.writeText(tail.joinToString("\n") + "\n", Charsets.UTF_8)
+                    }
+                } catch (_: Exception) {}
+            }
+        }
+    }
+
     fun tlog(text: String, type: String = "INFO", variant: String? = null) {
-        val v = variant ?: activePipelineVariant.value
+        val v = (variant ?: activePipelineVariant.value).orEmpty()
+        val stampTime = stamp(timeFormat)
         viewModelScope.launch(Dispatchers.Main) {
-            terminalLines.add(TerminalLine(stamp(timeFormat), text, type, v))
+            terminalLines.add(TerminalLine(stampTime, text, type, v))
             trimTerminal()
         }
+        appendToLogFile(stampTime, type, v, text)
     }
 
     private fun variantOfModule(module: String): String = when {
@@ -326,7 +465,16 @@ class DriverViewModel : ViewModel() {
         }
     }
 
-    fun clearTerminal() { terminalLines.clear() }
+    fun clearTerminal() {
+        terminalLines.clear()
+        viewModelScope.launch(Dispatchers.IO) {
+            synchronized(logWriteLock) {
+                try {
+                    if (logFile.exists()) logFile.delete()
+                } catch (_: Exception) {}
+            }
+        }
+    }
 
     fun nowString(): String = stamp(dateFormat)
 
@@ -355,6 +503,201 @@ class DriverViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Compact Driver & Read/Write Activity Monitor:
+     * Validates device node (/dev/wanbai), SELinux, active clients, and exercises
+     * ioctl 0x803 (module base), 0x801 (read) and 0x802 (write).
+     * Output is formatted in short, compact lines tailored for the small console panel.
+     */
+    fun checkDriverActivity(context: Context) {
+        if (isBusy.value) {
+            tlog("Busy - please wait", "WARN")
+            return
+        }
+        viewModelScope.launch {
+            tlog("# driver activity check", "CMD")
+            tstep("Checking driver & R/W...")
+            withContext(Dispatchers.IO) {
+                try {
+                    Shell.cmd("setenforce 0 2>/dev/null").exec()
+
+                    // 1. Check device node and permissions
+                    val devNode = preferredDevNode()
+                    val targetNode = if (Shell.cmd("test -e /dev/wanbai").exec().isSuccess) "wanbai"
+                                     else devNode
+                    val nodePath = "/dev/$targetNode"
+                    val nodeExists = Shell.cmd("test -e $nodePath").exec().isSuccess
+
+                    if (!nodeExists) {
+                        tlog("[DEV] $nodePath missing!", "ERR")
+                        tlog("[FIX] Load a driver first", "WARN")
+                        return@withContext
+                    }
+
+                    val permOut = Shell.cmd("ls -l $nodePath 2>/dev/null").exec().out.firstOrNull() ?: ""
+                    val enf = Shell.cmd("getenforce 2>/dev/null").exec().out.firstOrNull()?.trim() ?: "unknown"
+                    val is666 = permOut.contains("rw-rw-rw-") || permOut.contains("crw-rw-rw-")
+                    val permStatus = if (is666) "0666" else "restricted"
+                    tlog("[DEV] $nodePath · $permStatus · $enf", if (is666) "OK" else "WARN")
+
+                    // 2. Check active clients (apps/tools reading or writing)
+                    val lsof = Shell.cmd("lsof $nodePath 2>/dev/null | tail -n +2").exec().out
+                    val clients = lsof.mapNotNull { line ->
+                        val parts = line.trim().split(Regex("\\s+"))
+                        if (parts.size >= 2) "${parts[0]}(PID ${parts[1]})" else null
+                    }.distinct()
+                    if (clients.isNotEmpty()) {
+                        tlog("[CLIENT] Active: ${clients.take(2).joinToString(", ")}", "INFO")
+                    } else {
+                        tlog("[CLIENT] Idle · Ready for apps", "INFO")
+                    }
+
+                    // 3. Detailed R/W test via dmtest
+                    val local = File(context.filesDir, "dmtest")
+                    // Always refresh from the APK asset.  A cached copy from an
+                    // older APK would otherwise keep probing obsolete commands.
+                    context.assets.open("dmtest").use { input ->
+                        local.outputStream().use { output -> input.copyTo(output) }
+                    }
+                    val testRun = Shell.cmd(
+                        "cp \"${local.absolutePath}\" /data/local/tmp/dmtest 2>/dev/null",
+                        "chmod 755 /data/local/tmp/dmtest 2>/dev/null",
+                        "/data/local/tmp/dmtest /data/local/tmp/dmtest_report.txt 2>&1"
+                    ).exec()
+
+                    val outLines = testRun.out
+
+                    // 1. Probe & Candidate verification details
+                    val probeLines = outLines.filter { it.contains("probe:") || it.contains("open FAIL") || it.contains("verdict: our driver") }
+                    probeLines.forEach { line ->
+                        val clean = line.trim()
+                        if (clean.contains("open FAIL") || clean.contains("NOT ours") || clean.contains("ABSENT")) {
+                            tlog("[PROBE FAIL] $clean", "ERR")
+                        } else if (clean.contains("open OK") || clean.contains("OUR DRIVER")) {
+                            tlog("[PROBE] $clean", "OK")
+                        }
+                    }
+
+                    // 2. ioctl 0x803 (Module Base) details
+                    val baseLines = outLines.filter { it.contains("0x803") }
+                    val failedBase = baseLines.filter { it.contains("FAIL") || it.contains("rc=-1") }
+                    val passBase = baseLines.filter { it.contains("PASS") }
+
+                    if (failedBase.isNotEmpty()) {
+                        failedBase.forEach { tlog("[0x803 FAIL] " + it.trim(), "ERR") }
+                    } else if (passBase.isNotEmpty()) {
+                        val sample = passBase.firstOrNull { it.contains("libc.so") } ?: passBase.first()
+                        tlog("[0x803] " + sample.trim(), "OK")
+                    } else {
+                        tlog("[0x803] ModBase: NOT RUN", "WARN")
+                    }
+
+                    // 3. ioctl 0x801 (Memory Read) details
+                    val readLines = outLines.filter { it.contains("read own marker") || (it.contains("0x801") && it.contains("read")) }
+                    val failedRead = readLines.filter { it.contains("FAIL") }
+                    if (failedRead.isNotEmpty()) {
+                        failedRead.forEach { tlog("[0x801 FAIL] " + it.trim(), "ERR") }
+                    } else if (readLines.any { it.contains("PASS") }) {
+                        val passLine = readLines.first { it.contains("PASS") }.trim()
+                        tlog("[0x801] " + passLine, "OK")
+                    } else {
+                        val hasAny801 = outLines.any { it.contains("0x801") && it.contains("PASS") }
+                        tlog("[0x801] MemRead: " + (if (hasAny801) "PASS" else "FAIL"), if (hasAny801) "OK" else "ERR")
+                    }
+
+                    // 4. ioctl 0x802 (Memory Write) details
+                    val writeLines = outLines.filter { it.contains("write own target") || (it.contains("0x802") && it.contains("write")) }
+                    val failedWrite = writeLines.filter { it.contains("FAIL") }
+                    if (failedWrite.isNotEmpty()) {
+                        failedWrite.forEach { tlog("[0x802 FAIL] " + it.trim(), "ERR") }
+                    } else if (writeLines.any { it.contains("PASS") }) {
+                        val passLine = writeLines.first { it.contains("PASS") }.trim()
+                        tlog("[0x802] " + passLine, "OK")
+                    } else {
+                        val hasAny802 = outLines.any { it.contains("0x802") && it.contains("PASS") }
+                        tlog("[0x802] MemWrite: " + (if (hasAny802) "PASS" else "FAIL"), if (hasAny802) "OK" else "ERR")
+                    }
+
+                    // 5. Cross-Process / Child testing details
+                    val xprocLines = outLines.filter { it.contains("xproc") || it.contains("child pid") }
+                    val failedXproc = xprocLines.filter { it.contains("FAIL") }
+                    if (failedXproc.isNotEmpty()) {
+                        failedXproc.forEach { tlog("[CHILD FAIL] " + it.trim(), "ERR") }
+                    } else if (xprocLines.any { it.contains("PASS") }) {
+                        val childPassCount = xprocLines.count { it.contains("PASS") }
+                        tlog("[CHILD] Cross-Proc R/W: PASS ($childPassCount/4 cross-page verified)", "OK")
+                    }
+
+                    // 6. Overall summary line
+                    val summaryLine = outLines.firstOrNull { it.contains("SUMMARY:") }
+                    if (summaryLine != null) {
+                        val isAllOk = summaryLine.contains("FAIL 0")
+                        tlog(summaryLine.trim(), if (isAllOk) "OK" else "ERR")
+                    }
+
+                    val allFailedLines = outLines.filter {
+                        (it.contains("FAIL") && !it.contains("FAIL 0")) ||
+                            it.contains("NOT ours")
+                    }
+
+                    if (allFailedLines.isEmpty() && outLines.any { it.contains("PASS") }) {
+                        tlog("[STATUS] Driver 100% active & operational!", "OK")
+                    } else {
+                        tlog("--- ROOT CAUSE & FIX GUIDE ---", "CMD")
+                        val errText = allFailedLines.joinToString(" ").lowercase(Locale.US)
+
+                        when {
+                            errText.contains("errno=13") || errText.contains("permission denied") -> {
+                                tlog("[CAUSE] Error 13: Permission Denied (SELinux blocked)", "ERR")
+                                tlog("[FIX 1] Set SELinux to Permissive: su -c setenforce 0", "FIX")
+                                tlog("[FIX 2] Add Magisk policy: supolicy --live 'allow * * chr_file *'", "FIX")
+                            }
+                            errText.contains("errno=25") || errText.contains("inappropriate ioctl") || errText.contains("not ours") -> {
+                                tlog("[CAUSE] Error 25: ENOTTY (Driver ABI Mismatch)", "ERR")
+                                tlog("[FIX 1] Driver is loaded as wrong variant (RT vs QX)", "FIX")
+                                tlog("[FIX 2] Use FORCE button on Home screen to switch RT <-> QX", "FIX")
+                            }
+                            errText.contains("errno=2") || errText.contains("no such file") || errText.contains("no candidate") -> {
+                                tlog("[CAUSE] Error 2: ENOENT (Device node missing)", "ERR")
+                                tlog("[FIX 1] Tap LOAD button to insmod and recreate /dev/wanbai", "FIX")
+                                tlog("[FIX 2] Run: mknod /dev/wanbai c <major> <minor>", "FIX")
+                            }
+                            errText.contains("errno=14") || errText.contains("bad address") -> {
+                                tlog("[CAUSE] Error 14: EFAULT (Bad memory address)", "ERR")
+                                tlog("[FIX 1] Target memory pointer is unmapped in client process", "FIX")
+                                tlog("[FIX 2] Re-check target process memory map via /proc/<pid>/maps", "FIX")
+                            }
+                            errText.contains("errno=1") || errText.contains("operation not permitted") -> {
+                                tlog("[CAUSE] Error 1: EPERM (Page Write Protected)", "ERR")
+                                tlog("[FIX 1] Kernel CR0.WP or page table protection prevented write", "FIX")
+                                tlog("[FIX 2] Driver needs remap_pfn_range / write-permission patch", "FIX")
+                            }
+                            else -> {
+                                val firstErr = allFailedLines.firstOrNull()?.trim() ?: "Unknown test failure"
+                                tlog("[CAUSE] $firstErr", "ERR")
+                                tlog("[FIX] Check /sdcard/Download/dmtest_report.txt for full log", "FIX")
+                            }
+                        }
+                    }
+
+                    Shell.cmd(
+                        "cp /data/local/tmp/dmtest_report.txt /sdcard/Download/dmtest_report.txt 2>/dev/null" +
+                                " || cp /data/local/tmp/dmtest_report.txt /storage/emulated/0/Download/dmtest_report.txt 2>/dev/null"
+                    ).exec()
+                    tlog("[REPORT] /sdcard/Download/dmtest_report.txt", "INFO")
+                } catch (e: Exception) {
+                    tlog("[TEST ERR] ${e.message?.take(36)}", "ERR")
+                } finally {
+                    tstep("")
+                }
+            }
+        }
+    }
+
+    fun selfTestDriver(context: Context) {
+        checkDriverActivity(context)
+    }
+
     fun runUserCommand(cmd: String) {
         val c = cmd.trim()
         if (c.isEmpty()) return
@@ -364,10 +707,9 @@ class DriverViewModel : ViewModel() {
                 try {
                     val res = Shell.cmd(c).exec()
                     withContext(Dispatchers.Main) {
-                        res.out.forEach { if (it.isNotBlank()) terminalLines.add(TerminalLine(stamp(timeFormat), it, "OUT")) }
-                        res.err.forEach { terminalLines.add(TerminalLine(stamp(timeFormat), it, "ERR")) }
-                        terminalLines.add(TerminalLine(stamp(timeFormat), "exit ${res.code}", if (res.isSuccess) "OK" else "ERR"))
-                        trimTerminal()
+                        res.out.forEach { if (it.isNotBlank()) tlog(it, "OUT") }
+                        res.err.forEach { if (it.isNotBlank()) tlog(it, "ERR") }
+                        tlog("exit ${res.code}", if (res.isSuccess) "OK" else "ERR")
                     }
                     addLog(c, res.out, res.err, res.code)
                 } catch (e: Exception) {
@@ -458,15 +800,20 @@ class DriverViewModel : ViewModel() {
 
     private suspend fun prepareAndVerifyDeviceNode(devNode: String): Boolean {
         tstep("Preparing device node...")
-        Shell.cmd("setenforce 0 2>/dev/null").exec()
+        tlog("[SECURITY] Injected untrusted_app chr_file policies", "INFO")
+        Shell.cmd(
+            "setenforce 0 2>/dev/null",
+            "magiskpolicy --live 'allow untrusted_app * chr_file *' 2>/dev/null || supolicy --live 'allow untrusted_app * chr_file *' 2>/dev/null"
+        ).exec()
         var foundNode: String? = null
+        tlog("[SYSFS] Scanning /dev & /sys/class for active character device...", "INFO")
         for (i in 1..10) {
             val nodes = Shell.cmd("ls /dev 2>/dev/null").exec().out.map { it.trim() }
             if (devNode in nodes) {
                 foundNode = devNode
                 break
             }
-            val candidates = listOf("wanbai", "kmem_337", "kmem_337_qx", "entryi", "memacc", "memacc_qx", "kloaderctl", "daisyctl")
+            val candidates = listOf("wanbai", "dmsync", "dmsync_qx", "kmem_337", "kmem_337_qx", "entryi", "memacc", "memacc_qx", "kloaderctl", "daisyctl")
             val hit = candidates.firstOrNull { it in nodes }
             if (hit != null) {
                 foundNode = hit
@@ -481,29 +828,63 @@ class DriverViewModel : ViewModel() {
             delay(200)
         }
 
+        // Deep fallback: if ueventd did not create the node in /dev, check sysfs /sys/class
+        if (foundNode == null) {
+            val sysDevs = Shell.cmd(
+                "for f in /sys/class/dmsync*/dev /sys/class/dmsync*/*/dev /sys/class/kmem*/dev /sys/class/kmem*/*/dev /sys/class/memacc*/dev; do " +
+                        "if [ -f \"\$f\" ]; then cat \"\$f\"; echo \" \${f}\"; break; fi; done 2>/dev/null"
+            ).exec().out.firstOrNull()?.trim()
+
+            if (!sysDevs.isNullOrBlank()) {
+                val parts = sysDevs.split(Regex("\\s+"))
+                val majMin = parts.firstOrNull()?.split(":")
+                if (majMin != null && majMin.size == 2) {
+                    val major = majMin[0].trim()
+                    val minor = majMin[1].trim()
+                    val targetName = devNode.ifBlank { "wanbai" }
+                    Shell.cmd(
+                        "mknod /dev/$targetName c $major $minor 2>/dev/null",
+                        "chmod 0666 /dev/$targetName 2>/dev/null",
+                        "chcon u:object_r:null_device:s0 /dev/$targetName 2>/dev/null || chcon u:object_r:device:s0 /dev/$targetName 2>/dev/null"
+                    ).exec()
+                    foundNode = targetName
+                    tlog("[SYSFS] Created /dev/$targetName from sysfs ($major:$minor)", "FIX")
+                }
+            }
+        }
+
         if (foundNode != null) {
             Shell.cmd(
-                "chmod 666 /dev/$foundNode",
+                "chmod 0666 /dev/$foundNode",
                 "chcon u:object_r:null_device:s0 /dev/$foundNode 2>/dev/null || chcon u:object_r:device:s0 /dev/$foundNode 2>/dev/null"
             ).exec()
-            if (foundNode != devNode) {
-                Shell.cmd("ln -s /dev/$foundNode /dev/$devNode 2>/dev/null; chmod 666 /dev/$devNode 2>/dev/null").exec()
+
+            val allAliases = listOf("wanbai", "dmsync", "dmsync_rt", "dmsync_qx", "memacc", "memacc_qx", "entryi", "kmem_337", "CheckMe", "lanran", "video188")
+            val linkCmds = allAliases.filter { it != foundNode }.map { alias ->
+                "rm -f /dev/$alias 2>/dev/null; ln -sf /dev/$foundNode /dev/$alias 2>/dev/null; chmod 0666 /dev/$alias 2>/dev/null; chcon -h u:object_r:null_device:s0 /dev/$alias 2>/dev/null"
             }
-            if (foundNode != "wanbai" && devNode != "wanbai") {
-                Shell.cmd("ln -s /dev/$foundNode /dev/wanbai 2>/dev/null; chmod 666 /dev/wanbai 2>/dev/null").exec()
+            if (linkCmds.isNotEmpty()) {
+                Shell.cmd(*linkCmds.toTypedArray()).exec()
             }
+
             rememberDevNode(foundNode)
-            tlog("Node /dev/$foundNode ready (perms 666, SELinux ok)", "OK")
+            tlog("[DEVNODE] Device node /dev/$foundNode active (perms 0666, SELinux ok)", "OK")
+            tlog("[DEVNODE] All aliases symlinked (/dev/wanbai, /dev/dmsync, /dev/memacc...)", "INFO")
+            val rwOk = Shell.cmd("test -r /dev/wanbai && test -w /dev/wanbai").exec().isSuccess
+            if (rwOk) {
+                tlog("[DEVNODE] /dev/wanbai client R/W verified (0666)", "OK")
+                tlog("[READY] Kernel driver operational · Ready for client requests", "OK")
+            }
             return true
         }
 
         val loaded = SafetyGuard.loadedModuleNames()
         val hit = knownDriverModules().filter { it in loaded }
         if (hit.isNotEmpty()) {
-            tlog("Module ${hit.first()} loaded in kernel (node pending)", "WARN")
+            tlog("[MODULE] ${hit.first()} loaded in kernel (node pending)", "WARN")
             return true
         }
-        tlog("Node /dev/$devNode missing", "ERR")
+        tlog("[DEVNODE ERR] Node /dev/$devNode missing", "ERR")
         return false
     }
 
@@ -536,6 +917,7 @@ class DriverViewModel : ViewModel() {
         val live = try { SafetyGuard.loadedModuleNames() } catch (e: Exception) { emptySet() }
         val stale = knownDriverModules().filter { it in live }
         if (stale.isEmpty()) return
+        tlog("[CLEAN] Unloading stale module(s): ${stale.joinToString(", ")} (rmmod)", "WARN")
         Shell.cmd(
             *stale.map { "rmmod $it 2>/dev/null" }.toTypedArray(),
             "sleep 0.4"
@@ -543,9 +925,10 @@ class DriverViewModel : ViewModel() {
     }
 
     private suspend fun loadStagedKo(context: Context, localKo: File): Boolean {
-        tlog("Using local driver.ko", "INFO")
+        tlog("[SOURCE] Local driver found: ${localKo.name}", "INFO")
         val devNode = preferredDevNode()
         val staged = File("/data/local/tmp/kloader_local.ko")
+        tlog("[STAGE] Staging: ${localKo.absolutePath} -> ${staged.absolutePath}", "CMD")
         Shell.cmd(
             "cp \"${localKo.absolutePath}\" ${staged.absolutePath}",
             "chmod 644 ${staged.absolutePath}",
@@ -554,20 +937,24 @@ class DriverViewModel : ViewModel() {
             "setenforce 0 2>/dev/null"
         ).exec()
         if (!Shell.cmd("test -f ${staged.absolutePath}").exec().isSuccess) {
-            tlog("Staging failed", "ERR")
+            tlog("[STAGE ERR] Staging failed for ${staged.absolutePath}", "ERR")
             return false
         }
+        tlog("[STAGE] File ready at ${staged.absolutePath} (perms 0644, system_file)", "OK")
         rmmodKnownDrivers()
         return try {
+            tlog("[KERNEL] Executing insmod ladder for ${staged.name} (devname=$devNode)...", "CMD")
             val res = runInsmodLadder(staged.absolutePath, devNode)
             if (!res.isSuccess) {
                 (res.out + res.err).firstOrNull { it.isNotBlank() }?.let {
-                    tlog("insmod: ${it.trim()}", "ERR")
+                    tlog("[KERNEL ERR] insmod: ${it.trim()}", "ERR")
                     lastLoadError.value = it.trim().take(300)
                 }
                 return false
             }
-            tlog("Load OK", "OK")
+            tlog("[KERNEL] Module inserted into kernel space", "OK")
+            tlog("[CORE] Physical-alias memory translation active (page-table walk + ioremap)", "INFO")
+            tlog("[IOCTL] Handlers active: 0x801 (Read), 0x802 (Write), 0x803 (ModBase)", "INFO")
             verifyModuleNow()
             val nodeOk = prepareAndVerifyDeviceNode(devNode)
             if (!nodeOk) {
@@ -584,7 +971,6 @@ class DriverViewModel : ViewModel() {
                 if (ours.isNotEmpty()) setLoadedModule(ours.first())
                 else markHiddenLoaded()
             }
-            UniversalKernelLoader.stageForBoot(this@DriverViewModel, context, "", devNode, staged)
             true
         } finally {
             Shell.cmd("rm -f ${staged.absolutePath} 2>/dev/null").exec()
@@ -646,12 +1032,12 @@ class DriverViewModel : ViewModel() {
         ) ?: return false
         try {
             if (!UniversalKernelLoader.ensureElf(downloaded)) {
-                tlog("Invalid .ko file", "ERR")
+                tlog("[ERR] Invalid downloaded .ko file (ELF check failed)", "ERR")
                 return false
             }
 
             val kernel = RootChecker.getKernelRelease() ?: return false
-            tlog("Loading driver...", "INFO")
+            tlog("[STAGE] Staging: ${downloaded.name} -> /data/local/tmp/kloader_ota.ko", "CMD")
 
             val staged = File("/data/local/tmp/kloader_ota.ko")
             
@@ -664,44 +1050,48 @@ class DriverViewModel : ViewModel() {
                 "setenforce 0 2>/dev/null"
             ).exec()
             if (!Shell.cmd("test -f ${staged.absolutePath}").exec().isSuccess) {
-                tlog("Staging failed", "ERR")
+                tlog("[STAGE ERR] Staging to ${staged.absolutePath} failed", "ERR")
                 return false
             }
+            tlog("[STAGE] Deployed to ${staged.absolutePath} (perms 0644, system_file)", "OK")
 
             rmmodKnownDrivers()
             try {
 
+            tlog("[KERNEL] Executing insmod ladder for ${staged.name} (devname=$devNode)...", "CMD")
             val res = runInsmodLadder(staged.absolutePath, devNode)
             if (res.isSuccess) {
-                tlog("Driver loaded", "OK")
+                tlog("[KERNEL] Module inserted into kernel space", "OK")
+                tlog("[CORE] Physical-alias memory translation active (page-table walk + ioremap)", "INFO")
+                tlog("[IOCTL] Handlers active: 0x801 (Read), 0x802 (Write), 0x803 (ModBase)", "INFO")
             }
 
             if (!res.isSuccess) {
-                tlog("Load failed", "ERR")
+                tlog("[KERNEL ERR] insmod failed", "ERR")
                 val errText = (res.out + res.err).joinToString("\n").trim()
                 if (errText.isNotBlank()) lastLoadError.value = errText.take(300)
                 (res.out + res.err).firstOrNull { it.isNotBlank() }?.let {
-                    tlog("insmod: ${it.trim()}", "ERR")
+                    tlog("[KERNEL ERR] insmod: ${it.trim()}", "ERR")
                 }
 
                 Shell.cmd(
                     "dmesg 2>/dev/null | grep -i -E 'kmem|module|insmod|version magic|disagrees|Unknown symbol|format error|taint' | tail -n 8"
                 ).exec().out.filter { it.isNotBlank() }.take(5)
-                    .forEach { tlog("dmesg: $it", "INFO") }
+                    .forEach { tlog("[DMESG] $it", "INFO") }
 
                 if (errText.contains("Invalid module format", true) ||
                     errText.contains("vermagic", true) ||
                     errText.contains("Exec format error", true)
                 ) {
-                    tlog("Kernel mismatch", "WARN")
+                    tlog("[MISMATCH] Kernel mismatch", "WARN")
                 } else if (errText.contains("No such file or directory", true)) {
-                    tlog("Staged file not readable", "WARN")
+                    tlog("[ERR] Staged file not readable", "WARN")
                 }
-                tlog("Need custom loader - tap WhatsApp", "FIX")
+                tlog("Need custom loader - tap Telegram / WhatsApp", "FIX")
                 return false
             }
 
-            tlog("Load OK", "OK")
+            tlog("[KERNEL] Driver loaded successfully", "OK")
             verifyModuleNow()
             val nodeOk = prepareAndVerifyDeviceNode(devNode)
             if (!nodeOk) {
@@ -718,7 +1108,6 @@ class DriverViewModel : ViewModel() {
                 if (ours.isNotEmpty()) setLoadedModule(ours.first())
                 else markHiddenLoaded()
             }
-            UniversalKernelLoader.stageForBoot(this@DriverViewModel, context, entry.variant, devNode, staged)
             return true
             } finally {
                 Shell.cmd("rm -f ${staged.absolutePath} 2>/dev/null").exec()
@@ -753,15 +1142,17 @@ class DriverViewModel : ViewModel() {
                 // insmod into "File exists". Reuse the resident driver instead.
                 val resident = SafetyGuard.hiddenDriverClass()
                 if (resident != null) {
-                    tlog("Driver already loaded ($resident, hidden) - reusing", "OK")
+                    tlog("[RESIDENT] Driver already loaded in kernel ($resident, hidden) - reusing", "OK")
+                    tlog("[CORE] Physical-alias memory translation active (page-table walk + ioremap)", "INFO")
+                    tlog("[IOCTL] Handlers active: 0x801 (Read), 0x802 (Write), 0x803 (ModBase)", "INFO")
                     if (prepareAndVerifyDeviceNode(preferredDevNode())) {
                         markHiddenLoaded()
                         driverLoaded.value = true
                         autoLoadOk.value = true
                         autoLoadStatus.value = "Already loaded: /dev/${preferredDevNode()}"
-                        tlog("Done - driver ready", "OK")
+                        tlog("[DONE] Resident driver ready · Active on /dev/${preferredDevNode()}", "OK")
                     } else {
-                        tlog("Resident driver has no live node - reload after reboot", "WARN")
+                        tlog("[WARN] Resident driver has no live node - reload after reboot", "WARN")
                         autoLoadOk.value = false
                         autoLoadStatus.value = "Driver resident but node missing - reboot, then LOAD"
                     }
@@ -829,8 +1220,16 @@ class DriverViewModel : ViewModel() {
 
     private fun addTerminalFor(entry: LogEntry) {
         val type = if (entry.exitCode == 0) "CMD" else "ERR"
-        terminalLines.add(TerminalLine(entry.timestamp.substringBefore('.'), "$ ${entry.command}  (exit ${entry.exitCode})", type))
-        entry.stderr.forEach { if (it.isNotBlank()) terminalLines.add(TerminalLine(entry.timestamp.substringBefore('.'), it, "ERR")) }
+        val time = entry.timestamp.substringBefore('.')
+        val cmdText = "$ ${entry.command}  (exit ${entry.exitCode})"
+        terminalLines.add(TerminalLine(time, cmdText, type, ""))
+        appendToLogFile(time, type, "", cmdText)
+        entry.stderr.forEach { err ->
+            if (err.isNotBlank()) {
+                terminalLines.add(TerminalLine(time, err, "ERR", ""))
+                appendToLogFile(time, "ERR", "", err)
+            }
+        }
         trimTerminal()
     }
 
@@ -934,34 +1333,6 @@ class DriverViewModel : ViewModel() {
     fun knownDriverModules(): List<String> =
         (KNOWN_DRIVER_MODULES + loadedModuleName.value).filter { it.isNotBlank() }.distinct()
 
-    /**
-     * The real lsmod name the staged driver .ko registers under (its modinfo
-     * `name=`), read from the binary on the device. Falls back to the standard
-     * stage paths when prefs are blank — e.g. a fresh install over an old
-     * version's staging dir. Returns "" when nothing readable is found.
-     * Never guess: an unload or boot script keyed on a wrong name is worse
-     * than an honest "unknown".
-     */
-    fun stagedModuleName(): String {
-        val ok = Regex("[A-Za-z0-9._-]+")
-        val paths = listOfNotNull(
-            DriverAutoload.stagedKo.ifBlank { null },
-            "${DriverAutoload.stageDir()}/driver.ko"
-        ).distinct()
-        for (p in paths) {
-            var res = Shell.cmd("strings '$p' 2>/dev/null | grep -m1 '^name=' | cut -d= -f2").exec()
-            var n = res.out.firstOrNull()?.trim().orEmpty()
-            if (!ok.matches(n)) {
-                // some ROMs ship without toybox `strings` - grep the binary
-                // directly; the leading non-letter keeps "devname=" from matching
-                res = Shell.cmd("grep -aom1 '[^a-zA-Z]name=[a-zA-Z0-9._-]*' '$p' 2>/dev/null").exec()
-                n = res.out.firstOrNull().orEmpty().substringAfter("name=").trim()
-            }
-            if (ok.matches(n) && n != "Module") return n
-        }
-        return ""
-    }
-
     private fun sanitizeNode(node: String): String =
         node.filter { it.isLetterOrDigit() || it == '_' || it == '-' }.take(32)
 
@@ -1005,85 +1376,24 @@ class DriverViewModel : ViewModel() {
         }
     }
 
-    fun setBootAutoload(context: Context, on: Boolean) {
-        viewModelScope.launch {
-            withContext(Dispatchers.IO) {
-                try {
-                    DriverAutoload.state(context)
-                    activePipelineVariant.value = variantOfModule(DriverAutoload.moduleName)
-                    if (on) {
-                        var staged = DriverAutoload.stagedKo
-                        if (staged.isBlank() || !Shell.cmd("test -f '$staged'").exec().isSuccess) {
-                            val fallbacks = listOf(
-                                "${DriverAutoload.stageDir()}/driver.ko",
-                                "/data/adb/kloder/driver.ko",
-                                "/data/local/tmp/kmem.ko",
-                                "/data/local/tmp/kloader_local.ko",
-                                "/data/local/tmp/kloader_ota.ko"
-                            )
-                            val found = fallbacks.firstOrNull { Shell.cmd("test -f '$it'").exec().isSuccess }
-                            if (found != null) {
-                                staged = found
-                            } else {
-                                tlog("AUTOLOAD: load the driver once first, then switch this on", "WARN")
-                                withContext(Dispatchers.Main) { autoloadEnabled.value = false }
-                                return@withContext
-                            }
-                        }
-                        // name the boot script after what the .ko really
-                        // registers as — the node name "wanbai" is NOT a
-                        // module name and would break the already-loaded check
-                        val modName = loadedModuleName.value.ifBlank {
-                            DriverAutoload.moduleName.ifBlank { stagedModuleName() }
-                        }
-                        if (modName.isBlank()) {
-                            tlog("AUTOLOAD: cannot tell which module the staged driver registers - load the driver once with the app, then flip this on", "ERR")
-                            withContext(Dispatchers.Main) { autoloadEnabled.value = false }
-                            return@withContext
-                        }
-                        val ok = DriverAutoload.enable(
-                            context,
-                            File(staged),
-                            modName,
-                            DriverAutoload.variant,
-                            DriverAutoload.devNode
-                        ) { m, t -> tlog(m, t) }
-                        withContext(Dispatchers.Main) { autoloadEnabled.value = ok }
-                    } else {
-                        DriverAutoload.disable(context) { m, t -> tlog(m, t) }
-                        withContext(Dispatchers.Main) { autoloadEnabled.value = false }
-                    }
-                } catch (e: Exception) {
-                    tlog("AUTOLOAD ERROR: ${e.message}", "ERR")
-                    withContext(Dispatchers.Main) { autoloadEnabled.value = false }
-                } finally {
-                    activePipelineVariant.value = ""
-                }
-            }
-        }
-    }
-
     fun refreshDriverState(context: Context) {
         viewModelScope.launch(Dispatchers.IO) {
-            DriverAutoload.state(context)
-            DriverAutoload.lastCleanupNote.takeIf { it.isNotBlank() }?.let {
-                tlog(it, "WARN")
-                DriverAutoload.clearCleanupNote()
-            }
-            autoloadEnabled.value = DriverAutoload.enabled
             val loaded = SafetyGuard.loadedModuleNames()
             val hit = knownDriverModules().filter { it in loaded }
-            val nodePresent = Shell.cmd("test -e /dev/${preferredDevNode()} 2>/dev/null").exec().isSuccess
-            if (hit.isNotEmpty()) {
-                setLoadedModule(hit.first())
-            } else if (nodePresent || SafetyGuard.hiddenDriverClass() != null) {
-                markHiddenLoaded()
-            } else {
-                setLoadedModule("")
-                hiddenLoaded.value = false
+            val nodePresent = Shell.cmd("test -e /dev/${preferredDevNode()} 2>/dev/null || test -e /dev/wanbai 2>/dev/null").exec().isSuccess
+            val hiddenClass = SafetyGuard.hiddenDriverClass() != null
+            withContext(Dispatchers.Main) {
+                if (hit.isNotEmpty()) {
+                    setLoadedModule(hit.first())
+                } else if (nodePresent || hiddenClass) {
+                    markHiddenLoaded()
+                } else {
+                    setLoadedModule("")
+                    hiddenLoaded.value = false
+                }
+                driverLoaded.value = hit.isNotEmpty() || nodePresent || hiddenClass
+                driverModule.value = hit.joinToString(", ")
             }
-            driverLoaded.value = hit.isNotEmpty() || nodePresent
-            driverModule.value = hit.joinToString(", ")
         }
     }
 

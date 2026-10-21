@@ -1,9 +1,18 @@
 package com.kernelloader.ui
 
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -25,11 +34,17 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -60,19 +75,60 @@ fun CreditsScreen(onBack: () -> Unit) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Image(
-                painter = painterResource(id = R.drawable.app_logo),
-                contentDescription = "Kernel Loader logo",
-                modifier = Modifier
-                    .size(92.dp)
-                    .clip(CircleShape)
-                    .border(
-                        2.dp,
-                        Brush.linearGradient(listOf(GradientRtStart, GradientQxEnd)),
-                        CircleShape
+            Box(modifier = Modifier.size(108.dp), contentAlignment = Alignment.Center) {
+                val transition = rememberInfiniteTransition(label = "creditsAnim")
+                val spin by transition.animateFloat(
+                    initialValue = 0f,
+                    targetValue = 360f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(7000, easing = LinearEasing)
                     ),
-                contentScale = ContentScale.Crop
-            )
+                    label = "creditsSpin"
+                )
+                val breathe by transition.animateFloat(
+                    initialValue = 0.95f,
+                    targetValue = 1.05f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(2200, easing = FastOutSlowInEasing),
+                        repeatMode = RepeatMode.Reverse
+                    ),
+                    label = "creditsBreathe"
+                )
+                Canvas(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer { rotationZ = spin }
+                ) {
+                    val stroke = Stroke(width = 2.5.dp.toPx(), cap = StrokeCap.Round)
+                    val diameter = size.minDimension - stroke.width
+                    val topLeft = Offset((size.width - diameter) / 2f, (size.height - diameter) / 2f)
+                    val arcSize = Size(diameter, diameter)
+                    drawArc(
+                        brush = Brush.sweepGradient(
+                            listOf(GradientRtStart, GradientQxEnd, GradientRtStart)
+                        ),
+                        startAngle = 0f, sweepAngle = 280f, useCenter = false,
+                        topLeft = topLeft, size = arcSize, style = stroke, alpha = 0.9f
+                    )
+                }
+                Image(
+                    painter = painterResource(id = R.drawable.app_logo),
+                    contentDescription = "Kernel Loader logo",
+                    modifier = Modifier
+                        .size(92.dp)
+                        .graphicsLayer {
+                            scaleX = breathe
+                            scaleY = breathe
+                        }
+                        .clip(CircleShape)
+                        .border(
+                            1.5.dp,
+                            Brush.linearGradient(listOf(GradientRtStart, GradientQxEnd)),
+                            CircleShape
+                        ),
+                    contentScale = ContentScale.Crop
+                )
+            }
 
             Spacer(modifier = Modifier.height(16.dp))
 

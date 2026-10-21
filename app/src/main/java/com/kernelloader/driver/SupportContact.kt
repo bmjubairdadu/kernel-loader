@@ -16,6 +16,12 @@ object SupportContact {
 
     const val WHATSAPP_DISPLAY = "+880 1785-917145"
 
+    const val TELEGRAM_USERNAME = "Jubairdadubm"
+
+    const val TELEGRAM_HANDLE = "@Jubairdadubm"
+
+    const val TELEGRAM_URL = "https://t.me/Jubairdadubm"
+
     fun defaultMessage(kernelRelease: String?): String {
         val model = (Build.MANUFACTURER.replaceFirstChar { it.uppercase() } + " " + Build.MODEL).trim()
         val k = kernelRelease?.takeIf { it.isNotBlank() } ?: "unknown"
@@ -122,31 +128,72 @@ object SupportContact {
             }
         }
         return try {
-            context.startActivity(Intent.createChooser(newIntent(), "Send report via WhatsApp"))
+            val chooser = Intent.createChooser(newIntent(), "Send report via WhatsApp").apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(chooser)
             true
         } catch (_: Exception) {
             false
         }
     }
 
-    fun issueUrlFromReport(reportText: String, issueTitle: String): String =
-        "https://github.com/bmjubairdadu/kernel-loader/issues/new?title=" +
-                URLEncoder.encode(issueTitle, "UTF-8") + "&body=" +
-                URLEncoder.encode(
-                    "Auto build request from $APP_NAME — device info collected on-device.\n\n```\n" +
-                            reportText + "\n```",
-                    "UTF-8"
-                )
-
-    fun issueUrl(kernelRelease: String?, appVersion: String, result: String, logText: String): String {
-        val short = kernelRelease?.let {
-            Regex("""(\d+)\.(\d+)\.(\d+)""").find(it)?.value
-        } ?: "unknown-kernel"
-        val title = "[AUTO-REPORT] load failed on $short"
-        val body = "Auto failure report from $APP_NAME $appVersion.\n\n```\n" +
-                failureReport(kernelRelease, appVersion, result, logText) + "\n```"
-        return "https://github.com/bmjubairdadu/kernel-loader/issues/new?title=" +
-                URLEncoder.encode(title, "UTF-8") + "&body=" +
-                URLEncoder.encode(body, "UTF-8")
+    /**
+     * Opens Telegram with the report ZIP attached and caption.
+     * Targets Telegram packages directly so the user only has to send.
+     * Returns false when no Telegram installation could be launched.
+     */
+    fun sendZipViaTelegram(context: Context, zip: File, caption: String): Boolean {
+        val uri = FileProvider.getUriForFile(
+            context, "${context.packageName}.fileprovider", zip
+        )
+        fun newIntent(): Intent = Intent(Intent.ACTION_SEND).apply {
+            type = "application/zip"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            putExtra(Intent.EXTRA_TEXT, "$caption\nTelegram: $TELEGRAM_HANDLE")
+            addFlags(
+                Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                        Intent.FLAG_ACTIVITY_NEW_TASK
+            )
+        }
+        val targets = listOf(
+            "org.telegram.messenger",
+            "org.telegram.messenger.web",
+            "org.telegram.messenger.beta",
+            "org.thunderdog.challegram",
+            "nekox.messenger"
+        )
+        for (pkg in targets) {
+            val intent = newIntent().apply { setPackage(pkg) }
+            val resolved = try {
+                context.packageManager.resolveActivity(intent, 0)
+            } catch (_: Exception) {
+                null
+            }
+            if (resolved != null) {
+                return try {
+                    context.startActivity(intent)
+                    true
+                } catch (_: Exception) {
+                    false
+                }
+            }
+        }
+        return try {
+            val chooser = Intent.createChooser(newIntent(), "Send report via Telegram ($TELEGRAM_HANDLE)").apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(chooser)
+            true
+        } catch (_: Exception) {
+            false
+        }
     }
+
+    fun telegramDirectUrl(): String = TELEGRAM_URL
+
+    fun telegramShareUrl(reportText: String): String =
+        "https://t.me/share/url?url=" +
+                URLEncoder.encode(TELEGRAM_URL, "UTF-8") + "&text=" +
+                URLEncoder.encode(reportText, "UTF-8")
 }

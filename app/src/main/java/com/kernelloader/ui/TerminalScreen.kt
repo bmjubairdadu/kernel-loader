@@ -137,7 +137,13 @@ fun ConsoleScreen(
         val last = shown.size - 1
         val visible = listState.layoutInfo.visibleItemsInfo
         val atBottom = visible.isEmpty() || visible.last().index >= last - 2
-        if (atBottom) listState.scrollToItem(last)
+        if (atBottom) {
+            try {
+                listState.animateScrollToItem(last)
+            } catch (_: Exception) {
+                listState.scrollToItem(last)
+            }
+        }
     }
 
     AppBackground {
@@ -300,7 +306,7 @@ fun ConsoleScreen(
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 ActionChip(
-                    label = "AUTO LOAD",
+                    label = "LOAD",
                     tint = AccentGreen,
                     enabled = !viewModel.isBusy.value && rootAvailable,
                     modifier = Modifier.weight(1f)
@@ -312,17 +318,17 @@ fun ConsoleScreen(
                     modifier = Modifier.weight(1f)
                 ) { viewModel.verifyModule() }
                 ActionChip(
+                    label = "CHECK R/W",
+                    tint = AccentViolet,
+                    enabled = !viewModel.isBusy.value && rootAvailable,
+                    modifier = Modifier.weight(1.2f)
+                ) { viewModel.checkDriverActivity(context) }
+                ActionChip(
                     label = "REBOOT",
                     tint = AccentRed,
                     enabled = !viewModel.isBusy.value && rootAvailable,
                     modifier = Modifier.weight(1f)
                 ) { viewModel.rebootDevice(context) }
-                ActionChip(
-                    label = "MEM TEST",
-                    tint = AccentViolet,
-                    enabled = !viewModel.isBusy.value && rootAvailable,
-                    modifier = Modifier.weight(1f)
-                ) { viewModel.memTest() }
                 if (viewModel.isBusy.value) {
                     ActionChip(
                         label = "STOP",
