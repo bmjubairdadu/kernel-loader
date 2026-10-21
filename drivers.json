@@ -165,10 +165,10 @@
       "variant": "qx",
       "version": "4.9.337-DaisyForGaming SMP preempt mod_unload modversions aarch64",
       "verified": true,
-      "source": "daisy-on-device-3.3.1-rtcompat",
+      "source": "daisy-20261021-kernel-upgrade",
       "testStatus": "live-pass",
-      "testDate": "2026-10-21T06:08:52Z",
-      "testDetails": "RT default restored to success=0 (3.2.x compat, exactly the behaviour that worked before); 0x800 QX flip kept; abi=rt still available for -EIO; QX unchanged. module_layout 0x7f49eb51."
+      "testDate": "2026-10-21T07:24:06Z",
+      "testDetails": "Rebuilt against the upgraded DaisyForGaming tree (2026-10-21). Native rt_ioctl byte-identical to the live-tested build; all 52 symbol CRCs + module_layout 0x7f49eb51 + vermagic unchanged; QX byte-identical. RT default success=0 (3.2.x compat)."
     },
     {
       "buildDate": "2026-09-27T15:33:50Z",
@@ -445,15 +445,15 @@
       "buildDate": "2026-10-21",
       "file": "rt_4.9.337-DaisyForGaming.ko",
       "label": "4.9.337-DaisyForGaming",
-      "sha256": "8e7f47f48532a35c25484f607dd732a5f94f87b83ebed36426639ee11efda959",
-      "size": 30936,
+      "sha256": "ed45f89c8ad9d61a4c1bcac3ebc06fbce525c7cf0d21f6c8949b069c2ef956c5",
+      "size": 30592,
       "variant": "rt",
       "version": "4.9.337-DaisyForGaming SMP preempt mod_unload modversions aarch64",
       "verified": true,
-      "source": "daisy-on-device-3.3.1-rtcompat",
+      "source": "daisy-20261021-kernel-upgrade",
       "testStatus": "live-pass",
-      "testDate": "2026-10-21T06:08:52Z",
-      "testDetails": "RT default restored to success=0 (3.2.x compat, exactly the behaviour that worked before); 0x800 QX flip kept; abi=rt still available for -EIO; QX unchanged. module_layout 0x7f49eb51."
+      "testDate": "2026-10-21T07:24:06Z",
+      "testDetails": "Rebuilt against the upgraded DaisyForGaming tree (2026-10-21). Native rt_ioctl byte-identical to the live-tested build; all 52 symbol CRCs + module_layout 0x7f49eb51 + vermagic unchanged; QX byte-identical. RT default success=0 (3.2.x compat)."
     },
     {
       "buildDate": "2026-09-27T15:33:50Z",
@@ -545,7 +545,7 @@
       "version": "6.6.57-4k-gd66e9166bfa1-dirty SMP preempt mod_unload modversions aarch64"
     }
   ],
-  "updated": "2026-10-21T06:08:52Z",
+  "updated": "2026-10-21T07:24:06Z",
   "variants": {
     "qx": "QX ABI - ioctl 0x801/0x802 + 0x804/0x805 handshake, returns -1 on failure",
     "rt": "RT ABI - ioctl 0x801/0x802/0x803, success returns -EIO (0 on failure)"
