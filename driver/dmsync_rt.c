@@ -277,32 +277,48 @@ static const char *rt_pick_node(void)
 }
 
 #ifndef KMEM_NO_PERM_WORK
+/* Grace window right after insmod: the loader app runs chmod/chcon on the
+ * node during this time, so a fast (200 ms) worker must keep up.  After that
+ * the interval relaxes unless something actually needed repair last pass. */
+static unsigned long rt_perm_stable;
 static void rt_perm_work_fn(struct work_struct *w)
 {
 	const char *node = rt_pick_node();
+	unsigned long delay;
+	int busy = 0;
 
-	/* Keep the node world-accessible AND "fresh" (atime == ctime) for a
-	 * while after the load: the loader app runs chmod/chcon on the node
-	 * right after insmod, which bumps ctime and hides the node from a
-	 * /dev scanner.  kmem_force_node_mode() repairs both without ever
-	 * touching ctime.
+	/* Keep the node world-accessible AND "fresh" (atime == ctime).
+	 * kmem_touch_node_mode() first asks "is it already correct?" so the
+	 * steady-state cost of this tick is one cheap path lookup instead of
+	 * an inode rewrite - this is what made idle matches feel sticky on
+	 * phones where free CPU budget is tight.
 	 *
 	 * Also re-create a node that was deleted or replaced by a broken
 	 * userspace symlink.  The hidden module cannot be unloaded between
 	 * matches; without this repair, deleting /dev/wanbai once would make
 	 * every later match report "Disconnected" until a reboot. */
-	kmem_repair_primary_node(rt_class, &rt_device, rt_dev, node,
-				 &rt_node_retry);
-	kmem_force_node_mode(node, 0666);
+	if (kmem_repair_primary_node(rt_class, &rt_device, rt_dev, node,
+				     &rt_node_retry))
+		busy = 1;
+	if (kmem_touch_node_mode(node, 0666))
+		busy = 1;
 	if (rt_alt.cls) {
-		kmem_repair_alt_node(&rt_alt);
-		kmem_force_node_mode(rt_alt.name, 0666);
+		if (kmem_repair_alt_node(&rt_alt))
+			busy = 1;
+		if (kmem_touch_node_mode(rt_alt.name, 0666))
+			busy = 1;
 	}
 
 	if (RT_PERM_MAX_TRIES && ++rt_perm_tries >= RT_PERM_MAX_TRIES)
 		return;
 
-	schedule_delayed_work(&rt_perm_work, msecs_to_jiffies(200));
+	if (busy)
+		delay = 200;          /* active repair - stay responsive */
+	else if (time_before(jiffies, rt_perm_stable))
+		delay = 200;          /* grace window - loader can still chmod */
+	else
+		delay = 1000;         /* stable, nothing to do - save CPU/heat */
+	schedule_delayed_work(&rt_perm_work, msecs_to_jiffies(delay));
 }
 #endif
 
@@ -355,6 +371,7 @@ static int __init rt_init(void)
 #ifndef KMEM_NO_PERM_WORK
 	INIT_DELAYED_WORK(&rt_perm_work, rt_perm_work_fn);
 	rt_perm_tries = 0;
+	rt_perm_stable = jiffies + msecs_to_jiffies(60000);
 	schedule_delayed_work(&rt_perm_work, 0);
 #endif
 
@@ -390,4 +407,4 @@ module_exit(rt_exit);
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("dmsync");
 MODULE_DESCRIPTION("Device state sync helper");
-MODULE_VERSION("3.3.3");
+MODULE_VERSION("3.3.4");

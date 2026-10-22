@@ -82,6 +82,7 @@
 #include <linux/highmem.h>
 #include <linux/jiffies.h>
 #include <linux/cred.h>
+#include <linux/ratelimit.h>
 #include <linux/moduleparam.h>
 #include <asm/pgtable.h>
 #include <asm/memory.h>
@@ -312,6 +313,47 @@ out:
 	return ret;
 }
 
+/* Cheap "does the node already look right?" pass for the hot repair worker.
+ *
+ * The force version above rewrites the inode every time it runs, which is
+ * correct when a node has just been re-created, but if it also runs on every
+ * 200 ms tick the cost is an inode_lock acquire + write to a devtmpfs inode
+ * plus the cache synchronization that comes with it - for nothing.  During a
+ * long match the steady state is "node is fine", so the worker now asks this
+ * version first and only falls back to the force path when something is
+ * actually off.
+ *
+ * Returns 1 when it really had to touch the inode (the caller uses this to
+ * keep the next worker tick short), 0 when the node was already correct (the
+ * expensive lock/write path was skipped entirely) and < 0 on lookup failure. */
+static int kmem_touch_node_mode(const char *name, umode_t mode)
+{
+	struct path path;
+	struct inode *inode;
+	char full[64];
+	int ok = 0;
+
+	snprintf(full, sizeof(full), "/dev/%s", name);
+
+	if (kern_path(full, LOOKUP_FOLLOW, &path))
+		return -ENOENT;
+	inode = d_inode(path.dentry);
+	if (inode && S_ISCHR(inode->i_mode) &&
+	    (inode->i_mode & S_IALLUGO) == mode &&
+	    (inode->i_flags & S_NOATIME) &&
+	    inode->i_atime.tv_sec == inode->i_ctime.tv_sec &&
+	    inode->i_atime.tv_nsec == inode->i_ctime.tv_nsec)
+		ok = 1;
+	path_put(&path);
+	if (ok)
+		return 0;
+	/* The lockless read said "needs work"; do the real fix.  A concurrent
+	 * change that landed between the two paths is handled by the force
+	 * path's own inode_lock. */
+	kmem_force_node_mode(name, mode);
+	return 1;
+}
+
 /*
  * Install (or re-install) a device node that userspace has removed.
  *
@@ -357,8 +399,10 @@ static int kmem_repair_primary_node(struct class *cls, struct device **devp,
 		return ret;
 	}
 	kmem_force_node_mode(name, 0666);
-	pr_info("dmsync: recreated /dev/%s\n", name);
-	return 0;
+	pr_info_ratelimited("dmsync: recreated /dev/%s\n", name);
+	/* Tell the caller that real work happened this pass so it can keep
+	 * the next worker tick short (see kmem_touch_node_mode). */
+	return 1;
 }
 
 static int kmem_create_alt_node(struct kmem_alt_node *alt,
@@ -451,8 +495,9 @@ static int kmem_repair_alt_node(struct kmem_alt_node *alt)
 		return ret;
 	}
 	kmem_force_node_mode(alt->name, 0666);
-	pr_info("dmsync: recreated alternate /dev/%s\n", alt->name);
-	return 0;
+	pr_info_ratelimited("dmsync: recreated alternate /dev/%s\n", alt->name);
+	/* Real work happened this pass - tell the caller (see primary). */
+	return 1;
 }
 
 typedef struct {
@@ -591,8 +636,8 @@ static struct task_struct *kmem_get_task_recover(pid_t *pidp)
 
 	task = kmem_find_recovery_task(cache.comm, cache.uid);
 	if (task) {
-		pr_info("dmsync: target pid %d -> %d (%s)\n",
-			*pidp, task->tgid, cache.comm);
+		pr_info_ratelimited("dmsync: target pid %d -> %d (%s)\n",
+				    *pidp, task->tgid, cache.comm);
 		*pidp = task->tgid;
 		kmem_cache_task(task);
 	}
@@ -690,7 +735,44 @@ static size_t kmem_copy_run(uintptr_t pa, void __user *ubuf, size_t sz,
  *
  * This is deliberately only used when the fast direct-map path cannot be
  * used; the normal per-frame reads keep the old low-overhead path.
+ *
+ * get_user_pages_remote() holds mmap_sem for the walk, and a flood of it is
+ * exactly what stalls the target's render/PageAlloc path and shows up as a
+ * brief screen freeze right after the game has just made a lot of memory
+ * dirty.  Callers go through kmem_gup_take_slot() first so the whole driver
+ * keeps a bounded number of GUP faults per window; a legit fresh-match
+ * recovery (a handful of new pages per read) still passes, but the "client
+ * re-scans 50k addresses it has never seen" storm degrades into one -EIO
+ * per page instead of a lock storm.
  */
+static DEFINE_SPINLOCK(kmem_gup_lock);
+static unsigned long kmem_gup_window;
+static u32 kmem_gup_used;
+
+/* ~ faults are expensive: 400 per 1 s window across the entire module is
+ * already 3x what a single in-flight 4 kB read burst from the overlay can
+ * do without starving the target.  Raise only if a specific client can
+ * prove it needs more and does not freeze. */
+#define KMEM_GUP_BUDGET_PER_WINDOW	400
+#define KMEM_GUP_WINDOW_JIFFIES		HZ
+
+static int kmem_gup_take_slot(void)
+{
+	int ok = 0;
+
+	spin_lock(&kmem_gup_lock);
+	if (time_after(jiffies, kmem_gup_window + KMEM_GUP_WINDOW_JIFFIES)) {
+		kmem_gup_window = jiffies;
+		kmem_gup_used = 0;
+	}
+	if (kmem_gup_used < KMEM_GUP_BUDGET_PER_WINDOW) {
+		kmem_gup_used++;
+		ok = 1;
+	}
+	spin_unlock(&kmem_gup_lock);
+	return ok;
+}
+
 static size_t kmem_slow_copy_page(struct task_struct *task, struct mm_struct *mm,
 				  uintptr_t va, void __user *ubuf, size_t sz,
 				  int is_write, void *bounce)
@@ -703,6 +785,8 @@ static size_t kmem_slow_copy_page(struct task_struct *task, struct mm_struct *mm
 	long ret;
 
 	if (!sz || !bounce)
+		return 0;
+	if (!kmem_gup_take_slot())
 		return 0;
 	if (sz > PAGE_SIZE - off)
 		sz = PAGE_SIZE - off;

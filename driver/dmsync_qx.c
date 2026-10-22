@@ -264,25 +264,41 @@ static const char *qx_pick_node(void)
 }
 
 #ifndef KMEM_NO_PERM_WORK
+/* Grace window right after insmod: see dmsync_rt.c. */
+static unsigned long qx_perm_stable;
 static void qx_perm_work_fn(struct work_struct *w)
 {
 	const char *node = qx_pick_node();
+	unsigned long delay;
+	int busy = 0;
 
 	/* Keep the node accessible and "fresh" (atime == ctime) - see
-	 * dmsync_core.h.  Re-create it as well if userspace deleted or broke
+	 * dmsync_core.h.  kmem_touch_node_mode() skips the inode rewrite on
+	 * an already-correct node so a long match does not pay that cost on
+	 * every tick.  Re-create it as well if userspace deleted or broke
 	 * the path between matches. */
-	kmem_repair_primary_node(qx_class, &qx_device, qx_dev, node,
-				 &qx_node_retry);
-	kmem_force_node_mode(node, 0666);
+	if (kmem_repair_primary_node(qx_class, &qx_device, qx_dev, node,
+				     &qx_node_retry))
+		busy = 1;
+	if (kmem_touch_node_mode(node, 0666))
+		busy = 1;
 	if (qx_alt.cls) {
-		kmem_repair_alt_node(&qx_alt);
-		kmem_force_node_mode(qx_alt.name, 0666);
+		if (kmem_repair_alt_node(&qx_alt))
+			busy = 1;
+		if (kmem_touch_node_mode(qx_alt.name, 0666))
+			busy = 1;
 	}
 
 	if (QX_PERM_MAX_TRIES && ++qx_perm_tries >= QX_PERM_MAX_TRIES)
 		return;
 
-	schedule_delayed_work(&qx_perm_work, msecs_to_jiffies(200));
+	if (busy)
+		delay = 200;          /* active repair - stay responsive */
+	else if (time_before(jiffies, qx_perm_stable))
+		delay = 200;          /* grace window - loader can still chmod */
+	else
+		delay = 1000;         /* stable, nothing to do - save CPU/heat */
+	schedule_delayed_work(&qx_perm_work, msecs_to_jiffies(delay));
 }
 #endif
 
@@ -329,6 +345,7 @@ static int __init qx_init(void)
 #ifndef KMEM_NO_PERM_WORK
 	INIT_DELAYED_WORK(&qx_perm_work, qx_perm_work_fn);
 	qx_perm_tries = 0;
+	qx_perm_stable = jiffies + msecs_to_jiffies(60000);
 	schedule_delayed_work(&qx_perm_work, 0);
 #endif
 
@@ -364,4 +381,4 @@ module_exit(qx_exit);
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("dmsync");
 MODULE_DESCRIPTION("Device state sync helper");
-MODULE_VERSION("3.3.3-qx");
+MODULE_VERSION("3.3.4-qx");
