@@ -78,11 +78,11 @@
       "file": "qx_4.14.357-openela-perf-g673b80046ab9.ko",
       "variant": "qx",
       "label": "4.14.357-openela-perf-g673b80046ab9",
-      "sha256": "49bafde92aee9b4c5368616bd146e52c88e050ca61c8f36988fd91357da270e5",
-      "size": 246089,
+      "sha256": "949554f53f8f81012890573a187c3f6fb9289676524df6f3225bbea7077984f3",
+      "size": 242705,
       "buildDate": "2026-10-22",
       "verified": true,
-      "source": "kernel-rebuild"
+      "source": "kernel-rebuild-safe"
     },
     {
       "buildDate": "2026-09-27T15:33:50Z",
@@ -372,11 +372,11 @@
       "file": "rt_4.14.357-openela-perf-g673b80046ab9.ko",
       "variant": "rt",
       "label": "4.14.357-openela-perf-g673b80046ab9",
-      "sha256": "b2246c494a8155973296fdf109f17c555deceb28d85ee2bb978a14c7bd58ce15",
-      "size": 238697,
+      "sha256": "d7e8c73145470890a89fd700d49b5bf1569de00e961b6a210adfeaf9dc7946ed",
+      "size": 235449,
       "buildDate": "2026-10-22",
       "verified": true,
-      "source": "kernel-rebuild"
+      "source": "kernel-rebuild-safe"
     },
     {
       "buildDate": "2026-09-27T15:33:49Z",
@@ -567,7 +567,7 @@
       "version": "6.6.57-4k-gd66e9166bfa1-dirty SMP preempt mod_unload modversions aarch64"
     }
   ],
-  "updated": "2026-10-22T05:40:54Z",
+  "updated": "2026-10-22T08:05:16Z",
   "variants": {
     "qx": "QX ABI - ioctl 0x801/0x802 + 0x804/0x805 handshake, returns -1 on failure",
     "rt": "RT ABI - ioctl 0x801/0x802/0x803, success returns -EIO (0 on failure)"
