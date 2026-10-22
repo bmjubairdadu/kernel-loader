@@ -168,18 +168,15 @@
       "source": "onc-chidori-verified"
     },
     {
-      "buildDate": "2026-10-21",
+      "buildDate": "2026-10-22",
       "file": "qx_4.9.337-DaisyForGaming.ko",
       "label": "4.9.337-DaisyForGaming",
-      "sha256": "c204b9d568282181cd12e153ee8287606531c2a1ffcea8a2de418594dc2ceb38",
-      "size": 31080,
+      "sha256": "d5730f1637de1b59459e536d0547c6a7e293b3bafd2c110b55e826db45f46e56",
+      "size": 32824,
       "variant": "qx",
       "version": "4.9.337-DaisyForGaming SMP preempt mod_unload modversions aarch64",
       "verified": true,
-      "source": "daisy-20261021-kernel-upgrade",
-      "testStatus": "live-pass",
-      "testDate": "2026-10-21T07:24:06Z",
-      "testDetails": "Rebuilt against the upgraded DaisyForGaming tree (2026-10-21). Native rt_ioctl byte-identical to the live-tested build; all 52 symbol CRCs + module_layout 0x7f49eb51 + vermagic unchanged; QX byte-identical. RT default success=0 (3.2.x compat)."
+      "source": "daisy-3.3.2-rebuild"
     },
     {
       "buildDate": "2026-09-27T15:33:50Z",
@@ -464,18 +461,15 @@
       "source": "onc-chidori-verified"
     },
     {
-      "buildDate": "2026-10-21",
+      "buildDate": "2026-10-22",
       "file": "rt_4.9.337-DaisyForGaming.ko",
       "label": "4.9.337-DaisyForGaming",
-      "sha256": "ed45f89c8ad9d61a4c1bcac3ebc06fbce525c7cf0d21f6c8949b069c2ef956c5",
-      "size": 30592,
+      "sha256": "ebac732a907493b6de237f70b6dd9fa83b99bbdadf75276cb4570d62531535c3",
+      "size": 32208,
       "variant": "rt",
       "version": "4.9.337-DaisyForGaming SMP preempt mod_unload modversions aarch64",
       "verified": true,
-      "source": "daisy-20261021-kernel-upgrade",
-      "testStatus": "live-pass",
-      "testDate": "2026-10-21T07:24:06Z",
-      "testDetails": "Rebuilt against the upgraded DaisyForGaming tree (2026-10-21). Native rt_ioctl byte-identical to the live-tested build; all 52 symbol CRCs + module_layout 0x7f49eb51 + vermagic unchanged; QX byte-identical. RT default success=0 (3.2.x compat)."
+      "source": "daisy-3.3.2-rebuild"
     },
     {
       "buildDate": "2026-09-27T15:33:50Z",
@@ -567,7 +561,7 @@
       "version": "6.6.57-4k-gd66e9166bfa1-dirty SMP preempt mod_unload modversions aarch64"
     }
   ],
-  "updated": "2026-10-22T08:05:16Z",
+  "updated": "2026-10-22T08:09:01Z",
   "variants": {
     "qx": "QX ABI - ioctl 0x801/0x802 + 0x804/0x805 handshake, returns -1 on failure",
     "rt": "RT ABI - ioctl 0x801/0x802/0x803, success returns -EIO (0 on failure)"
