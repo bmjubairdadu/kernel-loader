@@ -24,21 +24,24 @@ static struct cdev qx_cdev;
 static struct class *qx_class;
 static struct device *qx_device;
 static struct kmem_alt_node qx_alt;
+static unsigned long qx_node_retry;
 
-#define QX_PERM_MAX_TRIES	300
+/* 0 = repair forever - see dmsync_rt.c.  A node touched after the old
+ * 60-second window must still look fresh for the next match. */
+#define QX_PERM_MAX_TRIES	0
 #ifndef KMEM_NO_PERM_WORK
 static int qx_perm_tries;
 static void qx_perm_work_fn(struct work_struct *w);
 static struct delayed_work qx_perm_work;
 #endif
 
-static char *devicename = "dmsync";
+static char *devicename = "wanbai";
 module_param(devicename, charp, 0644);
 MODULE_PARM_DESC(devicename, "device node name");
 
-static char *devname = "dmsync";
+static char *devname = "";
 module_param(devname, charp, 0644);
-MODULE_PARM_DESC(devname, "alias of devicename");
+MODULE_PARM_DESC(devname, "alias of devicename (preferred when set)");
 
 static int qx_open(struct inode *inode, struct file *file)
 {
@@ -247,14 +250,16 @@ static char *qx_devnode(struct device *dev, umode_t *mode)
 
 static const char *qx_pick_node(void)
 {
-	const char *node = devicename;
+	const char *node = NULL;
 
-	if (!node || !*node)
-		node = NULL;
-	if (devname && *devname && strcmp(devname, "dmsync"))
+	/* Match the RT build and the loader default: wanbai is the engine's
+	 * special name and avoids relying on a loader-created symlink. */
+	if (devname && *devname)
 		node = devname;
+	else if (devicename && *devicename)
+		node = devicename;
 	if (!node)
-		node = "dmsync";
+		node = "wanbai";
 	return node;
 }
 
@@ -263,13 +268,18 @@ static void qx_perm_work_fn(struct work_struct *w)
 {
 	const char *node = qx_pick_node();
 
-	/* keep the node accessible and "fresh" (atime == ctime) - see
-	 * dmsync_core.h */
+	/* Keep the node accessible and "fresh" (atime == ctime) - see
+	 * dmsync_core.h.  Re-create it as well if userspace deleted or broke
+	 * the path between matches. */
+	kmem_repair_primary_node(qx_class, &qx_device, qx_dev, node,
+				 &qx_node_retry);
 	kmem_force_node_mode(node, 0666);
-	if (qx_alt.cls)
+	if (qx_alt.cls) {
+		kmem_repair_alt_node(&qx_alt);
 		kmem_force_node_mode(qx_alt.name, 0666);
+	}
 
-	if (++qx_perm_tries >= QX_PERM_MAX_TRIES)
+	if (QX_PERM_MAX_TRIES && ++qx_perm_tries >= QX_PERM_MAX_TRIES)
 		return;
 
 	schedule_delayed_work(&qx_perm_work, msecs_to_jiffies(200));
@@ -310,7 +320,8 @@ static int __init qx_init(void)
 	kmem_force_node_mode(node, 0666);
 
 	/* Second node with a reference-style random name - see dmsync_core.h */
-	if (!kmem_create_alt_node(&qx_alt, &qx_fops))
+	if (!kmem_create_alt_node(&qx_alt, &qx_fops,
+				  strcmp(node, "wanbai") ? "wanbai" : NULL))
 		pr_debug("dmsync: fresh node /dev/%s\n", qx_alt.name);
 	else
 		pr_warn("dmsync: fresh node failed\n");
@@ -353,4 +364,4 @@ module_exit(qx_exit);
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("dmsync");
 MODULE_DESCRIPTION("Device state sync helper");
-MODULE_VERSION("3.3.0-qx");
+MODULE_VERSION("3.3.3-qx");

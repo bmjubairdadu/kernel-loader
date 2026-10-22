@@ -23,21 +23,26 @@ static struct cdev rt_cdev;
 static struct class *rt_class;
 static struct device *rt_device;
 static struct kmem_alt_node rt_alt;
+static unsigned long rt_node_retry;
 
-#define RT_PERM_MAX_TRIES	300
+/* 0 = repair forever.  A loader/app restart can chmod/chcon the node at any
+ * time - long after the old 60-second window - so a bounded repair loop
+ * still leaves the next match with a stale atime and the client reports
+ * "Disconnected".  The work is one inode touch every 200 ms, not a hot path. */
+#define RT_PERM_MAX_TRIES	0
 #ifndef KMEM_NO_PERM_WORK
 static int rt_perm_tries;
 static void rt_perm_work_fn(struct work_struct *w);
 static struct delayed_work rt_perm_work;
 #endif
 
-static char *devicename = "dmsync";
+static char *devicename = "wanbai";
 module_param(devicename, charp, 0644);
 MODULE_PARM_DESC(devicename, "device node name");
 
-static char *devname = "dmsync";
+static char *devname = "";
 module_param(devname, charp, 0644);
-MODULE_PARM_DESC(devname, "alias of devicename");
+MODULE_PARM_DESC(devname, "alias of devicename (preferred when set)");
 
 static int rt_open(struct inode *inode, struct file *file)
 {
@@ -256,14 +261,18 @@ static char *rt_devnode(struct device *dev, umode_t *mode)
 
 static const char *rt_pick_node(void)
 {
-	const char *node = devicename;
+	const char *node = NULL;
 
-	if (!node || !*node)
-		node = NULL;
-	if (devname && *devname && strcmp(devname, "dmsync"))
+	/* The loader uses devname=wanbai on every normal path.  Keep the
+	 * same node as the default too: wanbai is one of the engine's five
+	 * "special" names, so it is accepted without the freshness stat and
+	 * is much harder for an alias rewrite to hide. */
+	if (devname && *devname)
 		node = devname;
+	else if (devicename && *devicename)
+		node = devicename;
 	if (!node)
-		node = "dmsync";
+		node = "wanbai";
 	return node;
 }
 
@@ -276,12 +285,21 @@ static void rt_perm_work_fn(struct work_struct *w)
 	 * while after the load: the loader app runs chmod/chcon on the node
 	 * right after insmod, which bumps ctime and hides the node from a
 	 * /dev scanner.  kmem_force_node_mode() repairs both without ever
-	 * touching ctime. */
+	 * touching ctime.
+	 *
+	 * Also re-create a node that was deleted or replaced by a broken
+	 * userspace symlink.  The hidden module cannot be unloaded between
+	 * matches; without this repair, deleting /dev/wanbai once would make
+	 * every later match report "Disconnected" until a reboot. */
+	kmem_repair_primary_node(rt_class, &rt_device, rt_dev, node,
+				 &rt_node_retry);
 	kmem_force_node_mode(node, 0666);
-	if (rt_alt.cls)
+	if (rt_alt.cls) {
+		kmem_repair_alt_node(&rt_alt);
 		kmem_force_node_mode(rt_alt.name, 0666);
+	}
 
-	if (++rt_perm_tries >= RT_PERM_MAX_TRIES)
+	if (RT_PERM_MAX_TRIES && ++rt_perm_tries >= RT_PERM_MAX_TRIES)
 		return;
 
 	schedule_delayed_work(&rt_perm_work, msecs_to_jiffies(200));
@@ -328,7 +346,8 @@ static int __init rt_init(void)
 	 * node stop looking "fresh" to a /dev scanner (atime == ctime).  The
 	 * scanner then finds nothing and the client stays "Disconnected".
 	 * This node is never touched, so it keeps atime == ctime. */
-	if (!kmem_create_alt_node(&rt_alt, &rt_fops))
+	if (!kmem_create_alt_node(&rt_alt, &rt_fops,
+				  strcmp(node, "wanbai") ? "wanbai" : NULL))
 		pr_debug("dmsync: fresh node /dev/%s\n", rt_alt.name);
 	else
 		pr_warn("dmsync: fresh node failed\n");
@@ -371,4 +390,4 @@ module_exit(rt_exit);
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("dmsync");
 MODULE_DESCRIPTION("Device state sync helper");
-MODULE_VERSION("3.3.0");
+MODULE_VERSION("3.3.3");
