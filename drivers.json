@@ -1,7 +1,7 @@
 {
   "baseUrl": "https://raw.githubusercontent.com/bmjubairdadu/kernel-loader/drivers",
   "branch": "drivers",
-  "count": 55,
+  "count": 57,
   "drivers": [
     {
       "version": "4.14.113-25741605 SMP preempt mod_unload aarch64",
@@ -72,6 +72,17 @@
       "testStatus": "qemu-pass",
       "testDate": "2026-10-19T16:53:53Z",
       "testDetails": "QEMU 4.14.264 phone-identical kernel: load OK, node 0666 OK, read/write/cross-page/multipage OK, cross-process child R/W OK, EIO/EINVAL OK, 32-bit compat 5/5 OK, stress-race 2500x = 2500/2500 0 err; 403s stable, no crash/oops"
+    },
+    {
+      "version": "4.14.357-openela-perf-g673b80046ab9 SMP preempt mod_unload modversions aarch64",
+      "file": "qx_4.14.357-openela-perf-g673b80046ab9.ko",
+      "variant": "qx",
+      "label": "4.14.357-openela-perf-g673b80046ab9",
+      "sha256": "49bafde92aee9b4c5368616bd146e52c88e050ca61c8f36988fd91357da270e5",
+      "size": 246089,
+      "buildDate": "2026-10-22",
+      "verified": true,
+      "source": "kernel-rebuild"
     },
     {
       "buildDate": "2026-09-27T15:33:50Z",
@@ -357,6 +368,17 @@
       "testDetails": "QEMU 4.14.264 phone-identical kernel: load OK, node 0666 OK, read/write/cross-page/multipage OK, cross-process child R/W OK, EIO/EINVAL OK, 32-bit compat 5/5 OK, stress-race 2500x = 2500/2500 0 err; 403s stable, no crash/oops"
     },
     {
+      "version": "4.14.357-openela-perf-g673b80046ab9 SMP preempt mod_unload modversions aarch64",
+      "file": "rt_4.14.357-openela-perf-g673b80046ab9.ko",
+      "variant": "rt",
+      "label": "4.14.357-openela-perf-g673b80046ab9",
+      "sha256": "b2246c494a8155973296fdf109f17c555deceb28d85ee2bb978a14c7bd58ce15",
+      "size": 238697,
+      "buildDate": "2026-10-22",
+      "verified": true,
+      "source": "kernel-rebuild"
+    },
+    {
       "buildDate": "2026-09-27T15:33:49Z",
       "file": "rt_4.19.113.ko",
       "label": "4.19.113",
@@ -545,7 +567,7 @@
       "version": "6.6.57-4k-gd66e9166bfa1-dirty SMP preempt mod_unload modversions aarch64"
     }
   ],
-  "updated": "2026-10-21T07:24:06Z",
+  "updated": "2026-10-22T05:40:54Z",
   "variants": {
     "qx": "QX ABI - ioctl 0x801/0x802 + 0x804/0x805 handshake, returns -1 on failure",
     "rt": "RT ABI - ioctl 0x801/0x802/0x803, success returns -EIO (0 on failure)"
