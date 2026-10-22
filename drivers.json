@@ -171,12 +171,12 @@
       "buildDate": "2026-10-22",
       "file": "qx_4.9.337-DaisyForGaming.ko",
       "label": "4.9.337-DaisyForGaming",
-      "sha256": "aa2d606a00a27658cf7236e2b7a05c93b76c72402f29cb5b4304898339170dff",
-      "size": 41024,
+      "sha256": "cb9a7d012b8ef92cfcef1d7091c885c432dc9dd1a1a4929d20397866866da73c",
+      "size": 45104,
       "variant": "qx",
       "version": "4.9.337-DaisyForGaming SMP preempt mod_unload modversions aarch64",
       "verified": true,
-      "source": "daisy-3.3.3-multimatch"
+      "source": "daisy-3.3.4-freeze-fix"
     },
     {
       "buildDate": "2026-09-27T15:33:50Z",
@@ -464,12 +464,12 @@
       "buildDate": "2026-10-22",
       "file": "rt_4.9.337-DaisyForGaming.ko",
       "label": "4.9.337-DaisyForGaming",
-      "sha256": "bcddcb3b23cb2de3aba32b554a66f481a49cd81e0c6fcead6b4627a483f7a419",
-      "size": 40544,
+      "sha256": "74d296514048c326e9781d27797565ba1e770ba878a77bcb29f958f0bb57735d",
+      "size": 44488,
       "variant": "rt",
       "version": "4.9.337-DaisyForGaming SMP preempt mod_unload modversions aarch64",
       "verified": true,
-      "source": "daisy-3.3.3-multimatch"
+      "source": "daisy-3.3.4-freeze-fix"
     },
     {
       "buildDate": "2026-09-27T15:33:50Z",
@@ -561,7 +561,7 @@
       "version": "6.6.57-4k-gd66e9166bfa1-dirty SMP preempt mod_unload modversions aarch64"
     }
   ],
-  "updated": "2026-10-22T10:55:22Z",
+  "updated": "2026-10-22T16:23:55Z",
   "variants": {
     "qx": "QX ABI - ioctl 0x801/0x802 + 0x804/0x805 handshake, returns -1 on failure",
     "rt": "RT ABI - ioctl 0x801/0x802/0x803, success returns -EIO (0 on failure)"
