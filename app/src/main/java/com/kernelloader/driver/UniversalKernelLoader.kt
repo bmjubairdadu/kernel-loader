@@ -142,7 +142,7 @@ object UniversalKernelLoader {
 
         val baselineMods = SafetyGuard.loadedModuleNames()
 
-        val alreadyLoaded = vm.knownDriverModules().firstOrNull { it in baselineMods }
+        val alreadyLoaded = (vm.knownDriverModules() + listOfNotNull(sourceName.removeSuffix(".ko"))).firstOrNull { it in baselineMods }
         if (alreadyLoaded != null) {
             vm.tlog("[CLEAN] Unloading stale module: $alreadyLoaded (rmmod)...", "WARN")
             Shell.cmd("rmmod $alreadyLoaded 2>/dev/null", "sleep 1").exec()
@@ -419,7 +419,7 @@ object UniversalKernelLoader {
         }
 
         val lsmod = Shell.cmd("lsmod").exec()
-        val allCandidates = (listOf(moduleName) + vm.knownDriverModules()).filter { it.isNotBlank() }.distinct()
+        val allCandidates = (listOf(moduleName, vm.preferredDevNode()) + vm.knownDriverModules()).filter { it.isNotBlank() }.distinct()
         val loadedLine = lsmod.out.drop(1).firstOrNull { line ->
             val n = line.trim().split(Regex("\\s+")).firstOrNull() ?: ""
             n.isNotBlank() && n != "Module" && n in allCandidates

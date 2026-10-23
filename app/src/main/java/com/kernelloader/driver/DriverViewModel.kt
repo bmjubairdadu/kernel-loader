@@ -928,10 +928,14 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             return true
         }
 
-        val loaded = SafetyGuard.loadedModuleNames()
-        val hit = knownDriverModules().filter { it in loaded }
-        if (hit.isNotEmpty()) {
-            tlog("[MODULE] ${hit.first()} loaded in kernel (node pending)", "WARN")
+        val hiddenClass = SafetyGuard.hiddenDriverClass()
+        if (hiddenClass != null) {
+            tlog("[STEALTH] Hidden driver class active in sysfs ($hiddenClass)", "OK")
+            return true
+        }
+        val currentMod = loadedModuleName.value
+        if (currentMod.isNotBlank() && currentMod in SafetyGuard.loadedModuleNames()) {
+            tlog("[MODULE] $currentMod loaded in kernel (node pending)", "WARN")
             return true
         }
         tlog("[DEVNODE ERR] Node /dev/$devNode missing", "ERR")
@@ -941,7 +945,6 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
     private fun firstLocalKo(variant: String = ""): File? {
         val explicit = when (variant.lowercase(Locale.US)) {
             OtaDriverStore.RT -> "/data/adb/kloder/driver_rt.ko"
-            OtaDriverStore.QX -> "/data/adb/kloder/driver_qx.ko"
             else -> null
         }
         if (explicit != null) {
@@ -958,7 +961,11 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
 
     private fun rmmodKnownDrivers() {
         val live = try { SafetyGuard.loadedModuleNames() } catch (e: Exception) { emptySet() }
-        val stale = knownDriverModules().filter { it in live }
+        val candidateNames = listOfNotNull(
+            loadedModuleName.value.ifBlank { null },
+            driverModule.value.ifBlank { null }
+        ).distinct()
+        val stale = candidateNames.filter { it in live }
         if (stale.isEmpty()) return
         tlog("[CLEAN] Unloading stale module(s): ${stale.joinToString(", ")} (rmmod)", "WARN")
         Shell.cmd(
@@ -1008,9 +1015,10 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                 return false
             }
             val mods = SafetyGuard.loadedModuleNames()
-            val ours = knownDriverModules().filter { it in mods }
+            val stagedBase = staged.nameWithoutExtension
+            val ours = mods.firstOrNull { it.contains(stagedBase, ignoreCase = true) || stagedBase.contains(it, ignoreCase = true) }
             withContext(Dispatchers.Main) {
-                if (ours.isNotEmpty()) setLoadedModule(ours.first())
+                if (ours != null) setLoadedModule(ours)
                 else markHiddenLoaded()
             }
             val kRelease = RootChecker.getKernelRelease() ?: ""
@@ -1154,9 +1162,10 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                 return false
             }
             val mods = SafetyGuard.loadedModuleNames()
-            val ours = knownDriverModules().filter { it in mods }
+            val stagedBase = staged.nameWithoutExtension
+            val ours = mods.firstOrNull { it.contains(stagedBase, ignoreCase = true) || stagedBase.contains(it, ignoreCase = true) }
             withContext(Dispatchers.Main) {
-                if (ours.isNotEmpty()) setLoadedModule(ours.first())
+                if (ours != null) setLoadedModule(ours)
                 else markHiddenLoaded()
             }
             DriverRevocationManager.recordLoadedDriver(
@@ -1405,13 +1414,11 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
         autoLoadUniversal(context, preferOta = false, variant = "")
     }
 
-    private val KNOWN_DRIVER_MODULES = listOf(
-        "memacc", "kmem_337", "kmem", "kloader",
-        "5.10_A12", "daisy"
-    )
-
     fun knownDriverModules(): List<String> =
-        (KNOWN_DRIVER_MODULES + loadedModuleName.value).filter { it.isNotBlank() }.distinct()
+        listOfNotNull(
+            loadedModuleName.value.ifBlank { null },
+            driverModule.value.ifBlank { null }
+        ).distinct()
 
     private fun sanitizeNode(node: String): String =
         node.filter { it.isLetterOrDigit() || it == '_' || it == '-' }.take(32)
@@ -1459,21 +1466,35 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
 
     fun refreshDriverState(context: Context) {
         viewModelScope.launch(Dispatchers.IO) {
-            val loaded = SafetyGuard.loadedModuleNames()
-            val hit = knownDriverModules().filter { it in loaded }
-            val nodePresent = Shell.cmd("test -e /dev/${preferredDevNode()} 2>/dev/null").exec().isSuccess
+            val devNode = preferredDevNode()
+            val nodePath = "/dev/$devNode"
+            val nodeChar = Shell.cmd("test -c $nodePath 2>/dev/null").exec().isSuccess
+            val nodeRw = nodeChar && Shell.cmd("test -r $nodePath && test -w $nodePath 2>/dev/null").exec().isSuccess
             val hiddenClass = SafetyGuard.hiddenDriverClass() != null
+            val loadedMods = SafetyGuard.loadedModuleNames()
+            val currentMod = loadedModuleName.value
+            val isModuleInLsmod = currentMod.isNotBlank() && currentMod in loadedMods
+
             withContext(Dispatchers.Main) {
-                if (hit.isNotEmpty()) {
-                    setLoadedModule(hit.first())
-                } else if (nodePresent || hiddenClass) {
+                if (nodeRw || nodeChar) {
+                    driverLoaded.value = true
+                    if (isModuleInLsmod) {
+                        setLoadedModule(currentMod)
+                    } else {
+                        markHiddenLoaded()
+                    }
+                } else if (hiddenClass) {
+                    driverLoaded.value = true
                     markHiddenLoaded()
+                } else if (isModuleInLsmod) {
+                    driverLoaded.value = true
+                    setLoadedModule(currentMod)
                 } else {
                     setLoadedModule("")
                     hiddenLoaded.value = false
+                    driverLoaded.value = false
+                    driverModule.value = ""
                 }
-                driverLoaded.value = hit.isNotEmpty() || nodePresent || hiddenClass
-                driverModule.value = hit.joinToString(", ")
             }
         }
     }
