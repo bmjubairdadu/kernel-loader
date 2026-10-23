@@ -794,16 +794,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
     private val INSMOD_BACKOFF_MS = 500L
 
     private suspend fun runInsmodLadder(koPath: String, devNode: String): Shell.Result {
-        val hasKsud = Shell.cmd("which ksud 2>/dev/null").exec().isSuccess
-        if (hasKsud) {
-            val ksuRes = Shell.cmd("ksud kernel-module load \"$koPath\" devname=$devNode 2>/dev/null || ksud module load --skip-signature \"$koPath\" 2>/dev/null").exec()
-            if (ksuRes.isSuccess) return ksuRes
-        }
-        val hasKptools = Shell.cmd("which kptools 2>/dev/null").exec().isSuccess
-        if (hasKptools) {
-            val apatchRes = Shell.cmd("kptools --load-module \"$koPath\" 2>/dev/null").exec()
-            if (apatchRes.isSuccess) return apatchRes
-        }
+        UniversalKernelLoader.loadViaFramework(koPath, devNode, this@DriverViewModel)?.let { return it }
 
         val bins = listOf(
             "insmod", "/system/bin/insmod", "/vendor/bin/insmod",

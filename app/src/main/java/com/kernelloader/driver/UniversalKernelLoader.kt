@@ -155,27 +155,7 @@ object UniversalKernelLoader {
 
         stripModuleSig(File(TMP_KO), vm)
 
-        var res = Shell.cmd("false").exec()
-
-        val hasKsud = Shell.cmd("which ksud 2>/dev/null").exec().isSuccess
-        if (hasKsud) {
-            val ksuRes = Shell.cmd("ksud kernel-module load \"$TMP_KO\" devname=$devNode 2>/dev/null || ksud module load --skip-signature \"$TMP_KO\" 2>/dev/null").exec()
-            if (ksuRes.isSuccess) {
-                res = ksuRes
-                vm.tlog("[KERNEL] Module loaded via KernelSU (ksud)", "OK")
-            }
-        }
-
-        if (!res.isSuccess) {
-            val hasKptools = Shell.cmd("which kptools 2>/dev/null").exec().isSuccess
-            if (hasKptools) {
-                val apatchRes = Shell.cmd("kptools --load-module \"$TMP_KO\" 2>/dev/null").exec()
-                if (apatchRes.isSuccess) {
-                    res = apatchRes
-                    vm.tlog("[KERNEL] Module loaded via APatch (kptools)", "OK")
-                }
-            }
-        }
+        var res = loadViaFramework(TMP_KO, devNode, vm) ?: Shell.cmd("false").exec()
 
         if (!res.isSuccess) {
             vm.tlog("Inserting module...", "CMD")
@@ -510,6 +490,29 @@ object UniversalKernelLoader {
             runCatching { Shell.cmd("rm -f $TMP_KO 2>/dev/null").exec() }
         }
         vm.tstep("")
+    }
+
+    fun loadViaFramework(koPath: String, devNode: String, vm: DriverViewModel? = null): Shell.Result? {
+        val ksudBin = listOf("ksud", "/data/adb/ksud", "/data/adb/ksu/bin/ksud", "/system/bin/ksud")
+            .firstOrNull { Shell.cmd("test -x \"$it\" 2>/dev/null || which \"$it\" 2>/dev/null").exec().isSuccess }
+        if (ksudBin != null) {
+            val ksuRes = Shell.cmd("$ksudBin kernel-module load \"$koPath\" devname=$devNode 2>/dev/null || $ksudBin module load --skip-signature \"$koPath\" 2>/dev/null").exec()
+            if (ksuRes.isSuccess) {
+                vm?.tlog("[KERNEL] Module loaded via KernelSU ($ksudBin)", "OK")
+                return ksuRes
+            }
+        }
+
+        val kptoolsBin = listOf("kptools", "/data/adb/ap/bin/kptools", "/data/adb/apatch/kptools", "/system/bin/kptools")
+            .firstOrNull { Shell.cmd("test -x \"$it\" 2>/dev/null || which \"$it\" 2>/dev/null").exec().isSuccess }
+        if (kptoolsBin != null) {
+            val apatchRes = Shell.cmd("$kptoolsBin --load-module \"$koPath\" 2>/dev/null").exec()
+            if (apatchRes.isSuccess) {
+                vm?.tlog("[KERNEL] Module loaded via APatch ($kptoolsBin)", "OK")
+                return apatchRes
+            }
+        }
+        return null
     }
 
     fun disableModuleSigEnforce(vm: DriverViewModel? = null) {
