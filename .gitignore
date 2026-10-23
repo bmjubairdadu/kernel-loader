@@ -13,6 +13,7 @@ local.properties
 
 # ===== APK at repo root is the official release file - DO push it =====
 !/Kernel-Loder-*.apk
+!/Kernel-Loader-*.apk
 
 # ===== Logs / temporary tooling output =====
 *.log
