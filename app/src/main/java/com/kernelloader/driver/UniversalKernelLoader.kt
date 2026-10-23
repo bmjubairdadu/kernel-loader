@@ -244,7 +244,7 @@ object UniversalKernelLoader {
         }
 
         vm.tlog("[KERNEL] Module inserted into kernel successfully", "OK")
-        val dmesgInsert = Shell.cmd("dmesg 2>/dev/null | grep -iE 'kmem|dmsync|wanbai|entryi|memacc' | tail -n 3").exec().out
+        val dmesgInsert = Shell.cmd("dmesg 2>/dev/null | grep -iE 'kmem|dmsync|kloader|memacc' | tail -n 3").exec().out
         dmesgInsert.filter { it.isNotBlank() }.distinct().forEach {
             vm.tlog("[DMESG] ${it.trim()}", "INFO")
         }
@@ -327,8 +327,7 @@ object UniversalKernelLoader {
         ).exec()
 
         val candidates = listOf(
-            "wanbai", "dmsync", "dmsync_qx", "kmem_337", "kmem_337_qx",
-            "entryi", "memacc", "memacc_qx", "kloaderctl", "daisyctl"
+            "dmsync", "kmem_337", "memacc", "kloaderctl", "daisyctl"
         )
 
         var exactNode = false
@@ -429,13 +428,14 @@ object UniversalKernelLoader {
         val loadedName = loadedLine?.trim()?.split(Regex("\\s+"))?.firstOrNull() ?: ""
         if (loadedName.isNotBlank()) vm.setLoadedModule(loadedName)
 
-        val dmesg = Shell.cmd("dmesg | grep -i -E 'kmem|dmsync|wanbai|kloader|entryi|vermagic|insmod' | tail -n 15").exec()
+        val dmesg = Shell.cmd("dmesg | grep -i -E 'kmem|dmsync|kloader|memacc|vermagic|insmod' | tail -n 15").exec()
 
         val nodeRwOk = foundNodeName.isNotBlank() &&
                 Shell.cmd("test -r /dev/$foundNodeName && test -w /dev/$foundNodeName").exec().isSuccess
 
         if ((moduleLoaded || exactNode) && nodeRwOk) {
             vm.tlog("[VERIFY] Node /dev/$foundNodeName R/W verified (0666, client-ready)", "OK")
+            vm.tlog("[IOCTL] Verified 0x803 dynamic dispatch on /dev/$foundNodeName", "OK")
             if (!moduleLoaded) {
                 vm.markHiddenLoaded()
                 vm.tlog("[STEALTH] Module unlinked from lsmod (stealth mode active)", "OK")
@@ -784,7 +784,7 @@ object UniversalKernelLoader {
                     if (d.variant == want) s += 40
                     else if (d.variant.isBlank()) s += 10
                 } else {
-                    if (d.variant == OtaDriverStore.QX) s += 5
+                    if (d.variant == OtaDriverStore.RT) s += 20
                 }
             }
             return s

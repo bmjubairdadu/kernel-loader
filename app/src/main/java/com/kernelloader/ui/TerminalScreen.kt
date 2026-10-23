@@ -120,8 +120,8 @@ fun ConsoleScreen(
 
     val shown = when (filter) {
         "RT" -> viewModel.terminalLines.filter { it.variant == OtaDriverStore.RT }
-        "QX" -> viewModel.terminalLines.filter { it.variant == OtaDriverStore.QX }
-        "STATUS" -> viewModel.terminalLines.filter { it.variant.isBlank() }
+        "CMD" -> viewModel.terminalLines.filter { it.type == "CMD" }
+        "ERR" -> viewModel.terminalLines.filter { it.type == "ERR" }
         else -> viewModel.terminalLines
     }
 
@@ -216,9 +216,9 @@ fun ConsoleScreen(
             ) {
                 listOf(
                     "ALL" to TextSecondary,
-                    "STATUS" to AccentGreen,
-                    "RT" to FamilyRt,
-                    "QX" to FamilyQx
+                    "CMD" to LogCmd,
+                    "ERR" to LogErr,
+                    "RT" to FamilyRt
                 ).forEach { (label, tint) ->
                     val selected = filter == label
                     Surface(
@@ -261,7 +261,6 @@ fun ConsoleScreen(
                         Text(
                             text = when (filter) {
                                 "ALL" -> "No console output yet"
-                                "STATUS" -> "No status yet"
                                 else -> "No $filter lines yet"
                             },
                             color = TextMuted,

@@ -181,40 +181,19 @@ fun HomeScreen(
         viewModel.refreshDriverState(context)
     }
 
-    var family by remember { mutableStateOf("") }
     val kernelShort = remember(kernelRelease) {
         RootChecker.kernelShortVersion(kernelRelease)
     }
 
-    val autoVariant = remember(manifest, kernelRelease) {
-        viewModel.determineBestVariant(context, kernelRelease)
-    }
-
-    val exact = remember(manifest, family, kernelRelease, autoVariant) {
+    val exact = remember(manifest, kernelRelease) {
         manifest?.let {
-            if (family.isBlank()) {
-                OtaDriverStore.exactFor(it, kernelRelease, autoVariant)
-                    ?: OtaDriverStore.exactFor(it, kernelRelease, if (autoVariant == OtaDriverStore.RT) OtaDriverStore.QX else OtaDriverStore.RT)
-            } else {
-                OtaDriverStore.exactFor(it, kernelRelease, family)
-            }
+            OtaDriverStore.exactFor(it, kernelRelease, OtaDriverStore.RT)
         }
     }
 
     val rtSupported = remember(manifest, kernelShort) {
         manifest?.let {
             OtaDriverStore.supportedEntries(it, OtaDriverStore.RT)
-        }?.let { list ->
-            val (mine, others) = list.partition {
-                RootChecker.kernelShortVersion(it.version) == kernelShort
-            }
-            mine + others
-        } ?: emptyList()
-    }
-
-    val qxSupported = remember(manifest, kernelShort) {
-        manifest?.let {
-            OtaDriverStore.supportedEntries(it, OtaDriverStore.QX)
         }?.let { list ->
             val (mine, others) = list.partition {
                 RootChecker.kernelShortVersion(it.version) == kernelShort
@@ -409,8 +388,7 @@ fun HomeScreen(
                         enabled = loadsTapable && !busy && rootAvailable && !viewModel.isDriverRevoked.value,
                         animated = true,
                         onClick = {
-                            family = ""
-                            viewModel.autoLoadUniversal(context, preferOta = true, variant = "")
+                            viewModel.autoLoadUniversal(context, preferOta = true, variant = OtaDriverStore.RT)
                         }
                     ) {
                         if (running) {
@@ -457,7 +435,7 @@ fun HomeScreen(
                     } else {
                         Text(
                             text = if (running) busyStep.ifBlank { "working..." }
-                            else "auto pipeline · RT → QX → built-in",
+                            else "Modern RT Stealth Engine",
                             style = MonoTiny,
                             color = if (running) AccentAmber else FamilyRt,
                             textAlign = TextAlign.Center,
@@ -467,83 +445,6 @@ fun HomeScreen(
                     if (running) {
                         Spacer(Modifier.height(8.dp))
                         StopLoadButton(onStop = { viewModel.stopLoad() })
-                    }
-                    Spacer(Modifier.height(8.dp))
-
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = if (family.isBlank()) "MODE (AUTO ${autoVariant.uppercase()}):" else "FORCE:",
-                            style = MonoTiny,
-                            color = TextDisabled
-                        )
-                        listOf(
-                            "RT" to OtaDriverStore.RT,
-                            "QX" to OtaDriverStore.QX
-                        ).forEach { (label, tag) ->
-                            val isAuto = family.isBlank() && autoVariant == tag
-                            val isSelected = family == tag || isAuto
-                            val accent = if (tag == OtaDriverStore.RT) FamilyRt else FamilyQx
-                            Surface(
-                                shape = RoundedCornerShape(14.dp),
-                                color = if (isSelected) accent.copy(alpha = 0.22f) else Surface2,
-                                border = BorderStroke(
-                                    1.dp,
-                                    if (isSelected) accent.copy(alpha = 0.8f) else BorderSubtle
-                                ),
-                                modifier = Modifier.clickable(
-                                    enabled = !busy && rootAvailable && loadsTapable
-                                ) {
-                                    family = if (family == tag) "" else tag
-                                }
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                                ) {
-                                    Text(
-                                        text = label,
-                                        style = MaterialTheme.typography.labelMedium,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                        color = if (isSelected) accent else TextSecondary
-                                    )
-                                    if (isAuto) {
-                                        Spacer(Modifier.width(4.dp))
-                                        Text(
-                                            text = "★",
-                                            style = MonoTiny,
-                                            color = accent,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                        if (family.isNotBlank()) {
-                            Surface(
-                                shape = CircleShape,
-                                color = (if (family == OtaDriverStore.RT) FamilyRt else FamilyQx)
-                                    .copy(alpha = 0.85f),
-                                modifier = Modifier.clickable(
-                                    enabled = !busy && rootAvailable && loadsTapable
-                                ) {
-                                    viewModel.autoLoadUniversal(
-                                        context, preferOta = true, variant = family
-                                    )
-                                }
-                            ) {
-                                Icon(
-                                    Icons.Default.Bolt,
-                                    contentDescription = "Load forced variant",
-                                    tint = TextPrimary,
-                                    modifier = Modifier
-                                        .padding(6.dp)
-                                        .size(18.dp)
-                                )
-                            }
-                        }
                     }
                 }
 
@@ -566,7 +467,7 @@ fun HomeScreen(
                     if (loaded) Brush.horizontalGradient(
                         listOf(
                             GradientRtStart.copy(alpha = 0.65f),
-                            GradientQxStart.copy(alpha = 0.65f)
+                            GradientRtEnd.copy(alpha = 0.65f)
                         )
                     ) else Brush.horizontalGradient(listOf(BorderSubtle, BorderSubtle))
                 )
@@ -891,14 +792,6 @@ fun HomeScreen(
                 title = "RT KERNELS (${rtSupported.size})",
                 accent = FamilyRt,
                 entries = rtSupported,
-                status = manifestStatus,
-                kernelRelease = kernelRelease
-            )
-            Spacer(Modifier.height(10.dp))
-            KernelListSection(
-                title = "QX KERNELS (${qxSupported.size})",
-                accent = FamilyQx,
-                entries = qxSupported,
                 status = manifestStatus,
                 kernelRelease = kernelRelease
             )

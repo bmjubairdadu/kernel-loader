@@ -140,7 +140,7 @@ data class TerminalLine(
 
 class DriverViewModel(application: Application) : AndroidViewModel(application) {
 
-    val DEFAULT_DEV_NODE = "wanbai"
+    val DEFAULT_DEV_NODE = "dmsync"
     var devNodeOverride = mutableStateOf("")
 
     var pickedFileUri = mutableStateOf<Uri?>(null)
@@ -705,8 +705,8 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                             }
                             errText.contains("errno=25") || errText.contains("inappropriate ioctl") || errText.contains("not ours") -> {
                                 tlog("[CAUSE] Error 25: ENOTTY (Driver ABI Mismatch)", "ERR")
-                                tlog("[FIX 1] Driver is loaded as wrong variant (RT vs QX)", "FIX")
-                                tlog("[FIX 2] Use FORCE button on Home screen to switch RT <-> QX", "FIX")
+                                tlog("[FIX 1] Re-load modern RT driver to sync IOCTL dispatch", "FIX")
+                                tlog("[FIX 2] Tap LOAD button to reinstall active driver", "FIX")
                             }
                             errText.contains("errno=2") || errText.contains("no such file") || errText.contains("no candidate") -> {
                                 tlog("[CAUSE] Error 2: ENOENT (Device node missing)", "ERR")
@@ -775,12 +775,8 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
         "/data/local/tmp/driver.ko",
         "/data/local/tmp/kmem.ko",
         "/data/local/tmp/kmem_337.ko",
-        "/data/local/tmp/kmem_337_qx.ko",
         "/data/local/tmp/memacc.ko",
-        "/data/local/tmp/memacc_qx.ko",
-        "/data/local/tmp/wanbai.ko",
-        "/data/adb/kloder/driver_rt.ko",
-        "/data/adb/kloder/driver_qx.ko"
+        "/data/adb/kloder/driver_rt.ko"
     )
 
     private val FATAL_INSMOD_ERRORS = listOf(
@@ -877,7 +873,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                 foundNode = devNode
                 break
             }
-            val candidates = listOf("wanbai", "dmsync", "dmsync_qx", "kmem_337", "kmem_337_qx", "entryi", "memacc", "memacc_qx", "kloaderctl", "daisyctl")
+            val candidates = listOf("dmsync", "kmem_337", "memacc", "kloaderctl", "daisyctl")
             val hit = candidates.firstOrNull { it in nodes }
             if (hit != null) {
                 foundNode = hit
@@ -1185,48 +1181,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
         get() = "nearest-series loader, restart guard active"
 
     fun determineBestVariant(context: Context, kernelRelease: String): String {
-        val manifest = remoteManifest.value
-        val short = RootChecker.kernelShortVersion(kernelRelease)
-
-        val rtOta = manifest?.let { OtaDriverStore.exactFor(it, kernelRelease, OtaDriverStore.RT) }
-        val qxOta = manifest?.let { OtaDriverStore.exactFor(it, kernelRelease, OtaDriverStore.QX) }
-
-        val rtAsset = UniversalKernelLoader.findBestEmbeddedDriver(context, kernelRelease, OtaDriverStore.RT)
-        val rtAssetVermagic = rtAsset?.let { EmbeddedDrivers.readVermagic(context, it.filename) } ?: ""
-        val rtFullMatch = (rtOta != null && rtOta.version.startsWith(kernelRelease)) ||
-                (rtAssetVermagic.isNotEmpty() && rtAssetVermagic == kernelRelease)
-        val rtShortMatch = (rtOta != null) || (rtAsset != null && RootChecker.kernelShortVersion(rtAsset.version) == short)
-
-        val qxAsset = UniversalKernelLoader.findBestEmbeddedDriver(context, kernelRelease, OtaDriverStore.QX)
-        val qxAssetVermagic = qxAsset?.let { EmbeddedDrivers.readVermagic(context, it.filename) } ?: ""
-        val qxFullMatch = (qxOta != null && qxOta.version.startsWith(kernelRelease)) ||
-                (qxAssetVermagic.isNotEmpty() && qxAssetVermagic == kernelRelease)
-        val qxShortMatch = (qxOta != null) || (qxAsset != null && RootChecker.kernelShortVersion(qxAsset.version) == short)
-
-        return when {
-            qxFullMatch && !rtFullMatch -> OtaDriverStore.QX
-            rtFullMatch && !qxFullMatch -> OtaDriverStore.RT
-            qxFullMatch && rtFullMatch -> {
-                val major = kernelRelease.split('.').firstOrNull()?.toIntOrNull() ?: 4
-                val isDaisy = kernelRelease.contains("Daisy", ignoreCase = true)
-                if (isDaisy || major <= 4) OtaDriverStore.QX else OtaDriverStore.RT
-            }
-            qxShortMatch && !rtShortMatch -> OtaDriverStore.QX
-            rtShortMatch && !qxShortMatch -> OtaDriverStore.RT
-            else -> {
-                val qxResolve = manifest?.let { OtaDriverStore.resolve(it, kernelRelease, OtaDriverStore.QX) }
-                val rtResolve = manifest?.let { OtaDriverStore.resolve(it, kernelRelease, OtaDriverStore.RT) }
-                val qxDist = if (qxResolve is OtaDriverStore.ResolveResult.Near) qxResolve.distance else Int.MAX_VALUE
-                val rtDist = if (rtResolve is OtaDriverStore.ResolveResult.Near) rtResolve.distance else Int.MAX_VALUE
-
-                if (qxDist < rtDist) OtaDriverStore.QX
-                else if (rtDist < qxDist) OtaDriverStore.RT
-                else {
-                    val major = kernelRelease.split('.').firstOrNull()?.toIntOrNull() ?: 4
-                    if (major <= 4) OtaDriverStore.QX else OtaDriverStore.RT
-                }
-            }
-        }
+        return OtaDriverStore.RT
     }
 
     fun autoLoadUniversal(context: Context, preferOta: Boolean = true, variant: String = "") {
@@ -1287,15 +1242,11 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
 
                 delay(450L)
                 tstep("Matching best variant...")
-                val primaryVariant = when {
-                    variant.isNotBlank() -> variant.lowercase(Locale.US)
-                    else -> determineBestVariant(context, kernel)
-                }
-                val secondaryVariant = if (primaryVariant == OtaDriverStore.RT) OtaDriverStore.QX else OtaDriverStore.RT
+                val primaryVariant = OtaDriverStore.RT
 
-                tlog("Best match: ${primaryVariant.uppercase()} driver", "OK")
+                tlog("Target driver: RT Stealth Engine", "OK")
                 delay(350L)
-                tlog("Starting ${primaryVariant.uppercase()} pipeline...", "CMD")
+                tlog("Starting RT pipeline...", "CMD")
 
                 val resident = SafetyGuard.hiddenDriverClass()
                 if (resident != null) {
@@ -1316,47 +1267,27 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                 if (pickedFileUri.value != null) {
                     tlog("Loading custom file: ${pickedFileName.value}", "CMD")
                     tstep("Loading custom file...")
-                    UniversalKernelLoader.autoLoad(context, this@DriverViewModel, variant)
-                } else if (variant.isBlank() && preferOta) {
+                    UniversalKernelLoader.autoLoad(context, this@DriverViewModel, OtaDriverStore.RT)
+                } else if (preferOta) {
                     activePipelineVariant.value = primaryVariant
-                    tlog("Loading ${primaryVariant.uppercase()} driver...", "CMD")
-                    tstep("Stage 1/3: ${primaryVariant.uppercase()} driver")
+                    tlog("Loading RT driver...", "CMD")
+                    tstep("Stage 1/2: RT driver (OTA / DB)")
                     val primaryHandled = runOtaLoad(context, primaryVariant)
                     if (primaryHandled) return@launch
                     checkpoint()
 
                     activePipelineVariant.value = ""
-                    tlog("${primaryVariant.uppercase()} failed, trying ${secondaryVariant.uppercase()}...", "WARN")
-                    activePipelineVariant.value = secondaryVariant
-                    tlog("Loading ${secondaryVariant.uppercase()} driver...", "CMD")
-                    tstep("Stage 2/3: ${secondaryVariant.uppercase()} driver")
-                    val secondaryHandled = runOtaLoad(context, secondaryVariant)
-                    if (secondaryHandled) return@launch
-                    checkpoint()
-
-                    activePipelineVariant.value = ""
-                    tlog("OTA failed, trying built-in driver...", "WARN")
-                    tstep("Stage 3/3: built-in loader")
+                    tlog("OTA driver unavailable/failed, loading built-in RT driver...", "WARN")
+                    tstep("Stage 2/2: Built-in RT driver")
                     UniversalKernelLoader.autoLoad(context, this@DriverViewModel, primaryVariant)
-                } else if (preferOta) {
-                    activePipelineVariant.value = variant.lowercase(Locale.US)
-                    tlog("Loading ${OtaDriverStore.variantLabel(variant)} driver...", "CMD")
-                    tstep("Loading driver...")
-                    val handled = runOtaLoad(context, variant)
-                    if (handled) return@launch
-                    checkpoint()
-                    activePipelineVariant.value = ""
-                    tlog("DB driver failed, trying built-in...", "INFO")
-                    tstep("Built-in loader...")
-                    UniversalKernelLoader.autoLoad(context, this@DriverViewModel, variant)
                 } else {
-                    UniversalKernelLoader.autoLoad(context, this@DriverViewModel, variant)
+                    UniversalKernelLoader.autoLoad(context, this@DriverViewModel, primaryVariant)
                 }
                 if (autoLoadOk.value != true && !driverLoaded.value) {
-                    tlog("All pipelines failed", "ERR")
+                    tlog("RT pipeline failed", "ERR")
                     autoLoadOk.value = false
                     if (autoLoadStatus.value.isBlank()) {
-                        autoLoadStatus.value = "Load failed — RT, QX and built-in all failed"
+                        autoLoadStatus.value = "Load failed — RT module could not be loaded"
                     }
                 }
             } catch (e: CancellationException) {
@@ -1475,8 +1406,8 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     private val KNOWN_DRIVER_MODULES = listOf(
-        "memacc", "memacc_qx", "kmem_337", "kmem_337_qx", "kmem", "entryi", "kloader",
-        "5.10_A12", "wanbai", "daisy"
+        "memacc", "kmem_337", "kmem", "kloader",
+        "5.10_A12", "daisy"
     )
 
     fun knownDriverModules(): List<String> =
