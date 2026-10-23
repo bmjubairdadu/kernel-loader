@@ -33,27 +33,21 @@ No device hunting. No adb. No manual `insmod`.
 
 ## ✨ Features
 
-- ⚡ **One-tap LOAD** — auto pipeline: **RT → QX → built-in**. If the RT driver fails, QX
-  is tried automatically, then the built-in universal loader.
-- 🎯 **Exact kernel matching** — the app reads `uname -r` and resolves an **exact**
-  prebuilt driver from the OTA database (42 kernels, 4.9 → 6.6, Driver Engine 3.1).
-- 🧨 **One-tap UNLOAD** — removes the driver cleanly, including **stealth-loaded**
-  builds: the app sends the driver's unhide ioctl (`0x806`) through a bundled
-  freestanding helper, then `rmmod`s the module and verifies the node is gone,
-  `lsmod` is clean and the kernel taint is unchanged.
-- 🛑 **STOP button** — any load can be cancelled mid-pipeline with one tap.
-- 🗒️ **Status console** — short, colour-coded live status of every step
-  (`Database Connected`, `Driver loaded`, `Load OK`...).
-- 🔀 **RT / QX separation** — supported-kernel lists are split per ABI
-  (`RT KERNELS` / `QX KERNELS`) with `THIS DEVICE` / `NEWEST` badges.
-- 🔁 **Boot auto-load — opt-in** — the switch is **OFF by default** and loading never
-  turns it on. Flip it ON yourself and a Magisk/APatch service script re-loads the
-  driver after every reboot; switch it OFF again and the next reboot loads nothing.
-- 🧾 **Auto build-request reports** — unsupported kernel? The app collects everything a
-  builder needs (see below) and hands you a ready-made WhatsApp message or GitHub issue.
-- 📲 **In-app updates** — the app checks GitHub releases and can install its own update.
-- 🛡️ **Anti-tamper** — signature check, debugger/Xposed refusal, obfuscated release
-  builds, sha256-verified OTA drivers (see [Security](#-security)).
+- ⚡ **One-tap LOAD** — smart adaptive pipeline: evaluates **Primary (QX or RT) → Fallback Secondary → Built-in Universal**.
+- 🧠 **Smart Dual-Variant Detection** — inspects your kernel's full vermagic, configuration flags, and gaming profile (e.g., Daisy, CAF) to dynamically designate either **QX** or **RT** as the best-suited primary driver.
+- 🔐 **Kernel Signature Verification Bypass** — bypasses `CONFIG_MODULE_SIG_FORCE` and `module_sig_enforce` on restrictive kernels by disabling enforcement at runtime and stripping incompatible vendor signatures (`stripModuleSig`) before insertion.
+- 🎯 **Exact kernel matching** — reads `uname -r` and resolves an **exact** prebuilt driver from the OTA database (42+ kernels, 4.9 → 6.6, Driver Engine 3.1).
+- 🔍 **Live Pre-Load Diagnostics** — runs sequential, paced pre-flight system inspections (Root privileges, Kernel & Arch, Signature enforcement, Driver DB availability, Variant evaluation) with clean, concise status feedback.
+- 🧨 **One-tap UNLOAD** — cleanly removes the driver, including **stealth-loaded** builds via unhide ioctl (`0x806`), `rmmod`, and post-unload cleanup verification.
+- 🛡️ **Revocation Watchdog Daemon** — detached background supervisor (`kloader_daemon.sh` & service) actively guards driver health and root access; cleanly purges and reboots if root or permissions are revoked.
+- 🔗 **Universal Device Node Symlinks** — automatically exposes and links all standard memory access aliases (`/dev/wanbai`, `/dev/dmsync`, `/dev/memacc`, `/dev/vmemacc`) with verified `0666` permissions and SELinux `chr_file` policy injection.
+- 🛑 **STOP button** — cancels load operations safely mid-pipeline with one tap.
+- 🗒️ **Status console** — clean, color-coded, single-line live feedback (`Database Connected`, `Driver loaded`, `Load OK`...).
+- 🔀 **RT / QX separation** — driver catalogs split per ABI (`RT KERNELS` / `QX KERNELS`) with `THIS DEVICE` / `NEWEST` indicators.
+- 🔁 **Boot auto-load — opt-in** — toggle **OFF by default**. When enabled, a Magisk/APatch boot service restores the module on every startup.
+- 🧾 **Auto build-request reports** — easily report unsupported kernels with pre-filled WhatsApp/GitHub reports containing compiler strings, vermagic, and `/proc/config.gz` flags.
+- 📲 **In-app background updates** — checks GitHub releases automatically, downloads updates in the background, and triggers one-tap seamless APK installation.
+- 🛡️ **Anti-tamper & hardening** — release signature validation, debugger/Xposed refusal, R8 code flattening, and sha256 OTA integrity verification (see [Security](#-security)).
 
 ## 📥 Download
 
@@ -88,16 +82,23 @@ one-tap in-app install.
 tap LOAD
    │
    ▼
-Stage 1/3 · RT driver ── local staged .ko → OTA DB exact match → download → insmod → verify /dev
-   │  fail?
-   ▼
-Stage 2/3 · QX driver ── same flow with the QX ABI build
-   │  fail?
-   ▼
-Stage 3/3 · Built-in ─── embedded universal loader
+[Pre-Load Diagnostics] ── Root privileges · Kernel & Vermagic · Signature bypass · Variant scoring
    │
    ▼
-verify: lsmod + /dev node → driver staged for the boot switch (script installs only if the switch is ON)
+Stage 1/3 · Primary Variant (Smart QX / RT) ── local staged .ko → OTA DB match → download → insmod ladder → verify /dev
+   │  fail?
+   ▼
+Stage 2/3 · Fallback Variant (Alternate ABI) ─ same flow with alternate driver ABI
+   │  fail?
+   ▼
+Stage 3/3 · Built-in Universal Loader ──────── embedded universal fallback loader
+   │
+   ▼
+Post-Load Verification & Arming:
+   ├─ verify: lsmod + character devnode live
+   ├─ symlinks: /dev/wanbai, /dev/dmsync, /dev/memacc, /dev/vmemacc (perms 0666)
+   ├─ security: SELinux chr_file rules injected
+   └─ watchdog: supervisor daemon armed (auto-cleanup & reboot guard)
 ```
 
 Every stage is cancellable with the **STOP** button, and each ABI's logs stay tagged so
@@ -179,7 +180,7 @@ is given**. Keep a backup of your boot image and know how to recover.
 
 <div align="center">
 
-**Kernel Loader v1.1** — one tap, the right driver, every kernel.
+**Kernel Loader v1.3** — one tap, the right driver, every kernel.
 ⭐ Star the repo if it helped you!
 
 </div>
