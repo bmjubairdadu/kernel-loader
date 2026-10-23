@@ -1,7 +1,7 @@
 {
   "baseUrl": "https://raw.githubusercontent.com/bmjubairdadu/kernel-loader/drivers",
   "branch": "drivers",
-  "count": 59,
+  "count": 60,
   "drivers": [
     {
       "version": "4.14.113-25741605 SMP preempt mod_unload aarch64",
@@ -179,15 +179,15 @@
       "source": "onc-chidori-verified"
     },
     {
-      "buildDate": "2026-10-22",
+      "buildDate": "2026-10-24",
       "file": "qx_4.9.337-DaisyForGaming.ko",
       "label": "4.9.337-DaisyForGaming",
-      "sha256": "cb9a7d012b8ef92cfcef1d7091c885c432dc9dd1a1a4929d20397866866da73c",
-      "size": 45104,
+      "sha256": "7d691f083664de1ad85c616bf08afe9fc4919ec166a0dd127f1cbf7a7f4c181a",
+      "size": 17880,
       "variant": "qx",
       "version": "4.9.337-DaisyForGaming SMP preempt mod_unload modversions aarch64",
       "verified": true,
-      "source": "daisy-3.3.4-freeze-fix"
+      "source": "daisy-native-zero-lag"
     },
     {
       "buildDate": "2026-09-27T15:33:50Z",
@@ -483,15 +483,15 @@
       "source": "onc-chidori-verified"
     },
     {
-      "buildDate": "2026-10-22",
+      "buildDate": "2026-10-24",
       "file": "rt_4.9.337-DaisyForGaming.ko",
       "label": "4.9.337-DaisyForGaming",
-      "sha256": "74d296514048c326e9781d27797565ba1e770ba878a77bcb29f958f0bb57735d",
-      "size": 44488,
+      "sha256": "7d691f083664de1ad85c616bf08afe9fc4919ec166a0dd127f1cbf7a7f4c181a",
+      "size": 17880,
       "variant": "rt",
       "version": "4.9.337-DaisyForGaming SMP preempt mod_unload modversions aarch64",
       "verified": true,
-      "source": "daisy-3.3.4-freeze-fix"
+      "source": "daisy-native-zero-lag"
     },
     {
       "buildDate": "2026-09-27T15:33:50Z",
@@ -581,9 +581,20 @@
       "size": 327560,
       "variant": "rt",
       "version": "6.6.57-4k-gd66e9166bfa1-dirty SMP preempt mod_unload modversions aarch64"
+    },
+    {
+      "buildDate": "2026-10-24",
+      "file": "daisy_gaming.ko",
+      "label": "4.9.337-DaisyForGaming (Zero-Lag)",
+      "sha256": "7d691f083664de1ad85c616bf08afe9fc4919ec166a0dd127f1cbf7a7f4c181a",
+      "size": 17880,
+      "variant": "native",
+      "version": "4.9.337-DaisyForGaming SMP preempt mod_unload modversions aarch64",
+      "verified": true,
+      "source": "daisy-native-zero-lag"
     }
   ],
-  "updated": "2026-10-23T08:14:07Z",
+  "updated": "2026-10-24T03:18:00Z",
   "variants": {
     "qx": "QX ABI - ioctl 0x801/0x802 + 0x804/0x805 handshake, returns -1 on failure",
     "rt": "RT ABI - ioctl 0x801/0x802/0x803, success returns -EIO (0 on failure)"
