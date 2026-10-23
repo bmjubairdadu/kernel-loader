@@ -152,6 +152,11 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
     var isBusy = mutableStateOf(false)
     var busyStep = mutableStateOf("")
 
+    var isBootPatching = mutableStateOf(false)
+    var bootPatchResult = mutableStateOf<Boolean?>(null)
+    var bootPatchStatus = mutableStateOf("")
+    var bootBackupPath = mutableStateOf("")
+
     var rebooting = mutableStateOf(false)
     var autoLoadStatus = mutableStateOf("")
     var autoLoadOk = mutableStateOf<Boolean?>(null)
@@ -1569,5 +1574,35 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             }
         }
         return name
+    }
+
+    fun patchBootImage(context: Context, switchSlot: Boolean = false) {
+        if (isBusy.value || isBootPatching.value) return
+        isBootPatching.value = true
+        isBusy.value = true
+        bootPatchResult.value = null
+        bootPatchStatus.value = "Starting boot patch pipeline..."
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val res = BootPatcherEngine.runPipeline(context, this@DriverViewModel, switchSlot)
+                withContext(Dispatchers.Main) {
+                    bootPatchResult.value = res.success
+                    bootPatchStatus.value = res.message
+                    bootBackupPath.value = res.backupPath
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    bootPatchResult.value = false
+                    bootPatchStatus.value = "Error: ${e.message}"
+                }
+                tlog("[BOOT ERR] Fatal: ${e.message}", "ERR")
+            } finally {
+                withContext(Dispatchers.Main) {
+                    isBootPatching.value = false
+                    isBusy.value = false
+                    busyStep.value = ""
+                }
+            }
+        }
     }
 }

@@ -221,8 +221,8 @@ object UniversalKernelLoader {
 
             if (isSignatureLocked) {
                 vm.tlog("[SIGNATURE LOCKED] Kernel enforces strict CONFIG_MODULE_SIG_FORCE=y.", "ERR")
-                vm.tlog("[GUIDANCE] This device requires a patched boot image via official APatch / KernelSU or a custom kernel to allow unsigned modules.", "WARN")
-                finish(vm, false, "Signature Locked: Use APatch / KernelSU boot patch")
+                vm.tlog("[GUIDANCE] Use 'PATCH BOOT IMAGE' in Kernel Loader or APatch/KernelSU to bypass kernel signature locks.", "WARN")
+                finish(vm, false, "Signature Locked: Use Boot Patcher tool")
                 return
             }
 

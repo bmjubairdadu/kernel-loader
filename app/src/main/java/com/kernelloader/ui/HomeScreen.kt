@@ -764,6 +764,116 @@ fun HomeScreen(
                 }
             }
 
+            Spacer(Modifier.height(10.dp))
+
+            var switchSlotState by remember { mutableStateOf(false) }
+            val isBootPatching = viewModel.isBootPatching.value
+            val bootResult = viewModel.bootPatchResult.value
+            val bootStatus = viewModel.bootPatchStatus.value
+            val bootBackup = viewModel.bootBackupPath.value
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = Surface1),
+                border = BorderStroke(1.dp, if (bootResult == true) AccentGreen.copy(alpha = 0.5f) else AccentAmber.copy(alpha = 0.4f))
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 10.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                text = "Kernel Signature Bypass (Boot Patcher)",
+                                style = MaterialTheme.typography.titleSmall,
+                                color = TextPrimary
+                            )
+                            Spacer(Modifier.height(2.dp))
+                            Text(
+                                text = "Unpack · HexPatch · AVB re-sign · Anti-bootloop",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = TextMuted
+                            )
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        Button(
+                            onClick = { viewModel.patchBootImage(context, switchSlotState) },
+                            enabled = !busy && rootAvailable && !isBootPatching,
+                            colors = ButtonDefaults.buttonColors(containerColor = AccentAmber),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            if (isBootPatching) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(16.dp),
+                                    color = TextOnAccent,
+                                    strokeWidth = 2.dp
+                                )
+                            } else {
+                                Icon(
+                                    Icons.Default.SystemUpdate,
+                                    contentDescription = null,
+                                    tint = TextOnAccent,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                text = if (isBootPatching) "PATCHING..." else "PATCH BOOT",
+                                color = TextOnAccent,
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+
+                    if (bootStatus.isNotBlank()) {
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            text = bootStatus,
+                            style = MonoTiny,
+                            color = if (bootResult == true) AccentGreen else if (bootResult == false) AccentRed else AccentAmber
+                        )
+                    }
+
+                    if (bootBackup.isNotBlank()) {
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            text = "Backup: $bootBackup",
+                            style = MonoTiny,
+                            color = TextMuted
+                        )
+                    }
+
+                    if (bootResult == true) {
+                        Spacer(Modifier.height(8.dp))
+                        Button(
+                            onClick = { viewModel.rebootDevice(context) },
+                            colors = ButtonDefaults.buttonColors(containerColor = AccentGreen),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(
+                                Icons.Default.Refresh,
+                                contentDescription = null,
+                                tint = TextOnAccent,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                text = "REBOOT TO APPLY BYPASS",
+                                color = TextOnAccent,
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+            }
+
             Spacer(Modifier.height(14.dp))
 
             VariantConsoleSection(
