@@ -45,8 +45,12 @@ object UniversalKernelLoader {
             return
         }
 
-        Shell.cmd("setenforce 0 2>/dev/null").exec()
-        vm.tlog("[SELINUX] Permissive mode requested (setenforce 0)", "CMD")
+        val selinuxMode = Shell.cmd("getenforce 2>/dev/null").exec().out.firstOrNull()?.trim() ?: "unknown"
+        if (selinuxMode.equals("Permissive", true)) {
+            vm.tlog("[SELINUX] Device is Permissive - anti-cheat scanners flag this. Run 'setenforce 1' to restore Enforcing", "WARN")
+        } else {
+            vm.tlog("[SELINUX] Mode: $selinuxMode - kept Enforcing (per-node context only)", "INFO")
+        }
 
         vm.tstep("Preparing driver...")
         val cacheFile = File(context.cacheDir, "kloader_auto.ko")
@@ -145,43 +149,68 @@ object UniversalKernelLoader {
         }
 
         vm.tstep("Loading module...")
-        Shell.cmd("setenforce 0 2>/dev/null").exec()
-        disableModuleSigEnforce(vm)
+        val devNodesBefore = snapshotDevCharNodes()
+        val charMajorsBefore = snapshotCharMajors()
+        vm.tlog("[SCAN] ${devNodesBefore.size} char nodes present in /dev before insmod", "INFO")
+
         stripModuleSig(File(TMP_KO), vm)
-        vm.tlog("Inserting module...", "CMD")
-        var res = Shell.cmd("insmod $TMP_KO devname=$devNode").exec()
-        if (!res.isSuccess) {
-            vm.tlog("[KERNEL] Retrying with devicename param...", "CMD")
-            res = Shell.cmd("insmod $TMP_KO devicename=$devNode").exec()
+
+        var res = Shell.cmd("false").exec()
+
+        val hasKsud = Shell.cmd("which ksud 2>/dev/null").exec().isSuccess
+        if (hasKsud) {
+            val ksuRes = Shell.cmd("ksud kernel-module load \"$TMP_KO\" devname=$devNode 2>/dev/null || ksud module load --skip-signature \"$TMP_KO\" 2>/dev/null").exec()
+            if (ksuRes.isSuccess) {
+                res = ksuRes
+                vm.tlog("[KERNEL] Module loaded via KernelSU (ksud)", "OK")
+            }
         }
+
         if (!res.isSuccess) {
-            vm.tlog("[KERNEL] Retrying with default params...", "CMD")
-            res = Shell.cmd("insmod $TMP_KO").exec()
+            val hasKptools = Shell.cmd("which kptools 2>/dev/null").exec().isSuccess
+            if (hasKptools) {
+                val apatchRes = Shell.cmd("kptools --load-module \"$TMP_KO\" 2>/dev/null").exec()
+                if (apatchRes.isSuccess) {
+                    res = apatchRes
+                    vm.tlog("[KERNEL] Module loaded via APatch (kptools)", "OK")
+                }
+            }
         }
+
         if (!res.isSuccess) {
-            vm.tlog("[KERNEL] Retrying with forced insmod (-f)...", "WARN")
-            res = Shell.cmd("insmod -f $TMP_KO devname=$devNode 2>/dev/null || insmod -f $TMP_KO 2>/dev/null").exec()
+            vm.tlog("Inserting module...", "CMD")
+            res = Shell.cmd("insmod $TMP_KO devname=$devNode").exec()
+            if (!res.isSuccess) {
+                res = Shell.cmd("insmod $TMP_KO devicename=$devNode").exec()
+            }
+            if (!res.isSuccess) {
+                res = Shell.cmd("insmod $TMP_KO").exec()
+            }
+            if (!res.isSuccess) {
+                vm.tlog("[KERNEL] Retrying with forced insmod (-f)...", "WARN")
+                res = Shell.cmd("insmod -f $TMP_KO devname=$devNode 2>/dev/null || insmod -f $TMP_KO 2>/dev/null").exec()
+            }
         }
 
         if (!res.isSuccess) {
             val errAll = (res.out + res.err).joinToString(" ").lowercase()
-            val dmesgSig = Shell.cmd("dmesg 2>/dev/null | tail -n 5").exec().out.joinToString(" ").lowercase()
-            val isSigError = errAll.contains("required key not available") ||
+            val dmesgTail5 = Shell.cmd("dmesg 2>/dev/null | tail -n 5").exec().out.joinToString(" ").lowercase()
+            val isSigWarning = errAll.contains("required key not available") ||
+                    errAll.contains("key rejected") ||
                     errAll.contains("key was rejected") ||
                     errAll.contains("operation not permitted") ||
                     errAll.contains("permission denied") ||
-                    dmesgSig.contains("module verification failed") ||
-                    dmesgSig.contains("module signature") ||
-                    dmesgSig.contains("required key")
+                    dmesgTail5.contains("module verification failed") ||
+                    dmesgTail5.contains("module signature") ||
+                    dmesgTail5.contains("required key")
 
-            if (isSigError) {
+            if (isSigWarning) {
                 vm.tlog("Signature verification blocking load, fixing...", "WARN")
                 Shell.cmd(
                     "echo 0 > /proc/sys/kernel/module_sig_enforce 2>/dev/null",
                     "sysctl -w kernel.module_sig_enforce=0 2>/dev/null",
                     "echo 0 > /sys/module/module/parameters/sig_enforce 2>/dev/null"
                 ).exec()
-                stripModuleSig(File(TMP_KO), vm)
                 res = Shell.cmd("insmod -f $TMP_KO devname=$devNode 2>/dev/null || insmod -f $TMP_KO 2>/dev/null").exec()
                 if (!res.isSuccess) {
                     res = Shell.cmd("insmod $TMP_KO devname=$devNode 2>/dev/null || insmod $TMP_KO 2>/dev/null").exec()
@@ -192,23 +221,44 @@ object UniversalKernelLoader {
             }
         }
 
+        runCatching { Shell.cmd("rm -f $TMP_KO 2>/dev/null").exec() }
+        vm.tlog("[CLEANUP] Staged .ko wiped from $TMP_KO", "INFO")
+
         if (!res.isSuccess) {
             val errAll = (res.out + res.err).joinToString(" ")
-            if (errAll.contains("File exists", true)) {
+            val errLower = errAll.lowercase()
+            val dmesgTail10 = Shell.cmd("dmesg 2>/dev/null | tail -n 10").exec().out
+            val dmesgLower = dmesgTail10.joinToString(" ").lowercase()
 
+            val isSignatureLocked = errLower.contains("required key not available") ||
+                    errLower.contains("key rejected") ||
+                    errLower.contains("key was rejected") ||
+                    errLower.contains("module verification failed") ||
+                    dmesgLower.contains("module verification failed") ||
+                    dmesgLower.contains("required key not available") ||
+                    dmesgLower.contains("key rejected") ||
+                    dmesgLower.contains("key was rejected")
+
+            if (isSignatureLocked) {
+                vm.tlog("[SIGNATURE LOCKED] Kernel enforces strict CONFIG_MODULE_SIG_FORCE=y.", "ERR")
+                vm.tlog("[GUIDANCE] This device requires a patched boot image via official APatch / KernelSU or a custom kernel to allow unsigned modules.", "WARN")
+                finish(vm, false, "Signature Locked: Use APatch / KernelSU boot patch")
+                return
+            }
+
+            if (errAll.contains("File exists", true)) {
                 vm.tlog("[RESIDENT] Module already live in kernel memory (hidden) - validating live node...", "INFO")
-                if (verifyLoad(vm, sourceName, devNode, vm.loadedModuleName.value)) {
-                    vm.tlog("[DONE] Resident kernel driver verified & operational", "OK")
+                val residentNode = verifyLoad(vm, devNode, vm.loadedModuleName.value, devNodesBefore, charMajorsBefore)
+                if (residentNode.isNotEmpty()) {
+                    vm.tlog("[DONE] Resident kernel driver verified & operational on /dev/$residentNode", "OK")
                     finish(vm, true, "Already loaded: $sourceName", context)
-                    runCatching { Shell.cmd("rm -f $TMP_KO 2>/dev/null").exec() }
                     return
                 }
             }
             val errFirst = (res.out + res.err).firstOrNull { it.isNotBlank() } ?: "exit ${res.code}"
             vm.tlog("[KERNEL ERR] insmod failed: $errFirst", "ERR")
 
-            Shell.cmd("dmesg 2>/dev/null | grep -iE 'kmem|dmsync|insmod|module|vermagic' | tail -n 3").exec().out
-                .filter { it.isNotBlank() }.distinct().forEach { vm.tlog("[DMESG] ${it.trim()}", "INFO") }
+            dmesgTail10.filter { it.isNotBlank() }.distinct().takeLast(3).forEach { vm.tlog("[DMESG] ${it.trim()}", "INFO") }
             finish(vm, false, "Load failed: $errFirst")
             return
         }
@@ -224,16 +274,12 @@ object UniversalKernelLoader {
             vm.setLoadedModule(loadedNow.first())
             vm.tlog("[MODULE] Registered in /proc/modules: ${loadedNow.first()}", "OK")
         }
-        vm.tstep("Verifying module...")
-
-        val ok = verifyLoad(vm, sourceName, devNode, vm.loadedModuleName.value)
-        if (ok) {
+        val activeNode = verifyLoad(vm, devNode, vm.loadedModuleName.value, devNodesBefore, charMajorsBefore)
+        if (activeNode.isNotEmpty()) {
             vm.tlog("[CORE] Physical-alias memory translation active (page-table walk + ioremap)", "INFO")
             vm.tlog("[IOCTL] Handlers active: 0x801 (Read), 0x802 (Write), 0x803 (ModBase)", "INFO")
-            vm.tlog("[DONE] ${viewModelModule(vm)} ready · Listening on /dev/wanbai", "OK")
+            vm.tlog("[DONE] ${viewModelModule(vm)} ready · Listening on /dev/$activeNode", "OK")
             finish(vm, true, "Loaded OK: $sourceName", context)
-
-            runCatching { Shell.cmd("rm -f $TMP_KO 2>/dev/null").exec() }
         } else {
             vm.tlog("[FAIL] Verification failed - device node not accessible", "ERR")
             finish(vm, false, "Load failed - details in the terminal")
@@ -243,16 +289,60 @@ object UniversalKernelLoader {
     private fun viewModelModule(vm: DriverViewModel): String =
         vm.loadedModuleName.value.ifBlank { "driver" }
 
+    private fun isCharNode(name: String): Boolean =
+        name.isNotBlank() && Shell.cmd("test -c /dev/$name 2>/dev/null").exec().isSuccess
+
+    private fun snapshotDevCharNodes(): Set<String> =
+        Shell.cmd("for f in /dev/*; do [ -c \"\$f\" ] && echo \"\${f##*/}\"; done 2>/dev/null")
+            .exec().out.map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+
+    private fun snapshotCharMajors(): Map<Int, String> {
+        var inChar = false
+        val majors = mutableMapOf<Int, String>()
+        for (raw in Shell.cmd("cat /proc/devices 2>/dev/null").exec().out) {
+            val line = raw.trim()
+            when {
+                line.startsWith("Character devices:") -> inChar = true
+                line.startsWith("Block devices:") -> inChar = false
+                inChar -> {
+                    val parts = line.split(Regex("\\s+"))
+                    if (parts.size >= 2) parts[0].toIntOrNull()?.let { majors[it] = parts[1] }
+                }
+            }
+        }
+        return majors
+    }
+
+    private fun pickFreshMajorNode(
+        vm: DriverViewModel,
+        moduleName: String,
+        before: Map<Int, String>
+    ): Pair<Int, String>? {
+        val after = snapshotCharMajors()
+        if (after.isEmpty()) return null
+        val fresh = if (before.isNotEmpty()) after.filter { (maj, name) -> before[maj] != name } else after
+        if (fresh.isEmpty()) return null
+        val knownNames = (vm.knownDriverModules() + moduleName).filter { it.isNotBlank() }
+        val knownHit = fresh.entries.firstOrNull { (_, name) ->
+            knownNames.any { kn -> name.contains(kn, ignoreCase = true) || kn.contains(name, ignoreCase = true) }
+        }
+        val picked = knownHit ?: if (before.isNotEmpty()) fresh.entries.firstOrNull() else null
+        if (picked == null) return null
+        val (maj, name) = picked
+        val clean = name.filter { it.isLetterOrDigit() || it == '_' || it == '-' }
+        return if (clean.isBlank()) null else maj to clean
+    }
+
     private fun verifyLoad(
         vm: DriverViewModel,
-        sourceName: String,
         expectedNode: String = "",
-        moduleName: String = ""
-    ): Boolean {
+        moduleName: String = "",
+        devNodesBefore: Set<String> = emptySet(),
+        charMajorsBefore: Map<Int, String> = emptyMap()
+    ): String {
         vm.tstep("Verifying module...")
-        vm.tlog("[SECURITY] Injected untrusted_app chr_file access policies", "INFO")
+        vm.tlog("[SECURITY] SELinux kept Enforcing - chr_file access granted via live policy patch", "INFO")
         Shell.cmd(
-            "setenforce 0 2>/dev/null",
             "magiskpolicy --live 'allow untrusted_app * chr_file *' 2>/dev/null || supolicy --live 'allow untrusted_app * chr_file *' 2>/dev/null"
         ).exec()
 
@@ -262,23 +352,31 @@ object UniversalKernelLoader {
         )
 
         var exactNode = false
-        var foundNodeName = expectedNode.ifBlank { "wanbai" }
+        var foundNodeName = ""
 
         for (attempt in 1..10) {
             val devList = Shell.cmd("ls /dev 2>/dev/null").exec().out.map { it.trim() }
-            if (expectedNode.isNotEmpty() && devList.contains(expectedNode)) {
+            if (expectedNode.isNotEmpty() && devList.contains(expectedNode) && isCharNode(expectedNode)) {
                 exactNode = true
                 foundNodeName = expectedNode
                 break
             }
-            val hit = candidates.firstOrNull { it in devList }
+            if (devNodesBefore.isNotEmpty()) {
+                val freshNode = (snapshotDevCharNodes() - devNodesBefore).sorted().firstOrNull()
+                if (!freshNode.isNullOrBlank()) {
+                    exactNode = true
+                    foundNodeName = freshNode
+                    break
+                }
+            }
+            val hit = candidates.firstOrNull { it in devList && isCharNode(it) }
             if (hit != null) {
                 exactNode = true
                 foundNodeName = hit
                 break
             }
             val mods = SafetyGuard.loadedModuleNames()
-            val modHit = devList.firstOrNull { d -> mods.any { m -> d.contains(m, ignoreCase = true) } }
+            val modHit = devList.firstOrNull { d -> mods.any { m -> d.contains(m, ignoreCase = true) } && isCharNode(d) }
             if (modHit != null) {
                 exactNode = true
                 foundNodeName = modHit
@@ -291,7 +389,7 @@ object UniversalKernelLoader {
             vm.tlog("[SYSFS] Scanning /sys/class for registered driver devices...", "INFO")
             val sysDevs = Shell.cmd(
                 "for f in /sys/class/dmsync*/dev /sys/class/dmsync*/*/dev /sys/class/kmem*/dev /sys/class/kmem*/*/dev /sys/class/memacc*/dev; do " +
-                        "if [ -f \"\$f\" ]; then cat \"\$f\"; echo \" \${f}\"; break; fi; done 2>/dev/null"
+                        "if [ -f \"\$f\" ]; then echo \"\$(cat \"\$f\") \$f\"; break; fi; done 2>/dev/null"
             ).exec().out.firstOrNull()?.trim()
 
             if (!sysDevs.isNullOrBlank()) {
@@ -300,13 +398,33 @@ object UniversalKernelLoader {
                 if (parts.size == 2 && parts[0].toIntOrNull() != null && parts[1].toIntOrNull() != null) {
                     val maj = parts[0]
                     val min = parts[1]
-                    foundNodeName = if (expectedNode.isNotBlank()) expectedNode else "wanbai"
-                    Shell.cmd(
-                        "mknod -m 666 /dev/$foundNodeName c $maj $min 2>/dev/null",
-                        "mknod -m 666 /dev/wanbai c $maj $min 2>/dev/null"
-                    ).exec()
+                    val sysfsName = Regex("""/sys/class/(?:[^/]+/)*([^/]+)/dev$""")
+                        .find(sysDevs.substringAfter(' ', ""))?.groupValues?.get(1) ?: ""
+                    foundNodeName = when {
+                        sysfsName.isNotBlank() -> sysfsName
+                        expectedNode.isNotBlank() -> expectedNode
+                        else -> ""
+                    }
+                    if (foundNodeName.isNotEmpty()) {
+                        Shell.cmd("mknod -m 666 /dev/$foundNodeName c $maj $min 2>/dev/null").exec()
+                        exactNode = isCharNode(foundNodeName)
+                        if (exactNode) {
+                            vm.tlog("[SYSFS] Created /dev/$foundNodeName (major=$maj minor=$min)", "OK")
+                        }
+                    }
+                }
+            }
+        }
+
+        if (!exactNode) {
+            val picked = pickFreshMajorNode(vm, moduleName, charMajorsBefore)
+            if (picked != null) {
+                val (maj, nodeName) = picked
+                Shell.cmd("mknod -m 666 /dev/$nodeName c $maj 0 2>/dev/null").exec()
+                if (isCharNode(nodeName)) {
+                    foundNodeName = nodeName
                     exactNode = true
-                    vm.tlog("[SYSFS] Created /dev/$foundNodeName (major=$maj minor=$min)", "OK")
+                    vm.tlog("[PROCDEV] Created /dev/$nodeName from /proc/devices (major=$maj, minor=0)", "OK")
                 }
             }
         }
@@ -314,20 +432,11 @@ object UniversalKernelLoader {
         if (exactNode && foundNodeName.isNotEmpty()) {
             Shell.cmd(
                 "chmod 666 /dev/$foundNodeName 2>/dev/null",
-                "chcon u:object_r:null_device:s0 /dev/$foundNodeName 2>/dev/null || chcon u:object_r:device:s0 /dev/$foundNodeName 2>/dev/null"
+                "chcon u:object_r:device:s0 /dev/$foundNodeName 2>/dev/null"
             ).exec()
 
-            val allAliases = listOf("wanbai", "dmsync", "dmsync_rt", "dmsync_qx", "memacc", "memacc_qx", "entryi", "kmem_337", "CheckMe", "lanran", "video188")
-            val linkCmds = allAliases.filter { it != foundNodeName }.map { alias ->
-                "rm -f /dev/$alias 2>/dev/null; ln -sf /dev/$foundNodeName /dev/$alias 2>/dev/null; chmod 666 /dev/$alias 2>/dev/null; chcon -h u:object_r:null_device:s0 /dev/$alias 2>/dev/null"
-            }
-            if (linkCmds.isNotEmpty()) {
-                Shell.cmd(*linkCmds.toTypedArray()).exec()
-            }
-
             vm.rememberDevNode(foundNodeName)
-            vm.tlog("[DEVNODE] Active node: /dev/$foundNodeName (0666, null_device)", "OK")
-            vm.tlog("[DEVNODE] All aliases symlinked (/dev/wanbai, /dev/dmsync, /dev/memacc...)", "INFO")
+            vm.tlog("[DEVNODE] Active node: /dev/$foundNodeName (0666, device:s0, no alias symlinks)", "OK")
         }
 
         val lsmod = Shell.cmd("lsmod").exec()
@@ -342,11 +451,11 @@ object UniversalKernelLoader {
 
         val dmesg = Shell.cmd("dmesg | grep -i -E 'kmem|dmsync|wanbai|kloader|entryi|vermagic|insmod' | tail -n 15").exec()
 
-        val nodeRwOk = Shell.cmd("test -r /dev/wanbai && test -w /dev/wanbai").exec().isSuccess
+        val nodeRwOk = foundNodeName.isNotBlank() &&
+                Shell.cmd("test -r /dev/$foundNodeName && test -w /dev/$foundNodeName").exec().isSuccess
 
         if ((moduleLoaded || exactNode) && nodeRwOk) {
-            val disp = if (loadedName.isNotBlank()) loadedName else "/dev/wanbai"
-            vm.tlog("[VERIFY] Node /dev/wanbai R/W verified (0666, client-ready)", "OK")
+            vm.tlog("[VERIFY] Node /dev/$foundNodeName R/W verified (0666, client-ready)", "OK")
             if (!moduleLoaded) {
                 vm.markHiddenLoaded()
                 vm.tlog("[STEALTH] Module unlinked from lsmod (stealth mode active)", "OK")
@@ -377,7 +486,7 @@ object UniversalKernelLoader {
             )
         )
 
-        return (moduleLoaded || exactNode)
+        return if (exactNode && foundNodeName.isNotBlank()) foundNodeName else ""
     }
 
     private fun finish(vm: DriverViewModel, ok: Boolean, msg: String, context: Context? = null) {
@@ -471,7 +580,7 @@ object UniversalKernelLoader {
             val bytes = koFile.readBytes()
             if (!isElf(bytes)) return false
 
-            val sigMarker = "~Module signature appended~\n".toByteArray(Charsets.US_ASCII)
+            val sigMarker = "~Module signature appended~".toByteArray(Charsets.US_ASCII)
             val markerIdx = indexOfFromEnd(bytes, sigMarker)
             if (markerIdx < 0) return false
 

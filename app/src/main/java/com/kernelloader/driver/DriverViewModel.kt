@@ -558,7 +558,6 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             tlog("# memtest", "CMD")
             withContext(Dispatchers.IO) {
                 try {
-                    Shell.cmd("setenforce 0 2>/dev/null").exec()
                     val lines = MemDirect.selfTest()
                     withContext(Dispatchers.Main) {
                         lines.forEach { (text, type) -> tlog(text, type) }
@@ -580,12 +579,8 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             tstep("Checking driver & R/W...")
             withContext(Dispatchers.IO) {
                 try {
-                    Shell.cmd("setenforce 0 2>/dev/null").exec()
-
                     val devNode = preferredDevNode()
-                    val targetNode = if (Shell.cmd("test -e /dev/wanbai").exec().isSuccess) "wanbai"
-                                     else devNode
-                    val nodePath = "/dev/$targetNode"
+                    val nodePath = "/dev/$devNode"
                     val nodeExists = Shell.cmd("test -e $nodePath").exec().isSuccess
 
                     if (!nodeExists) {
@@ -700,8 +695,8 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                         when {
                             errText.contains("errno=13") || errText.contains("permission denied") -> {
                                 tlog("[CAUSE] Error 13: Permission Denied (SELinux blocked)", "ERR")
-                                tlog("[FIX 1] Set SELinux to Permissive: su -c setenforce 0", "FIX")
-                                tlog("[FIX 2] Add Magisk policy: supolicy --live 'allow * * chr_file *'", "FIX")
+                                tlog("[FIX 1] Inject live policy: supolicy --live 'allow untrusted_app * chr_file *'", "FIX")
+                                tlog("[FIX 2] Set node context: chcon u:object_r:device:s0 /dev/${preferredDevNode()}", "FIX")
                             }
                             errText.contains("errno=25") || errText.contains("inappropriate ioctl") || errText.contains("not ours") -> {
                                 tlog("[CAUSE] Error 25: ENOTTY (Driver ABI Mismatch)", "ERR")
@@ -710,8 +705,8 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                             }
                             errText.contains("errno=2") || errText.contains("no such file") || errText.contains("no candidate") -> {
                                 tlog("[CAUSE] Error 2: ENOENT (Device node missing)", "ERR")
-                                tlog("[FIX 1] Tap LOAD button to insmod and recreate /dev/wanbai", "FIX")
-                                tlog("[FIX 2] Run: mknod /dev/wanbai c <major> <minor>", "FIX")
+                                tlog("[FIX 1] Tap LOAD button to insmod and recreate device node", "FIX")
+                                tlog("[FIX 2] Run: mknod /dev/${preferredDevNode()} c <major> <minor>", "FIX")
                             }
                             errText.contains("errno=14") || errText.contains("bad address") -> {
                                 tlog("[CAUSE] Error 14: EFAULT (Bad memory address)", "ERR")
@@ -799,6 +794,17 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
     private val INSMOD_BACKOFF_MS = 500L
 
     private suspend fun runInsmodLadder(koPath: String, devNode: String): Shell.Result {
+        val hasKsud = Shell.cmd("which ksud 2>/dev/null").exec().isSuccess
+        if (hasKsud) {
+            val ksuRes = Shell.cmd("ksud kernel-module load \"$koPath\" devname=$devNode 2>/dev/null || ksud module load --skip-signature \"$koPath\" 2>/dev/null").exec()
+            if (ksuRes.isSuccess) return ksuRes
+        }
+        val hasKptools = Shell.cmd("which kptools 2>/dev/null").exec().isSuccess
+        if (hasKptools) {
+            val apatchRes = Shell.cmd("kptools --load-module \"$koPath\" 2>/dev/null").exec()
+            if (apatchRes.isSuccess) return apatchRes
+        }
+
         val bins = listOf(
             "insmod", "/system/bin/insmod", "/vendor/bin/insmod",
             "/data/adb/magisk/busybox insmod", "busybox insmod"
@@ -832,7 +838,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
         }
         if (!res.isSuccess) {
             val errAll = (res.out + res.err).joinToString(" ").lowercase(Locale.US)
-            val dmesg = Shell.cmd("dmesg 2>/dev/null | tail -n 5").exec().out.joinToString(" ").lowercase(Locale.US)
+            val dmesg = Shell.cmd("dmesg 2>/dev/null | tail -n 10").exec().out.joinToString(" ").lowercase(Locale.US)
             val isSig = errAll.contains("required key") ||
                     errAll.contains("rejected") ||
                     errAll.contains("operation not permitted") ||
@@ -848,6 +854,16 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             (force.out + force.err).firstOrNull { it.isNotBlank() }?.let {
                 tlog("insmod -f: ${it.trim().take(35)}", "ERR")
             }
+            val isLocked = errAll.contains("required key not available") ||
+                    errAll.contains("key rejected") ||
+                    errAll.contains("key was rejected") ||
+                    dmesg.contains("module verification failed") ||
+                    dmesg.contains("required key not available") ||
+                    dmesg.contains("key rejected")
+            if (isLocked) {
+                tlog("[SIGNATURE LOCKED] Kernel enforces strict CONFIG_MODULE_SIG_FORCE=y.", "ERR")
+                tlog("[GUIDANCE] This device requires a patched boot image via official APatch / KernelSU or a custom kernel to allow unsigned modules.", "WARN")
+            }
         }
         return res
     }
@@ -856,7 +872,6 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
         tstep("Preparing device node...")
         tlog("Configuring SELinux policy...", "INFO")
         Shell.cmd(
-            "setenforce 0 2>/dev/null",
             "magiskpolicy --live 'allow untrusted_app * chr_file *' 2>/dev/null || supolicy --live 'allow untrusted_app * chr_file *' 2>/dev/null"
         ).exec()
         var foundNode: String? = null
@@ -897,7 +912,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                     Shell.cmd(
                         "mknod /dev/$targetName c $major $minor 2>/dev/null",
                         "chmod 0666 /dev/$targetName 2>/dev/null",
-                        "chcon u:object_r:null_device:s0 /dev/$targetName 2>/dev/null || chcon u:object_r:device:s0 /dev/$targetName 2>/dev/null"
+                        "chcon u:object_r:device:s0 /dev/$targetName 2>/dev/null"
                     ).exec()
                     foundNode = targetName
                     tlog("[SYSFS] Created /dev/$targetName from sysfs ($major:$minor)", "FIX")
@@ -908,23 +923,14 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
         if (foundNode != null) {
             Shell.cmd(
                 "chmod 0666 /dev/$foundNode",
-                "chcon u:object_r:null_device:s0 /dev/$foundNode 2>/dev/null || chcon u:object_r:device:s0 /dev/$foundNode 2>/dev/null"
+                "chcon u:object_r:device:s0 /dev/$foundNode 2>/dev/null"
             ).exec()
-
-            val allAliases = listOf("wanbai", "dmsync", "dmsync_rt", "dmsync_qx", "memacc", "memacc_qx", "entryi", "kmem_337", "CheckMe", "lanran", "video188")
-            val linkCmds = allAliases.filter { it != foundNode }.map { alias ->
-                "rm -f /dev/$alias 2>/dev/null; ln -sf /dev/$foundNode /dev/$alias 2>/dev/null; chmod 0666 /dev/$alias 2>/dev/null; chcon -h u:object_r:null_device:s0 /dev/$alias 2>/dev/null"
-            }
-            if (linkCmds.isNotEmpty()) {
-                Shell.cmd(*linkCmds.toTypedArray()).exec()
-            }
 
             rememberDevNode(foundNode)
             tlog("Node /dev/$foundNode active (0666)", "OK")
-            tlog("Node aliases linked", "INFO")
-            val rwOk = Shell.cmd("test -r /dev/wanbai && test -w /dev/wanbai").exec().isSuccess
+            val rwOk = Shell.cmd("test -r /dev/$foundNode && test -w /dev/$foundNode").exec().isSuccess
             if (rwOk) {
-                tlog("/dev/wanbai verified (R/W OK)", "OK")
+                tlog("/dev/$foundNode verified (R/W OK)", "OK")
                 tlog("Driver ready for use", "OK")
             }
             return true
@@ -978,8 +984,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             "cp \"${localKo.absolutePath}\" ${staged.absolutePath}",
             "chmod 644 ${staged.absolutePath}",
             "chown root:root ${staged.absolutePath} 2>/dev/null",
-            "chcon u:object_r:system_file:s0 ${staged.absolutePath} 2>/dev/null",
-            "setenforce 0 2>/dev/null"
+            "chcon u:object_r:system_file:s0 ${staged.absolutePath} 2>/dev/null"
         ).exec()
         if (!Shell.cmd("test -f ${staged.absolutePath}").exec().isSuccess) {
             tlog("Staging failed", "ERR")
@@ -1100,8 +1105,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                 "cp \"${downloaded.absolutePath}\" ${staged.absolutePath}",
                 "chmod 644 ${staged.absolutePath}",
                 "chown root:root ${staged.absolutePath} 2>/dev/null",
-                "chcon u:object_r:system_file:s0 ${staged.absolutePath} 2>/dev/null",
-                "setenforce 0 2>/dev/null"
+                "chcon u:object_r:system_file:s0 ${staged.absolutePath} 2>/dev/null"
             ).exec()
             if (!Shell.cmd("test -f ${staged.absolutePath}").exec().isSuccess) {
                 tlog("Staging failed", "ERR")
@@ -1530,7 +1534,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch(Dispatchers.IO) {
             val loaded = SafetyGuard.loadedModuleNames()
             val hit = knownDriverModules().filter { it in loaded }
-            val nodePresent = Shell.cmd("test -e /dev/${preferredDevNode()} 2>/dev/null || test -e /dev/wanbai 2>/dev/null").exec().isSuccess
+            val nodePresent = Shell.cmd("test -e /dev/${preferredDevNode()} 2>/dev/null").exec().isSuccess
             val hiddenClass = SafetyGuard.hiddenDriverClass() != null
             withContext(Dispatchers.Main) {
                 if (hit.isNotEmpty()) {
