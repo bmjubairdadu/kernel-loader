@@ -31,26 +31,99 @@ object AppUpdateChecker {
 
     private const val UA = "KernelLoder-Updater/1.0"
 
-    fun check(releasesPageUrl: String, currentVersionCode: Int): UpdateCheck {
-        checkFromReleasePage(releasesPageUrl, currentVersionCode)?.let { return it }
-        return checkFromApi(apiUrlFromPage(releasesPageUrl), currentVersionCode)
+    fun check(
+        releasesPageUrl: String,
+        currentVersionCode: Int,
+        currentVersionName: String = com.kernelloader.BuildConfig.VERSION_NAME
+    ): UpdateCheck {
+        checkFromReleasePage(releasesPageUrl, currentVersionCode, currentVersionName)?.let { return it }
+        return checkFromApi(apiUrlFromPage(releasesPageUrl), currentVersionCode, currentVersionName)
+    }
+
+    private fun parseSemver(v: String): List<Int>? {
+        val clean = v.trim().removePrefix("v").removePrefix("V")
+        val match = Regex("""^(\d+(?:\.\d+)+)""").find(clean) ?: return null
+        return match.groupValues[1].split('.').mapNotNull { it.toIntOrNull() }
+    }
+
+    private fun isSemverNewer(remote: String, current: String): Boolean {
+        val r = parseSemver(remote) ?: return false
+        val c = parseSemver(current) ?: return false
+        val maxLen = maxOf(r.size, c.size)
+        for (i in 0 until maxLen) {
+            val rPart = r.getOrElse(i) { 0 }
+            val cPart = c.getOrElse(i) { 0 }
+            if (rPart > cPart) return true
+            if (rPart < cPart) return false
+        }
+        return false
     }
 
     private fun extractVersionCode(tag: String, text: String = ""): Int? {
         val vcRegex = Regex("""(?:versionCode|vc|build)[\s:=]+(\d+)""", RegexOption.IGNORE_CASE)
         vcRegex.find(text)?.groupValues?.get(1)?.toIntOrNull()?.let { return it }
         Regex("""^v?(\d+)$""").find(tag.trim())?.groupValues?.get(1)?.toIntOrNull()?.let { return it }
-        return Regex("""\b(\d+)\b""").find(tag)?.groupValues?.get(1)?.toIntOrNull()
+        return null
     }
 
-    private fun checkFromReleasePage(pageUrl: String, currentVersionCode: Int): UpdateCheck? {
+    private fun isUpdateAvailable(
+        tag: String,
+        text: String,
+        currentVersionCode: Int,
+        currentVersionName: String
+    ): Boolean {
+        if (isSemverNewer(tag, currentVersionName)) return true
+
+        val nameMatch = Regex("""(?:Kernel-Loader-|Kernel\s+Loader\s+)?v?(\d+\.\d+(?:\.\d+)*)""", RegexOption.IGNORE_CASE).find(text)
+        if (nameMatch != null && isSemverNewer(nameMatch.groupValues[1], currentVersionName)) {
+            return true
+        }
+
+        val code = extractVersionCode(tag, text)
+        if (code != null && code > currentVersionCode) {
+            return true
+        }
+
+        return false
+    }
+
+    private fun resolveVersionName(tag: String, text: String): String {
+        val tagSem = Regex("""^v?(\d+\.\d+(?:\.\d+)*)""").find(tag.trim())
+        if (tagSem != null) return tagSem.groupValues[1]
+
+        val textSem = Regex("""(?:Kernel-Loader-|Kernel\s+Loader\s+)?v?(\d+\.\d+(?:\.\d+)*)""", RegexOption.IGNORE_CASE).find(text)
+        if (textSem != null) return textSem.groupValues[1]
+
+        return tag.removePrefix("v").ifBlank { tag }
+    }
+
+    private fun resolveVersionCode(tag: String, text: String, currentVersionCode: Int, versionName: String): Int {
+        extractVersionCode(tag, text)?.let { return it }
+        val sem = parseSemver(versionName) ?: parseSemver(tag)
+        if (sem != null && sem.isNotEmpty()) {
+            val major = sem.getOrElse(0) { 1 }
+            val minor = sem.getOrElse(1) { 0 }
+            val patch = sem.getOrElse(2) { 0 }
+            val synthetic = major * 1000 + minor * 100 + patch
+            if (synthetic > currentVersionCode) return synthetic
+        }
+        return currentVersionCode + 1
+    }
+
+    private fun checkFromReleasePage(
+        pageUrl: String,
+        currentVersionCode: Int,
+        currentVersionName: String
+    ): UpdateCheck? {
         val page = pageUrl.trimEnd('/')
 
         val (_, finalUrl) = fetch("$page/latest") ?: return null
         val tag = latestTagFromUrl(finalUrl) ?: return null
         val assetsBody = fetch("$page/expanded_assets/$tag")?.first ?: ""
-        val code = extractVersionCode(tag, assetsBody) ?: return null
-        if (code <= currentVersionCode) return UpdateCheck.UpToDate
+
+        if (!isUpdateAvailable(tag, assetsBody, currentVersionCode, currentVersionName)) {
+            return UpdateCheck.UpToDate
+        }
 
         val apkHref = Regex("""href="([^"]+/releases/download/[^"]+\.apk)"""")
             .findAll(assetsBody)
@@ -58,10 +131,13 @@ object AppUpdateChecker {
             ?: return null
         val apkUrl = if (apkHref.startsWith("/")) "https://github.com$apkHref" else apkHref
 
+        val resolvedName = resolveVersionName(tag, assetsBody)
+        val resolvedCode = resolveVersionCode(tag, assetsBody, currentVersionCode, resolvedName)
+
         return UpdateCheck.Available(
             UpdateInfo(
-                versionCode = code,
-                versionName = tag.removePrefix("v").ifBlank { tag },
+                versionCode = resolvedCode,
+                versionName = resolvedName,
                 apkUrl = apkUrl,
                 apkSize = headContentLength(apkUrl) ?: 0L,
                 notes = "",
@@ -113,7 +189,11 @@ object AppUpdateChecker {
         null
     }
 
-    private fun checkFromApi(apiUrl: String, currentVersionCode: Int): UpdateCheck {
+    private fun checkFromApi(
+        apiUrl: String,
+        currentVersionCode: Int,
+        currentVersionName: String
+    ): UpdateCheck {
         if (apiUrl.isBlank()) return UpdateCheck.Offline
         val text = try {
             val conn = (URL(apiUrl).openConnection() as HttpURLConnection).apply {
@@ -136,20 +216,20 @@ object AppUpdateChecker {
             val tag = rel.optString("tag_name", "")
             val name = rel.optString("name", "")
             val body = rel.optString("body", "")
+            val fullText = "$name\n$body"
 
-            val code = extractVersionCode(tag, "$name\n$body")
-                ?: rel.optInt("id", 0)
-            if (code <= currentVersionCode) return UpdateCheck.UpToDate
+            if (!isUpdateAvailable(tag, fullText, currentVersionCode, currentVersionName)) {
+                return UpdateCheck.UpToDate
+            }
 
             val assets = rel.optJSONArray("assets") ?: return UpdateCheck.UpToDate
             var apkUrl = ""
             var apkSize = 0L
             for (i in 0 until assets.length()) {
                 val a = assets.getJSONObject(i)
-                val name = a.optString("name", "")
-                if (name.endsWith(".apk", true)) {
-
-                    if (name.contains("release", true) || apkUrl.isBlank()) {
+                val aName = a.optString("name", "")
+                if (aName.endsWith(".apk", true)) {
+                    if (aName.contains("release", true) || apkUrl.isBlank()) {
                         apkUrl = a.optString("browser_download_url", "")
                         apkSize = a.optLong("size", 0L)
                     }
@@ -157,12 +237,15 @@ object AppUpdateChecker {
             }
             if (apkUrl.isBlank()) return UpdateCheck.UpToDate
 
+            val resolvedName = resolveVersionName(tag, fullText).ifBlank {
+                rel.optString("name", tag.removePrefix("v"))
+            }
+            val resolvedCode = resolveVersionCode(tag, fullText, currentVersionCode, resolvedName)
+
             UpdateCheck.Available(
                 UpdateInfo(
-                    versionCode = code,
-                    versionName = tag.removePrefix("v").ifBlank {
-                        rel.optString("name", "v$code")
-                    },
+                    versionCode = resolvedCode,
+                    versionName = resolvedName,
                     apkUrl = apkUrl,
                     apkSize = apkSize,
                     notes = rel.optString("body", ""),

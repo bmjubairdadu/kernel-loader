@@ -314,9 +314,10 @@ fun HomeScreen(
                             )
                             Spacer(Modifier.width(8.dp))
                             Column(Modifier.weight(1f)) {
+                                val displayVer = if (appUpdate.versionName.startsWith("v", ignoreCase = true)) appUpdate.versionName else "v${appUpdate.versionName}"
                                 Text(
-                                    text = if (isReady) "UPDATE v${appUpdate.versionName} READY"
-                                           else "UPDATE v${appUpdate.versionCode} · ${appUpdate.versionName}",
+                                    text = if (isReady) "UPDATE $displayVer READY"
+                                           else "UPDATE $displayVer AVAILABLE",
                                     style = MaterialTheme.typography.labelMedium,
                                     color = if (isReady) AccentGreen else AccentAmber,
                                     fontWeight = FontWeight.Bold

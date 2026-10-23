@@ -271,7 +271,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
         if (!wasReady) updateStatus.value = "CHECKING"
         if (!silent) tlog("Checking Update...", "INFO")
         viewModelScope.launch(Dispatchers.IO) {
-            val result = AppUpdateChecker.check(BuildConfig.UPDATE_RELEASES_PAGE, BuildConfig.VERSION_CODE)
+            val result = AppUpdateChecker.check(BuildConfig.UPDATE_RELEASES_PAGE, BuildConfig.VERSION_CODE, BuildConfig.VERSION_NAME)
             withContext(Dispatchers.Main) {
                 when (result) {
                     is AppUpdateChecker.UpdateCheck.Available -> {
