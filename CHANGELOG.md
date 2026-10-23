@@ -7,6 +7,29 @@ the in-app updater parses the tag number, so dotted tags never trigger updates.
 
 ---
 
+## [1.3] — 2026-10-24 (versionCode 7, tag `v1.3` / `v7`) ⚡ Smart Detection & Signature Security Release
+
+> Intelligent multi-layered QX vs RT variant detection, automatic kernel module signature verification bypass (`CONFIG_MODULE_SIG_FORCE`), sequential pre-load diagnostic checks, remote driver revocation watchdog, single-line console layout, and complete codebase streamlining.
+
+### ✨ Added
+* **Smart Multi-Layer Variant Detection.** Automatically evaluates and selects the optimal driver variant (`QX` vs `RT`) using full vermagic matching, kernel release names, and compatibility scoring. Prioritizes QX on gaming kernel profiles (such as `4.9.337-DaisyForGaming`) while selecting native RT on modern GKI kernels (5.x / 6.x) or when only RT is supported.
+* **Kernel Signature Verification Bypass (`module_sig_enforce`).** Added dynamic bypass for kernels with `CONFIG_MODULE_SIG_FORCE` enabled via `/proc/sys/kernel/module_sig_enforce`, SELinux policy injection, and verity props to prevent `ENOKEY` / `EKEYREJECTED` load blocks.
+* **Module Signature Stripper (`stripModuleSig`).** Automatically strips invalid or untrusted vendor signature metadata appended to `.ko` files before insertion, enabling custom driver loading on restrictive kernels.
+* **Live Pre-Load Diagnostics.** Streams paced, real-time diagnostic checks (`Root Permission` -> `Kernel & Arch` -> `Signature Security` -> `Driver Database Scan` -> `Variant Detection`) to the console with realistic intervals before loading modules.
+* **Remote Driver Revocation Watchdog.** Background root daemon (`kloader_daemon.sh`) and `DriverWatchdogService` verify driver license validity against remote database; immediately wipes module and reboots device if access is revoked.
+
+### 🛠️ Fixed
+* **Console Single-Line Layout & Ellipsis Protection.** Enforced single-line rendering with text ellipsis (`maxLines = 1`, `TextOverflow.Ellipsis`) on both Home and Terminal consoles, preventing text wrapping or card overflow.
+* **Console Noise & Tag Stripping.** Removed bracket prefixes (`[DEVNODE]`, `[STAGE]`, etc.) and header banners for clean, uniform `- ` log lines.
+* **Console Auto-Scroll Tracking.** Console list locks to the latest incoming line automatically during active load pipelines.
+* **Social Asset Sizing.** Fixed WhatsApp and Telegram vector drawable display sizing across devices.
+* **Clean Codebase.** Preserved complete code cleanliness with all comments stripped across the project.
+
+### 🔄 Changed
+* Built with `versionCode 7` and `versionName 1.3`.
+
+---
+
 ## [1.2] — 2026-10-21 (versionCode 6, tag `v6`) 🚀 Auto-Update & Persistence Release
 
 > Seamless background auto-updates, persistent terminal logs across app clears, direct Telegram issue reports with device diagnostics, universal device node symlinks, and enhanced resident stealth driver detection.

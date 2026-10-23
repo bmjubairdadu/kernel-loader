@@ -5,7 +5,7 @@ import java.io.BufferedReader
 import java.io.InputStreamReader
 
 object RootChecker {
-    
+
     private val KERNEL_RE = Regex("""(\d+)\.(\d+)\.(\d+)""")
 
     fun isRootAvailable(): Boolean {

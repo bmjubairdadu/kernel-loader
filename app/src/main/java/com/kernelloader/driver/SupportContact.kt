@@ -9,7 +9,7 @@ import java.io.File
 import java.net.URLEncoder
 
 object SupportContact {
-    
+
     const val APP_NAME = "Kernel Loader"
 
     const val WHATSAPP_NUMBER = "8801785917145"
@@ -90,12 +90,6 @@ object SupportContact {
         "https://wa.me/$WHATSAPP_NUMBER?text=" +
                 URLEncoder.encode(reportText, "UTF-8")
 
-    /**
-     * Opens WhatsApp with the report ZIP attached and a one-line caption.
-     * jid extra targets the dev chat directly on most WhatsApp builds; when the
-     * build ignores it, WhatsApp's own send-to screen opens with everything filled.
-     * Returns false when no WhatsApp installation could be launched.
-     */
     fun sendZipViaWhatsApp(context: Context, zip: File, caption: String): Boolean {
         val uri = FileProvider.getUriForFile(
             context, "${context.packageName}.fileprovider", zip
@@ -138,11 +132,6 @@ object SupportContact {
         }
     }
 
-    /**
-     * Opens Telegram with the report ZIP attached and caption.
-     * Targets Telegram packages directly so the user only has to send.
-     * Returns false when no Telegram installation could be launched.
-     */
     fun sendZipViaTelegram(context: Context, zip: File, caption: String): Boolean {
         val uri = FileProvider.getUriForFile(
             context, "${context.packageName}.fileprovider", zip

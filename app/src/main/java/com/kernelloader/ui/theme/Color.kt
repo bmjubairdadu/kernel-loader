@@ -2,26 +2,26 @@ package com.kernelloader.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-val Surface0 = Color(0xFF0E1A22)   
-val Surface1 = Color(0xFF16262F)   
-val Surface2 = Color(0xFF1E323D)   
-val Surface3 = Color(0xFF274150)   
-val SurfaceInset = Color(0xFF0A141A) 
+val Surface0 = Color(0xFF0E1A22)
+val Surface1 = Color(0xFF16262F)
+val Surface2 = Color(0xFF1E323D)
+val Surface3 = Color(0xFF274150)
+val SurfaceInset = Color(0xFF0A141A)
 
 val BorderSubtle = Color(0xFF24404F)
 val BorderStrong = Color(0xFF35606F)
 
-val TextPrimary = Color(0xFFF2F7FA)    
-val TextSecondary = Color(0xFFBFD3DE)  
-val TextMuted = Color(0xFF93A9B6)      
-val TextDisabled = Color(0xFF5F7684)   
-val TextOnAccent = Color(0xFF04231A)   
+val TextPrimary = Color(0xFFF2F7FA)
+val TextSecondary = Color(0xFFBFD3DE)
+val TextMuted = Color(0xFF93A9B6)
+val TextDisabled = Color(0xFF5F7684)
+val TextOnAccent = Color(0xFF04231A)
 
-val AccentGreen = Color(0xFF35D07F)    
-val AccentBlue = Color(0xFF56C7F0)     
-val AccentAmber = Color(0xFFFFC46B)    
-val AccentRed = Color(0xFFFF7B7B)      
-val AccentViolet = Color(0xFFB79BFF)   
+val AccentGreen = Color(0xFF35D07F)
+val AccentBlue = Color(0xFF56C7F0)
+val AccentAmber = Color(0xFFFFC46B)
+val AccentRed = Color(0xFFFF7B7B)
+val AccentViolet = Color(0xFFB79BFF)
 
 val StatusOk = AccentGreen
 val StatusWarn = AccentAmber

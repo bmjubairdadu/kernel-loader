@@ -48,7 +48,6 @@ object DeviceReportCollector {
         private val kernelShort: String =
             Regex("""\d+\.\d+\.\d+""").find(kernelRelease)?.value ?: "unknown"
 
-        // "4.14.284-LONGSU-gffbd2268fef7" -> "4.14.284-LONGSU"
         val kernelCaption: String =
             Regex("""\d+\.\d+\.\d+(?:-[A-Za-z0-9._]+)?""").find(kernelRelease)?.value ?: kernelShort
 

@@ -31,13 +31,6 @@ object AppUpdateChecker {
 
     private const val UA = "KernelLoder-Updater/1.0"
 
-    /**
-     * The REST API rate-limits unauthenticated clients per IP, so everyone on
-     * the same carrier NAT shares one tiny budget and sees "Update Check
-     * Offline". The public release pages are not rate-limited: /releases/latest
-     * redirects to the tag, /releases/expanded_assets/<tag> lists the assets.
-     * The API JSON flow is kept only as a fallback for a page-layout change.
-     */
     fun check(releasesPageUrl: String, currentVersionCode: Int): UpdateCheck {
         checkFromReleasePage(releasesPageUrl, currentVersionCode)?.let { return it }
         return checkFromApi(apiUrlFromPage(releasesPageUrl), currentVersionCode)
@@ -52,7 +45,7 @@ object AppUpdateChecker {
 
     private fun checkFromReleasePage(pageUrl: String, currentVersionCode: Int): UpdateCheck? {
         val page = pageUrl.trimEnd('/')
-        // only the final redirect URL matters here; the page body does not
+
         val (_, finalUrl) = fetch("$page/latest") ?: return null
         val tag = latestTagFromUrl(finalUrl) ?: return null
         val assetsBody = fetch("$page/expanded_assets/$tag")?.first ?: ""

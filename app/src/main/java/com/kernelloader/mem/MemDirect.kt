@@ -19,7 +19,7 @@ object MemDirect {
         val out = Shell.cmd("cat /proc/$pid/maps 2>&1").exec().out
         val list = mutableListOf<MemRegion>()
         for (line in out) {
-            
+
             val m = Regex("""^([0-9a-f]+)-([0-9a-f]+)\s+(\S+)\s+\S+\s+\S+\s+\S+\s*(.*)$""")
                 .find(line.trim()) ?: continue
             try {

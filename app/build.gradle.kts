@@ -15,8 +15,8 @@ android {
         applicationId = "com.kernelloader"
         minSdk = 28
         targetSdk = 34
-        versionCode = 6
-        versionName = "1.2"
+        versionCode = 7
+        versionName = "1.3"
 
         buildConfigField(
             "String",
@@ -32,7 +32,7 @@ android {
 
     buildTypes {
         release {
-            
+
             isShrinkResources = true
             optimization {
                 enable = true
@@ -41,7 +41,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            
+
             signingConfig = signingConfigs.getByName("debug")
         }
     }

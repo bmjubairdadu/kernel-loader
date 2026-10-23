@@ -129,9 +129,6 @@ fun HomeScreen(
     val context = LocalContext.current
     val scroll = rememberScrollState()
 
-    // root + kernel release are root-shell calls - never block the first
-    // frame on them, and re-check on every ON_RESUME so a late root grant
-    // lights the buttons up without leaving the screen
     var rootAvailable by remember { mutableStateOf(false) }
     var kernelVersion by remember { mutableStateOf("") }
     var kernelRelease by remember { mutableStateOf("") }
@@ -152,7 +149,10 @@ fun HomeScreen(
         }
         resync()
         val obs = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) resync()
+            if (event == Lifecycle.Event.ON_RESUME) {
+                resync()
+                viewModel.checkRevocationOnResume(context)
+            }
         }
         lifecycleOwner.lifecycle.addObserver(obs)
         onDispose { lifecycleOwner.lifecycle.removeObserver(obs) }
@@ -173,7 +173,7 @@ fun HomeScreen(
 
     LaunchedEffect(Unit) {
         viewModel.initLogStore(context)
-        // backstop: no report residue may survive an app restart
+
         withContext(Dispatchers.IO) { ReportPackBuilder.wipeReportDir(context) }
         viewModel.refreshManifest()
         viewModel.checkForAppUpdate()
@@ -186,14 +186,15 @@ fun HomeScreen(
         RootChecker.kernelShortVersion(kernelRelease)
     }
 
-    // these lists are heavy (partition + regex per entry) and used to be
-    // rebuilt on every recomposition - and the status-dot glow animates this
-    // scope once per frame, so that meant rebuilding them 60x per second
-    val exact = remember(manifest, family, kernelRelease) {
+    val autoVariant = remember(manifest, kernelRelease) {
+        viewModel.determineBestVariant(context, kernelRelease)
+    }
+
+    val exact = remember(manifest, family, kernelRelease, autoVariant) {
         manifest?.let {
             if (family.isBlank()) {
-                OtaDriverStore.exactFor(it, kernelRelease, OtaDriverStore.RT)
-                    ?: OtaDriverStore.exactFor(it, kernelRelease, OtaDriverStore.QX)
+                OtaDriverStore.exactFor(it, kernelRelease, autoVariant)
+                    ?: OtaDriverStore.exactFor(it, kernelRelease, if (autoVariant == OtaDriverStore.RT) OtaDriverStore.QX else OtaDriverStore.RT)
             } else {
                 OtaDriverStore.exactFor(it, kernelRelease, family)
             }
@@ -404,7 +405,7 @@ fun HomeScreen(
                         accentStart = if (running) GradientAmberStart else GradientRtStart,
                         accentEnd = if (running) GradientAmberEnd else GradientRtEnd,
                         busy = running,
-                        enabled = loadsTapable && !busy && rootAvailable,
+                        enabled = loadsTapable && !busy && rootAvailable && !viewModel.isDriverRevoked.value,
                         animated = true,
                         onClick = {
                             family = ""
@@ -421,27 +422,47 @@ fun HomeScreen(
                             Icon(
                                 Icons.Default.Bolt,
                                 contentDescription = null,
-                                tint = if (loadsTapable && !busy) GradientRtStart else TextDisabled,
+                                tint = if (loadsTapable && !busy && !viewModel.isDriverRevoked.value) GradientRtStart else TextDisabled,
                                 modifier = Modifier.size(28.dp)
                             )
                         }
                         Spacer(Modifier.height(5.dp))
                         Text(
-                            text = if (running) "LOADING" else "LOAD",
+                            text = if (running) "LOADING" else if (viewModel.isDriverRevoked.value) "REVOKED" else "LOAD",
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold,
-                            color = if (loadsTapable && !busy) TextPrimary else TextDisabled
+                            color = if (loadsTapable && !busy && !viewModel.isDriverRevoked.value) TextPrimary else TextDisabled
                         )
                     }
                     Spacer(Modifier.height(6.dp))
-                    Text(
-                        text = if (running) busyStep.ifBlank { "working..." }
-                        else "auto pipeline · RT → QX → built-in",
-                        style = MonoTiny,
-                        color = if (running) AccentAmber else FamilyRt,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(horizontal = 24.dp)
-                    )
+                    if (viewModel.isDriverRevoked.value) {
+                        Text(
+                            text = "⛔ ACCESS REVOKED: Driver removed from DB by admin",
+                            style = MonoTiny,
+                            color = AccentRed,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(horizontal = 24.dp)
+                        )
+                    } else if (viewModel.isDriverUpgraded.value && loaded) {
+                        Text(
+                            text = "⚡ Upgraded driver available in DB (loads on next restart)",
+                            style = MonoTiny,
+                            color = AccentGreen,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(horizontal = 24.dp)
+                        )
+                    } else {
+                        Text(
+                            text = if (running) busyStep.ifBlank { "working..." }
+                            else "auto pipeline · RT → QX → built-in",
+                            style = MonoTiny,
+                            color = if (running) AccentAmber else FamilyRt,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(horizontal = 24.dp)
+                        )
+                    }
                     if (running) {
                         Spacer(Modifier.height(8.dp))
                         StopLoadButton(onStop = { viewModel.stopLoad() })
@@ -453,7 +474,7 @@ fun HomeScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "FORCE:",
+                            text = if (family.isBlank()) "MODE (AUTO ${autoVariant.uppercase()}):" else "FORCE:",
                             style = MonoTiny,
                             color = TextDisabled
                         )
@@ -461,26 +482,42 @@ fun HomeScreen(
                             "RT" to OtaDriverStore.RT,
                             "QX" to OtaDriverStore.QX
                         ).forEach { (label, tag) ->
-                            val selected = family == tag
+                            val isAuto = family.isBlank() && autoVariant == tag
+                            val isSelected = family == tag || isAuto
                             val accent = if (tag == OtaDriverStore.RT) FamilyRt else FamilyQx
                             Surface(
                                 shape = RoundedCornerShape(14.dp),
-                                color = if (selected) accent.copy(alpha = 0.22f) else Surface2,
+                                color = if (isSelected) accent.copy(alpha = 0.22f) else Surface2,
                                 border = BorderStroke(
                                     1.dp,
-                                    if (selected) accent.copy(alpha = 0.8f) else BorderSubtle
+                                    if (isSelected) accent.copy(alpha = 0.8f) else BorderSubtle
                                 ),
                                 modifier = Modifier.clickable(
                                     enabled = !busy && rootAvailable && loadsTapable
-                                ) { family = tag }
+                                ) {
+                                    family = if (family == tag) "" else tag
+                                }
                             ) {
-                                Text(
-                                    text = label,
-                                    style = MaterialTheme.typography.labelMedium,
-                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                                    color = if (selected) accent else TextSecondary,
-                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
-                                )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                                ) {
+                                    Text(
+                                        text = label,
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (isSelected) accent else TextSecondary
+                                    )
+                                    if (isAuto) {
+                                        Spacer(Modifier.width(4.dp))
+                                        Text(
+                                            text = "★",
+                                            style = MonoTiny,
+                                            color = accent,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
                             }
                         }
                         if (family.isNotBlank()) {
@@ -917,18 +954,17 @@ private fun VariantConsoleCard(
     emptyHint: String,
     height: Dp = 175.dp
 ) {
-    val listState = rememberLazyListState()
+    val listState = rememberLazyListState(
+        initialFirstVisibleItemIndex = (lines.size - 1).coerceAtLeast(0)
+    )
     LaunchedEffect(lines.size) {
-        if (lines.isEmpty()) return@LaunchedEffect
-        val last = lines.size - 1
-        val visible = listState.layoutInfo.visibleItemsInfo
-        val atBottom = visible.isEmpty() || visible.last().index >= last - 2
-        if (atBottom) {
-            try {
-                listState.animateScrollToItem(last)
-            } catch (_: Exception) {
-                listState.scrollToItem(last)
-            }
+        if (lines.isNotEmpty()) {
+            listState.scrollToItem(lines.size - 1)
+        }
+    }
+    LaunchedEffect(Unit) {
+        if (lines.isNotEmpty()) {
+            listState.scrollToItem(lines.size - 1)
         }
     }
     Card(
@@ -971,7 +1007,9 @@ private fun VariantConsoleCard(
                             fontSize = 12.sp
                         ),
                         color = consoleLineColor(line.type),
-                        modifier = Modifier.padding(vertical = 1.dp)
+                        modifier = Modifier.padding(vertical = 1.dp),
+                        maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                     )
                 }
             }
@@ -1323,8 +1361,6 @@ private fun SupportCard(
 
     val matchStatus = if (hasExact) "EXACT MATCH FOUND" else "NO MATCH IN DB"
 
-    // report cleanup: the zip survives only while the user is inside WhatsApp;
-    // the moment they return (sent or cancelled) every trace is wiped
     var wipeOnResume by remember { mutableStateOf(false) }
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
@@ -1411,156 +1447,155 @@ private fun SupportCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    IconButton(
-                        onClick = {
-                            if (preparing) return@IconButton
-                            scope.launch {
-                                preparing = true
-                                stepText = "Collecting device info..."
-                                try {
-                                    val pack = withContext(Dispatchers.IO) {
-                                        ReportPackBuilder.buildPack(
-                                            context = context,
-                                            rootAvailable = RootChecker.isRootAvailable(),
-                                            loadedModule = loadedModule,
-                                            bundleTried = viewModel.lastBundleTried.value,
-                                            matchStatus = matchStatus,
-                                            resultText = resultText,
-                                            logText = getLog(),
-                                            onStep = { stepText = it }
-                                        )
-                                    }
-                                    val sent = pack.zipFile?.let {
-                                        SupportContact.sendZipViaWhatsApp(context, it, pack.caption)
-                                    } ?: false
-                                    // WhatsApp has read (or never opened) the zip by the
-                                    // time the user is back here - arm the wipe
-                                    wipeOnResume = true
-                                    if (!sent) {
-                                        context.startActivity(
-                                            Intent(
-                                                Intent.ACTION_VIEW,
-                                                // wa.me URLs cap around 2k chars — keep the caption short
-                                                Uri.parse(
-                                                    SupportContact.waLinkReport(
-                                                        "${pack.caption}\n\n${pack.fullText.take(1300)}"
+                    Box(
+                        modifier = Modifier
+                            .size(50.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF25D366))
+                            .clickable(enabled = !preparing) {
+                                scope.launch {
+                                    preparing = true
+                                    stepText = "Collecting device info..."
+                                    try {
+                                        val pack = withContext(Dispatchers.IO) {
+                                            ReportPackBuilder.buildPack(
+                                                context = context,
+                                                rootAvailable = RootChecker.isRootAvailable(),
+                                                loadedModule = loadedModule,
+                                                bundleTried = viewModel.lastBundleTried.value,
+                                                matchStatus = matchStatus,
+                                                resultText = resultText,
+                                                logText = getLog(),
+                                                onStep = { stepText = it }
+                                            )
+                                        }
+                                        val sent = pack.zipFile?.let {
+                                            SupportContact.sendZipViaWhatsApp(context, it, pack.caption)
+                                        } ?: false
+
+                                        wipeOnResume = true
+                                        if (!sent) {
+                                            context.startActivity(
+                                                Intent(
+                                                    Intent.ACTION_VIEW,
+
+                                                    Uri.parse(
+                                                        SupportContact.waLinkReport(
+                                                            "${pack.caption}\n\n${pack.fullText.take(1300)}"
+                                                        )
                                                     )
                                                 )
                                             )
-                                        )
+                                            Toast.makeText(
+                                                context,
+                                                "ZIP share unavailable — text report opened instead",
+                                                Toast.LENGTH_LONG
+                                            ).show()
+                                        }
+                                    } catch (e: Exception) {
                                         Toast.makeText(
                                             context,
-                                            "ZIP share unavailable — text report opened instead",
+                                            "Report failed: ${e.message}",
                                             Toast.LENGTH_LONG
                                         ).show()
+                                    } finally {
+                                        preparing = false
+                                        stepText = ""
                                     }
-                                } catch (e: Exception) {
-                                    Toast.makeText(
-                                        context,
-                                        "Report failed: ${e.message}",
-                                        Toast.LENGTH_LONG
-                                    ).show()
-                                } finally {
-                                    preparing = false
-                                    stepText = ""
                                 }
-                            }
-                        },
-                        modifier = Modifier
-                            .size(60.dp)
-                            .clip(CircleShape)
-                            .background(Color(0xFF25D366))
+                            },
+                        contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             painter = painterResource(id = R.drawable.ic_whatsapp),
                             contentDescription = "Send report ZIP on WhatsApp",
                             tint = Color.White,
-                            modifier = Modifier.size(30.dp)
+                            modifier = Modifier.size(26.dp)
                         )
                     }
-                    Spacer(Modifier.height(4.dp))
+                    Spacer(Modifier.height(6.dp))
                     Text(
                         text = "WhatsApp",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = TextSecondary,
-                        fontWeight = FontWeight.Bold
+                        style = MaterialTheme.typography.labelMedium,
+                        color = TextPrimary,
+                        fontWeight = FontWeight.SemiBold
                     )
                 }
 
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    IconButton(
-                        onClick = {
-                            if (preparing) return@IconButton
-                            scope.launch {
-                                preparing = true
-                                stepText = "Collecting device info..."
-                                try {
-                                    val pack = withContext(Dispatchers.IO) {
-                                        ReportPackBuilder.buildPack(
-                                            context = context,
-                                            rootAvailable = RootChecker.isRootAvailable(),
-                                            loadedModule = loadedModule,
-                                            bundleTried = viewModel.lastBundleTried.value,
-                                            matchStatus = matchStatus,
-                                            resultText = resultText,
-                                            logText = getLog(),
-                                            onStep = { stepText = it }
-                                        )
-                                    }
-                                    clipboard.setText(AnnotatedString(SupportContact.TELEGRAM_HANDLE))
-                                    val sent = pack.zipFile?.let {
-                                        SupportContact.sendZipViaTelegram(context, it, pack.caption)
-                                    } ?: false
-                                    wipeOnResume = true
-                                    if (!sent) {
-                                        context.startActivity(
-                                            Intent(
-                                                Intent.ACTION_VIEW,
-                                                Uri.parse(SupportContact.telegramDirectUrl())
-                                            )
-                                        )
-                                        Toast.makeText(
-                                            context,
-                                            "Telegram opened (@Jubairdadubm copied)",
-                                            Toast.LENGTH_LONG
-                                        ).show()
-                                    } else {
-                                        Toast.makeText(
-                                            context,
-                                            "Sending report to @Jubairdadubm",
-                                            Toast.LENGTH_SHORT
-                                        ).show()
-                                    }
-                                } catch (e: Exception) {
-                                    Toast.makeText(
-                                        context,
-                                        "Report failed: ${e.message}",
-                                        Toast.LENGTH_LONG
-                                    ).show()
-                                } finally {
-                                    preparing = false
-                                    stepText = ""
-                                }
-                            }
-                        },
+                    Box(
                         modifier = Modifier
-                            .size(60.dp)
+                            .size(50.dp)
                             .clip(CircleShape)
                             .background(Color(0xFF24A1DE))
+                            .clickable(enabled = !preparing) {
+                                scope.launch {
+                                    preparing = true
+                                    stepText = "Collecting device info..."
+                                    try {
+                                        val pack = withContext(Dispatchers.IO) {
+                                            ReportPackBuilder.buildPack(
+                                                context = context,
+                                                rootAvailable = RootChecker.isRootAvailable(),
+                                                loadedModule = loadedModule,
+                                                bundleTried = viewModel.lastBundleTried.value,
+                                                matchStatus = matchStatus,
+                                                resultText = resultText,
+                                                logText = getLog(),
+                                                onStep = { stepText = it }
+                                            )
+                                        }
+                                        clipboard.setText(AnnotatedString(SupportContact.TELEGRAM_HANDLE))
+                                        val sent = pack.zipFile?.let {
+                                            SupportContact.sendZipViaTelegram(context, it, pack.caption)
+                                        } ?: false
+                                        wipeOnResume = true
+                                        if (!sent) {
+                                            context.startActivity(
+                                                Intent(
+                                                    Intent.ACTION_VIEW,
+                                                    Uri.parse(SupportContact.telegramDirectUrl())
+                                                )
+                                            )
+                                            Toast.makeText(
+                                                context,
+                                                "Telegram opened (@Jubairdadubm copied)",
+                                                Toast.LENGTH_LONG
+                                            ).show()
+                                        } else {
+                                            Toast.makeText(
+                                                context,
+                                                "Sending report to @Jubairdadubm",
+                                                Toast.LENGTH_SHORT
+                                            ).show()
+                                        }
+                                    } catch (e: Exception) {
+                                        Toast.makeText(
+                                            context,
+                                            "Report failed: ${e.message}",
+                                            Toast.LENGTH_LONG
+                                        ).show()
+                                    } finally {
+                                        preparing = false
+                                        stepText = ""
+                                    }
+                                }
+                            },
+                        contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             painter = painterResource(id = R.drawable.ic_telegram),
                             contentDescription = "Send report ZIP on Telegram (@Jubairdadubm)",
                             tint = Color.White,
-                            modifier = Modifier.size(28.dp)
+                            modifier = Modifier.size(26.dp)
                         )
                     }
-                    Spacer(Modifier.height(4.dp))
+                    Spacer(Modifier.height(6.dp))
                     Text(
                         text = "Telegram",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = TextSecondary,
-                        fontWeight = FontWeight.Bold
+                        style = MaterialTheme.typography.labelMedium,
+                        color = TextPrimary,
+                        fontWeight = FontWeight.SemiBold
                     )
                 }
             }

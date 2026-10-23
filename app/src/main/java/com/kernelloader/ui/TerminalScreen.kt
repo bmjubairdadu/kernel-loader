@@ -106,13 +106,8 @@ fun ConsoleScreen(
     val clipboardManager = LocalClipboardManager.current
     var input by remember { mutableStateOf("") }
     var filter by remember { mutableStateOf("ALL") }
-    val listState = rememberLazyListState()
 
-    // root check is a root-shell call - async so the screen paints first,
-    // and the chips light up as soon as the shell resolves
     var rootAvailable by remember { mutableStateOf(false) }
-    // uname is a forked process - run it off the main thread, the screen
-    // paints first and the pill fills in when the answer lands
     var kernelVersion by remember { mutableStateOf("") }
     LaunchedEffect(Unit) {
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
@@ -130,19 +125,19 @@ fun ConsoleScreen(
         else -> viewModel.terminalLines
     }
 
+    val listState = rememberLazyListState(
+        initialFirstVisibleItemIndex = (shown.size - 1).coerceAtLeast(0)
+    )
+
     LaunchedEffect(shown.size, filter) {
-        if (shown.isEmpty()) return@LaunchedEffect
-        // instant jump: animating here stacked a new scroll animation for
-        // every incoming line and janked the console during loads
-        val last = shown.size - 1
-        val visible = listState.layoutInfo.visibleItemsInfo
-        val atBottom = visible.isEmpty() || visible.last().index >= last - 2
-        if (atBottom) {
-            try {
-                listState.animateScrollToItem(last)
-            } catch (_: Exception) {
-                listState.scrollToItem(last)
-            }
+        if (shown.isNotEmpty()) {
+            listState.scrollToItem(shown.size - 1)
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        if (shown.isNotEmpty()) {
+            listState.scrollToItem(shown.size - 1)
         }
     }
 
@@ -474,7 +469,7 @@ private fun TerminalLineRow(line: TerminalLine) {
             modifier = Modifier.padding(top = 1.dp, end = 8.dp)
         )
         Text(
-            text = line.text,
+            text = "- ${line.text}",
             color = typeColor,
             style = MaterialTheme.typography.bodySmall.copy(
                 fontFamily = FontFamily.Monospace,
@@ -483,7 +478,9 @@ private fun TerminalLineRow(line: TerminalLine) {
                     FontWeight.SemiBold
                 else FontWeight.Normal
             ),
-            modifier = Modifier.weight(1f)
+            modifier = Modifier.weight(1f),
+            maxLines = 1,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
         )
     }
 }

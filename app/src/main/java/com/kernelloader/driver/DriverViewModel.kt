@@ -30,7 +30,7 @@ import java.util.Date
 import java.util.Locale
 
 object EmbeddedDrivers {
-    
+
     fun getAvailableDrivers(context: Context): List<DriverInfo> {
         val drivers = mutableListOf<DriverInfo>()
         val names = try {
@@ -45,7 +45,7 @@ object EmbeddedDrivers {
             val prefix = if (idx == -1) "" else base.substring(0, idx).uppercase(Locale.US)
             val type = if (idx == -1) "KERNEL" else prefix
             val version = if (idx == -1) base else base.substring(idx + 1)
-            
+
             val variant = when {
                 prefix.startsWith("RT") -> OtaDriverStore.RT
                 prefix.startsWith("QX") -> OtaDriverStore.QX
@@ -78,7 +78,7 @@ object EmbeddedDrivers {
     fun readVermagic(context: Context, assetPath: String): String {
         return try {
             val bytes = context.resources.assets.open(assetPath).use { input ->
-                val buf = ByteArray(1 shl 20)          
+                val buf = ByteArray(1 shl 20)
                 val n = input.read(buf)
                 if (n <= 0) ByteArray(0) else buf.copyOf(n)
             }
@@ -110,7 +110,7 @@ data class DriverInfo(
     val filename: String,
     val displayName: String,
     val description: String,
-    
+
     val variant: String = ""
 )
 
@@ -124,7 +124,7 @@ data class LogEntry(
 
 data class VerificationResult(
     val lsmod: List<String> = emptyList(),
-    val deviceNodeFound: Boolean = false,     
+    val deviceNodeFound: Boolean = false,
     val dmesgLogs: List<String> = emptyList(),
     val timestamp: String = "",
     val kernelRelease: String = "",
@@ -139,7 +139,7 @@ data class TerminalLine(
 )
 
 class DriverViewModel(application: Application) : AndroidViewModel(application) {
-    
+
     val DEFAULT_DEV_NODE = "wanbai"
     var devNodeOverride = mutableStateOf("")
 
@@ -152,14 +152,12 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
     var isBusy = mutableStateOf(false)
     var busyStep = mutableStateOf("")
 
-    // true only while the reboot-to-unload is in flight: the restart ring spins
-    // fast and shows a spinner for this, not for unrelated busy actions
     var rebooting = mutableStateOf(false)
-    var autoLoadStatus = mutableStateOf("")   
+    var autoLoadStatus = mutableStateOf("")
     var autoLoadOk = mutableStateOf<Boolean?>(null)
 
     var remoteManifest = mutableStateOf<OtaDriverStore.Manifest?>(null)
-    var manifestStatus = mutableStateOf("IDLE")   
+    var manifestStatus = mutableStateOf("IDLE")
 
     var loadedModuleName = mutableStateOf("")
 
@@ -167,7 +165,6 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
 
     var driverModule = mutableStateOf("")
 
-    // report context: which driver family the last pipeline tried + the exact insmod error
     var lastBundleTried = mutableStateOf("")
     var lastLoadError = mutableStateOf("")
 
@@ -186,19 +183,83 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
 
     var hiddenLoaded = mutableStateOf(false)
 
+    var isDriverRevoked = mutableStateOf(false)
+    var revokedReason = mutableStateOf("")
+    var isDriverUpgraded = mutableStateOf(false)
+    var upgradedDriverFile = mutableStateOf("")
+
+    private var revocationWatcherJob: Job? = null
+    private var upgradeNotified = false
+
     var appUpdate = mutableStateOf<AppUpdateChecker.UpdateInfo?>(null)
-    var updateStatus = mutableStateOf("IDLE")     
-    var updateProgress = mutableStateOf(-1)       
+    var updateStatus = mutableStateOf("IDLE")
+    var updateProgress = mutableStateOf(-1)
     var updateMsg = mutableStateOf("")
 
     private var updateCheckJob: Job? = null
     private var downloadJob: Job? = null
 
+    fun startPeriodicRevocationWatcher() {
+        revocationWatcherJob?.cancel()
+        revocationWatcherJob = viewModelScope.launch(Dispatchers.IO) {
+            while (isActive) {
+                delay(30_000L)
+                checkRevocationInternal(silent = true)
+            }
+        }
+    }
+
+    suspend fun checkRevocationInternal(silent: Boolean = false) {
+        val isLoaded = driverLoaded.value || DriverRevocationManager.isDriverResident()
+        if (!isLoaded) return
+
+        val manifest = remoteManifest.value ?: OtaDriverStore.fetchManifest() ?: return
+        val verdict = DriverRevocationManager.evaluate(getApplication(), manifest, isLoaded)
+        when (verdict) {
+            is DriverRevocationManager.RevocationVerdict.Revoked -> {
+                withContext(Dispatchers.Main) {
+                    isDriverRevoked.value = true
+                    revokedReason.value = verdict.reason
+                    autoLoadOk.value = false
+                    autoLoadStatus.value = "Access revoked - driver removed from DB"
+                }
+                DriverRevocationManager.enforceRevocation(getApplication(), verdict.reason) { msg, kind ->
+                    tlog(msg, kind)
+                }
+            }
+            is DriverRevocationManager.RevocationVerdict.Upgraded -> {
+                withContext(Dispatchers.Main) {
+                    isDriverUpgraded.value = true
+                    upgradedDriverFile.value = verdict.newEntry.file
+                }
+                if (!upgradeNotified) {
+                    upgradeNotified = true
+                    tlog("[DB] Upgraded driver available (${verdict.newEntry.file}) - current session active, loads on next restart", "INFO")
+                }
+            }
+            is DriverRevocationManager.RevocationVerdict.Valid -> {
+                withContext(Dispatchers.Main) {
+                    if (isDriverRevoked.value) {
+                        isDriverRevoked.value = false
+                        revokedReason.value = ""
+                    }
+                }
+            }
+            else -> {}
+        }
+    }
+
+    fun checkRevocationOnResume(context: Context) {
+        viewModelScope.launch(Dispatchers.IO) {
+            checkRevocationInternal(silent = true)
+        }
+    }
+
     fun startPeriodicUpdateCheck() {
         updateCheckJob?.cancel()
         updateCheckJob = viewModelScope.launch(Dispatchers.IO) {
             while (isActive) {
-                delay(15 * 60 * 1000L) // check every 15 minutes
+                delay(15 * 60 * 1000L)
                 checkForAppUpdate(silent = true)
             }
         }
@@ -320,11 +381,12 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                         tlog("Database Offline", "ERR")
                 }
             }
+            if (m != null) {
+                checkRevocationInternal(silent = true)
+            }
         }
     }
 
-    // SimpleDateFormat is not thread-safe and these are reached from both the
-    // main thread and IO (load/verify paths) - serialize every format call
     private val dateFormat = SimpleDateFormat("HH:mm:ss.SSS", Locale.getDefault())
     private val timeFormat = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
     private fun stamp(f: SimpleDateFormat): String = synchronized(f) { f.format(Date()) }
@@ -340,6 +402,8 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
 
     init {
         try {
+            isDriverRevoked.value = DriverRevocationManager.isRevoked(application)
+            revokedReason.value = DriverRevocationManager.getRevokedReason(application)
             if (logFile.exists() && logFile.length() > 0) {
                 val rawLines = logFile.readLines(Charsets.UTF_8).takeLast(MAX_TERMINAL_LINES)
                 val parsed = rawLines.mapNotNull { parseStoredLogLine(it) }
@@ -349,6 +413,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             }
         } catch (_: Exception) {}
         startPeriodicUpdateCheck()
+        startPeriodicRevocationWatcher()
     }
 
     fun initLogStore(context: Context? = null) {
@@ -421,13 +486,15 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun tlog(text: String, type: String = "INFO", variant: String? = null) {
+        val clean = text.replace(Regex("""^\s*\[[A-Za-z0-9_/ -]+\]\s*"""), "").trim()
+        if (clean.isBlank() || clean.startsWith("====")) return
         val v = (variant ?: activePipelineVariant.value).orEmpty()
         val stampTime = stamp(timeFormat)
         viewModelScope.launch(Dispatchers.Main) {
-            terminalLines.add(TerminalLine(stampTime, text, type, v))
+            terminalLines.add(TerminalLine(stampTime, clean, type, v))
             trimTerminal()
         }
-        appendToLogFile(stampTime, type, v, text)
+        appendToLogFile(stampTime, type, v, clean)
     }
 
     private fun variantOfModule(module: String): String = when {
@@ -503,12 +570,6 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    /**
-     * Compact Driver & Read/Write Activity Monitor:
-     * Validates device node (/dev/wanbai), SELinux, active clients, and exercises
-     * ioctl 0x803 (module base), 0x801 (read) and 0x802 (write).
-     * Output is formatted in short, compact lines tailored for the small console panel.
-     */
     fun checkDriverActivity(context: Context) {
         if (isBusy.value) {
             tlog("Busy - please wait", "WARN")
@@ -521,7 +582,6 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                 try {
                     Shell.cmd("setenforce 0 2>/dev/null").exec()
 
-                    // 1. Check device node and permissions
                     val devNode = preferredDevNode()
                     val targetNode = if (Shell.cmd("test -e /dev/wanbai").exec().isSuccess) "wanbai"
                                      else devNode
@@ -540,7 +600,6 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                     val permStatus = if (is666) "0666" else "restricted"
                     tlog("[DEV] $nodePath · $permStatus · $enf", if (is666) "OK" else "WARN")
 
-                    // 2. Check active clients (apps/tools reading or writing)
                     val lsof = Shell.cmd("lsof $nodePath 2>/dev/null | tail -n +2").exec().out
                     val clients = lsof.mapNotNull { line ->
                         val parts = line.trim().split(Regex("\\s+"))
@@ -552,10 +611,8 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                         tlog("[CLIENT] Idle · Ready for apps", "INFO")
                     }
 
-                    // 3. Detailed R/W test via dmtest
                     val local = File(context.filesDir, "dmtest")
-                    // Always refresh from the APK asset.  A cached copy from an
-                    // older APK would otherwise keep probing obsolete commands.
+
                     context.assets.open("dmtest").use { input ->
                         local.outputStream().use { output -> input.copyTo(output) }
                     }
@@ -567,7 +624,6 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
 
                     val outLines = testRun.out
 
-                    // 1. Probe & Candidate verification details
                     val probeLines = outLines.filter { it.contains("probe:") || it.contains("open FAIL") || it.contains("verdict: our driver") }
                     probeLines.forEach { line ->
                         val clean = line.trim()
@@ -578,7 +634,6 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                         }
                     }
 
-                    // 2. ioctl 0x803 (Module Base) details
                     val baseLines = outLines.filter { it.contains("0x803") }
                     val failedBase = baseLines.filter { it.contains("FAIL") || it.contains("rc=-1") }
                     val passBase = baseLines.filter { it.contains("PASS") }
@@ -592,7 +647,6 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                         tlog("[0x803] ModBase: NOT RUN", "WARN")
                     }
 
-                    // 3. ioctl 0x801 (Memory Read) details
                     val readLines = outLines.filter { it.contains("read own marker") || (it.contains("0x801") && it.contains("read")) }
                     val failedRead = readLines.filter { it.contains("FAIL") }
                     if (failedRead.isNotEmpty()) {
@@ -605,7 +659,6 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                         tlog("[0x801] MemRead: " + (if (hasAny801) "PASS" else "FAIL"), if (hasAny801) "OK" else "ERR")
                     }
 
-                    // 4. ioctl 0x802 (Memory Write) details
                     val writeLines = outLines.filter { it.contains("write own target") || (it.contains("0x802") && it.contains("write")) }
                     val failedWrite = writeLines.filter { it.contains("FAIL") }
                     if (failedWrite.isNotEmpty()) {
@@ -618,7 +671,6 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                         tlog("[0x802] MemWrite: " + (if (hasAny802) "PASS" else "FAIL"), if (hasAny802) "OK" else "ERR")
                     }
 
-                    // 5. Cross-Process / Child testing details
                     val xprocLines = outLines.filter { it.contains("xproc") || it.contains("child pid") }
                     val failedXproc = xprocLines.filter { it.contains("FAIL") }
                     if (failedXproc.isNotEmpty()) {
@@ -628,7 +680,6 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                         tlog("[CHILD] Cross-Proc R/W: PASS ($childPassCount/4 cross-page verified)", "OK")
                     }
 
-                    // 6. Overall summary line
                     val summaryLine = outLines.firstOrNull { it.contains("SUMMARY:") }
                     if (summaryLine != null) {
                         val isAllOk = summaryLine.contains("FAIL 0")
@@ -732,9 +783,6 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
         "/data/adb/kloder/driver_qx.ko"
     )
 
-    // deterministic kernel rejections: retrying the same .ko through other
-    // loader binaries cannot succeed, so the ladder must stop instead of
-    // hammering insmod (each failed insmod wakes the whole module loader)
     private val FATAL_INSMOD_ERRORS = listOf(
         "invalid module format",
         "disagrees about version",
@@ -750,12 +798,6 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
     private val MAX_INSMOD_ATTEMPTS = 4
     private val INSMOD_BACKOFF_MS = 500L
 
-    /**
-     * One bounded insmod ladder for every load path: devname form first, plain
-     * form for legacy .ko builds, at most [MAX_INSMOD_ATTEMPTS] real attempts
-     * with a small backoff between them. A missing loader binary moves on to
-     * the next candidate; a deterministic kernel rejection aborts the ladder.
-     */
     private suspend fun runInsmodLadder(koPath: String, devNode: String): Shell.Result {
         val bins = listOf(
             "insmod", "/system/bin/insmod", "/vendor/bin/insmod",
@@ -789,10 +831,22 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             }
         }
         if (!res.isSuccess) {
+            val errAll = (res.out + res.err).joinToString(" ").lowercase(Locale.US)
+            val dmesg = Shell.cmd("dmesg 2>/dev/null | tail -n 5").exec().out.joinToString(" ").lowercase(Locale.US)
+            val isSig = errAll.contains("required key") ||
+                    errAll.contains("rejected") ||
+                    errAll.contains("operation not permitted") ||
+                    dmesg.contains("module verification failed") ||
+                    dmesg.contains("module signature")
+            if (isSig) {
+                tlog("Signature verification active, bypassing...", "WARN")
+                UniversalKernelLoader.disableModuleSigEnforce(this@DriverViewModel)
+                UniversalKernelLoader.stripModuleSig(File(koPath), this@DriverViewModel)
+            }
             val force = Shell.cmd("insmod -f $koPath devname=$devNode 2>/dev/null || insmod -f $koPath devicename=$devNode 2>/dev/null || insmod -f $koPath 2>/dev/null").exec()
             if (force.isSuccess) return force
             (force.out + force.err).firstOrNull { it.isNotBlank() }?.let {
-                tlog("insmod -f: ${it.trim()}", "ERR")
+                tlog("insmod -f: ${it.trim().take(35)}", "ERR")
             }
         }
         return res
@@ -800,13 +854,12 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
 
     private suspend fun prepareAndVerifyDeviceNode(devNode: String): Boolean {
         tstep("Preparing device node...")
-        tlog("[SECURITY] Injected untrusted_app chr_file policies", "INFO")
+        tlog("Configuring SELinux policy...", "INFO")
         Shell.cmd(
             "setenforce 0 2>/dev/null",
             "magiskpolicy --live 'allow untrusted_app * chr_file *' 2>/dev/null || supolicy --live 'allow untrusted_app * chr_file *' 2>/dev/null"
         ).exec()
         var foundNode: String? = null
-        tlog("[SYSFS] Scanning /dev & /sys/class for active character device...", "INFO")
         for (i in 1..10) {
             val nodes = Shell.cmd("ls /dev 2>/dev/null").exec().out.map { it.trim() }
             if (devNode in nodes) {
@@ -828,7 +881,6 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             delay(200)
         }
 
-        // Deep fallback: if ueventd did not create the node in /dev, check sysfs /sys/class
         if (foundNode == null) {
             val sysDevs = Shell.cmd(
                 "for f in /sys/class/dmsync*/dev /sys/class/dmsync*/*/dev /sys/class/kmem*/dev /sys/class/kmem*/*/dev /sys/class/memacc*/dev; do " +
@@ -868,12 +920,12 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             }
 
             rememberDevNode(foundNode)
-            tlog("[DEVNODE] Device node /dev/$foundNode active (perms 0666, SELinux ok)", "OK")
-            tlog("[DEVNODE] All aliases symlinked (/dev/wanbai, /dev/dmsync, /dev/memacc...)", "INFO")
+            tlog("Node /dev/$foundNode active (0666)", "OK")
+            tlog("Node aliases linked", "INFO")
             val rwOk = Shell.cmd("test -r /dev/wanbai && test -w /dev/wanbai").exec().isSuccess
             if (rwOk) {
-                tlog("[DEVNODE] /dev/wanbai client R/W verified (0666)", "OK")
-                tlog("[READY] Kernel driver operational · Ready for client requests", "OK")
+                tlog("/dev/wanbai verified (R/W OK)", "OK")
+                tlog("Driver ready for use", "OK")
             }
             return true
         }
@@ -906,13 +958,6 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
         return tmpKos.firstOrNull()?.let { File(it) }
     }
 
-    /**
-     * rmmod every module of this family that is actually live before a fresh
-     * insmod — the embedded qx/rt .ko builds come up as "entryi" / "5.10_A12",
-     * so removing only kmem_337 variants would leave the old driver loaded and
-     * the next insmod would die with "File exists". Nothing live -> no rmmod
-     * and no wait: a fresh load must not pay for the switch case.
-     */
     private fun rmmodKnownDrivers() {
         val live = try { SafetyGuard.loadedModuleNames() } catch (e: Exception) { emptySet() }
         val stale = knownDriverModules().filter { it in live }
@@ -925,10 +970,10 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     private suspend fun loadStagedKo(context: Context, localKo: File): Boolean {
-        tlog("[SOURCE] Local driver found: ${localKo.name}", "INFO")
+        tlog("Local driver found: ${localKo.name}", "INFO")
         val devNode = preferredDevNode()
         val staged = File("/data/local/tmp/kloader_local.ko")
-        tlog("[STAGE] Staging: ${localKo.absolutePath} -> ${staged.absolutePath}", "CMD")
+        tlog("Staging local driver...", "CMD")
         Shell.cmd(
             "cp \"${localKo.absolutePath}\" ${staged.absolutePath}",
             "chmod 644 ${staged.absolutePath}",
@@ -937,24 +982,24 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             "setenforce 0 2>/dev/null"
         ).exec()
         if (!Shell.cmd("test -f ${staged.absolutePath}").exec().isSuccess) {
-            tlog("[STAGE ERR] Staging failed for ${staged.absolutePath}", "ERR")
+            tlog("Staging failed", "ERR")
             return false
         }
-        tlog("[STAGE] File ready at ${staged.absolutePath} (perms 0644, system_file)", "OK")
+        tlog("Driver staged successfully", "OK")
         rmmodKnownDrivers()
         return try {
-            tlog("[KERNEL] Executing insmod ladder for ${staged.name} (devname=$devNode)...", "CMD")
+            UniversalKernelLoader.disableModuleSigEnforce(this@DriverViewModel)
+            UniversalKernelLoader.stripModuleSig(staged, this@DriverViewModel)
+            tlog("Inserting module into kernel...", "CMD")
             val res = runInsmodLadder(staged.absolutePath, devNode)
             if (!res.isSuccess) {
                 (res.out + res.err).firstOrNull { it.isNotBlank() }?.let {
-                    tlog("[KERNEL ERR] insmod: ${it.trim()}", "ERR")
+                    tlog("Error: ${it.trim().take(35)}", "ERR")
                     lastLoadError.value = it.trim().take(300)
                 }
                 return false
             }
-            tlog("[KERNEL] Module inserted into kernel space", "OK")
-            tlog("[CORE] Physical-alias memory translation active (page-table walk + ioremap)", "INFO")
-            tlog("[IOCTL] Handlers active: 0x801 (Read), 0x802 (Write), 0x803 (ModBase)", "INFO")
+            tlog("Module inserted into kernel", "OK")
             verifyModuleNow()
             val nodeOk = prepareAndVerifyDeviceNode(devNode)
             if (!nodeOk) {
@@ -971,6 +1016,15 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                 if (ours.isNotEmpty()) setLoadedModule(ours.first())
                 else markHiddenLoaded()
             }
+            val kRelease = RootChecker.getKernelRelease() ?: ""
+            DriverRevocationManager.recordLoadedDriver(
+                context = context,
+                entry = null,
+                kernelRelease = kRelease,
+                variant = activePipelineVariant.value,
+                isOta = false
+            )
+            try { DriverWatchdogService.start(context) } catch (_: Exception) {}
             true
         } finally {
             Shell.cmd("rm -f ${staged.absolutePath} 2>/dev/null").exec()
@@ -1037,10 +1091,10 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             }
 
             val kernel = RootChecker.getKernelRelease() ?: return false
-            tlog("[STAGE] Staging: ${downloaded.name} -> /data/local/tmp/kloader_ota.ko", "CMD")
+            tlog("Staging driver file...", "CMD")
 
             val staged = File("/data/local/tmp/kloader_ota.ko")
-            
+
             val devNode = preferredDevNode()
             Shell.cmd(
                 "cp \"${downloaded.absolutePath}\" ${staged.absolutePath}",
@@ -1050,48 +1104,49 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                 "setenforce 0 2>/dev/null"
             ).exec()
             if (!Shell.cmd("test -f ${staged.absolutePath}").exec().isSuccess) {
-                tlog("[STAGE ERR] Staging to ${staged.absolutePath} failed", "ERR")
+                tlog("Staging failed", "ERR")
                 return false
             }
-            tlog("[STAGE] Deployed to ${staged.absolutePath} (perms 0644, system_file)", "OK")
+            tlog("Driver staged successfully", "OK")
 
             rmmodKnownDrivers()
             try {
 
-            tlog("[KERNEL] Executing insmod ladder for ${staged.name} (devname=$devNode)...", "CMD")
+            UniversalKernelLoader.disableModuleSigEnforce(this@DriverViewModel)
+            UniversalKernelLoader.stripModuleSig(staged, this@DriverViewModel)
+
+            tlog("Inserting module into kernel...", "CMD")
             val res = runInsmodLadder(staged.absolutePath, devNode)
             if (res.isSuccess) {
-                tlog("[KERNEL] Module inserted into kernel space", "OK")
-                tlog("[CORE] Physical-alias memory translation active (page-table walk + ioremap)", "INFO")
-                tlog("[IOCTL] Handlers active: 0x801 (Read), 0x802 (Write), 0x803 (ModBase)", "INFO")
+                tlog("Module inserted into kernel", "OK")
             }
 
             if (!res.isSuccess) {
-                tlog("[KERNEL ERR] insmod failed", "ERR")
+                tlog("Module insert failed", "ERR")
                 val errText = (res.out + res.err).joinToString("\n").trim()
                 if (errText.isNotBlank()) lastLoadError.value = errText.take(300)
                 (res.out + res.err).firstOrNull { it.isNotBlank() }?.let {
-                    tlog("[KERNEL ERR] insmod: ${it.trim()}", "ERR")
+                    tlog("Error: ${it.trim().take(35)}", "ERR")
                 }
 
                 Shell.cmd(
                     "dmesg 2>/dev/null | grep -i -E 'kmem|module|insmod|version magic|disagrees|Unknown symbol|format error|taint' | tail -n 8"
                 ).exec().out.filter { it.isNotBlank() }.take(5)
-                    .forEach { tlog("[DMESG] $it", "INFO") }
+                    .forEach { tlog("DMESG: ${it.take(35)}", "INFO") }
 
                 if (errText.contains("Invalid module format", true) ||
                     errText.contains("vermagic", true) ||
                     errText.contains("Exec format error", true)
                 ) {
-                    tlog("[MISMATCH] Kernel mismatch", "WARN")
+                    tlog("Kernel mismatch", "WARN")
                 } else if (errText.contains("No such file or directory", true)) {
-                    tlog("[ERR] Staged file not readable", "WARN")
+                    tlog("Staged file not readable", "WARN")
                 }
-                tlog("Need custom loader - tap Telegram / WhatsApp", "FIX")
+                tlog("Need custom loader - tap Support", "FIX")
                 return false
             }
 
-            tlog("[KERNEL] Driver loaded successfully", "OK")
+            tlog("Driver loaded successfully", "OK")
             verifyModuleNow()
             val nodeOk = prepareAndVerifyDeviceNode(devNode)
             if (!nodeOk) {
@@ -1108,6 +1163,15 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                 if (ours.isNotEmpty()) setLoadedModule(ours.first())
                 else markHiddenLoaded()
             }
+            DriverRevocationManager.recordLoadedDriver(
+                context = context,
+                entry = entry,
+                kernelRelease = kernel,
+                variant = entry.variant,
+                isOta = true
+            )
+            upgradeNotified = false
+            try { DriverWatchdogService.start(context) } catch (_: Exception) {}
             return true
             } finally {
                 Shell.cmd("rm -f ${staged.absolutePath} 2>/dev/null").exec()
@@ -1120,39 +1184,130 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
     private val _forceNote: String
         get() = "nearest-series loader, restart guard active"
 
+    fun determineBestVariant(context: Context, kernelRelease: String): String {
+        val manifest = remoteManifest.value
+        val short = RootChecker.kernelShortVersion(kernelRelease)
+
+        val rtOta = manifest?.let { OtaDriverStore.exactFor(it, kernelRelease, OtaDriverStore.RT) }
+        val qxOta = manifest?.let { OtaDriverStore.exactFor(it, kernelRelease, OtaDriverStore.QX) }
+
+        val rtAsset = UniversalKernelLoader.findBestEmbeddedDriver(context, kernelRelease, OtaDriverStore.RT)
+        val rtAssetVermagic = rtAsset?.let { EmbeddedDrivers.readVermagic(context, it.filename) } ?: ""
+        val rtFullMatch = (rtOta != null && rtOta.version.startsWith(kernelRelease)) ||
+                (rtAssetVermagic.isNotEmpty() && rtAssetVermagic == kernelRelease)
+        val rtShortMatch = (rtOta != null) || (rtAsset != null && RootChecker.kernelShortVersion(rtAsset.version) == short)
+
+        val qxAsset = UniversalKernelLoader.findBestEmbeddedDriver(context, kernelRelease, OtaDriverStore.QX)
+        val qxAssetVermagic = qxAsset?.let { EmbeddedDrivers.readVermagic(context, it.filename) } ?: ""
+        val qxFullMatch = (qxOta != null && qxOta.version.startsWith(kernelRelease)) ||
+                (qxAssetVermagic.isNotEmpty() && qxAssetVermagic == kernelRelease)
+        val qxShortMatch = (qxOta != null) || (qxAsset != null && RootChecker.kernelShortVersion(qxAsset.version) == short)
+
+        return when {
+            qxFullMatch && !rtFullMatch -> OtaDriverStore.QX
+            rtFullMatch && !qxFullMatch -> OtaDriverStore.RT
+            qxFullMatch && rtFullMatch -> {
+                val major = kernelRelease.split('.').firstOrNull()?.toIntOrNull() ?: 4
+                val isDaisy = kernelRelease.contains("Daisy", ignoreCase = true)
+                if (isDaisy || major <= 4) OtaDriverStore.QX else OtaDriverStore.RT
+            }
+            qxShortMatch && !rtShortMatch -> OtaDriverStore.QX
+            rtShortMatch && !qxShortMatch -> OtaDriverStore.RT
+            else -> {
+                val qxResolve = manifest?.let { OtaDriverStore.resolve(it, kernelRelease, OtaDriverStore.QX) }
+                val rtResolve = manifest?.let { OtaDriverStore.resolve(it, kernelRelease, OtaDriverStore.RT) }
+                val qxDist = if (qxResolve is OtaDriverStore.ResolveResult.Near) qxResolve.distance else Int.MAX_VALUE
+                val rtDist = if (rtResolve is OtaDriverStore.ResolveResult.Near) rtResolve.distance else Int.MAX_VALUE
+
+                if (qxDist < rtDist) OtaDriverStore.QX
+                else if (rtDist < qxDist) OtaDriverStore.RT
+                else {
+                    val major = kernelRelease.split('.').firstOrNull()?.toIntOrNull() ?: 4
+                    if (major <= 4) OtaDriverStore.QX else OtaDriverStore.RT
+                }
+            }
+        }
+    }
+
     fun autoLoadUniversal(context: Context, preferOta: Boolean = true, variant: String = "") {
         if (isBusy.value) return
+        if (DriverRevocationManager.isRevoked(context)) {
+            tlog("[REVOKED] Driver was removed from database by administrator.", "ERR")
+            tlog("[REVOKED] Access revoked - cannot load. Contact admin.", "ERR")
+            autoLoadOk.value = false
+            autoLoadStatus.value = "Access revoked - driver deleted from DB"
+            return
+        }
         isBusy.value = true
-        busyStep.value = "Starting..."
+        busyStep.value = "Inspecting system..."
         autoLoadOk.value = null
         autoLoadStatus.value = ""
         lastLoadError.value = ""
         if (pickedFileUri.value != null) {
             lastBundleTried.value = pickedFileName.value ?: "custom file"
         } else {
+            val autoVar = determineBestVariant(context, RootChecker.getKernelRelease() ?: "")
             lastBundleTried.value = when {
-                variant.isBlank() && preferOta -> "RT → QX → built-in"
+                variant.isBlank() && preferOta -> "${autoVar.uppercase()} (auto) → built-in"
                 preferOta -> "${OtaDriverStore.variantLabel(variant)} (forced)"
                 else -> "built-in"
             }
         }
         loadJob = viewModelScope.launch(Dispatchers.IO) {
             try {
-                // 3.2+ driver hides from lsmod on load - a second LOAD would
-                // insmod into "File exists". Reuse the resident driver instead.
+                tstep("Checking superuser...")
+                tlog("Checking root permission...", "INFO")
+                delay(400L)
+
+                val root = RootChecker.isRootAvailable()
+                if (root) {
+                    tlog("Root permission: GRANTED", "OK")
+                } else {
+                    tlog("Root permission: DENIED", "ERR")
+                    autoLoadOk.value = false
+                    autoLoadStatus.value = "Root access denied"
+                    return@launch
+                }
+
+                delay(400L)
+                tstep("Detecting kernel...")
+                val kernel = RootChecker.getKernelRelease() ?: "unknown"
+                val short = RootChecker.kernelShortVersion(kernel)
+                val arch = android.os.Build.SUPPORTED_ABIS.firstOrNull() ?: "arm64-v8a"
+                tlog("Kernel detected: $short ($arch)", "OK")
+
+                delay(350L)
+                tstep("Checking signature security...")
+                UniversalKernelLoader.disableModuleSigEnforce(this@DriverViewModel)
+
+                delay(450L)
+                tstep("Scanning drivers...")
+                tlog("Scanning driver database...", "INFO")
+                val manifest = remoteManifest.value ?: OtaDriverStore.fetchManifest()
+
+                delay(450L)
+                tstep("Matching best variant...")
+                val primaryVariant = when {
+                    variant.isNotBlank() -> variant.lowercase(Locale.US)
+                    else -> determineBestVariant(context, kernel)
+                }
+                val secondaryVariant = if (primaryVariant == OtaDriverStore.RT) OtaDriverStore.QX else OtaDriverStore.RT
+
+                tlog("Best match: ${primaryVariant.uppercase()} driver", "OK")
+                delay(350L)
+                tlog("Starting ${primaryVariant.uppercase()} pipeline...", "CMD")
+
                 val resident = SafetyGuard.hiddenDriverClass()
                 if (resident != null) {
-                    tlog("[RESIDENT] Driver already loaded in kernel ($resident, hidden) - reusing", "OK")
-                    tlog("[CORE] Physical-alias memory translation active (page-table walk + ioremap)", "INFO")
-                    tlog("[IOCTL] Handlers active: 0x801 (Read), 0x802 (Write), 0x803 (ModBase)", "INFO")
+                    tlog("Driver already resident in kernel", "OK")
                     if (prepareAndVerifyDeviceNode(preferredDevNode())) {
                         markHiddenLoaded()
                         driverLoaded.value = true
                         autoLoadOk.value = true
                         autoLoadStatus.value = "Already loaded: /dev/${preferredDevNode()}"
-                        tlog("[DONE] Resident driver ready · Active on /dev/${preferredDevNode()}", "OK")
+                        tlog("Resident driver ready: /dev/${preferredDevNode()}", "OK")
                     } else {
-                        tlog("[WARN] Resident driver has no live node - reload after reboot", "WARN")
+                        tlog("Resident driver has no live node", "WARN")
                         autoLoadOk.value = false
                         autoLoadStatus.value = "Driver resident but node missing - reboot, then LOAD"
                     }
@@ -1163,41 +1318,42 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                     tstep("Loading custom file...")
                     UniversalKernelLoader.autoLoad(context, this@DriverViewModel, variant)
                 } else if (variant.isBlank() && preferOta) {
-                    activePipelineVariant.value = OtaDriverStore.RT
-                    tlog("PIPELINE 1/3 — RT driver", "CMD")
-                    tstep("Stage 1/3: RT driver")
-                    val rtHandled = runOtaLoad(context, OtaDriverStore.RT)
-                    if (rtHandled) return@launch
+                    activePipelineVariant.value = primaryVariant
+                    tlog("Loading ${primaryVariant.uppercase()} driver...", "CMD")
+                    tstep("Stage 1/3: ${primaryVariant.uppercase()} driver")
+                    val primaryHandled = runOtaLoad(context, primaryVariant)
+                    if (primaryHandled) return@launch
                     checkpoint()
+
                     activePipelineVariant.value = ""
-                    tlog("RT Failed → QX", "WARN")
-                    activePipelineVariant.value = OtaDriverStore.QX
-                    tlog("PIPELINE 2/3 — QX driver", "CMD")
-                    tstep("Stage 2/3: QX driver")
-                    val qxHandled = runOtaLoad(context, OtaDriverStore.QX)
-                    if (qxHandled) return@launch
+                    tlog("${primaryVariant.uppercase()} failed, trying ${secondaryVariant.uppercase()}...", "WARN")
+                    activePipelineVariant.value = secondaryVariant
+                    tlog("Loading ${secondaryVariant.uppercase()} driver...", "CMD")
+                    tstep("Stage 2/3: ${secondaryVariant.uppercase()} driver")
+                    val secondaryHandled = runOtaLoad(context, secondaryVariant)
+                    if (secondaryHandled) return@launch
                     checkpoint()
+
                     activePipelineVariant.value = ""
-                    tlog("QX Failed → Built-in", "WARN")
-                    tlog("PIPELINE 3/3 — Built-in", "CMD")
+                    tlog("OTA failed, trying built-in driver...", "WARN")
                     tstep("Stage 3/3: built-in loader")
-                    UniversalKernelLoader.autoLoad(context, this@DriverViewModel, variant)
+                    UniversalKernelLoader.autoLoad(context, this@DriverViewModel, primaryVariant)
                 } else if (preferOta) {
                     activePipelineVariant.value = variant.lowercase(Locale.US)
-                    tlog("PIPELINE — ${OtaDriverStore.variantLabel(variant)} driver (forced)", "CMD")
-                    tstep("Stage 1/2: ${OtaDriverStore.variantLabel(variant)} driver")
+                    tlog("Loading ${OtaDriverStore.variantLabel(variant)} driver...", "CMD")
+                    tstep("Loading driver...")
                     val handled = runOtaLoad(context, variant)
                     if (handled) return@launch
                     checkpoint()
                     activePipelineVariant.value = ""
-                    tlog("DB driver failed — trying built-in loader", "INFO")
-                    tstep("Stage 2/2: built-in loader")
+                    tlog("DB driver failed, trying built-in...", "INFO")
+                    tstep("Built-in loader...")
                     UniversalKernelLoader.autoLoad(context, this@DriverViewModel, variant)
                 } else {
                     UniversalKernelLoader.autoLoad(context, this@DriverViewModel, variant)
                 }
                 if (autoLoadOk.value != true && !driverLoaded.value) {
-                    tlog("All Pipelines Failed", "ERR")
+                    tlog("All pipelines failed", "ERR")
                     autoLoadOk.value = false
                     if (autoLoadStatus.value.isBlank()) {
                         autoLoadStatus.value = "Load failed — RT, QX and built-in all failed"
@@ -1246,18 +1402,13 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch(Dispatchers.Main) { verifyModuleNow() }
     }
 
-    /**
-     * Awaited by the load pipeline so the loaded/hidden verdict is settled
-     * before the next step runs. Every line here is a root-shell round trip:
-     * this must never be called on the main thread.
-     */
     private suspend fun verifyModuleNow() = withContext(Dispatchers.IO) {
             val kernelRelease = try {
                 Shell.cmd("uname -r").exec().out.firstOrNull()?.trim() ?: ""
             } catch (e: Exception) { "" }
 
             val lsmodRes = Shell.cmd("lsmod").exec()
-            
+
             val moduleNames = lsmodRes.out.drop(1)
                 .map { it.trim().split(Regex("\\s+")).firstOrNull() ?: "" }
                 .filter { it.isNotBlank() && it != "Module" }
@@ -1291,9 +1442,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                 driverModule.value = ours.joinToString(", ")
                 tlog("${ours.first()} loaded", "OK", variant = variantOfModule(ours.first()))
             } else {
-                // 3.2+ drivers unlink themselves from /proc/modules on load:
-                // an empty lsmod next to a live sysfs class means "loaded and
-                // hidden", which is the normal success state, not a failure
+
                 val hiddenClass = SafetyGuard.hiddenDriverClass()
                 if (hiddenClass != null) {
                     tlog("Driver hidden (class $hiddenClass live, not in lsmod)", "OK")
@@ -1351,10 +1500,11 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
         isBusy.value = true
         rebooting.value = true
         busyStep.value = "Rebooting..."
+        try { DriverWatchdogService.stop(context) } catch (_: Exception) {}
+        try { DriverRevocationManager.stopRootDaemon() } catch (_: Exception) {}
         loadJob = viewModelScope.launch(Dispatchers.IO) {
             try {
-                // the driver hides on load and offers no unhide -
-                // only a reboot unloads it (same as reference drivers)
+
                 tlog("Rebooting to unload driver...", "INFO")
                 val res = Shell.cmd("reboot 2>/dev/null || svc power reboot 2>/dev/null").exec()
                 if (!res.isSuccess) {

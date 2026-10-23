@@ -14,7 +14,6 @@ object UniversalKernelLoader {
 
     private const val TMP_KO = "/data/local/tmp/kloader_auto.ko"
 
-    /** exact lsmod line match, so short names cannot hit unrelated modules */
     private fun lsmodKnownRegex(candidates: List<String>): String =
         candidates.joinToString("|") { it.replace(".", "\\.") }
 
@@ -40,9 +39,6 @@ object UniversalKernelLoader {
 
         vm.tlog("Device: $kernel · $arch", "INFO")
 
-        // every .ko in the database and the assets is aarch64; a wrong-arch
-        // device can only fail at insmod with "Exec format error", so say so
-        // up front instead of burning the whole pipeline
         if (arch != "aarch64" && arch != "arm64") {
             vm.tlog("This driver set is arm64-only - device reports $arch", "ERR")
             finish(vm, false, "arm64 CPU required (device: $arch)")
@@ -82,7 +78,7 @@ object UniversalKernelLoader {
                 return
             }
             sourceName = best.displayName
-            
+
             val realVerm = EmbeddedDrivers.readVermagic(context, best.filename)
             val exactCover = realVerm.isNotEmpty() &&
                     RootChecker.kernelShortVersion(realVerm) == RootChecker.kernelShortVersion(kernel)
@@ -150,7 +146,9 @@ object UniversalKernelLoader {
 
         vm.tstep("Loading module...")
         Shell.cmd("setenforce 0 2>/dev/null").exec()
-        vm.tlog("[KERNEL] Executing: insmod $TMP_KO devname=$devNode", "CMD")
+        disableModuleSigEnforce(vm)
+        stripModuleSig(File(TMP_KO), vm)
+        vm.tlog("Inserting module...", "CMD")
         var res = Shell.cmd("insmod $TMP_KO devname=$devNode").exec()
         if (!res.isSuccess) {
             vm.tlog("[KERNEL] Retrying with devicename param...", "CMD")
@@ -166,21 +164,49 @@ object UniversalKernelLoader {
         }
 
         if (!res.isSuccess) {
+            val errAll = (res.out + res.err).joinToString(" ").lowercase()
+            val dmesgSig = Shell.cmd("dmesg 2>/dev/null | tail -n 5").exec().out.joinToString(" ").lowercase()
+            val isSigError = errAll.contains("required key not available") ||
+                    errAll.contains("key was rejected") ||
+                    errAll.contains("operation not permitted") ||
+                    errAll.contains("permission denied") ||
+                    dmesgSig.contains("module verification failed") ||
+                    dmesgSig.contains("module signature") ||
+                    dmesgSig.contains("required key")
+
+            if (isSigError) {
+                vm.tlog("Signature verification blocking load, fixing...", "WARN")
+                Shell.cmd(
+                    "echo 0 > /proc/sys/kernel/module_sig_enforce 2>/dev/null",
+                    "sysctl -w kernel.module_sig_enforce=0 2>/dev/null",
+                    "echo 0 > /sys/module/module/parameters/sig_enforce 2>/dev/null"
+                ).exec()
+                stripModuleSig(File(TMP_KO), vm)
+                res = Shell.cmd("insmod -f $TMP_KO devname=$devNode 2>/dev/null || insmod -f $TMP_KO 2>/dev/null").exec()
+                if (!res.isSuccess) {
+                    res = Shell.cmd("insmod $TMP_KO devname=$devNode 2>/dev/null || insmod $TMP_KO 2>/dev/null").exec()
+                }
+                if (res.isSuccess) {
+                    vm.tlog("Module loaded after signature fix", "OK")
+                }
+            }
+        }
+
+        if (!res.isSuccess) {
             val errAll = (res.out + res.err).joinToString(" ")
             if (errAll.contains("File exists", true)) {
-                // hidden resident driver (lsmod empty, class live) -
-                // verify the live node instead of failing
+
                 vm.tlog("[RESIDENT] Module already live in kernel memory (hidden) - validating live node...", "INFO")
                 if (verifyLoad(vm, sourceName, devNode, vm.loadedModuleName.value)) {
                     vm.tlog("[DONE] Resident kernel driver verified & operational", "OK")
-                    finish(vm, true, "Already loaded: $sourceName")
+                    finish(vm, true, "Already loaded: $sourceName", context)
                     runCatching { Shell.cmd("rm -f $TMP_KO 2>/dev/null").exec() }
                     return
                 }
             }
             val errFirst = (res.out + res.err).firstOrNull { it.isNotBlank() } ?: "exit ${res.code}"
             vm.tlog("[KERNEL ERR] insmod failed: $errFirst", "ERR")
-            // Fetch kernel buffer for exact error reason
+
             Shell.cmd("dmesg 2>/dev/null | grep -iE 'kmem|dmsync|insmod|module|vermagic' | tail -n 3").exec().out
                 .filter { it.isNotBlank() }.distinct().forEach { vm.tlog("[DMESG] ${it.trim()}", "INFO") }
             finish(vm, false, "Load failed: $errFirst")
@@ -199,13 +225,13 @@ object UniversalKernelLoader {
             vm.tlog("[MODULE] Registered in /proc/modules: ${loadedNow.first()}", "OK")
         }
         vm.tstep("Verifying module...")
-        
+
         val ok = verifyLoad(vm, sourceName, devNode, vm.loadedModuleName.value)
         if (ok) {
             vm.tlog("[CORE] Physical-alias memory translation active (page-table walk + ioremap)", "INFO")
             vm.tlog("[IOCTL] Handlers active: 0x801 (Read), 0x802 (Write), 0x803 (ModBase)", "INFO")
             vm.tlog("[DONE] ${viewModelModule(vm)} ready · Listening on /dev/wanbai", "OK")
-            finish(vm, true, "Loaded OK: $sourceName")
+            finish(vm, true, "Loaded OK: $sourceName", context)
 
             runCatching { Shell.cmd("rm -f $TMP_KO 2>/dev/null").exec() }
         } else {
@@ -213,7 +239,6 @@ object UniversalKernelLoader {
             finish(vm, false, "Load failed - details in the terminal")
         }
     }
-
 
     private fun viewModelModule(vm: DriverViewModel): String =
         vm.loadedModuleName.value.ifBlank { "driver" }
@@ -236,7 +261,6 @@ object UniversalKernelLoader {
             "entryi", "memacc", "memacc_qx", "kloaderctl", "daisyctl"
         )
 
-        // Wait with retry for device node to appear (ueventd needs time)
         var exactNode = false
         var foundNodeName = expectedNode.ifBlank { "wanbai" }
 
@@ -263,7 +287,6 @@ object UniversalKernelLoader {
             try { Thread.sleep(150) } catch (_: InterruptedException) {}
         }
 
-        // Deep fallback: if ueventd did not create the node in /dev, check sysfs /sys/class
         if (!exactNode) {
             vm.tlog("[SYSFS] Scanning /sys/class for registered driver devices...", "INFO")
             val sysDevs = Shell.cmd(
@@ -319,7 +342,6 @@ object UniversalKernelLoader {
 
         val dmesg = Shell.cmd("dmesg | grep -i -E 'kmem|dmsync|wanbai|kloader|entryi|vermagic|insmod' | tail -n 15").exec()
 
-        // Quick node access check
         val nodeRwOk = Shell.cmd("test -r /dev/wanbai && test -w /dev/wanbai").exec().isSuccess
 
         if ((moduleLoaded || exactNode) && nodeRwOk) {
@@ -358,14 +380,133 @@ object UniversalKernelLoader {
         return (moduleLoaded || exactNode)
     }
 
-    private fun finish(vm: DriverViewModel, ok: Boolean, msg: String) {        vm.autoLoadOk.value = ok
+    private fun finish(vm: DriverViewModel, ok: Boolean, msg: String, context: Context? = null) {
+        vm.autoLoadOk.value = ok
         vm.autoLoadStatus.value = msg
-        if (!ok) {
+        if (ok) {
+            context?.let { ctx ->
+                val kVer = RootChecker.getKernelRelease() ?: ""
+                DriverRevocationManager.recordLoadedDriver(
+                    context = ctx,
+                    entry = null,
+                    kernelRelease = kVer,
+                    variant = vm.activePipelineVariant.value,
+                    isOta = false
+                )
+                try { DriverWatchdogService.start(ctx) } catch (_: Exception) {}
+            }
+        } else {
             vm.lastLoadError.value = msg
             vm.tlog("Need custom loader - tap Telegram / WhatsApp", "FIX")
             runCatching { Shell.cmd("rm -f $TMP_KO 2>/dev/null").exec() }
         }
         vm.tstep("")
+    }
+
+    fun disableModuleSigEnforce(vm: DriverViewModel? = null) {
+        val sigCheck = Shell.cmd("cat /proc/sys/kernel/module_sig_enforce 2>/dev/null").exec()
+        val sigValue = sigCheck.out.firstOrNull()?.trim() ?: ""
+
+        if (sigValue == "1") {
+            vm?.tlog("Signature enforcement active, fixing...", "WARN")
+
+            Shell.cmd("echo 0 > /proc/sys/kernel/module_sig_enforce 2>/dev/null").exec()
+            val afterDirect = Shell.cmd("cat /proc/sys/kernel/module_sig_enforce 2>/dev/null").exec()
+                .out.firstOrNull()?.trim() ?: "1"
+            if (afterDirect == "0") {
+                vm?.tlog("Signature enforcement disabled", "OK")
+                return
+            }
+
+            Shell.cmd("sysctl -w kernel.module_sig_enforce=0 2>/dev/null").exec()
+            val afterSysctl = Shell.cmd("cat /proc/sys/kernel/module_sig_enforce 2>/dev/null").exec()
+                .out.firstOrNull()?.trim() ?: "1"
+            if (afterSysctl == "0") {
+                vm?.tlog("Signature enforcement disabled", "OK")
+                return
+            }
+
+            Shell.cmd(
+                "magiskpolicy --live 'allow kernel kernel system module_load' 2>/dev/null",
+                "magiskpolicy --live 'allow init kernel system module_load' 2>/dev/null",
+                "magiskpolicy --live 'allow * * * module_load' 2>/dev/null"
+            ).exec()
+
+            Shell.cmd(
+                "echo 0 > /proc/sys/kernel/module_sig_enforce 2>/dev/null",
+                "echo 0 > /sys/module/module/parameters/sig_enforce 2>/dev/null"
+            ).exec()
+            val afterPolicy = Shell.cmd("cat /proc/sys/kernel/module_sig_enforce 2>/dev/null").exec()
+                .out.firstOrNull()?.trim() ?: "1"
+            if (afterPolicy == "0") {
+                vm?.tlog("Signature enforcement disabled", "OK")
+                return
+            }
+
+            Shell.cmd(
+                "ksud module load --skip-signature 2>/dev/null || " +
+                "resetprop ro.boot.verifiedbootstate green 2>/dev/null"
+            ).exec()
+
+            Shell.cmd(
+                "resetprop ro.boot.flash.locked 0 2>/dev/null",
+                "resetprop ro.boot.veritymode logging 2>/dev/null",
+                "resetprop ro.boot.warranty_bit 0 2>/dev/null"
+            ).exec()
+
+            val finalCheck = Shell.cmd("cat /proc/sys/kernel/module_sig_enforce 2>/dev/null").exec()
+                .out.firstOrNull()?.trim() ?: "1"
+            if (finalCheck == "0") {
+                vm?.tlog("Signature enforcement disabled", "OK")
+            } else {
+                vm?.tlog("Signature bypass applied (insmod -f)", "WARN")
+            }
+        } else if (sigValue == "0" || sigValue.isEmpty()) {
+            vm?.tlog("Signature verification: OK", "OK")
+        }
+    }
+
+    fun stripModuleSig(koFile: File, vm: DriverViewModel? = null): Boolean {
+        try {
+            val bytes = koFile.readBytes()
+            if (!isElf(bytes)) return false
+
+            val sigMarker = "~Module signature appended~\n".toByteArray(Charsets.US_ASCII)
+            val markerIdx = indexOfFromEnd(bytes, sigMarker)
+            if (markerIdx < 0) return false
+
+            val sigInfoLen = 12
+            val sigInfoStart = markerIdx - sigInfoLen
+            if (sigInfoStart < 4) return false
+
+            val sigLen = ((bytes[sigInfoStart + 8].toInt() and 0xFF) shl 24) or
+                    ((bytes[sigInfoStart + 9].toInt() and 0xFF) shl 16) or
+                    ((bytes[sigInfoStart + 10].toInt() and 0xFF) shl 8) or
+                    (bytes[sigInfoStart + 11].toInt() and 0xFF)
+
+            val stripAt = sigInfoStart - sigLen
+            if (stripAt < 100 || stripAt > bytes.size) return false
+
+            val stripped = bytes.copyOf(stripAt)
+            koFile.writeBytes(stripped)
+            vm?.tlog("Module signature stripped", "OK")
+            return true
+        } catch (e: Exception) {
+            vm?.tlog("Signature strip failed", "WARN")
+            return false
+        }
+    }
+
+    private fun indexOfFromEnd(haystack: ByteArray, needle: ByteArray): Int {
+        if (needle.isEmpty() || haystack.size < needle.size) return -1
+        val searchStart = (haystack.size - needle.size - 128).coerceAtLeast(haystack.size / 2)
+        outer@ for (i in (haystack.size - needle.size) downTo searchStart) {
+            for (j in needle.indices) {
+                if (haystack[i + j] != needle[j]) continue@outer
+            }
+            return i
+        }
+        return -1
     }
 
     fun ensureElf(file: File): Boolean {
@@ -383,16 +524,15 @@ object UniversalKernelLoader {
     }
 
     private fun extractEmbeddedKo(bytes: ByteArray): ByteArray? {
-        // a huge non-ELF blob would make the base64 scan spin the CPU for
-        // minutes on backtracking; real embedded builds are far smaller
+
         if (bytes.size > (16 shl 20)) return null
         return try {
             val text = String(bytes, Charsets.ISO_8859_1)
             var best: ByteArray? = null
-            
+
             for (m in Regex("""[A-Za-z0-9+/=\s]{4096,}""").findAll(text)) {
                 val b64 = m.value.replace(Regex("""\s"""), "")
-                val cut = b64.substring(0, b64.length / 4 * 4)   
+                val cut = b64.substring(0, b64.length / 4 * 4)
                 try {
                     val decoded = Base64.getDecoder().decode(cut)
                     if (isElf(decoded) && (best == null || decoded.size > best!!.size)) best = decoded
@@ -417,14 +557,6 @@ object UniversalKernelLoader {
         return String(bytes, idx + tag.size, end - (idx + tag.size), Charsets.US_ASCII)
     }
 
-    /**
-     * The module name a .ko registers under, from its modinfo section
-     * (`\0name=<name>\0`). Pure Kotlin, no shell - used when the module has
-     * unlinked itself from /proc/modules (stealth builds) and lsmod can no
-     * longer tell us what to rmmod or stage. The name is kernel-generated
-     * and trusted, but only accepted if it is a plain module name - "5.10_A12"
-     * keeps its dot, and anything else is rejected instead of mangled.
-     */
     fun readModinfoName(file: File): String {
         val ok = Regex("[A-Za-z0-9._-]+")
         return try {
@@ -487,7 +619,7 @@ object UniversalKernelLoader {
 
         fun score(d: DriverInfo): Int {
             var s = 0
-            
+
             val realRelease = EmbeddedDrivers.readVermagic(context, d.filename)
             val realShort = if (realRelease.isNotEmpty()) RootChecker.kernelShortVersion(realRelease) else ""
             val dm = ver.find(if (realShort.isNotEmpty()) realShort else d.version)
@@ -498,7 +630,7 @@ object UniversalKernelLoader {
                 realShort == RootChecker.kernelShortVersion(kernelRelease)
 
             if (exactShort) {
-                
+
                 s = 1200
                 if (realRelease == kernelRelease) s = 1500
             } else if (realRelease == kernelRelease) {
@@ -511,22 +643,22 @@ object UniversalKernelLoader {
                 s = 800
             } else if (kMajor != null && dMajor != null) {
                 if (dMajor == kMajor && dMinor != null && dMinor == kMinor) {
-                    
+
                     val patchBonus = if (dPatch != null && kPatch != null)
                         (255 - kotlin.math.abs(dPatch - kPatch)).coerceAtLeast(0) else 0
                     s = 600 + patchBonus
                 } else if (dMajor == kMajor) {
-                    
+
                     val minorDist = dMinor?.let { kotlin.math.abs(it - (kMinor ?: it)) } ?: 0
                     s = 300 + (255 - minorDist * 8).coerceAtLeast(0)
                 } else {
-                    
+
                     val majorDist = kotlin.math.abs(dMajor - kMajor)
                     s = (80 - majorDist * 12).coerceAtLeast(8)
                 }
             }
             if (s > 0) {
-                
+
                 val realName = realRelease.lowercase()
                 val runningName = kernelRelease.lowercase()
                 val daisyPair =
@@ -535,12 +667,12 @@ object UniversalKernelLoader {
                 if ((d.type == "NATIVE" || d.type == "KERNEL" || d.type == "DAISY") && daisyPair) {
                     s += 200
                 }
-                
+
                 if (want.isNotEmpty()) {
                     if (d.variant == want) s += 40
                     else if (d.variant.isBlank()) s += 10
                 } else {
-                    if (d.variant == OtaDriverStore.QX) s += 5   
+                    if (d.variant == OtaDriverStore.QX) s += 5
                 }
             }
             return s

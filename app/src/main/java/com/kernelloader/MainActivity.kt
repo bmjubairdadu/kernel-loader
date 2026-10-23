@@ -44,7 +44,7 @@ class MainActivity : ComponentActivity() {
         }
         enableEdgeToEdge()
         setContent {
-            
+
             KernelLoderTheme(darkTheme = true, dynamicColor = false) {
                 val backStack = remember { NavBackStack<NavKey>(MainRoute) }
                 NavDisplay(

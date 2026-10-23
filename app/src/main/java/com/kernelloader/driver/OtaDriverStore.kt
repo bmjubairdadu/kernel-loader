@@ -13,7 +13,7 @@ object OtaDriverStore {
         "https://raw.githubusercontent.com/bmjubairdadu/kernel-loader/drivers/drivers.json"
 
     val fallbackManifestUrls: List<String> = listOf(
-        
+
         "https://cdn.jsdelivr.net/gh/bmjubairdadu/kernel-loader@drivers/drivers.json",
         "https://github.com/bmjubairdadu/kernel-loader/releases/latest/download/drivers.json"
     )
@@ -27,7 +27,7 @@ object OtaDriverStore {
         val sha256: String = "",
         val size: Long = 0L,
         val buildDate: String = "",
-        
+
         val variant: String = ""
     )
 
@@ -175,7 +175,7 @@ object OtaDriverStore {
             val arr = obj.optJSONArray("drivers") ?: return null
             val drivers = mutableListOf<DriverEntry>()
             for (i in 0 until arr.length()) {
-                
+
                 val d = arr.optJSONObject(i) ?: continue
                 val version = d.optString("version", "")
                 val file = d.optString("file", "")
@@ -224,7 +224,7 @@ object OtaDriverStore {
                     onLog("Driver cached", "OK")
                     return out
                 }
-                // a cached file that fails its manifest hash must never reach insmod
+
                 onLog("Cached driver failed sha256 - redownloading", "WARN")
                 out.delete()
             }

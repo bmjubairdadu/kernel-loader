@@ -13,8 +13,6 @@ import java.util.zip.ZipOutputStream
 
 object ReportPackBuilder {
 
-    // the dynamic-PIE extractor builds are ~10 KB; a larger cached copy is a
-    // stale static build, a smaller one is a truncated/HTML download
     private const val MIN_KCRC_SIZE = 4096
     private const val MAX_KCRC_SIZE = 64 shl 20
 
@@ -24,7 +22,6 @@ object ReportPackBuilder {
         "https://github.com/bmjubairdadu/kernel-loader/raw/refs/heads/drivers/tools/"
     )
 
-    // ELF e_machine values so an arm build never runs on an arm64 shell
     private const val ELF_MACHINE_AARCH64 = 0xB7
     private const val ELF_MACHINE_ARM = 0x28
 
@@ -78,7 +75,6 @@ object ReportPackBuilder {
 
         var kcrcStatus = ""
 
-        // --- dmesg.txt : lines around the insmod error ---
         onStep("Collecting dmesg...")
         File(dir, "dmesg.txt").writeText(
             (report.dmesgTail + (if (report.lastError.isNotBlank()) listOf("", "LAST ERROR: ${report.lastError}") else emptyList()))
@@ -86,12 +82,10 @@ object ReportPackBuilder {
                 .ifBlank { "(unavailable)" }
         )
 
-        // --- applog.txt : the app's own terminal log ---
         File(dir, "applog.txt").writeText(
             logText.lines().filter { it.isNotBlank() }.takeLast(200).joinToString("\n").ifBlank { "(empty)" }
         )
 
-        // --- config.txt : full kernel config from /proc/config.gz ---
         onStep("Dumping kernel config...")
         val configOk = try {
             Shell.cmd(
@@ -113,7 +107,6 @@ object ReportPackBuilder {
             )
         }
 
-        // --- Module.symvers.txt : CRC table via kcrc_dump ---
         if (!rootAvailable) {
             kcrcStatus = "root missing - kcrc_dump skipped"
         } else {
@@ -127,7 +120,6 @@ object ReportPackBuilder {
             }
         }
 
-        // --- report.txt : the full 14-field template + SOURCE ---
         File(dir, "report.txt").writeText(fullText)
 
         onStep("Packing report zip...")
@@ -150,8 +142,6 @@ object ReportPackBuilder {
             zipFile = null
         }
 
-        // the zip carries everything - the loose parts are residue, drop them
-        // as soon as the zip exists (the WhatsApp share reads only the zip)
         zipFile?.let { zip ->
             dir.listFiles { f -> f.isFile && f.name != zip.name }?.forEach { it.delete() }
         }
@@ -167,7 +157,6 @@ object ReportPackBuilder {
         )
     }
 
-    /** Removes every trace of a previous report, the zip included. */
     fun wipeReportDir(context: Context) {
         runCatching { File(context.cacheDir, "report").deleteRecursively() }
     }
@@ -220,8 +209,7 @@ object ReportPackBuilder {
         if (cached.exists() && isElf(cached, wantMachine) &&
             cached.length() in MIN_KCRC_SIZE..MAX_KCRC_SIZE
         ) {
-            // the extractor ships on the drivers branch and can be rebuilt
-            // without an app update - refresh when the published size changes
+
             val remoteSize = headContentLength(urls.first())
             if (remoteSize == null || remoteSize == cached.length()) return cached
             cached.delete()
@@ -248,7 +236,7 @@ object ReportPackBuilder {
                 if (tmp.length() in MIN_KCRC_SIZE..MAX_KCRC_SIZE && isElf(tmp, wantMachine)) {
                     cached.delete()
                     if (tmp.renameTo(cached)) {
-                        // drop the other arch's stale copy
+
                         File(dir, if (remote == "kcrc_dump") "kcrc_dump-arm" else "kcrc_dump").delete()
                         return cached
                     }
