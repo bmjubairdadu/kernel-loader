@@ -1,7 +1,7 @@
 {
   "baseUrl": "https://raw.githubusercontent.com/bmjubairdadu/kernel-loader/drivers",
   "branch": "drivers",
-  "count": 57,
+  "count": 59,
   "drivers": [
     {
       "version": "4.14.113-25741605 SMP preempt mod_unload aarch64",
@@ -119,6 +119,17 @@
       "size": 12352,
       "variant": "qx",
       "version": "4.19.157-perf SMP preempt mod_unload modversions aarch64"
+    },
+    {
+      "version": "4.19.157-perf-g1a6087bc0325-dirty SMP preempt mod_unload modversions aarch64",
+      "file": "qx_4.19.157-perf-g1a6087bc0325-dirty.ko",
+      "variant": "qx",
+      "label": "4.19.157-perf-g1a6087bc0325-dirty",
+      "sha256": "b948db1f719bcffe6553cd8741f15372dd7b31b9b8a7ca86edaa201222e571a2",
+      "size": 231248,
+      "buildDate": "2026-10-23",
+      "verified": true,
+      "source": "sm6115-3.3.4-freeze-fix"
     },
     {
       "buildDate": "2026-09-27T15:33:50Z",
@@ -394,6 +405,17 @@
       "version": "4.19.157-perf-g9aba441cf6cd-dirty SMP preempt mod_unload modversions aarch64"
     },
     {
+      "version": "4.19.157-perf-g1a6087bc0325-dirty SMP preempt mod_unload modversions aarch64",
+      "file": "rt_4.19.157-perf-g1a6087bc0325-dirty.ko",
+      "variant": "rt",
+      "label": "4.19.157-perf-g1a6087bc0325-dirty",
+      "sha256": "07dbb300dd06be2aa3c1a4ebaef4fb21f2b97ec0d4f395ac9ca804027cf83a1b",
+      "size": 228056,
+      "buildDate": "2026-10-23",
+      "verified": true,
+      "source": "sm6115-3.3.4-freeze-fix"
+    },
+    {
       "buildDate": "2026-09-27T15:33:49Z",
       "file": "rt_4.19.157b.ko",
       "label": "4.19.157b",
@@ -561,7 +583,7 @@
       "version": "6.6.57-4k-gd66e9166bfa1-dirty SMP preempt mod_unload modversions aarch64"
     }
   ],
-  "updated": "2026-10-22T16:23:55Z",
+  "updated": "2026-10-23T08:14:07Z",
   "variants": {
     "qx": "QX ABI - ioctl 0x801/0x802 + 0x804/0x805 handshake, returns -1 on failure",
     "rt": "RT ABI - ioctl 0x801/0x802/0x803, success returns -EIO (0 on failure)"
