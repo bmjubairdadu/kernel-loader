@@ -370,9 +370,7 @@ fun HomeScreen(
             val running = busy
 
             Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(268.dp),
+                modifier = Modifier.fillMaxWidth(),
                 contentAlignment = Alignment.TopCenter
             ) {
                 Column(
