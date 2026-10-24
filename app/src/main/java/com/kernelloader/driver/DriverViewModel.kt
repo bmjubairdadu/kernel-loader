@@ -1078,42 +1078,50 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    private var otaFailReason: String = ""
+
     private suspend fun runOtaLoad(context: Context, variant: String = ""): Boolean {
         checkpoint()
-        val localKo = firstLocalKo(variant)
-        if (localKo != null) {
-            if (loadStagedKo(context, localKo)) return true
-            tlog("Local driver failed - trying DB", "WARN")
-        }
-        checkpoint()
+        // Database is the ONLY driver source - no bundled or leftover local .ko
+        // is ever loaded. The OTA download always happens fresh.
         tlog("Checking driver DB...", "INFO")
         val manifest = OtaDriverStore.fetchManifest() ?: run {
-            tlog("DB unavailable", "WARN")
+            tlog("DB unreachable", "WARN")
+            otaFailReason = "No internet connection - connect to the internet first, then tap LOAD"
             return false
         }
         if (manifest.drivers.isEmpty()) {
             tlog("DB has no drivers", "WARN")
+            otaFailReason = "Driver database is empty - wait for the next database update"
             return false
         }
         val pool = OtaDriverStore.variantsFor(manifest, variant)
         if (pool.isEmpty()) {
             tlog("No ${OtaDriverStore.variantLabel(variant)} driver", "WARN")
+            otaFailReason = "No driver for this variant in the database yet"
             return false
         }
-        val kernel = RootChecker.getKernelRelease() ?: return false
+        val kernel = RootChecker.getKernelRelease()
+        if (kernel.isNullOrBlank()) {
+            otaFailReason = "Could not read kernel version"
+            return false
+        }
         checkpoint()
         val resolved = OtaDriverStore.resolve(manifest, kernel, variant)
         return when (resolved) {
             is OtaDriverStore.ResolveResult.Exact -> {
                 tlog("Exact match: $kernel", "OK")
                 downloadAndLoadOta(context, manifest, resolved.entry)
+                    .also { if (!it) otaFailReason = "Driver download failed - check your internet connection and try again" }
             }
             is OtaDriverStore.ResolveResult.Near -> {
                 tlog("Nearest match: ${resolved.entry.version}", "WARN")
                 downloadAndLoadOta(context, manifest, resolved.entry)
+                    .also { if (!it) otaFailReason = "Driver download failed - check your internet connection and try again" }
             }
             is OtaDriverStore.ResolveResult.None -> {
-                tlog("No driver for this kernel", "INFO")
+                tlog("No driver for this kernel in the database", "INFO")
+                otaFailReason = "No driver for kernel $kernel in the database yet - it will appear after the next database update"
                 false
             }
         }
@@ -1255,9 +1263,8 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
         } else {
             val autoVar = determineBestVariant(context, RootChecker.getKernelRelease() ?: "")
             lastBundleTried.value = when {
-                variant.isBlank() && preferOta -> "${autoVar.uppercase()} (auto) → built-in"
-                preferOta -> "${OtaDriverStore.variantLabel(variant)} (forced)"
-                else -> "built-in"
+                variant.isBlank() -> "${autoVar.uppercase()} (auto) → OTA database"
+                else -> "${OtaDriverStore.variantLabel(variant)} (forced) → OTA database"
             }
         }
         loadJob = viewModelScope.launch(Dispatchers.IO) {
@@ -1317,23 +1324,24 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                     return@launch
                 }
                 if (pickedFileUri.value != null) {
+                    // User-provided .ko (BROWSE) - not bundled, their own file.
                     tlog("Loading custom file: ${pickedFileName.value}", "CMD")
                     tstep("Loading custom file...")
                     UniversalKernelLoader.autoLoad(context, this@DriverViewModel, OtaDriverStore.RT)
-                } else if (preferOta) {
+                } else {
+                    // Drivers are NEVER bundled in the APK - the OTA database is the
+                    // only source, so every load is a fresh DB download.
                     activePipelineVariant.value = primaryVariant
                     tlog("Loading RT driver...", "CMD")
-                    tstep("Stage 1/2: RT driver (OTA / DB)")
-                    val primaryHandled = runOtaLoad(context, primaryVariant)
-                    if (primaryHandled) return@launch
+                    tstep("Stage 1/1: RT driver (OTA / DB)")
+                    val handled = runOtaLoad(context, primaryVariant)
+                    if (handled) return@launch
                     checkpoint()
 
-                    activePipelineVariant.value = ""
-                    tlog("OTA driver unavailable/failed, loading built-in RT driver...", "WARN")
-                    tstep("Stage 2/2: Built-in RT driver")
-                    UniversalKernelLoader.autoLoad(context, this@DriverViewModel, primaryVariant)
-                } else {
-                    UniversalKernelLoader.autoLoad(context, this@DriverViewModel, primaryVariant)
+                    tlog("[NET] ${otaFailReason.ifBlank { "No internet connection - connect to the internet first, then tap LOAD" }}", "ERR")
+                    tlog("[NET] Drivers always download from the database - no offline build is bundled.", "INFO")
+                    autoLoadOk.value = false
+                    autoLoadStatus.value = "Load failed - driver database unreachable"
                 }
                 if (autoLoadOk.value != true && !driverLoaded.value) {
                     tlog("RT pipeline failed", "ERR")
