@@ -1112,12 +1112,10 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             is OtaDriverStore.ResolveResult.Exact -> {
                 tlog("Exact match: $kernel", "OK")
                 downloadAndLoadOta(context, manifest, resolved.entry)
-                    .also { if (!it) otaFailReason = "Driver download failed - check your internet connection and try again" }
             }
             is OtaDriverStore.ResolveResult.Near -> {
                 tlog("Nearest match: ${resolved.entry.version}", "WARN")
                 downloadAndLoadOta(context, manifest, resolved.entry)
-                    .also { if (!it) otaFailReason = "Driver download failed - check your internet connection and try again" }
             }
             is OtaDriverStore.ResolveResult.None -> {
                 tlog("No driver for this kernel in the database", "INFO")
@@ -1181,13 +1179,16 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                 val errText = (res.out + res.err).joinToString("\n").trim()
                 if (errText.isNotBlank()) lastLoadError.value = errText.take(300)
                 (res.out + res.err).firstOrNull { it.isNotBlank() }?.let {
-                    tlog("Error: ${it.trim().take(35)}", "ERR")
+                    tlog("Error: ${it.trim().take(90)}", "ERR")
                 }
+                // Kernel rejection (Unknown symbol / format error) is NOT a network
+                // problem - give the right message so users report the dmesg lines.
+                otaFailReason = "The kernel rejected this driver build - send the DMESG lines above to support if it repeats"
 
                 Shell.cmd(
                     "dmesg 2>/dev/null | grep -i -E 'kmem|module|insmod|version magic|disagrees|Unknown symbol|format error|taint' | tail -n 8"
                 ).exec().out.filter { it.isNotBlank() }.take(5)
-                    .forEach { tlog("DMESG: ${it.take(35)}", "INFO") }
+                    .forEach { tlog("DMESG: ${it.take(90)}", "INFO") }
 
                 if (errText.contains("Invalid module format", true) ||
                     errText.contains("vermagic", true) ||
