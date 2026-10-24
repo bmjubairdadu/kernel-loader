@@ -874,6 +874,40 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
         Shell.cmd("for f in /dev/*; do [ -c \"\$f\" ] && echo \"\${f##*/}\"; done 2>/dev/null")
             .exec().out.map { it.trim() }.filter { it.isNotEmpty() }.toSet()
 
+    private fun snapshotSysClasses(): Set<String> =
+        Shell.cmd("ls /sys/class 2>/dev/null").exec().out
+            .map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+
+    /**
+     * Devices where /dev is not devtmpfs-driven never materialize our
+     * device_create() nodes, and randomized class names defeat every
+     * prefix-glob fallback. The driver ALWAYS registers its classes in
+     * /sys/class though, so: diff the class list against the pre-insmod
+     * snapshot and mknod each fresh class device. Returns created node names.
+     */
+    private fun mknodNewSysClasses(before: Set<String>): List<String> {
+        if (before.isEmpty()) return emptyList()
+        val fresh = snapshotSysClasses() - before
+        val made = mutableListOf<String>()
+        for (cls in fresh) {
+            val dev = Shell.cmd("cat /sys/class/$cls/dev 2>/dev/null").exec().out
+                .firstOrNull()?.trim() ?: continue
+            val mm = dev.split(":")
+            val maj = mm.getOrNull(0)?.trim()?.toIntOrNull()
+            val min = mm.getOrNull(1)?.trim()?.toIntOrNull()
+            if (maj == null || min == null) continue
+            val safe = cls.replace(Regex("[^A-Za-z0-9_.-]"), "")
+            if (safe.isBlank()) continue
+            if (Shell.cmd("test -c /dev/$safe 2>/dev/null").exec().isSuccess) continue
+            Shell.cmd(
+                "mknod -m 666 /dev/$safe c $maj $min 2>/dev/null",
+                "chcon u:object_r:device:s0 /dev/$safe 2>/dev/null"
+            ).exec()
+            if (Shell.cmd("test -c /dev/$safe").exec().isSuccess) made.add(safe)
+        }
+        return made
+    }
+
     private suspend fun prepareAndVerifyDeviceNode(devNode: String, devNodesBefore: Set<String> = emptySet()): Boolean {
         tstep("Preparing device node...")
         tlog("Verifying stealth device node...", "INFO")
@@ -1168,10 +1202,17 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             UniversalKernelLoader.stripModuleSig(staged, this@DriverViewModel)
 
             val devNodesBefore = snapshotDevCharNodes()
+            val sysClassesBefore = snapshotSysClasses()
             tlog("Inserting module into kernel...", "CMD")
             val res = runInsmodLadder(staged.absolutePath, devNode)
             if (res.isSuccess) {
                 tlog("Module inserted into kernel", "OK")
+                // /dev may not be devtmpfs on every device - re-create nodes
+                // from any class the module just registered in /sys/class.
+                val mknodded = mknodNewSysClasses(sysClassesBefore)
+                if (mknodded.isNotEmpty()) {
+                    tlog("[SYSFS] Created /dev nodes from new classes: ${mknodded.joinToString(", ")}", "FIX")
+                }
             }
 
             if (!res.isSuccess) {
