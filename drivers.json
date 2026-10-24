@@ -316,7 +316,7 @@
             "source": "pure-stealth-random-node"
         }
     ],
-    "updated": "2026-10-24T09:17:11Z",
+    "updated": "2026-10-24T09:18:50Z",
     "variants": {
         "rt": "RT ABI - ioctl 0x801/0x802/0x803, success returns -EIO (0 on failure)"
     }
