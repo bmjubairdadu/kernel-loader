@@ -789,7 +789,7 @@ fun HomeScreen(
             Spacer(Modifier.height(14.dp))
 
             KernelListSection(
-                title = "RT KERNELS (${rtSupported.size})",
+                title = "SUPPORTED KERNELS (${rtSupported.size})",
                 accent = FamilyRt,
                 entries = rtSupported,
                 status = manifestStatus,
