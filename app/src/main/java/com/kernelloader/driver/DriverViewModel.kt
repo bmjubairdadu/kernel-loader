@@ -905,6 +905,37 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             ).exec()
             if (Shell.cmd("test -c /dev/$safe").exec().isSuccess) made.add(safe)
         }
+        if (made.isEmpty()) made.addAll(mknodPatternSysClasses())
+        return made
+    }
+
+    /**
+     * The driver's node/class names are 8 uppercase letters drawn from a fixed
+     * pool (B,Y,N,A,C,D,E,F,G) - no stock Android class looks like that.  When
+     * the before/after diff finds nothing (e.g. the module was ALREADY resident
+     * from an earlier attempt), this pattern scan still finds its classes.
+     */
+    private fun mknodPatternSysClasses(): List<String> {
+        val made = mutableListOf<String>()
+        val classes = Shell.cmd("ls /sys/class 2>/dev/null").exec().out
+            .map { it.trim() }.filter { it.matches(Regex("^[B-YA-N]{8}$")) && it.none { c -> c in "HIJKLMOPQRSTUVWXYZ".substring(0, 0) } }
+        for (cls in classes) {
+            if (!cls.all { it in "BDEFGACNY" }) continue
+            val dev = Shell.cmd("cat /sys/class/$cls/dev 2>/dev/null").exec().out
+                .firstOrNull()?.trim() ?: continue
+            val mm = dev.split(":")
+            val maj = mm.getOrNull(0)?.trim()?.toIntOrNull() ?: continue
+            val min = mm.getOrNull(1)?.trim()?.toIntOrNull() ?: continue
+            if (Shell.cmd("test -c /dev/$cls 2>/dev/null").exec().isSuccess) {
+                made.add(cls)  // node already exists - still a valid candidate
+                continue
+            }
+            Shell.cmd(
+                "mknod -m 666 /dev/$cls c $maj $min 2>/dev/null",
+                "chcon u:object_r:device:s0 /dev/$cls 2>/dev/null"
+            ).exec()
+            if (Shell.cmd("test -c /dev/$cls").exec().isSuccess) made.add(cls)
+        }
         return made
     }
 
@@ -989,6 +1020,12 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             if (probedOk == null) {
                 tlog("[PROBE FAIL] /dev/$node did not answer our ABI - rejecting node", "ERR")
                 Shell.cmd("rm -f /dev/$node 2>/dev/null").exec()
+                // A resident module with no answering node = an earlier load is
+                // stuck in kernel memory (hidden, nodes lost). Only a reboot clears it.
+                val resident = Shell.cmd("lsmod 2>/dev/null; cat /proc/modules 2>/dev/null").exec().out
+                if (resident.any { it.contains("sysync") || it.contains("dmsync") }) {
+                    tlog("[STALE] Module is resident but its nodes are gone - REBOOT the phone, then tap LOAD", "ERR")
+                }
                 tlog("[DEVNODE ERR] No node answered the ABI probe", "ERR")
                 return false
             }
