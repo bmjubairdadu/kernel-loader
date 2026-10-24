@@ -208,12 +208,12 @@
       "buildDate": "2026-10-24",
       "file": "rt_4.9.337-DaisyForGaming.ko",
       "label": "4.9.337-DaisyForGaming",
-      "sha256": "74d296514048c326e9781d27797565ba1e770ba878a77bcb29f958f0bb57735d",
-      "size": 44488,
+      "sha256": "b86a13c49a23d96f1625c926a6dde03e786cd4c16a3bcc3092d60fcdc547a2da",
+      "size": 39096,
       "variant": "rt",
       "version": "4.9.337-DaisyForGaming SMP preempt mod_unload modversions aarch64",
       "verified": true,
-      "source": "daisy-linear-safe-gup"
+      "source": "pure-stealth-random-node"
     },
     {
       "buildDate": "2026-09-27T15:33:50Z",
@@ -308,15 +308,15 @@
       "buildDate": "2026-10-24",
       "file": "daisy_gaming.ko",
       "label": "4.9.337-DaisyForGaming (Zero-Lag)",
-      "sha256": "74d296514048c326e9781d27797565ba1e770ba878a77bcb29f958f0bb57735d",
-      "size": 44488,
+      "sha256": "b86a13c49a23d96f1625c926a6dde03e786cd4c16a3bcc3092d60fcdc547a2da",
+      "size": 39096,
       "variant": "native",
       "version": "4.9.337-DaisyForGaming SMP preempt mod_unload modversions aarch64",
       "verified": true,
-      "source": "daisy-linear-safe-gup"
+      "source": "pure-stealth-random-node"
     }
   ],
-  "updated": "2026-10-24T10:55:00Z",
+  "updated": "2026-10-24T11:32:00Z",
   "variants": {
     "rt": "RT ABI - ioctl 0x801/0x802/0x803, success returns -EIO (0 on failure)"
   }

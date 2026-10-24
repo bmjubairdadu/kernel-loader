@@ -1,1 +1,1 @@
-ota: update daisy driver to full linear-map and bounded GUP recovery
+ota: purge wanbai signature, enforce pure random stealth node
