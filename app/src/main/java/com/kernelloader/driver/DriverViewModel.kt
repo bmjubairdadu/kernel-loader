@@ -1022,9 +1022,20 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                 Shell.cmd("rm -f /dev/$node 2>/dev/null").exec()
                 // A resident module with no answering node = an earlier load is
                 // stuck in kernel memory (hidden, nodes lost). Only a reboot clears it.
-                val resident = Shell.cmd("lsmod 2>/dev/null; cat /proc/modules 2>/dev/null").exec().out
-                if (resident.any { it.contains("sysync") || it.contains("dmsync") }) {
-                    tlog("[STALE] Module is resident but its nodes are gone - REBOOT the phone, then tap LOAD", "ERR")
+                // Hidden modules vanish from lsmod but their chrdev registration
+                // stays visible in /proc/devices - check both.
+                val resident = Shell.cmd("lsmod 2>/dev/null; cat /proc/modules 2>/dev/null; cat /proc/devices 2>/dev/null").exec().out
+                val hit = resident.filter {
+                    it.contains("sysync") || it.contains("dmsync") || it.contains("memacc") || it.contains("kmem")
+                }.map { it.trim() }.filter { it.isNotBlank() }
+                if (hit.isNotEmpty()) {
+                    tlog("[STALE] Driver is still resident in kernel memory (${hit.take(2).joinToString("; ").take(70)})", "ERR")
+                    tlog("[STALE] Reboot the phone FIRST, then tap LOAD", "ERR")
+                }
+                val poolCls = Shell.cmd("ls /sys/class 2>/dev/null").exec().out
+                    .map { it.trim() }.filter { it.matches(Regex("^[BDEFGACNY]{8}$")) }
+                if (poolCls.isNotEmpty()) {
+                    tlog("[DIAG] driver classes present: ${poolCls.joinToString(",")}", "INFO")
                 }
                 tlog("[DEVNODE ERR] No node answered the ABI probe", "ERR")
                 return false
