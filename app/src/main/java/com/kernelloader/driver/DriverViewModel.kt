@@ -1083,6 +1083,23 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                     .filter { it.contains("probe") || it.contains("verdict") || it.contains("open") || it.contains("SUMMARY") || it.contains("!!") }
                     .take(8)
                 dmr.forEach { tlog("[DIAG] ${it.take(110)}", "INFO") }
+                // Own-probe: per-ioctl rc/errno with known-good buffers -
+                // distinguishes a dmtest quirk from a real uaccess fault.
+                try {
+                    val pbin = java.io.File(getApplication<Application>().filesDir, "myprobe")
+                    getApplication<Application>().assets.open("bin/myprobe").use { input ->
+                        pbin.outputStream().use { input.copyTo(it) }
+                    }
+                    Shell.cmd("cp \"${pbin.absolutePath}\" /data/local/tmp/myprobe 2>/dev/null", "chmod 755 /data/local/tmp/myprobe").exec()
+                    val poolNodes = Shell.cmd("ls /dev 2>/dev/null").exec().out
+                        .map { it.trim() }.filter { it.matches(Regex("^[A-GNYB]{8}$")) }
+                    for (n in poolNodes.take(3)) {
+                        val r = Shell.cmd("/data/local/tmp/myprobe /dev/$n 2>&1").exec().out
+                        r.filter { it.isNotBlank() }.take(4).forEach { tlog("[MYPROBE] /dev/$n ${it.take(80)}", "INFO") }
+                    }
+                } catch (e: Exception) {
+                    tlog("[MYPROBE] unavailable: ${e.message}", "INFO")
+                }
                 otaFailReason = "Driver inserted but no usable device node appeared" +
                     (if (hit.isNotEmpty()) " - an old load is stuck: REBOOT the phone, then tap LOAD" else " - reboot and retry; if it repeats send the [DIAG] lines to support")
                 tlog("[DEVNODE ERR] No node answered the ABI probe", "ERR")
