@@ -1,1 +1,0 @@
-feat(stealth): harden anti-cheat evasion, purge legacy artifacts, and add stealth exit

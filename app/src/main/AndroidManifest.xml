@@ -56,6 +56,11 @@
             android:name=".driver.DriverWatchdogService"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
+
+        <service
+            android:name=".CleanExitService"
+            android:exported="false"
+            android:stopWithTask="false" />
     </application>
 
 </manifest>

@@ -217,7 +217,7 @@ object OtaDriverStore {
         return try {
             val out = cachedFile(context, entry)
             val expected = entry.sha256.trim().lowercase()
-            if (out.exists() && out.length() > 0 &&
+            if (expected.isNotBlank() && out.exists() && out.length() > 0 &&
                 (entry.size <= 0 || out.length() == entry.size)
             ) {
                 if (hashMatches(out, expected)) {
@@ -261,6 +261,7 @@ object OtaDriverStore {
             out
         } catch (e: Exception) {
             onLog("Download failed: ${e.message}", "ERR")
+            runCatching { cachedFile(context, entry).delete() }
             null
         }
     }

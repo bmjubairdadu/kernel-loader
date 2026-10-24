@@ -506,25 +506,6 @@ fun HomeScreen(
                             )
                         }
                     }
-                    if (loaded) {
-                        val activity = LocalContext.current as? Activity
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 12.dp, vertical = 8.dp),
-                            horizontalArrangement = Arrangement.End
-                        ) {
-                            Button(
-                                onClick = { activity?.finishAndRemoveTask() },
-                                colors = ButtonDefaults.buttonColors(containerColor = AccentRed.copy(alpha = 0.85f)),
-                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-                            ) {
-                                Icon(Icons.Default.Close, contentDescription = null, tint = TextOnAccent, modifier = Modifier.size(14.dp))
-                                Spacer(Modifier.width(6.dp))
-                                Text("STEALTH EXIT (WIPE FROM RECENTS)", style = MonoTiny, color = TextOnAccent, fontWeight = FontWeight.Bold)
-                            }
-                        }
-                    }
                 }
             }
             Spacer(Modifier.height(8.dp))
@@ -982,7 +963,7 @@ private fun VariantConsoleCard(
     val listState = rememberLazyListState(
         initialFirstVisibleItemIndex = (lines.size - 1).coerceAtLeast(0)
     )
-    LaunchedEffect(lines.size) {
+    LaunchedEffect(lines.size, lines.lastOrNull()) {
         if (lines.isNotEmpty()) {
             listState.scrollToItem(lines.size - 1)
         }

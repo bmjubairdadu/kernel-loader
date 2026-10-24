@@ -228,7 +228,7 @@ object UniversalKernelLoader {
 
             if (errAll.contains("File exists", true)) {
                 vm.tlog("[RESIDENT] Module already live in kernel memory (hidden) - validating live node...", "INFO")
-                val residentNode = verifyLoad(vm, devNode, vm.loadedModuleName.value, devNodesBefore, charMajorsBefore)
+                val residentNode = verifyLoad(vm, devNode, vm.loadedModuleName.value, devNodesBefore, charMajorsBefore, context)
                 if (residentNode.isNotEmpty()) {
                     vm.tlog("[DONE] Resident kernel driver verified & operational on /dev/$residentNode", "OK")
                     finish(vm, true, "Already loaded: $sourceName", context)
@@ -259,7 +259,7 @@ object UniversalKernelLoader {
             vm.tlog("[CORE] Physical-alias memory translation active (page-table walk + ioremap)", "INFO")
             vm.tlog("[IOCTL] Handlers active: 0x801 (Read), 0x802 (Write), 0x803 (ModBase)", "INFO")
             vm.tlog("[DONE] ${viewModelModule(vm)} ready · Listening on /dev/$activeNode", "OK")
-            vm.tlog("[STEALTH] Driver ready. Tap STEALTH EXIT before launching game!", "OK")
+            vm.tlog("[STEALTH] Driver ready. Clear app from recents before launching game!", "OK")
             finish(vm, true, "Loaded OK: $sourceName", context)
         } else {
             vm.tlog("[FAIL] Verification failed - device node not accessible", "ERR")
@@ -269,6 +269,40 @@ object UniversalKernelLoader {
 
     private fun viewModelModule(vm: DriverViewModel): String =
         vm.loadedModuleName.value.ifBlank { "driver" }
+
+    /**
+     * Runs the bundled dmtest probe and returns the /dev node it verified as OUR driver
+     * (RT/QX ioctl ABI), or null. This is the authoritative node gate: it cannot be
+     * fooled by concurrently-created stock nodes because it actually issues ioctls.
+     */
+    fun probeOurDriverNode(context: Context?, vm: DriverViewModel): String? {
+        if (context == null) return null
+        return try {
+            val local = File(context.filesDir, "dmtest")
+            if (!local.exists() || local.length() == 0L) {
+                context.assets.open("dmtest").use { input ->
+                    local.outputStream().use { output -> input.copyTo(output) }
+                }
+            }
+            val res = Shell.cmd(
+                "cp \"${local.absolutePath}\" /data/local/tmp/dmtest 2>/dev/null",
+                "chmod 755 /data/local/tmp/dmtest 2>/dev/null",
+                "/data/local/tmp/dmtest /data/local/tmp/dmtest_probe.txt 2>&1"
+            ).exec()
+            val verdict = res.out.firstOrNull { it.contains("verdict: our driver") } ?: return null
+            val raw = verdict.substringAfter('=').trim()
+            val node = raw.substringBefore(' ').trim().removePrefix("/dev/").trim()
+            // dmtest prints "NOT FOUND" (and engine pick "NONE") when nothing is
+            // resident - those sentinels must never be mistaken for a node name.
+            val sentinel = node.isBlank() || node.equals("NOT", true) || node.equals("NONE", true) ||
+                node.equals("FOUND", true) || node.startsWith("!!")
+            if (sentinel || !node.all { it.isLetterOrDigit() || it == '_' || it == '-' || it == '.' }) return null
+            // The node must actually exist as a char device right now.
+            return if (Shell.cmd("test -c /dev/$node 2>/dev/null").exec().isSuccess) node else null
+        } catch (e: Exception) {
+            null
+        }
+    }
 
     private fun isCharNode(name: String): Boolean =
         name.isNotBlank() && Shell.cmd("test -c /dev/$name 2>/dev/null").exec().isSuccess
@@ -325,7 +359,7 @@ object UniversalKernelLoader {
         vm.tstep("Verifying module...")
 
         val candidates = listOfNotNull(
-            expectedNode.ifBlank { null }, "dmsync", "kmem_337", "memacc"
+            expectedNode.ifBlank { null }, "dmsync", "sysync", "kmem_337", "memacc"
         )
 
         var exactNode = false
@@ -378,7 +412,7 @@ object UniversalKernelLoader {
         if (!exactNode) {
             vm.tlog("[SYSFS] Scanning /sys/class for registered driver devices...", "INFO")
             val sysDevs = Shell.cmd(
-                "for f in /sys/class/dmsync*/dev /sys/class/dmsync*/*/dev /sys/class/kmem*/dev /sys/class/kmem*/*/dev /sys/class/memacc*/dev; do " +
+                "for f in /sys/class/dmsync*/dev /sys/class/sysync*/dev /sys/class/uni*/dev /sys/class/dmsync*/*/dev /sys/class/kmem*/dev /sys/class/kmem*/*/dev /sys/class/memacc*/dev; do " +
                         "if [ -f \"\$f\" ]; then echo \"\$(cat \"\$f\") \$f\"; break; fi; done 2>/dev/null"
             ).exec().out.firstOrNull()?.trim()
 

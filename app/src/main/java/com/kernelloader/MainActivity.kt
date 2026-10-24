@@ -1,5 +1,6 @@
 package com.kernelloader
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -31,6 +32,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         if (AppGuard.isTampered(this)) {
+            android.widget.Toast.makeText(
+                this, "Integrity check failed - app closed", android.widget.Toast.LENGTH_LONG
+            ).show()
             finish()
             return
         }
@@ -42,6 +46,9 @@ class MainActivity : ComponentActivity() {
                     .setTimeout(10)
             )
         }
+        try {
+            startService(Intent(this, CleanExitService::class.java))
+        } catch (_: Exception) {}
         enableEdgeToEdge()
         setContent {
 
@@ -78,6 +85,17 @@ class MainActivity : ComponentActivity() {
                     }
                 )
             }
+        }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        if (!isChangingConfigurations) {
+            try {
+                stopService(Intent(this, CleanExitService::class.java))
+            } catch (_: Exception) {}
+            android.os.Process.killProcess(android.os.Process.myPid())
+            kotlin.system.exitProcess(0)
         }
     }
 

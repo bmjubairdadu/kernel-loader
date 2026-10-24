@@ -67,6 +67,8 @@ object BootPatcherEngine {
 
         vm.tstep("Dumping partition images...")
         vm.tlog("[DUMP] Backing up untouched partition images to: $sessionBackupDir", "INFO")
+        val sdcardBackupDir = "/sdcard/Download/kloader_backup_$stamp"
+        Shell.cmd("mkdir -p $sdcardBackupDir").exec()
 
         val dumpBootRes = Shell.cmd("dd if=${bootPart.blockPath} of=$sessionBackupDir/boot_stock.img bs=4096 2>/dev/null").exec()
         if (!dumpBootRes.isSuccess || !verifyFileExists("$sessionBackupDir/boot_stock.img", 4 * 1024 * 1024)) {
@@ -228,15 +230,22 @@ object BootPatcherEngine {
         if (switchSlot && targetSlotName != slot && targetSlotName.isNotBlank()) {
             val slotNum = if (targetSlotName == "_b") 1 else 0
             vm.tstep("Switching active boot slot to $targetSlotName...")
-            Shell.cmd("bootctl set-active-boot-slot $slotNum 2>/dev/null").exec()
-            vm.tlog("[SLOT OK] Active boot slot set to slot $slotNum ($targetSlotName)", "OK")
+            val slotRes = Shell.cmd("bootctl set-active-boot-slot $slotNum 2>/dev/null").exec()
+            if (slotRes.isSuccess) {
+                vm.tlog("[SLOT OK] Active boot slot set to slot $slotNum ($targetSlotName)", "OK")
+            } else {
+                vm.tlog("[SLOT WARN] bootctl could not switch slots (rc=" + slotRes.code + ") - device may keep booting the UNPATCHED slot", "ERR")
+                vm.tlog("[SLOT WARN] Patched image sits in " + targetSlotName + "; switch manually or flash the active slot", "WARN")
+            }
         }
 
         Shell.cmd("rm -rf $tmpDir 2>/dev/null").exec()
 
         vm.tlog("[DONE] Kernel signature bypass patched & flashed successfully!", "OK")
+        Shell.cmd("cp $sessionBackupDir/boot_stock.img $sdcardBackupDir/ 2>/dev/null").exec()
         vm.tlog("[RECOVERY] If device bootloops, restore stock backup via Fastboot:", "INFO")
-        vm.tlog("fastboot flash boot $sessionBackupDir/boot_stock.img", "INFO")
+        vm.tlog("fastboot flash boot $sdcardBackupDir/boot_stock.img", "INFO")
+        vm.tlog("[RECOVERY] Backup also kept at (app-private): $sessionBackupDir", "INFO")
 
         PatchResult(
             success = true,

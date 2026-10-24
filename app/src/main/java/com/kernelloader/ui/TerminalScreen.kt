@@ -129,7 +129,7 @@ fun ConsoleScreen(
         initialFirstVisibleItemIndex = (shown.size - 1).coerceAtLeast(0)
     )
 
-    LaunchedEffect(shown.size, filter) {
+    LaunchedEffect(shown.size, shown.lastOrNull(), filter) {
         if (shown.isNotEmpty()) {
             listState.scrollToItem(shown.size - 1)
         }

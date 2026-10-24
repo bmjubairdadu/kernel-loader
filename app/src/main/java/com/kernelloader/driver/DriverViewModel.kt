@@ -215,7 +215,11 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     suspend fun checkRevocationInternal(silent: Boolean = false) {
-        val isLoaded = driverLoaded.value || DriverRevocationManager.isDriverResident()
+        // Evaluate whenever a load record exists (the driver may be resident but
+        // hidden with randomized names that isDriverResident cannot see).
+        val isLoaded = driverLoaded.value ||
+            DriverRevocationManager.isDriverResident() ||
+            DriverRevocationManager.getLoadedRecord(getApplication()) != null
         if (!isLoaded) return
 
         val manifest = remoteManifest.value ?: OtaDriverStore.fetchManifest() ?: return
@@ -525,7 +529,8 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch(Dispatchers.IO) {
             runCatching { Shell.cmd("killall insmod 2>/dev/null; true").exec() }
         }
-        isBusy.value = false
+        // NOTE: isBusy stays true until the cancelled job's finally block runs -
+        // clearing it here allowed a second load pipeline to start mid-insmod.
         busyStep.value = ""
         autoLoadOk.value = false
         autoLoadStatus.value = "Stopped by user"
@@ -584,13 +589,22 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             tstep("Checking driver & R/W...")
             withContext(Dispatchers.IO) {
                 try {
-                    val devNode = preferredDevNode()
+                    var devNode = preferredDevNode()
+                    if (devNode.isBlank()) {
+                        // Remembered node is lost on restart - ask the driver directly.
+                        val probed = try { UniversalKernelLoader.probeOurDriverNode(getApplication(), this@DriverViewModel) } catch (e: Exception) { null }
+                        if (probed != null) {
+                            devNode = probed
+                            rememberDevNode(probed)
+                        }
+                    }
                     val nodePath = "/dev/$devNode"
-                    val nodeExists = Shell.cmd("test -e $nodePath").exec().isSuccess
+                    val nodeExists = devNode.isNotBlank() &&
+                        Shell.cmd("test -c $nodePath").exec().isSuccess
 
                     if (!nodeExists) {
                         tlog("[DEV] $nodePath missing!", "ERR")
-                        tlog("[FIX] Load a driver first", "WARN")
+                        tlog("[FIX] Load a driver first, then tap VERIFY", "WARN")
                         return@withContext
                     }
 
@@ -893,8 +907,18 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
         }
 
         if (foundNode == null) {
+            // Probe first: node/class names are random, so ask the driver directly
+            // before trusting any name-based guess.
+            val probedNode = try { UniversalKernelLoader.probeOurDriverNode(getApplication(), this@DriverViewModel) } catch (e: Exception) { null }
+            if (probedNode != null && probedNode.isNotBlank()) {
+                foundNode = probedNode
+                tlog("[PROBE] dmtest verified /dev/$probedNode (RT/QX ABI)", "OK")
+            }
+        }
+
+        if (foundNode == null) {
             val sysDevs = Shell.cmd(
-                "for f in /sys/class/*/dev; do " +
+                "for f in /sys/class/dmsync*/dev /sys/class/sysync*/dev /sys/class/uni*/dev /sys/class/kmem*/dev /sys/class/memacc*/dev; do " +
                         "if [ -f \"\$f\" ]; then cat \"\$f\"; echo \" \${f}\"; break; fi; done 2>/dev/null"
             ).exec().out.firstOrNull()?.trim()
 
@@ -919,16 +943,27 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
         }
 
         if (foundNode != null) {
+            val node = foundNode  // smart-cast anchor
             Shell.cmd(
-                "chmod 0666 /dev/$foundNode",
-                "chcon u:object_r:device:s0 /dev/$foundNode 2>/dev/null"
+                "chmod 0666 /dev/$node",
+                "chcon u:object_r:device:s0 /dev/$node 2>/dev/null"
             ).exec()
 
-            rememberDevNode(foundNode)
-            tlog("Node /dev/$foundNode active (0666)", "OK")
-            val rwOk = Shell.cmd("test -r /dev/$foundNode && test -w /dev/$foundNode").exec().isSuccess
+            // Final gate: the node must actually answer OUR ioctl ABI, else a
+            // concurrently-created stock node could get adopted and remembered.
+            val probedOk = try { UniversalKernelLoader.probeOurDriverNode(getApplication(), this@DriverViewModel) } catch (e: Exception) { null }
+            if (probedOk == null) {
+                tlog("[PROBE FAIL] /dev/$node did not answer our ABI - rejecting node", "ERR")
+                Shell.cmd("rm -f /dev/$node 2>/dev/null").exec()
+                tlog("[DEVNODE ERR] No node answered the ABI probe", "ERR")
+                return false
+            }
+
+            rememberDevNode(node)
+            tlog("Node /dev/$node active (0666)", "OK")
+            val rwOk = Shell.cmd("test -r /dev/$node && test -w /dev/$node").exec().isSuccess
             if (rwOk) {
-                tlog("/dev/$foundNode verified (R/W OK)", "OK")
+                tlog("/dev/$node verified (R/W OK)", "OK")
                 tlog("Driver ready for use", "OK")
             }
             return true
@@ -1036,7 +1071,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                 variant = activePipelineVariant.value,
                 isOta = false
             )
-            tlog("[STEALTH] Driver ready. Tap STEALTH EXIT before launching game!", "OK")
+            tlog("[STEALTH] Driver ready. Clear app from recents before launching game!", "OK")
             true
         } finally {
             Shell.cmd("rm -f ${staged.absolutePath} 2>/dev/null").exec()
@@ -1184,7 +1219,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                 isOta = true
             )
             upgradeNotified = false
-            tlog("[STEALTH] Driver ready. Tap STEALTH EXIT before launching game!", "OK")
+            tlog("[STEALTH] Driver ready. Clear app from recents before launching game!", "OK")
             return true
             } finally {
                 Shell.cmd("rm -f ${staged.absolutePath} 2>/dev/null").exec()
@@ -1390,8 +1425,21 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                 driverModule.value = ours.joinToString(", ")
                 tlog("${ours.first()} loaded", "OK", variant = variantOfModule(ours.first()))
             } else {
-                markHiddenLoaded()
-                tlog("Driver running in stealth mode", "OK")
+                // Randomized node/class means lsmod says nothing - confirm via ABI probe.
+                val probed = try { UniversalKernelLoader.probeOurDriverNode(getApplication(), this@DriverViewModel) } catch (e: Exception) { null }
+                if (probed != null) {
+                    rememberDevNode(probed)
+                    markHiddenLoaded()
+                    tlog("Driver running in stealth mode (/dev/$probed)", "OK")
+                } else {
+                    // Probe says nothing of ours is resident - clear stale state
+                    // so the UI falls back to LOAD and revocation logic stays sane.
+                    setLoadedModule("")
+                    hiddenLoaded.value = false
+                    driverLoaded.value = false
+                    driverModule.value = ""
+                    tlog("No resident driver found", "INFO")
+                }
             }
     }
 
@@ -1476,22 +1524,34 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             val loadedMods = SafetyGuard.loadedModuleNames()
             val currentMod = loadedModuleName.value
             val isModuleInLsmod = currentMod.isNotBlank() && currentMod in loadedMods
+            // Probe gate runs on IO (it shells out - never block Main): with randomized
+            // node/class names a fixed-prefix hiddenClass check can't see the driver.
+            // Skipped entirely when lsmod already shows our module.
+            val probed = if (!isModuleInLsmod) try {
+                UniversalKernelLoader.probeOurDriverNode(getApplication(), this@DriverViewModel)
+            } catch (e: Exception) {
+                null
+            } else null
 
             withContext(Dispatchers.Main) {
-                if (nodeRw || nodeChar) {
+                if (isModuleInLsmod) {
+                    // Visible load wins over the probe's hidden classification.
                     driverLoaded.value = true
-                    if (isModuleInLsmod) {
-                        setLoadedModule(currentMod)
-                    } else {
-                        markHiddenLoaded()
-                    }
+                    setLoadedModule(currentMod)
+                } else if (probed != null) {
+                    rememberDevNode(probed)
+                    driverLoaded.value = true
+                    markHiddenLoaded()
                 } else if (hiddenClass) {
                     driverLoaded.value = true
                     markHiddenLoaded()
-                } else if (isModuleInLsmod) {
-                    driverLoaded.value = true
-                    setLoadedModule(currentMod)
                 } else {
+                    // Nothing resident: a leftover mknod node survives until reboot
+                    // and must NOT read as "loaded" - remove it and clear state.
+                    if (nodeChar) {
+                        Shell.cmd("rm -f $nodePath 2>/dev/null").exec()
+                        tlog("[CLEAN] Removed stale node $nodePath", "INFO")
+                    }
                     setLoadedModule("")
                     hiddenLoaded.value = false
                     driverLoaded.value = false

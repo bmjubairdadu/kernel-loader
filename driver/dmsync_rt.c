@@ -6,35 +6,18 @@
 #include <linux/cdev.h>
 #include <linux/device.h>
 #include <linux/uaccess.h>
-#include <linux/namei.h>
-#include <linux/jiffies.h>
-#include <linux/workqueue.h>
 
 #include "dmsync_core.h"
 
 #define CMD_PROC_READ	0x801
 #define CMD_PROC_WRITE	0x802
 #define CMD_MOD_BASE	0x803
-/* init key: a client that sends it gets the QX return convention */
 #define CMD_INIT_KEY	0x800
 
 static dev_t rt_dev;
 static struct cdev rt_cdev;
 static struct class *rt_class;
 static struct device *rt_device;
-static struct kmem_alt_node rt_alt;
-static unsigned long rt_node_retry;
-
-/* 0 = repair forever.  A loader/app restart can chmod/chcon the node at any
- * time - long after the old 60-second window - so a bounded repair loop
- * still leaves the next match with a stale atime and the client reports
- * "Disconnected".  The work is one inode touch every 200 ms, not a hot path. */
-#define RT_PERM_MAX_TRIES	0
-#ifndef KMEM_NO_PERM_WORK
-static int rt_perm_tries;
-static void rt_perm_work_fn(struct work_struct *w);
-static struct delayed_work rt_perm_work;
-#endif
 
 static char *devicename = "";
 module_param(devicename, charp, 0644);
@@ -43,6 +26,27 @@ MODULE_PARM_DESC(devicename, "device node name");
 static char *devname = "";
 module_param(devname, charp, 0644);
 MODULE_PARM_DESC(devname, "alias of devicename (preferred when set)");
+
+static char *abi = "compat";
+module_param(abi, charp, 0644);
+MODULE_PARM_DESC(abi, "ioctl return convention: 'compat' (success = 0), 'rt' (success = -EIO), 'qx' (success = 0)");
+
+static int rt_abi_is_qx(void)
+{
+	return abi && (!strcmp(abi, "qx") || !strcmp(abi, "QX"));
+}
+
+static int rt_abi_is_strict(void)
+{
+	return abi && (!strcmp(abi, "rt") || !strcmp(abi, "RT"));
+}
+
+static int rt_fd_is_qx(struct file *file)
+{
+	if (file && file->private_data)
+		return 1;
+	return rt_abi_is_qx();
+}
 
 static int rt_open(struct inode *inode, struct file *file)
 {
@@ -54,48 +58,6 @@ static int rt_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
-/*
- * ABI selection.
- *
- * Two client families talk to this driver and they disagree on what a
- * successful ioctl must return:
- *
- *   RT ABI : read/write return -EIO (-5) on success, 0 on failure
- *   QX ABI : read/write return 0 on success, -1 on failure
- *
- * The Aincrad Mods client (libservice.so) uses the QX convention - it
- * evaluates the result as "cmp w0,#0 ; cset w0,eq".  The classic
- * "Driver Loader V3" clients use the RT convention.
- *
- * The same .ko can serve both:
- *   - "abi=qx" (module parameter) makes the whole driver speak QX
- *   - a client that sends the init key (0x800) gets QX semantics for
- *     that file descriptor only, so one driver can serve both at once
- */
-static char *abi = "compat";
-module_param(abi, charp, 0644);
-MODULE_PARM_DESC(abi, "ioctl return convention: 'compat' (success = 0, 3.2.x behaviour), 'rt' (success = -EIO), 'qx' (success = 0)");
-
-static int rt_abi_is_qx(void)
-{
-	return abi && (!strcmp(abi, "qx") || !strcmp(abi, "QX"));
-}
-
-/* strict reference RT: success is -EIO.  Opt-in only (abi=rt), because
- * the shipped clients of this tree expect success = 0. */
-static int rt_abi_is_strict(void)
-{
-	return abi && (!strcmp(abi, "rt") || !strcmp(abi, "RT"));
-}
-
-/* per-fd override, set by the 0x800 init key */
-static int rt_fd_is_qx(struct file *file)
-{
-	if (file && file->private_data)
-		return 1;
-	return rt_abi_is_qx();
-}
-
 static long rt_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
 	copy_memoby_t cm;
@@ -103,12 +65,8 @@ static long rt_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	char name[256];
 	int ret;
 
-	/* Legacy RT surface is exactly these three commands, matching the
-	 * reference RT driver's dispatch_ioctl.  Everything else -EINVAL. */
 	switch (cmd) {
 	case CMD_INIT_KEY:
-		/* The client proved it speaks the QX ABI: remember it for
-		 * this descriptor and answer 0 (= success for QX). */
 		file->private_data = (void *)(uintptr_t)1;
 		return 0;
 
@@ -121,8 +79,6 @@ static long rt_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			return ret ? -1 : 0;
 		if (rt_abi_is_strict())
 			return ret ? 0 : -EIO;
-		/* 3.2.x compatibility (default): success is 0, failure -EIO.
-		 * This is the convention the shipped clients expect. */
 		return ret ? -EIO : 0;
 
 	case CMD_PROC_WRITE:
@@ -249,7 +205,6 @@ static const struct file_operations rt_fops = {
 #elif !defined(KMEM_NO_COMPAT32)
 	.compat_ioctl	= rt_ioctl,
 #endif
-	.llseek		= noop_llseek,
 };
 
 static char *rt_devnode(struct device *dev, umode_t *mode)
@@ -275,34 +230,6 @@ static const char *rt_pick_node(void)
 
 	return rt_active_node;
 }
-
-#ifndef KMEM_NO_PERM_WORK
-/* Grace window right after insmod */
-static unsigned long rt_perm_stable;
-static void rt_perm_work_fn(struct work_struct *w)
-{
-	const char *node = rt_pick_node();
-	unsigned long delay;
-	int busy = 0;
-
-	if (kmem_repair_primary_node(rt_class, &rt_device, rt_dev, node,
-				     &rt_node_retry))
-		busy = 1;
-	if (kmem_touch_node_mode(node, 0666))
-		busy = 1;
-
-	if (RT_PERM_MAX_TRIES && ++rt_perm_tries >= RT_PERM_MAX_TRIES)
-		return;
-
-	if (busy)
-		delay = 200;          /* active repair - stay responsive */
-	else if (time_before(jiffies, rt_perm_stable))
-		delay = 200;          /* grace window */
-	else
-		delay = 1000;         /* stable, nothing to do - save CPU/heat */
-	schedule_delayed_work(&rt_perm_work, msecs_to_jiffies(delay));
-}
-#endif
 
 static int __init rt_init(void)
 {
@@ -334,17 +261,7 @@ static int __init rt_init(void)
 		goto err_class;
 	}
 
-	/* Make the requested node world-accessible and freeze its atime */
-	kmem_force_node_mode(node, 0666);
-
-#ifndef KMEM_NO_PERM_WORK
-	INIT_DELAYED_WORK(&rt_perm_work, rt_perm_work_fn);
-	rt_perm_tries = 0;
-	rt_perm_stable = jiffies + msecs_to_jiffies(60000);
-	schedule_delayed_work(&rt_perm_work, 0);
-#endif
-
-	/* stealth: leave no lsmod / sysfs trace (reference behaviour) */
+	/* stealth: blind kernel inspectors and unlink from modules list */
 	kmem_hide_module(THIS_MODULE);
 
 	return 0;
@@ -360,9 +277,6 @@ err_region:
 
 static void __exit rt_exit(void)
 {
-#ifndef KMEM_NO_PERM_WORK
-	cancel_delayed_work_sync(&rt_perm_work);
-#endif
 	device_destroy(rt_class, rt_dev);
 	class_destroy(rt_class);
 	cdev_del(&rt_cdev);

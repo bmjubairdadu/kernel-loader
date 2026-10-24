@@ -74,10 +74,9 @@ object AppUpdateChecker {
     ): Boolean {
         if (isSemverNewer(tag, currentVersionName)) return true
 
-        val nameMatch = Regex("""(?:Kernel-Loader-|Kernel\s+Loader\s+)?v?(\d+\.\d+(?:\.\d+)*)""", RegexOption.IGNORE_CASE).find(text)
-        if (nameMatch != null && isSemverNewer(nameMatch.groupValues[1], currentVersionName)) {
-            return true
-        }
+        // NOTE: no free-text version scan - release bodies routinely contain
+        // kernel version numbers ("added 6.6.52 driver") which would trigger
+        // a phantom update against the app's own version.
 
         val code = extractVersionCode(tag, text)
         if (code != null && code > currentVersionCode) {

@@ -122,6 +122,9 @@ object SupportContact {
             }
         }
         return try {
+            if (newIntent().resolveActivity(context.packageManager) == null) {
+                return false
+            }
             val chooser = Intent.createChooser(newIntent(), "Send report via WhatsApp").apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
@@ -169,6 +172,9 @@ object SupportContact {
             }
         }
         return try {
+            if (newIntent().resolveActivity(context.packageManager) == null) {
+                return false
+            }
             val chooser = Intent.createChooser(newIntent(), "Send report via Telegram ($TELEGRAM_HANDLE)").apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }

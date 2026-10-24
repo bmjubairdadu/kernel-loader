@@ -224,9 +224,12 @@ object DriverRevocationManager {
 
         try {
             kotlinx.coroutines.delay(1500L)
-            Shell.cmd(
+            val res = Shell.cmd(
                 "reboot 2>/dev/null || svc power reboot 2>/dev/null || /system/bin/reboot 2>/dev/null"
             ).exec()
+            if (!res.isSuccess) {
+                onLog("[ERR] Auto-restart rejected - reboot manually NOW", "ERR")
+            }
         } catch (e: Exception) {
             onLog("[ERR] Auto-restart failed: ${e.message} - reboot manually", "ERR")
         }
