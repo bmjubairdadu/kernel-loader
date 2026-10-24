@@ -358,7 +358,7 @@ static int kmem_touch_node_mode(const char *name, umode_t mode)
  * Install (or re-install) a device node that userspace has removed.
  *
  * A resident hidden module cannot be unloaded between matches.  If the
- * loader app or a cleanup script deletes /dev/wanbai, the module and its
+ * loader app or a cleanup script deletes the primary node, the module and its
  * cdev keep working but no client can open them.  Re-registering the same
  * dev_t under the same name restores the path without touching the cdev or
  * any open file descriptor.

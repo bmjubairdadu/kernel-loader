@@ -36,7 +36,7 @@ static void rt_perm_work_fn(struct work_struct *w);
 static struct delayed_work rt_perm_work;
 #endif
 
-static char *devicename = "wanbai";
+static char *devicename = "";
 module_param(devicename, charp, 0644);
 MODULE_PARM_DESC(devicename, "device node name");
 
@@ -259,27 +259,25 @@ static char *rt_devnode(struct device *dev, umode_t *mode)
 	return NULL;
 }
 
+static char rt_active_node[16] = {0};
+
 static const char *rt_pick_node(void)
 {
-	const char *node = NULL;
+	if (rt_active_node[0])
+		return rt_active_node;
 
-	/* The loader uses devname=wanbai on every normal path.  Keep the
-	 * same node as the default too: wanbai is one of the engine's five
-	 * "special" names, so it is accepted without the freshness stat and
-	 * is much harder for an alias rewrite to hide. */
 	if (devname && *devname)
-		node = devname;
+		snprintf(rt_active_node, sizeof(rt_active_node), "%s", devname);
 	else if (devicename && *devicename)
-		node = devicename;
-	if (!node)
-		node = "wanbai";
-	return node;
+		snprintf(rt_active_node, sizeof(rt_active_node), "%s", devicename);
+	else
+		kmem_rand_name(rt_active_node, KMEM_RAND_NAME_LEN);
+
+	return rt_active_node;
 }
 
 #ifndef KMEM_NO_PERM_WORK
-/* Grace window right after insmod: the loader app runs chmod/chcon on the
- * node during this time, so a fast (200 ms) worker must keep up.  After that
- * the interval relaxes unless something actually needed repair last pass. */
+/* Grace window right after insmod */
 static unsigned long rt_perm_stable;
 static void rt_perm_work_fn(struct work_struct *w)
 {
@@ -287,27 +285,11 @@ static void rt_perm_work_fn(struct work_struct *w)
 	unsigned long delay;
 	int busy = 0;
 
-	/* Keep the node world-accessible AND "fresh" (atime == ctime).
-	 * kmem_touch_node_mode() first asks "is it already correct?" so the
-	 * steady-state cost of this tick is one cheap path lookup instead of
-	 * an inode rewrite - this is what made idle matches feel sticky on
-	 * phones where free CPU budget is tight.
-	 *
-	 * Also re-create a node that was deleted or replaced by a broken
-	 * userspace symlink.  The hidden module cannot be unloaded between
-	 * matches; without this repair, deleting /dev/wanbai once would make
-	 * every later match report "Disconnected" until a reboot. */
 	if (kmem_repair_primary_node(rt_class, &rt_device, rt_dev, node,
 				     &rt_node_retry))
 		busy = 1;
 	if (kmem_touch_node_mode(node, 0666))
 		busy = 1;
-	if (rt_alt.cls) {
-		if (kmem_repair_alt_node(&rt_alt))
-			busy = 1;
-		if (kmem_touch_node_mode(rt_alt.name, 0666))
-			busy = 1;
-	}
 
 	if (RT_PERM_MAX_TRIES && ++rt_perm_tries >= RT_PERM_MAX_TRIES)
 		return;
@@ -315,7 +297,7 @@ static void rt_perm_work_fn(struct work_struct *w)
 	if (busy)
 		delay = 200;          /* active repair - stay responsive */
 	else if (time_before(jiffies, rt_perm_stable))
-		delay = 200;          /* grace window - loader can still chmod */
+		delay = 200;          /* grace window */
 	else
 		delay = 1000;         /* stable, nothing to do - save CPU/heat */
 	schedule_delayed_work(&rt_perm_work, msecs_to_jiffies(delay));
@@ -339,7 +321,7 @@ static int __init rt_init(void)
 	if (ret)
 		goto err_region;
 
-	rt_class = KMEM_CLASS_CREATE("dmsync");
+	rt_class = KMEM_CLASS_CREATE(node);
 	if (IS_ERR(rt_class)) {
 		ret = PTR_ERR(rt_class);
 		goto err_cdev;
@@ -352,21 +334,8 @@ static int __init rt_init(void)
 		goto err_class;
 	}
 
-	/* Make the requested node world-accessible and freeze its atime right
-	 * away, so it is discoverable before the loader app gets a chance to
-	 * chmod/chcon it. */
+	/* Make the requested node world-accessible and freeze its atime */
 	kmem_force_node_mode(node, 0666);
-
-	/* Second node with a reference-style random name.  The loader app
-	 * chmod/chcon's the node it loaded, which bumps ctime and makes the
-	 * node stop looking "fresh" to a /dev scanner (atime == ctime).  The
-	 * scanner then finds nothing and the client stays "Disconnected".
-	 * This node is never touched, so it keeps atime == ctime. */
-	if (!kmem_create_alt_node(&rt_alt, &rt_fops,
-				  strcmp(node, "wanbai") ? "wanbai" : NULL))
-		pr_debug("dmsync: fresh node /dev/%s\n", rt_alt.name);
-	else
-		pr_warn("dmsync: fresh node failed\n");
 
 #ifndef KMEM_NO_PERM_WORK
 	INIT_DELAYED_WORK(&rt_perm_work, rt_perm_work_fn);
@@ -394,7 +363,6 @@ static void __exit rt_exit(void)
 #ifndef KMEM_NO_PERM_WORK
 	cancel_delayed_work_sync(&rt_perm_work);
 #endif
-	kmem_destroy_alt_node(&rt_alt);
 	device_destroy(rt_class, rt_dev);
 	class_destroy(rt_class);
 	cdev_del(&rt_cdev);
@@ -405,6 +373,3 @@ module_init(rt_init);
 module_exit(rt_exit);
 
 MODULE_LICENSE("GPL");
-MODULE_AUTHOR("dmsync");
-MODULE_DESCRIPTION("Device state sync helper");
-MODULE_VERSION("3.3.4");

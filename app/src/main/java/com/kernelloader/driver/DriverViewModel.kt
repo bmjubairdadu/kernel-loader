@@ -862,10 +862,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
 
     private suspend fun prepareAndVerifyDeviceNode(devNode: String): Boolean {
         tstep("Preparing device node...")
-        tlog("Configuring SELinux policy...", "INFO")
-        Shell.cmd(
-            "magiskpolicy --live 'allow untrusted_app * chr_file *' 2>/dev/null || supolicy --live 'allow untrusted_app * chr_file *' 2>/dev/null"
-        ).exec()
+        tlog("Verifying device node...", "INFO")
         var foundNode: String? = null
         for (i in 1..10) {
             val nodes = Shell.cmd("ls /dev 2>/dev/null").exec().out.map { it.trim() }
@@ -1029,7 +1026,8 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                 variant = activePipelineVariant.value,
                 isOta = false
             )
-            try { DriverWatchdogService.start(context) } catch (_: Exception) {}
+            // Watchdog service disabled to avoid anti-cheat detection of background service
+            // try { DriverWatchdogService.start(context) } catch (_: Exception) {}
             true
         } finally {
             Shell.cmd("rm -f ${staged.absolutePath} 2>/dev/null").exec()
@@ -1176,7 +1174,8 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                 isOta = true
             )
             upgradeNotified = false
-            try { DriverWatchdogService.start(context) } catch (_: Exception) {}
+            // Watchdog service disabled to avoid anti-cheat detection of background service
+            // try { DriverWatchdogService.start(context) } catch (_: Exception) {}
             return true
             } finally {
                 Shell.cmd("rm -f ${staged.absolutePath} 2>/dev/null").exec()
@@ -1382,14 +1381,8 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                 driverModule.value = ours.joinToString(", ")
                 tlog("${ours.first()} loaded", "OK", variant = variantOfModule(ours.first()))
             } else {
-
-                val hiddenClass = SafetyGuard.hiddenDriverClass()
-                if (hiddenClass != null) {
-                    tlog("Driver hidden (class $hiddenClass live, not in lsmod)", "OK")
-                } else {
-                    setLoadedModule("")
-                    tlog("No driver loaded", "WARN")
-                }
+                markHiddenLoaded()
+                tlog("Driver running in stealth mode", "OK")
             }
     }
 

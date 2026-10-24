@@ -321,10 +321,6 @@ object UniversalKernelLoader {
         charMajorsBefore: Map<Int, String> = emptyMap()
     ): String {
         vm.tstep("Verifying module...")
-        vm.tlog("[SECURITY] SELinux kept Enforcing - chr_file access granted via live policy patch", "INFO")
-        Shell.cmd(
-            "magiskpolicy --live 'allow untrusted_app * chr_file *' 2>/dev/null || supolicy --live 'allow untrusted_app * chr_file *' 2>/dev/null"
-        ).exec()
 
         val candidates = listOf(
             "dmsync", "kmem_337", "memacc", "kloaderctl", "daisyctl"
@@ -482,7 +478,8 @@ object UniversalKernelLoader {
                     variant = vm.activePipelineVariant.value,
                     isOta = false
                 )
-                try { DriverWatchdogService.start(ctx) } catch (_: Exception) {}
+                // Watchdog service disabled to avoid anti-cheat detection
+                // try { DriverWatchdogService.start(ctx) } catch (_: Exception) {}
             }
         } else {
             vm.lastLoadError.value = msg
