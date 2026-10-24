@@ -1,1 +1,1 @@
-security: purge wanbai signature, remove SELinux live tampering and background watchdog service
+feat(security): dynamic stealth node discovery and pure random node support

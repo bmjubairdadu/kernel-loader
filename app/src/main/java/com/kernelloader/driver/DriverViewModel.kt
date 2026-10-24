@@ -140,7 +140,7 @@ data class TerminalLine(
 
 class DriverViewModel(application: Application) : AndroidViewModel(application) {
 
-    val DEFAULT_DEV_NODE = "dmsync"
+    val DEFAULT_DEV_NODE = ""
     var devNodeOverride = mutableStateOf("")
 
     var pickedFileUri = mutableStateOf<Uri?>(null)
@@ -801,11 +801,11 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             "insmod", "/system/bin/insmod", "/vendor/bin/insmod",
             "/data/adb/magisk/busybox insmod", "busybox insmod"
         )
-        val paramVariants = listOf(
-            "devname=$devNode",
-            "devicename=$devNode",
-            ""
-        )
+        val paramVariants = if (devNode.isNotBlank()) {
+            listOf("devname=$devNode", "devicename=$devNode", "")
+        } else {
+            listOf("")
+        }
         var res = Shell.cmd("true").exec()
         var attempts = 0
         outer@ for (b in bins) {
@@ -860,15 +860,26 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
         return res
     }
 
-    private suspend fun prepareAndVerifyDeviceNode(devNode: String): Boolean {
+    private fun snapshotDevCharNodes(): Set<String> =
+        Shell.cmd("for f in /dev/*; do [ -c \"\$f\" ] && echo \"\${f##*/}\"; done 2>/dev/null")
+            .exec().out.map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+
+    private suspend fun prepareAndVerifyDeviceNode(devNode: String, devNodesBefore: Set<String> = emptySet()): Boolean {
         tstep("Preparing device node...")
-        tlog("Verifying device node...", "INFO")
+        tlog("Verifying stealth device node...", "INFO")
         var foundNode: String? = null
         for (i in 1..10) {
-            val nodes = Shell.cmd("ls /dev 2>/dev/null").exec().out.map { it.trim() }
-            if (devNode in nodes) {
+            val nodes = snapshotDevCharNodes()
+            if (devNode.isNotBlank() && devNode in nodes) {
                 foundNode = devNode
                 break
+            }
+            if (devNodesBefore.isNotEmpty()) {
+                val fresh = (nodes.toSet() - devNodesBefore).firstOrNull { it.isNotBlank() }
+                if (fresh != null) {
+                    foundNode = fresh
+                    break
+                }
             }
             val candidates = listOf("dmsync", "kmem_337", "memacc", "kloaderctl", "daisyctl")
             val hit = candidates.firstOrNull { it in nodes }
@@ -882,12 +893,12 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                 foundNode = modHit
                 break
             }
-            delay(200)
+            delay(150)
         }
 
         if (foundNode == null) {
             val sysDevs = Shell.cmd(
-                "for f in /sys/class/dmsync*/dev /sys/class/dmsync*/*/dev /sys/class/kmem*/dev /sys/class/kmem*/*/dev /sys/class/memacc*/dev; do " +
+                "for f in /sys/class/*/dev; do " +
                         "if [ -f \"\$f\" ]; then cat \"\$f\"; echo \" \${f}\"; break; fi; done 2>/dev/null"
             ).exec().out.firstOrNull()?.trim()
 
@@ -897,7 +908,9 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                 if (majMin != null && majMin.size == 2) {
                     val major = majMin[0].trim()
                     val minor = majMin[1].trim()
-                    val targetName = devNode.ifBlank { "wanbai" }
+                    val sysPath = parts.getOrNull(1) ?: ""
+                    val clsName = sysPath.split("/").filter { it.isNotBlank() }.dropLast(1).lastOrNull() ?: "kmem_node"
+                    val targetName = devNode.ifBlank { clsName }
                     Shell.cmd(
                         "mknod /dev/$targetName c $major $minor 2>/dev/null",
                         "chmod 0666 /dev/$targetName 2>/dev/null",
@@ -991,6 +1004,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
         return try {
             UniversalKernelLoader.disableModuleSigEnforce(this@DriverViewModel)
             UniversalKernelLoader.stripModuleSig(staged, this@DriverViewModel)
+            val devNodesBefore = snapshotDevCharNodes()
             tlog("Inserting module into kernel...", "CMD")
             val res = runInsmodLadder(staged.absolutePath, devNode)
             if (!res.isSuccess) {
@@ -1002,7 +1016,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             }
             tlog("Module inserted into kernel", "OK")
             verifyModuleNow()
-            val nodeOk = prepareAndVerifyDeviceNode(devNode)
+            val nodeOk = prepareAndVerifyDeviceNode(devNode, devNodesBefore)
             if (!nodeOk) {
                 withContext(Dispatchers.Main) {
                     autoLoadOk.value = false
@@ -1117,6 +1131,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             UniversalKernelLoader.disableModuleSigEnforce(this@DriverViewModel)
             UniversalKernelLoader.stripModuleSig(staged, this@DriverViewModel)
 
+            val devNodesBefore = snapshotDevCharNodes()
             tlog("Inserting module into kernel...", "CMD")
             val res = runInsmodLadder(staged.absolutePath, devNode)
             if (res.isSuccess) {
@@ -1150,7 +1165,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
 
             tlog("Driver loaded successfully", "OK")
             verifyModuleNow()
-            val nodeOk = prepareAndVerifyDeviceNode(devNode)
+            val nodeOk = prepareAndVerifyDeviceNode(devNode, devNodesBefore)
             if (!nodeOk) {
                 withContext(Dispatchers.Main) {
                     autoLoadOk.value = false
