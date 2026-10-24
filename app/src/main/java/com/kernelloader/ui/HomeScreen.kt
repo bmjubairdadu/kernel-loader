@@ -1,5 +1,6 @@
 package com.kernelloader.ui
 
+import android.app.Activity
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
@@ -45,6 +46,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FolderOpen
@@ -470,37 +472,58 @@ fun HomeScreen(
                     ) else Brush.horizontalGradient(listOf(BorderSubtle, BorderSubtle))
                 )
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 11.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    StatusDot(loaded = loaded)
-                    Spacer(Modifier.width(10.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text(
-                            text = if (loaded) {
-                                if (hidden) "LOADED BUT HIDDEN" else "LOADED · $loadedModule"
-                            } else "NOT LOADED",
-                            style = MonoSmall,
-                            color = if (loaded) StatusOk else TextSecondary
-                        )
-                        Text(
-                            text = if (loaded)
-                                "a module stays loaded until reboot"
-                            else "tap LOAD above to detect and load the driver",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = TextMuted
-                        )
+                Column {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 11.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        StatusDot(loaded = loaded)
+                        Spacer(Modifier.width(10.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                text = if (loaded) {
+                                    if (hidden) "LOADED BUT HIDDEN" else "LOADED · $loadedModule"
+                                } else "NOT LOADED",
+                                style = MonoSmall,
+                                color = if (loaded) StatusOk else TextSecondary
+                            )
+                            Text(
+                                text = if (loaded)
+                                    "a module stays loaded until reboot"
+                                else "tap LOAD above to detect and load the driver",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = TextMuted
+                            )
+                        }
+                        if (loaded) {
+                            Icon(
+                                Icons.Default.CheckCircle,
+                                contentDescription = null,
+                                tint = StatusOk,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
                     }
                     if (loaded) {
-                        Icon(
-                            Icons.Default.CheckCircle,
-                            contentDescription = null,
-                            tint = StatusOk,
-                            modifier = Modifier.size(18.dp)
-                        )
+                        val activity = LocalContext.current as? Activity
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.End
+                        ) {
+                            Button(
+                                onClick = { activity?.finishAndRemoveTask() },
+                                colors = ButtonDefaults.buttonColors(containerColor = AccentRed.copy(alpha = 0.85f)),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                            ) {
+                                Icon(Icons.Default.Close, contentDescription = null, tint = TextOnAccent, modifier = Modifier.size(14.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text("STEALTH EXIT (WIPE FROM RECENTS)", style = MonoTiny, color = TextOnAccent, fontWeight = FontWeight.Bold)
+                            }
+                        }
                     }
                 }
             }

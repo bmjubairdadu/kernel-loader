@@ -254,11 +254,12 @@ object UniversalKernelLoader {
             vm.setLoadedModule(loadedNow.first())
             vm.tlog("[MODULE] Registered in /proc/modules: ${loadedNow.first()}", "OK")
         }
-        val activeNode = verifyLoad(vm, devNode, vm.loadedModuleName.value, devNodesBefore, charMajorsBefore)
+        val activeNode = verifyLoad(vm, devNode, vm.loadedModuleName.value, devNodesBefore, charMajorsBefore, context)
         if (activeNode.isNotEmpty()) {
             vm.tlog("[CORE] Physical-alias memory translation active (page-table walk + ioremap)", "INFO")
             vm.tlog("[IOCTL] Handlers active: 0x801 (Read), 0x802 (Write), 0x803 (ModBase)", "INFO")
             vm.tlog("[DONE] ${viewModelModule(vm)} ready · Listening on /dev/$activeNode", "OK")
+            vm.tlog("[STEALTH] Driver ready. Tap STEALTH EXIT before launching game!", "OK")
             finish(vm, true, "Loaded OK: $sourceName", context)
         } else {
             vm.tlog("[FAIL] Verification failed - device node not accessible", "ERR")
@@ -318,18 +319,32 @@ object UniversalKernelLoader {
         expectedNode: String = "",
         moduleName: String = "",
         devNodesBefore: Set<String> = emptySet(),
-        charMajorsBefore: Map<Int, String> = emptyMap()
+        charMajorsBefore: Map<Int, String> = emptyMap(),
+        context: Context? = null
     ): String {
         vm.tstep("Verifying module...")
 
-        val candidates = listOf(
-            "dmsync", "kmem_337", "memacc", "kloaderctl", "daisyctl"
+        val candidates = listOfNotNull(
+            expectedNode.ifBlank { null }, "dmsync", "kmem_337", "memacc"
         )
 
         var exactNode = false
         var foundNodeName = ""
 
         for (attempt in 1..10) {
+            // PROBE GATE: only trust a node that answers OUR ioctl ABI (RT/QX probe).
+            // Stock nodes created concurrently by other processes (e.g. /dev/ramdump_wlan
+            // spawned by subsystem_ramdump) otherwise win the fresh-node diff race and
+            // every later ioctl reports ENOTTY.
+            val probed = probeOurDriverNode(context, vm)
+            if (probed != null && isCharNode(probed)) {
+                exactNode = true
+                foundNodeName = probed
+                if (probed != expectedNode) {
+                    vm.tlog("[PROBE] dmtest verified /dev/$probed (RT/QX ABI)", "OK")
+                }
+                break
+            }
             val devList = Shell.cmd("ls /dev 2>/dev/null").exec().out.map { it.trim() }
             if (expectedNode.isNotEmpty() && devList.contains(expectedNode) && isCharNode(expectedNode)) {
                 exactNode = true
@@ -337,11 +352,11 @@ object UniversalKernelLoader {
                 break
             }
             if (devNodesBefore.isNotEmpty()) {
-                val freshNode = (snapshotDevCharNodes() - devNodesBefore).sorted().firstOrNull()
-                if (!freshNode.isNullOrBlank()) {
-                    exactNode = true
-                    foundNodeName = freshNode
-                    break
+                val fresh = (snapshotDevCharNodes() - devNodesBefore).sorted()
+                if (fresh.isNotEmpty()) {
+                    // Diagnostic only: a concurrent stock node (ramdump_*, vcsa*, ...)
+                    // must NEVER be accepted without the ABI probe passing.
+                    vm.tlog("[SCAN] Fresh /dev nodes: ${fresh.take(4).joinToString(", ")} — probe gate did not confirm ours yet", "INFO")
                 }
             }
             val hit = candidates.firstOrNull { it in devList && isCharNode(it) }
@@ -517,58 +532,20 @@ object UniversalKernelLoader {
         val sigValue = sigCheck.out.firstOrNull()?.trim() ?: ""
 
         if (sigValue == "1") {
-            vm?.tlog("Signature enforcement active, fixing...", "WARN")
-
-            Shell.cmd("echo 0 > /proc/sys/kernel/module_sig_enforce 2>/dev/null").exec()
-            val afterDirect = Shell.cmd("cat /proc/sys/kernel/module_sig_enforce 2>/dev/null").exec()
-                .out.firstOrNull()?.trim() ?: "1"
-            if (afterDirect == "0") {
-                vm?.tlog("Signature enforcement disabled", "OK")
-                return
-            }
-
-            Shell.cmd("sysctl -w kernel.module_sig_enforce=0 2>/dev/null").exec()
-            val afterSysctl = Shell.cmd("cat /proc/sys/kernel/module_sig_enforce 2>/dev/null").exec()
-                .out.firstOrNull()?.trim() ?: "1"
-            if (afterSysctl == "0") {
-                vm?.tlog("Signature enforcement disabled", "OK")
-                return
-            }
-
-            Shell.cmd(
-                "magiskpolicy --live 'allow kernel kernel system module_load' 2>/dev/null",
-                "magiskpolicy --live 'allow init kernel system module_load' 2>/dev/null",
-                "magiskpolicy --live 'allow * * * module_load' 2>/dev/null"
-            ).exec()
+            vm?.tlog("Signature enforcement active, attempting kernel sysctl fix...", "WARN")
 
             Shell.cmd(
                 "echo 0 > /proc/sys/kernel/module_sig_enforce 2>/dev/null",
+                "sysctl -w kernel.module_sig_enforce=0 2>/dev/null",
                 "echo 0 > /sys/module/module/parameters/sig_enforce 2>/dev/null"
             ).exec()
-            val afterPolicy = Shell.cmd("cat /proc/sys/kernel/module_sig_enforce 2>/dev/null").exec()
+
+            val afterCheck = Shell.cmd("cat /proc/sys/kernel/module_sig_enforce 2>/dev/null").exec()
                 .out.firstOrNull()?.trim() ?: "1"
-            if (afterPolicy == "0") {
-                vm?.tlog("Signature enforcement disabled", "OK")
-                return
-            }
-
-            Shell.cmd(
-                "ksud module load --skip-signature 2>/dev/null || " +
-                "resetprop ro.boot.verifiedbootstate green 2>/dev/null"
-            ).exec()
-
-            Shell.cmd(
-                "resetprop ro.boot.flash.locked 0 2>/dev/null",
-                "resetprop ro.boot.veritymode logging 2>/dev/null",
-                "resetprop ro.boot.warranty_bit 0 2>/dev/null"
-            ).exec()
-
-            val finalCheck = Shell.cmd("cat /proc/sys/kernel/module_sig_enforce 2>/dev/null").exec()
-                .out.firstOrNull()?.trim() ?: "1"
-            if (finalCheck == "0") {
+            if (afterCheck == "0") {
                 vm?.tlog("Signature enforcement disabled", "OK")
             } else {
-                vm?.tlog("Signature bypass applied (insmod -f)", "WARN")
+                vm?.tlog("Signature bypass applied (insmod -f fallback)", "WARN")
             }
         } else if (sigValue == "0" || sigValue.isEmpty()) {
             vm?.tlog("Signature verification: OK", "OK")

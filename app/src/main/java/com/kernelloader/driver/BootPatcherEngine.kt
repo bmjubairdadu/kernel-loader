@@ -11,9 +11,6 @@ import java.util.Locale
 
 object BootPatcherEngine {
 
-    private const val TMP_DIR = "/data/local/tmp/kloader_bootpatch"
-    private const val BACKUP_DIR = "/sdcard/KernelLoader_Backups"
-
     data class PartitionInfo(
         val name: String,
         val blockPath: String,
@@ -63,8 +60,10 @@ object BootPatcherEngine {
         }
 
         val stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
-        val sessionBackupDir = "$BACKUP_DIR/backup_$stamp"
-        Shell.cmd("mkdir -p $sessionBackupDir $TMP_DIR/work").exec()
+        val backupRootDir = File(context.filesDir, "boot_backups").absolutePath
+        val tmpDir = File(context.cacheDir, "bootpatch").absolutePath
+        val sessionBackupDir = "$backupRootDir/backup_$stamp"
+        Shell.cmd("mkdir -p $sessionBackupDir $tmpDir/work").exec()
 
         vm.tstep("Dumping partition images...")
         vm.tlog("[DUMP] Backing up untouched partition images to: $sessionBackupDir", "INFO")
@@ -97,7 +96,7 @@ object BootPatcherEngine {
 
         var patchSuccess = false
         var methodUsed = ""
-        val patchedBootOut = "$TMP_DIR/patched_boot.img"
+        val patchedBootOut = "$tmpDir/patched_boot.img"
         Shell.cmd("rm -f $patchedBootOut 2>/dev/null").exec()
 
         if (!kptoolsPath.isNullOrBlank()) {
@@ -136,7 +135,7 @@ object BootPatcherEngine {
             vm.tstep("Tier 3: Unpacking & Kernel Hex-Patching via magiskboot...")
             vm.tlog("[PATCH] Running custom Unpack -> Decompress -> HexPatch -> Recompress -> AVB Repack pipeline...", "INFO")
 
-            val workDir = "$TMP_DIR/work"
+            val workDir = "$tmpDir/work"
             Shell.cmd("rm -rf $workDir && mkdir -p $workDir").exec()
             Shell.cmd("cp $sessionBackupDir/boot_stock.img $workDir/boot.img").exec()
 
@@ -233,7 +232,7 @@ object BootPatcherEngine {
             vm.tlog("[SLOT OK] Active boot slot set to slot $slotNum ($targetSlotName)", "OK")
         }
 
-        Shell.cmd("rm -rf $TMP_DIR 2>/dev/null").exec()
+        Shell.cmd("rm -rf $tmpDir 2>/dev/null").exec()
 
         vm.tlog("[DONE] Kernel signature bypass patched & flashed successfully!", "OK")
         vm.tlog("[RECOVERY] If device bootloops, restore stock backup via Fastboot:", "INFO")

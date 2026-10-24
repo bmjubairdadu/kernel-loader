@@ -731,14 +731,10 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                         }
                     }
 
-                    Shell.cmd(
-                        "cp /data/local/tmp/dmtest_report.txt /sdcard/Download/dmtest_report.txt 2>/dev/null" +
-                                " || cp /data/local/tmp/dmtest_report.txt /storage/emulated/0/Download/dmtest_report.txt 2>/dev/null"
-                    ).exec()
-                    tlog("[REPORT] /sdcard/Download/dmtest_report.txt", "INFO")
                 } catch (e: Exception) {
                     tlog("[TEST ERR] ${e.message?.take(36)}", "ERR")
                 } finally {
+                    Shell.cmd("rm -f /data/local/tmp/dmtest /data/local/tmp/dmtest_report.txt 2>/dev/null").exec()
                     tstep("")
                 }
             }
@@ -881,7 +877,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                     break
                 }
             }
-            val candidates = listOf("dmsync", "kmem_337", "memacc", "kloaderctl", "daisyctl")
+            val candidates = listOf("dmsync", "kmem_337", "memacc")
             val hit = candidates.firstOrNull { it in nodes }
             if (hit != null) {
                 foundNode = hit
@@ -1040,8 +1036,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                 variant = activePipelineVariant.value,
                 isOta = false
             )
-            // Watchdog service disabled to avoid anti-cheat detection of background service
-            // try { DriverWatchdogService.start(context) } catch (_: Exception) {}
+            tlog("[STEALTH] Driver ready. Tap STEALTH EXIT before launching game!", "OK")
             true
         } finally {
             Shell.cmd("rm -f ${staged.absolutePath} 2>/dev/null").exec()
@@ -1189,8 +1184,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                 isOta = true
             )
             upgradeNotified = false
-            // Watchdog service disabled to avoid anti-cheat detection of background service
-            // try { DriverWatchdogService.start(context) } catch (_: Exception) {}
+            tlog("[STEALTH] Driver ready. Tap STEALTH EXIT before launching game!", "OK")
             return true
             } finally {
                 Shell.cmd("rm -f ${staged.absolutePath} 2>/dev/null").exec()
@@ -1371,7 +1365,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             val matchedNodes = devList.filter { node ->
                 moduleNames.any { m -> node.contains(m, ignoreCase = true) }
             }
-            val candidateNodes = (moduleNames + matchedNodes + listOf("kloaderctl", "daisyctl", "entryi", "kmem_337", "wanbai"))
+            val candidateNodes = (moduleNames + matchedNodes + listOf(preferredDevNode(), "dmsync", "kmem_337", "memacc"))
                 .filter { it.isNotBlank() }.distinct()
             val devCmd = candidateNodes.joinToString(" ") { "ls /dev/$it 2>/dev/null;" } + " true"
             val devRes = Shell.cmd(devCmd).exec()

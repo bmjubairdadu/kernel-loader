@@ -399,7 +399,7 @@ static int kmem_repair_primary_node(struct class *cls, struct device **devp,
 		return ret;
 	}
 	kmem_force_node_mode(name, 0666);
-	pr_info_ratelimited("dmsync: recreated /dev/%s\n", name);
+	/* pr_info_ratelimited("dmsync: recreated /dev/%s\n", name); */
 	/* Tell the caller that real work happened this pass so it can keep
 	 * the next worker tick short (see kmem_touch_node_mode). */
 	return 1;
@@ -495,7 +495,7 @@ static int kmem_repair_alt_node(struct kmem_alt_node *alt)
 		return ret;
 	}
 	kmem_force_node_mode(alt->name, 0666);
-	pr_info_ratelimited("dmsync: recreated alternate /dev/%s\n", alt->name);
+	/* pr_info_ratelimited("dmsync: recreated alternate /dev/%s\n", alt->name); */
 	/* Real work happened this pass - tell the caller (see primary). */
 	return 1;
 }
@@ -636,8 +636,8 @@ static struct task_struct *kmem_get_task_recover(pid_t *pidp)
 
 	task = kmem_find_recovery_task(cache.comm, cache.uid);
 	if (task) {
-		pr_info_ratelimited("dmsync: target pid %d -> %d (%s)\n",
-				    *pidp, task->tgid, cache.comm);
+		/* pr_info_ratelimited("dmsync: target pid %d -> %d (%s)\n",
+				    *pidp, task->tgid, cache.comm); */
 		*pidp = task->tgid;
 		kmem_cache_task(task);
 	}
