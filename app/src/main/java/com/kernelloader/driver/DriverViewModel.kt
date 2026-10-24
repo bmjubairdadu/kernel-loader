@@ -821,10 +821,11 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             "insmod", "/system/bin/insmod", "/vendor/bin/insmod",
             "/data/adb/magisk/busybox insmod", "busybox insmod"
         )
+        val hideParam = if (supportsStealthHide()) "hide=1" else "hide=0"
         val paramVariants = if (devNode.isNotBlank()) {
-            listOf("devname=$devNode", "devicename=$devNode", "")
+            listOf("devname=$devNode $hideParam", "devicename=$devNode $hideParam", hideParam)
         } else {
-            listOf("")
+            listOf(hideParam)
         }
         var res = Shell.cmd("true").exec()
         var attempts = 0
@@ -883,6 +884,21 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
     private fun snapshotDevCharNodes(): Set<String> =
         Shell.cmd("for f in /dev/*; do [ -c \"\$f\" ] && echo \"\${f##*/}\"; done 2>/dev/null")
             .exec().out.map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+
+    /**
+     * Reference-driver behavior: hide the module from lsmod/sysfs on load.
+     * Safe on Magisk/KernelSU (proven for years by the RT/QX reference
+     * drivers), but KernelPatch (APatch) tracks the module list itself and
+     * the unlink corrupts kernel state there - so hide stays OFF on APatch.
+     */
+    private fun supportsStealthHide(): Boolean {
+        val suV = Shell.cmd("su -v 2>/dev/null").exec().out.firstOrNull()?.lowercase() ?: ""
+        if (suV.contains("apatch") || suV.contains("kernelpatch")) return false
+        val apatchDir = Shell.cmd("test -d /data/adb/ap 2>/dev/null && echo yes").exec().out.firstOrNull()
+        if (apatchDir == "yes" && !Shell.cmd("test -d /data/adb/magisk 2>/dev/null || test -d /data/adb/ksu 2>/dev/null").exec().isSuccess)
+            return false
+        return true
+    }
 
     private fun snapshotSysClasses(): Set<String> =
         Shell.cmd("ls /sys/class 2>/dev/null").exec().out
@@ -1275,6 +1291,19 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             UniversalKernelLoader.disableModuleSigEnforce(this@DriverViewModel)
             UniversalKernelLoader.stripModuleSig(staged, this@DriverViewModel)
 
+            // A hidden resident module is invisible to the kernel's duplicate
+            // check - asking the driver first is the only safe way to avoid a
+            // second (state-corrupting) load.
+            val preProbe = try { UniversalKernelLoader.probeOurDriverNode(getApplication(), this@DriverViewModel) } catch (e: Exception) { null }
+            if (preProbe != null) {
+                tlog("[RESIDENT] Driver already answering on /dev/$preProbe - skipping insert", "OK")
+                rememberDevNode(preProbe)
+                markHiddenLoaded()
+                driverLoaded.value = true
+                autoLoadOk.value = true
+                autoLoadStatus.value = "Already loaded: /dev/$preProbe"
+                return true
+            }
             val devNodesBefore = snapshotDevCharNodes()
             val sysClassesBefore = snapshotSysClasses()
             tlog("Inserting module into kernel...", "CMD")
