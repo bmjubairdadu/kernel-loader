@@ -805,7 +805,17 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
     private val INSMOD_BACKOFF_MS = 500L
 
     private suspend fun runInsmodLadder(koPath: String, devNode: String): Shell.Result {
-        UniversalKernelLoader.loadViaFramework(koPath, devNode, this@DriverViewModel)?.let { return it }
+        // kptools/ksud can exit 0 without the kernel actually registering the
+        // module (seen live on APatch devices) - trust them only after asking
+        // the kernel itself: /proc/devices gains our chrdev line even when the
+        // module immediately hides itself from /proc/modules.
+        val kstateBefore = Shell.cmd("cat /proc/modules 2>/dev/null; cat /proc/devices 2>/dev/null").exec().out.toSet()
+        UniversalKernelLoader.loadViaFramework(koPath, devNode, this@DriverViewModel)?.let { fwRes ->
+            delay(600)
+            val kstateNow = Shell.cmd("cat /proc/modules 2>/dev/null; cat /proc/devices 2>/dev/null").exec().out
+            if (kstateNow.any { it.isNotBlank() && it !in kstateBefore }) return fwRes
+            tlog("[KERNEL] Framework loader exited 0 but the kernel did not register the module - falling back to insmod", "WARN")
+        }
 
         val bins = listOf(
             "insmod", "/system/bin/insmod", "/vendor/bin/insmod",
