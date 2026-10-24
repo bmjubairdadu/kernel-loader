@@ -1054,6 +1054,13 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                     .forEach { tlog("[DIAG] ${it.take(110)}", "INFO") }
                 val up = Shell.cmd("cat /proc/uptime 2>/dev/null").exec().out.firstOrNull()?.trim() ?: ""
                 tlog("[DIAG] uptime: ${up.take(20)} (a short value means the phone WAS rebooted)", "INFO")
+                // dmtest's own report: per-node open/probe results WITH errno -
+                // this is the line that says exactly why the node did not answer.
+                val dmr = Shell.cmd("tail -n 25 /data/local/tmp/dmtest_probe.txt 2>/dev/null; tail -n 25 /data/local/tmp/dmtest_report.txt 2>/dev/null").exec().out
+                    .filter { it.isNotBlank() }
+                    .filter { it.contains("probe") || it.contains("verdict") || it.contains("open") || it.contains("SUMMARY") || it.contains("!!") }
+                    .take(8)
+                dmr.forEach { tlog("[DIAG] ${it.take(110)}", "INFO") }
                 otaFailReason = "Driver inserted but no usable device node appeared" +
                     (if (hit.isNotEmpty()) " - an old load is stuck: REBOOT the phone, then tap LOAD" else " - reboot and retry; if it repeats send the [DIAG] lines to support")
                 tlog("[DEVNODE ERR] No node answered the ABI probe", "ERR")
