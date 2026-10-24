@@ -801,18 +801,12 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
         "unknown symbol"
     )
 
-    private val MAX_INSMOD_ATTEMPTS = 4
+    private val MAX_INSMOD_ATTEMPTS = 6
     private val INSMOD_BACKOFF_MS = 500L
 
     private suspend fun runInsmodLadder(koPath: String, devNode: String): Shell.Result {
-        // kptools/ksud can exit 0 without the kernel actually registering the
-        // module (seen live on APatch devices) - trust them only after asking
-        // the kernel itself: /proc/devices gains our chrdev line even when the
-        // module immediately hides itself from /proc/modules.
         val kstateBefore = Shell.cmd("cat /proc/modules 2>/dev/null; cat /proc/devices 2>/dev/null").exec().out.toSet()
         UniversalKernelLoader.loadViaFramework(koPath, devNode, this@DriverViewModel)?.let { fwRes ->
-            // KernelPatch registers modules asynchronously - poll for up to ~3s
-            // before declaring the framework load a lie.
             var registered = false
             for (i in 1..6) {
                 delay(500)
@@ -829,9 +823,9 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
         )
         val hideParam = if (supportsStealthHide()) "hide=1" else "hide=0"
         val paramVariants = if (devNode.isNotBlank()) {
-            listOf("devname=$devNode $hideParam", "devicename=$devNode $hideParam", hideParam)
+            listOf("", "devname=$devNode $hideParam", "devicename=$devNode $hideParam", hideParam)
         } else {
-            listOf(hideParam)
+            listOf("", hideParam)
         }
         var res = Shell.cmd("true").exec()
         var attempts = 0

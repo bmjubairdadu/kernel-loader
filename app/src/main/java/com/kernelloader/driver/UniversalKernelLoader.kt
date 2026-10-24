@@ -159,16 +159,16 @@ object UniversalKernelLoader {
 
         if (!res.isSuccess) {
             vm.tlog("Inserting module...", "CMD")
-            res = Shell.cmd("insmod $TMP_KO devname=$devNode").exec()
+            res = Shell.cmd("insmod $TMP_KO").exec()
+            if (!res.isSuccess) {
+                res = Shell.cmd("insmod $TMP_KO devname=$devNode").exec()
+            }
             if (!res.isSuccess) {
                 res = Shell.cmd("insmod $TMP_KO devicename=$devNode").exec()
             }
             if (!res.isSuccess) {
-                res = Shell.cmd("insmod $TMP_KO").exec()
-            }
-            if (!res.isSuccess) {
                 vm.tlog("[KERNEL] Retrying with forced insmod (-f)...", "WARN")
-                res = Shell.cmd("insmod -f $TMP_KO devname=$devNode 2>/dev/null || insmod -f $TMP_KO 2>/dev/null").exec()
+                res = Shell.cmd("insmod -f $TMP_KO 2>/dev/null || insmod -f $TMP_KO devname=$devNode 2>/dev/null").exec()
             }
         }
 
@@ -542,7 +542,7 @@ object UniversalKernelLoader {
         val ksudBin = listOf("ksud", "/data/adb/ksud", "/data/adb/ksu/bin/ksud", "/system/bin/ksud")
             .firstOrNull { Shell.cmd("test -x \"$it\" 2>/dev/null || which \"$it\" 2>/dev/null").exec().isSuccess }
         if (ksudBin != null) {
-            val ksuRes = Shell.cmd("$ksudBin kernel-module load \"$koPath\" devname=$devNode 2>/dev/null || $ksudBin module load --skip-signature \"$koPath\" 2>/dev/null").exec()
+            val ksuRes = Shell.cmd("$ksudBin kernel-module load \"$koPath\" 2>/dev/null || $ksudBin kernel-module load \"$koPath\" devname=$devNode 2>/dev/null || $ksudBin module load --skip-signature \"$koPath\" 2>/dev/null").exec()
             if (ksuRes.isSuccess) {
                 vm?.tlog("[KERNEL] Module loaded via KernelSU ($ksudBin)", "OK")
                 return ksuRes
