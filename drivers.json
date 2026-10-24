@@ -5,12 +5,12 @@
     "drivers": [
         {
             "version": "4.14.113-25741605 SMP preempt mod_unload aarch64",
-            "file": "rt_4.14.113-25741605.ko",
+            "file": "uni_4.14.113-25741605.ko",
             "variant": "rt",
             "label": "4.14.113-25741605",
-            "sha256": "5696aac09ef91dfbff31a79c8bea71f9bfb61508415060b52eb1a23280b83827",
-            "size": 251320,
-            "buildDate": "2026-10-15T14:16:52Z",
+            "sha256": "b7bdeb0642baf230143aa8de84871dafe5b3b3bd1bdb2cd11b0628c3fd982090",
+            "size": 235144,
+            "buildDate": "2026-10-24T09:19:20Z",
             "source": "samsung-m31-exynos9611",
             "verified": false
         },
@@ -85,12 +85,12 @@
         },
         {
             "version": "4.14.264-GrassKSU@c717269a78 SMP preempt mod_unload modversions aarch64",
-            "file": "rt_4.14.264-GrassKSU.ko",
+            "file": "uni_4.14.264-GrassKSU@c717269a78.ko",
             "variant": "rt",
             "label": "4.14.264-GrassKSU@c717269a78",
-            "sha256": "18ab3f8143eb6924a493f61a337b5b3695cbf4bf8a55a5e303b974e546ac1ca4",
-            "size": 188560,
-            "buildDate": "2026-10-17T14:57:50Z",
+            "sha256": "9c92a48b1de3dbd24887e5514ef0184741ac3482c400a4197431c4e6ab96ff24",
+            "size": 235272,
+            "buildDate": "2026-10-24T09:19:20Z",
             "source": "samsung-universal9611-grass",
             "verified": true,
             "testStatus": "qemu-pass",
@@ -99,12 +99,12 @@
         },
         {
             "version": "4.14.357-openela-perf-g673b80046ab9 SMP preempt mod_unload modversions aarch64",
-            "file": "rt_4.14.357-openela-perf-g673b80046ab9.ko",
+            "file": "uni_4.14.357-openela-perf-g673b80046ab9.ko",
             "variant": "rt",
             "label": "4.14.357-openela-perf-g673b80046ab9",
-            "sha256": "b0fd8f52b0d56118526f864efa68238cf6f768dc9659de31b33d245f7dad354d",
-            "size": 233144,
-            "buildDate": "2026-10-24T06:08:45Z",
+            "sha256": "a9148e4399d0fc3a4c494f794146421cb362690044882204e7c0875125fb0370",
+            "size": 235272,
+            "buildDate": "2026-10-24T09:19:20Z",
             "verified": true,
             "source": "kernel-rebuild-safe"
         },
@@ -128,21 +128,21 @@
         },
         {
             "version": "4.19.157-perf-g1a6087bc0325-dirty SMP preempt mod_unload modversions aarch64",
-            "file": "rt_4.19.157-perf-g1a6087bc0325-dirty.ko",
+            "file": "uni_4.19.157-perf-g1a6087bc0325-dirty.ko",
             "variant": "rt",
             "label": "4.19.157-perf-g1a6087bc0325-dirty",
-            "sha256": "50e6fdf89d8392899ba35847b6f12885ba6e2e1210d7c4da416b929900398fa2",
-            "size": 292080,
-            "buildDate": "2026-10-24T06:08:45Z",
+            "sha256": "ddc4760c01abf9c9ab1c9201d99cff0cc55fc75decb2cb0e3934f0d695a52bb6",
+            "size": 298064,
+            "buildDate": "2026-10-24T09:19:20Z",
             "verified": true,
             "source": "sm6115-3.3.4-freeze-fix"
         },
         {
-            "buildDate": "2026-10-24T06:08:45Z",
-            "file": "rt_4.19.157b.ko",
+            "buildDate": "2026-10-24T09:19:20Z",
+            "file": "uni_4.19.157-perf+.ko",
             "label": "4.19.157b",
-            "sha256": "3882ed7fdc948f108861fd172998b8d1579f39c14083372fa21055c4d00e6e29",
-            "size": 292000,
+            "sha256": "290e7b03f42fd43cc8101a05f31a51b07f0743233134c384b33bc8370371d598",
+            "size": 298064,
             "variant": "rt",
             "version": "4.19.157-perf+ SMP preempt mod_unload modversions aarch64"
         },
@@ -316,7 +316,7 @@
             "source": "pure-stealth-random-node"
         }
     ],
-    "updated": "2026-10-24T09:18:50Z",
+    "updated": "2026-10-24T09:19:20Z",
     "variants": {
         "rt": "RT ABI - ioctl 0x801/0x802/0x803, success returns -EIO (0 on failure)"
     }
