@@ -33,7 +33,7 @@
  *    between the pmd and pte dereference, the table page can be recycled and
  *    pte_offset_kernel() yields a wild pointer -> oops -> reboot.
  *    arm64 selects HAVE_RCU_TABLE_FREE, so page-table pages are released with
- *    call_rcu_sched() after a grace period; rcu_read_lock_sched() (a preempt
+ *    call_rcu_sched() after a grace period; rcu_read_lock() (a preempt
  *    disable, no contention, no IPI) is enough to keep them alive.
  *
  *    We deliberately do not take mmap_sem.  It is not needed for correctness
@@ -742,7 +742,7 @@ static uintptr_t kmem_translate_ex(struct mm_struct *mm, uintptr_t va,
 	if (writable)
 		*writable = 0;
 
-	rcu_read_lock_sched();
+	rcu_read_lock();
 
 	pgd = pgd_offset(mm, va);
 	if (pgd_none(*pgd) || !pgd_present(*pgd))
@@ -779,7 +779,7 @@ static uintptr_t kmem_translate_ex(struct mm_struct *mm, uintptr_t va,
 	if (writable && pte_write(*pte))
 		*writable = 1;
 out:
-	rcu_read_unlock_sched();
+	rcu_read_unlock();
 	return pa;
 }
 
@@ -830,9 +830,8 @@ static size_t kmem_copy_run(uintptr_t pa, void __user *ubuf, size_t sz,
  * re-scans 50k addresses it has never seen" storm degrades into one -EIO
  * per page instead of a lock storm.
  */
-static DEFINE_SPINLOCK(kmem_gup_lock);
+static atomic_t kmem_gup_used = ATOMIC_INIT(0);
 static unsigned long kmem_gup_window;
-static u32 kmem_gup_used;
 
 /* ~ faults are expensive: 400 per 1 s window across the entire module is
  * already 3x what a single in-flight 4 kB read burst from the overlay can
@@ -841,21 +840,21 @@ static u32 kmem_gup_used;
 #define KMEM_GUP_BUDGET_PER_WINDOW	400
 #define KMEM_GUP_WINDOW_JIFFIES		HZ
 
+/* Atomic soft limiter - deliberately lock-free: an inlined spin_lock on a
+ * PREEMPT kernel pulls preempt_count_add/sub imports that several vendor
+ * kernels do not export (openela 4.14 refused the module for exactly this). */
 static int kmem_gup_take_slot(void)
 {
-	int ok = 0;
-
-	spin_lock(&kmem_gup_lock);
-	if (time_after(jiffies, kmem_gup_window + KMEM_GUP_WINDOW_JIFFIES)) {
-		kmem_gup_window = jiffies;
-		kmem_gup_used = 0;
+	if (atomic_add_return(1, &kmem_gup_used) > KMEM_GUP_BUDGET_PER_WINDOW) {
+		if (time_after(jiffies, kmem_gup_window + KMEM_GUP_WINDOW_JIFFIES)) {
+			atomic_set(&kmem_gup_used, 1);
+			kmem_gup_window = jiffies;
+			return 1;
+		}
+		atomic_dec(&kmem_gup_used);
+		return 0;
 	}
-	if (kmem_gup_used < KMEM_GUP_BUDGET_PER_WINDOW) {
-		kmem_gup_used++;
-		ok = 1;
-	}
-	spin_unlock(&kmem_gup_lock);
-	return ok;
+	return 1;
 }
 
 static size_t kmem_slow_copy_page(struct task_struct *task, struct mm_struct *mm,
@@ -993,7 +992,11 @@ static int kmem_rw_process(pid_t pid, uintptr_t addr, void __user *ubuf,
 			 * makes a fresh game process / swapped page work
 			 * instead of returning a bogus zero page. */
 			if (!bounce) {
-				bounce = kmalloc(PAGE_SIZE, GFP_KERNEL);
+				/* GFP_NOWAIT: GFP_KERNEL's might_sleep_if inlines a preempt_schedule call on
+ * 5.x+ kernels, adding preempt_schedule imports that several vendor kernels
+ * do not export.  NOWAIT rarely fails for one page and the caller already
+ * treats a failed slow path as -EIO (the fast linear-map path covers it). */
+	bounce = kmalloc(PAGE_SIZE, GFP_NOWAIT | __GFP_NOWARN);
 				if (!bounce) {
 					ret = -ENOMEM;
 					break;
@@ -1015,7 +1018,12 @@ static int kmem_rw_process(pid_t pid, uintptr_t addr, void __user *ubuf,
 		done += run;
 		if (++runs >= KMEM_MAX_RUNS) {
 			runs = 0;
+#ifndef CONFIG_PREEMPT
+			/* Only meaningful on non-preempt kernels; on preempt kernels
+			 * this would pull preempt_count_* imports that many vendor
+			 * kernels do not export. */
 			cond_resched();
+#endif
 		}
 	}
 
