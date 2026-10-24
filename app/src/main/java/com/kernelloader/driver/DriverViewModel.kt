@@ -811,9 +811,15 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
         // module immediately hides itself from /proc/modules.
         val kstateBefore = Shell.cmd("cat /proc/modules 2>/dev/null; cat /proc/devices 2>/dev/null").exec().out.toSet()
         UniversalKernelLoader.loadViaFramework(koPath, devNode, this@DriverViewModel)?.let { fwRes ->
-            delay(600)
-            val kstateNow = Shell.cmd("cat /proc/modules 2>/dev/null; cat /proc/devices 2>/dev/null").exec().out
-            if (kstateNow.any { it.isNotBlank() && it !in kstateBefore }) return fwRes
+            // KernelPatch registers modules asynchronously - poll for up to ~3s
+            // before declaring the framework load a lie.
+            var registered = false
+            for (i in 1..6) {
+                delay(500)
+                val now = Shell.cmd("cat /proc/modules 2>/dev/null; cat /proc/devices 2>/dev/null").exec().out
+                if (now.any { it.isNotBlank() && it !in kstateBefore }) { registered = true; break }
+            }
+            if (registered) return fwRes
             tlog("[KERNEL] Framework loader exited 0 but the kernel did not register the module - falling back to insmod", "WARN")
         }
 
@@ -839,6 +845,12 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                 res = Shell.cmd(cmd).exec()
                 if (res.isSuccess) return res
                 val err = (res.out + res.err).joinToString(" ").lowercase(Locale.US)
+                // A hidden/still-registering module makes insmod return EEXIST -
+                // the module IS resident, which is success as far as loading goes.
+                if (err.contains("file exists")) {
+                    tlog("[KERNEL] Module already resident (File exists) - verifying live node", "OK")
+                    return Shell.cmd("true").exec()
+                }
                 if (err.contains("not found") || err.contains("no such file")) continue@outer
 
                 val hasParam = param.isNotBlank()
@@ -1065,9 +1077,9 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                 }
                 // One-paste diagnostics: kernel's own view of what happened.
                 Shell.cmd(
-                    "dmesg | grep -i -E 'sysync|dmsync|kptools|module' | tail -n 10"
-                ).exec().out.filter { it.isNotBlank() }.take(6)
-                    .forEach { tlog("[DIAG] ${it.take(110)}", "INFO") }
+                    "dmesg | grep -i -E 'sysync|dmsync|kptools|WARNING:|RIP:' | tail -n 12"
+                ).exec().out.filter { it.isNotBlank() }.take(8)
+                    .forEach { tlog("[DIAG] ${it.take(160)}", "INFO") }
                 val up = Shell.cmd("cat /proc/uptime 2>/dev/null").exec().out.firstOrNull()?.trim() ?: ""
                 tlog("[DIAG] uptime: ${up.take(20)} (a short value means the phone WAS rebooted)", "INFO")
                 // dmtest's own report: per-node open/probe results WITH errno -
