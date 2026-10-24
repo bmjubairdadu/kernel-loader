@@ -1037,6 +1037,15 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                 if (poolCls.isNotEmpty()) {
                     tlog("[DIAG] driver classes present: ${poolCls.joinToString(",")}", "INFO")
                 }
+                // One-paste diagnostics: kernel's own view of what happened.
+                Shell.cmd(
+                    "dmesg | grep -i -E 'sysync|dmsync|kptools|module' | tail -n 10"
+                ).exec().out.filter { it.isNotBlank() }.take(6)
+                    .forEach { tlog("[DIAG] ${it.take(110)}", "INFO") }
+                val up = Shell.cmd("cat /proc/uptime 2>/dev/null").exec().out.firstOrNull()?.trim() ?: ""
+                tlog("[DIAG] uptime: ${up.take(20)} (a short value means the phone WAS rebooted)", "INFO")
+                otaFailReason = "Driver inserted but no usable device node appeared" +
+                    (if (hit.isNotEmpty()) " - an old load is stuck: REBOOT the phone, then tap LOAD" else " - reboot and retry; if it repeats send the [DIAG] lines to support")
                 tlog("[DEVNODE ERR] No node answered the ABI probe", "ERR")
                 return false
             }
