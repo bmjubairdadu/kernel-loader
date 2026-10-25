@@ -363,16 +363,6 @@ object UniversalKernelLoader {
                     if (isCharNode(node)) return node
                 }
             }
-            val enginePick = res.out.firstOrNull { it.contains("verdict: engine pick") }
-            if (enginePick != null) {
-                val raw = enginePick.substringAfter('=').trim()
-                val node = raw.substringBefore(' ').trim().removePrefix("/dev/").trim()
-                val sentinel = node.isBlank() || node.equals("NOT", true) || node.equals("NONE", true) ||
-                    node.equals("FOUND", true) || node.startsWith("!!")
-                if (!sentinel && node.all { it.isLetterOrDigit() || it == '_' || it == '-' || it == '.' }) {
-                    if (isCharNode(node)) return node
-                }
-            }
         } catch (_: Exception) {}
 
         return try {
@@ -388,7 +378,7 @@ object UniversalKernelLoader {
                     return cand
                 }
             }
-            poolCandidates.firstOrNull { isCharNode(it) }
+            null
         } catch (e: Exception) {
             null
         }

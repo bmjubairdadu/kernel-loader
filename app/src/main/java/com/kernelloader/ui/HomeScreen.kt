@@ -453,7 +453,12 @@ fun HomeScreen(
                     moduleName = loadedModule,
                     enabled = loaded && !busy && rootAvailable,
                     busy = rebooting,
-                    onUnload = { viewModel.rebootDevice(context) }
+                    onUnload = { viewModel.rebootDevice(context) },
+                    onReload = {
+                        viewModel.driverLoaded.value = false
+                        viewModel.hiddenLoaded.value = false
+                        viewModel.autoLoadUniversal(context, preferOta = true, variant = OtaDriverStore.RT)
+                    }
                 )
             }
 
@@ -1694,7 +1699,8 @@ private fun UnloadPanel(
     moduleName: String,
     enabled: Boolean,
     busy: Boolean,
-    onUnload: () -> Unit
+    onUnload: () -> Unit,
+    onReload: () -> Unit = {}
 ) {
     if (visible <= 0.001f) return
 
@@ -1745,6 +1751,18 @@ private fun UnloadPanel(
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(horizontal = 24.dp)
         )
+        Spacer(Modifier.height(4.dp))
+        TextButton(
+            onClick = onReload,
+            enabled = enabled && !busy
+        ) {
+            Text(
+                text = "⚡ FORCE RELOAD DRIVER",
+                style = MonoTiny,
+                color = AccentGreen,
+                fontWeight = FontWeight.Bold
+            )
+        }
     }
 }
 

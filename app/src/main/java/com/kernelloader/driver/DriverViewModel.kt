@@ -1462,23 +1462,6 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                 tlog("Target driver: RT Stealth Engine", "OK")
                 delay(350L)
                 tlog("Starting RT pipeline...", "CMD")
-
-                val resident = SafetyGuard.hiddenDriverClass()
-                if (resident != null) {
-                    tlog("Driver already resident in kernel", "OK")
-                    if (prepareAndVerifyDeviceNode(preferredDevNode())) {
-                        markHiddenLoaded()
-                        driverLoaded.value = true
-                        autoLoadOk.value = true
-                        autoLoadStatus.value = "Already loaded: /dev/${preferredDevNode()}"
-                        tlog("Resident driver ready: /dev/${preferredDevNode()}", "OK")
-                    } else {
-                        tlog("Resident driver has no live node", "WARN")
-                        autoLoadOk.value = false
-                        autoLoadStatus.value = "Driver resident but node missing - reboot, then LOAD"
-                    }
-                    return@launch
-                }
                 if (pickedFileUri.value != null) {
 
                     tlog("Loading custom file: ${pickedFileName.value}", "CMD")
@@ -1682,8 +1665,6 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             val devNode = preferredDevNode()
             val nodePath = "/dev/$devNode"
             val nodeChar = Shell.cmd("test -c $nodePath 2>/dev/null").exec().isSuccess
-            val nodeRw = nodeChar && Shell.cmd("test -r $nodePath && test -w $nodePath 2>/dev/null").exec().isSuccess
-            val hiddenClass = SafetyGuard.hiddenDriverClass() != null
             val loadedMods = SafetyGuard.loadedModuleNames()
             val currentMod = loadedModuleName.value
             val isModuleInLsmod = currentMod.isNotBlank() && currentMod in loadedMods
@@ -1696,26 +1677,18 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
 
             withContext(Dispatchers.Main) {
                 if (isModuleInLsmod) {
-
                     driverLoaded.value = true
                     setLoadedModule(currentMod)
-                } else if (probed != null) {
-                    rememberDevNode(probed)
-                    driverLoaded.value = true
-                    markHiddenLoaded()
-                } else if (hiddenClass) {
-                    driverLoaded.value = true
-                    markHiddenLoaded()
                 } else {
-
-                    if (nodeChar) {
-                        Shell.cmd("rm -f $nodePath 2>/dev/null").exec()
-                        tlog("[CLEAN] Removed stale node $nodePath", "INFO")
+                    if (probed != null) {
+                        rememberDevNode(probed)
                     }
-                    setLoadedModule("")
-                    hiddenLoaded.value = false
-                    driverLoaded.value = false
-                    driverModule.value = ""
+                    if (!driverLoaded.value) {
+                        setLoadedModule("")
+                        hiddenLoaded.value = false
+                        driverLoaded.value = false
+                        driverModule.value = ""
+                    }
                 }
             }
         }

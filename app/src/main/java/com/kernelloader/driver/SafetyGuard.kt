@@ -18,9 +18,14 @@ object SafetyGuard {
         loadedModuleNames().filter { it.isNotBlank() && it !in before }.toSet()
 
     fun hiddenDriverClass(): String? = try {
-        Shell.cmd("ls /sys/class 2>/dev/null").exec().out
+        val candidates = Shell.cmd("ls /sys/class 2>/dev/null").exec().out
             .map { it.trim() }
-            .firstOrNull { it.startsWith("dmsync") || it.startsWith("kmem") || it.startsWith("memacc") || it.matches(Regex("^[A-GNYB]{6,8}$")) }
+            .filter { it.startsWith("dmsync") || it.startsWith("kmem") || it.startsWith("memacc") || it.matches(Regex("^[A-GNYB]{6,8}$")) }
+        candidates.firstOrNull { cls ->
+            val devFileExists = Shell.cmd("test -f /sys/class/$cls/dev").exec().isSuccess
+            val charNodeExists = Shell.cmd("test -c /dev/$cls").exec().isSuccess
+            devFileExists && charNodeExists
+        }
     } catch (e: Exception) {
         null
     }
