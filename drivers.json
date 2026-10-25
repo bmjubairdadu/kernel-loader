@@ -195,10 +195,10 @@
       "file": "uni_4.14.357-openela-perf-g673b80046ab9.ko",
       "variant": "rt",
       "label": "4.14.357-openela-perf-g673b80046ab9",
-      "sha256": "e5914ba6bcc90ef2b8d4b260264b24991dcc4c619f7bca264e3a0e67575a5c08",
-      "size": 13696,
-      "buildDate": "2026-10-25T09:32:00Z",
-      "source": "kernel-drivers-stealth-8char-english",
+      "sha256": "624ca0b780fcfb38f11ad51a224fcc60050d5b645846f577d0e93a22708e19c6",
+      "size": 13272,
+      "buildDate": "2026-10-25T12:18:00Z",
+      "source": "kernel-drivers-safe-6char-english",
       "verified": true
     },
     {
