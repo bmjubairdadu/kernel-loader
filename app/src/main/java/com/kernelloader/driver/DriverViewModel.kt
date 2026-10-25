@@ -1662,9 +1662,10 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
 
     fun refreshDriverState(context: Context) {
         viewModelScope.launch(Dispatchers.IO) {
-            val devNode = preferredDevNode()
-            val nodePath = "/dev/$devNode"
-            val nodeChar = Shell.cmd("test -c $nodePath 2>/dev/null").exec().isSuccess
+            Shell.cmd(
+                "rm -f /data/local/tmp/kloader*.ko /data/local/tmp/kmem*.ko /data/local/tmp/dmtest* /data/local/tmp/myprobe 2>/dev/null",
+                "for n in /dev/[A-GNYB][A-GNYB][A-GNYB][A-GNYB][A-GNYB][A-GNYB]* /dev/dmsync*; do [ -c \"\$n\" ] && rm -f \"\$n\" 2>/dev/null; done"
+            ).exec()
             val loadedMods = SafetyGuard.loadedModuleNames()
             val currentMod = loadedModuleName.value
             val isModuleInLsmod = currentMod.isNotBlank() && currentMod in loadedMods
