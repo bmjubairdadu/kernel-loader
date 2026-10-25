@@ -381,7 +381,10 @@ object BootPatcherEngine {
         }
 
         val symbolsToPatch = listOf(
-            Triple("module_sig_check", "00 00 80 52 C0 03 5F D6", "Bypass module signature enforce (mov w0, #0; ret)"),
+            Triple("module_sig_check", "00 00 80 52 C0 03 5F D6", "Bypass module signature check (mov w0, #0; ret)"),
+            Triple("mod_verify_sig", "00 00 80 52 C0 03 5F D6", "Bypass module signature verification (mov w0, #0; ret)"),
+            Triple("is_module_sig_enforced", "00 00 80 52 C0 03 5F D6", "Disable signature enforcement (mov w0, #0; ret)"),
+            Triple("verify_pkcs7_signature", "00 00 80 52 C0 03 5F D6", "Bypass PKCS7 crypto signature (mov w0, #0; ret)"),
             Triple("check_modinfo", "00 00 80 52 C0 03 5F D6", "Bypass vermagic check (mov w0, #0; ret)"),
             Triple("check_version", "20 00 80 52 C0 03 5F D6", "Bypass symbol CRC version check (mov w0, #1; ret)")
         )
