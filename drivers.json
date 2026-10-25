@@ -85,10 +85,10 @@
       "file": "uni_4.19.157-perf+.ko",
       "variant": "rt",
       "label": "4.19.157-perf+",
-      "sha256": "3538b6b295ab3c852102c0449bb0a6ef85df64c666763430b64adbd32a3d6f1a",
+      "sha256": "3c3d7b0f62032116e5d4a246cb078df31ef055a8804ddb3268fcbb3963a27bdc",
       "size": 13680,
-      "buildDate": "2026-10-25T07:18:24Z",
-      "source": "kernel_drivers/4.19.157b.ko",
+      "buildDate": "2026-10-25T10:57:49Z",
+      "source": "kernel_drivers/4.19.157b.ko (english logs, 6-char random node)",
       "verified": true
     },
     {
@@ -206,10 +206,10 @@
       "file": "uni_4.19.157-perf-g1a6087bc0325-dirty.ko",
       "variant": "rt",
       "label": "4.19.157-perf-g1a6087bc0325-dirty",
-      "sha256": "b7910f23f0bc22934d51c2ba63192801cb7358d33a58ca8ff18890233637f38c",
-      "size": 30696,
-      "buildDate": "2026-10-25T07:18:24Z",
-      "source": "bengal-citrus-pure-rt-no-preempt",
+      "sha256": "ab4e0deeb58c11e1f851388175f369c89239396e89626005323612a3bb59ac71",
+      "size": 13672,
+      "buildDate": "2026-10-25T10:57:49Z",
+      "source": "kernel_drivers/4.19.157.ko (exact g1a6087bc0325 vermagic, english logs, 6-char random node)",
       "verified": true
     }
   ],
