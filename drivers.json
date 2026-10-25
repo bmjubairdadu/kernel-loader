@@ -85,10 +85,10 @@
       "file": "uni_4.19.157-perf+.ko",
       "variant": "rt",
       "label": "4.19.157-perf+",
-      "sha256": "3c3d7b0f62032116e5d4a246cb078df31ef055a8804ddb3268fcbb3963a27bdc",
-      "size": 13680,
-      "buildDate": "2026-10-25T10:57:49Z",
-      "source": "kernel_drivers/4.19.157b.ko (english logs, 6-char random node)",
+      "sha256": "5ac600cbb6e4708717ca8d1f303bc9c613ec001bd8071e5411ba96d3d8d3bb16",
+      "size": 15552,
+      "buildDate": "2026-10-25T15:35:00Z",
+      "source": "compiled from desktop entry.c master template (Linux 4.19.157 tree, clean English logs, 6-char random node)",
       "verified": true
     },
     {
@@ -195,10 +195,10 @@
       "file": "uni_4.14.357-openela-perf-g673b80046ab9.ko",
       "variant": "rt",
       "label": "4.14.357-openela-perf-g673b80046ab9",
-      "sha256": "f9d12181540dddd5bfdf81cd32ed8e0d5a4970b9ca0a733af2ec10c3bf29cefc",
-      "size": 14456,
-      "buildDate": "2026-10-25T13:06:00Z",
-      "source": "kernel-drivers-safe-rocksolid-english",
+      "sha256": "be656006f1d4ad323ce0e21c93786c2e07782666726782b1c905aabc208156ad",
+      "size": 15896,
+      "buildDate": "2026-10-25T15:35:00Z",
+      "source": "compiled from desktop entry.c master template (OpenELA 4.14 tree, clean English logs, 6-char random node)",
       "verified": true
     },
     {
@@ -206,14 +206,14 @@
       "file": "uni_4.19.157-perf-g1a6087bc0325-dirty.ko",
       "variant": "rt",
       "label": "4.19.157-perf-g1a6087bc0325-dirty",
-      "sha256": "ab4e0deeb58c11e1f851388175f369c89239396e89626005323612a3bb59ac71",
-      "size": 13672,
-      "buildDate": "2026-10-25T10:57:49Z",
-      "source": "kernel_drivers/4.19.157.ko (exact g1a6087bc0325 vermagic, english logs, 6-char random node)",
+      "sha256": "a9353cb5b8af2322f8c757cf15fba723e08357313f3ed279f2f9a09865461cee",
+      "size": 15616,
+      "buildDate": "2026-10-25T15:35:00Z",
+      "source": "compiled from desktop entry.c master template (Linux 4.19.157 tree, clean English logs, 6-char random node)",
       "verified": true
     }
   ],
-  "updated": "2026-10-25T13:06:00Z",
+  "updated": "2026-10-25T15:35:00Z",
   "variants": {
     "rt": "RT ABI - ioctl 0x801/0x802/0x803, success returns -EIO (0 on failure)"
   }
