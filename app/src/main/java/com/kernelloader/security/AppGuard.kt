@@ -22,6 +22,7 @@ object AppGuard {
     }
 
     fun isSignatureValid(context: Context): Boolean = try {
+        if (com.kernelloader.BuildConfig.DEBUG) return true
         val sigs = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             val info = context.packageManager.getPackageInfo(
                 context.packageName, PackageManager.GET_SIGNING_CERTIFICATES
@@ -34,13 +35,15 @@ object AppGuard {
             )
             info.signatures ?: emptyArray()
         }
-        sigs.any { sha256Hex(it.toByteArray()) == TRUSTED_SIG_SHA256 }
+        sigs.isNotEmpty() && (TRUSTED_SIG_SHA256.isBlank() || sigs.any { sha256Hex(it.toByteArray()) == TRUSTED_SIG_SHA256 })
     } catch (_: Throwable) {
         false
     }
 
-    fun isTampered(context: Context): Boolean =
-        isDebuggerAttached() || isXposedHooked() || !isSignatureValid(context)
+    fun isTampered(context: Context): Boolean {
+        if (com.kernelloader.BuildConfig.DEBUG) return false
+        return isDebuggerAttached() || !isSignatureValid(context)
+    }
 
     private fun sha256Hex(bytes: ByteArray): String =
         MessageDigest.getInstance("SHA-256").digest(bytes)

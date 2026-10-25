@@ -15,8 +15,8 @@ android {
         applicationId = "com.kernelloader"
         minSdk = 28
         targetSdk = 34
-        versionCode = 15
-        versionName = "1.6"
+        versionCode = 1
+        versionName = "1.0"
 
         buildConfigField(
             "String",

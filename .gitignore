@@ -86,3 +86,4 @@ driver/*.v17bak
 # ===== private: WSL/kernel build tooling at the repo root is not public =====
 # anchored so it can never swallow app/src/main/java/com/kernelloader/driver/
 /driver/
+/kernel-modules/

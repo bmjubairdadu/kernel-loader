@@ -94,8 +94,6 @@ class MainActivity : ComponentActivity() {
             try {
                 stopService(Intent(this, CleanExitService::class.java))
             } catch (_: Exception) {}
-            android.os.Process.killProcess(android.os.Process.myPid())
-            kotlin.system.exitProcess(0)
         }
     }
 

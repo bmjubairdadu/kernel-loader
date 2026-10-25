@@ -189,7 +189,7 @@ object DriverRevocationManager {
             return RevocationVerdict.Valid(best)
         }
 
-        if (record?.loadedFromOta == true || record != null) {
+        if (record != null && record.loadedFromOta) {
             val label = if (variant.isNotBlank()) "${variant.uppercase()} driver" else "driver"
             return RevocationVerdict.Revoked("$label for kernel $kernel deleted from DB")
         }

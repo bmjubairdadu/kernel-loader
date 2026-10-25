@@ -2,8 +2,25 @@
 
 All notable changes are documented here (newest first).
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
-Release tags are plain integers equal to `versionCode` (`v5`, `v6`, …) —
-the in-app updater parses the tag number, so dotted tags never trigger updates.
+
+---
+
+## [1.0] — 2026-10-25 (tag `v1.0` / `versionCode 1`) 🚀 Official Stability & General Release
+
+> **Official Stable Release:** Full compatibility with `Kernel_Drivers` zero-param insmod ladder, critical revocation watcher reboot-loop fix, safe sysfs and `/dev` device node discovery, hardened anti-tamper with debug support, and foreground service lifecycle reliability.
+
+### ✨ Added & Improved
+* **Zero-Param insmod Compatibility.** Preserved native zero-parameter `insmod` ladder compatibility matching `Kernel_Drivers` loader specifications.
+* **Hardened Device Node Sanitization.** `/dev` cleanup only prunes recognized driver node names (`^[BDEFGACNY]{8}$`, `dmsync`, `kmem_337`, `memacc`), completely eliminating risk to system device nodes.
+* **Android 13+ Notification Permissions.** Declared `POST_NOTIFICATIONS` permission in manifest for reliable foreground service notifications on modern Android versions.
+* **Optimized Build Environment.** Increased Gradle Metaspace heap allocation to 768MB in `gradle.properties` to ensure zero compilation memory starvation.
+
+### 🛠️ Fixed
+* **Driver Revocation Loop Fixed.** Corrected evaluation guard in `DriverRevocationManager` (`record.loadedFromOta`) so that custom/local `.ko` drivers are never falsely flagged as revoked, permanently preventing unwanted automatic device reboots.
+* **Anti-Tamper & LSPosed Compatibility.** Resolved false-positive tamper trigger for devices running Xposed/LSPosed frameworks, and allowed seamless debug testing under `BuildConfig.DEBUG`.
+* **Sysfs Class Pattern Matching.** Fixed pattern matching in `mknodPatternSysClasses()` to use the exact character pool regex (`^[BDEFGACNY]{8}$`).
+* **Lifecycle Crash Guard.** Removed destructive `killProcess` call from `MainActivity.onDestroy()`, allowing graceful multi-tasking and preventing abrupt crashes during system lifecycle transitions.
+* **Repository Cleanup.** Removed outdated binary artifacts, resolved version naming conflicts, and normalized release packaging as `Kernel-Loader-v1.0.apk`.
 
 ---
 

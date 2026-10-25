@@ -950,7 +950,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
     private fun mknodPatternSysClasses(): List<String> {
         val made = mutableListOf<String>()
         val classes = Shell.cmd("ls /sys/class 2>/dev/null").exec().out
-            .map { it.trim() }.filter { it.matches(Regex("^[B-YA-N]{8}$")) && it.none { c -> c in "HIJKLMOPQRSTUVWXYZ".substring(0, 0) } }
+            .map { it.trim() }.filter { it.matches(Regex("^[BDEFGACNY]{8}$")) }
         for (cls in classes) {
             if (!cls.all { it in "BDEFGACNY" }) continue
             val dev = Shell.cmd("cat /sys/class/$cls/dev 2>/dev/null").exec().out
@@ -1051,7 +1051,10 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             val probedOk = try { UniversalKernelLoader.probeOurDriverNode(getApplication(), this@DriverViewModel) } catch (e: Exception) { null }
             if (probedOk == null) {
                 tlog("[PROBE FAIL] /dev/$node did not answer our ABI - rejecting node", "ERR")
-                Shell.cmd("rm -f /dev/$node 2>/dev/null").exec()
+                // Only clean up node if it belongs to our random naming pool or recognized driver aliases
+                if (node.matches(Regex("^[BDEFGACNY]{8}$")) || node == "dmsync" || node == "kmem_337" || node == "memacc") {
+                    Shell.cmd("rm -f /dev/$node 2>/dev/null").exec()
+                }
                 // A resident module with no answering node = an earlier load is
                 // stuck in kernel memory (hidden, nodes lost). Only a reboot clears it.
                 // Hidden modules vanish from lsmod but their chrdev registration
