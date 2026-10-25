@@ -451,52 +451,6 @@ object BootPatcherEngine {
             vm.tlog("[PATCH OK] Patched $symName at offset 0x${Integer.toHexString(offset)} ($desc, PAC: $hasPac)", "OK")
         }
 
-        // Auto-Discovery Engine: Dynamically scan /proc/kallsyms for ANY signature/enforce verification symbols
-        vm.tstep("Scanning /proc/kallsyms for OEM signature verification functions...")
-        val discoveryRes = Shell.cmd(
-            "grep -E -i ' [Tt] .*([Mm]odule.*[Ss]ig|[Ss]ig.*[Cc]heck|[Vv]erify.*[Ss]ig|[Ss]ig.*[Ee]nforce|[Pp]kcs7|[Ss]ystem_verify|mod_verify)' /proc/kallsyms 2>/dev/null"
-        ).exec().out
-
-        for (line in discoveryRes) {
-            val parts = line.trim().split(Regex("\\s+"))
-            if (parts.size < 3) continue
-            val symAddrStr = parts[0]
-            val symName = parts[2]
-            if (patchedSymbols.contains(symName)) continue
-
-            val symAddr = try {
-                java.lang.Long.parseUnsignedLong(symAddrStr, 16)
-            } catch (e: Exception) {
-                continue
-            }
-
-            val offsetLong = symAddr - baseAddr
-            if (offsetLong < 0 || offsetLong + 16 > kernelBytes.size) continue
-            val offset = offsetLong.toInt()
-
-            val hasPac = (kernelBytes[offset] == pacPattern[0] &&
-                          kernelBytes[offset + 1] == pacPattern[1] &&
-                          kernelBytes[offset + 2] == pacPattern[2] &&
-                          kernelBytes[offset + 3] == pacPattern[3])
-
-            val rawPatch = hexToBytes("00 00 80 52 C0 03 5F D6") // mov w0, #0; ret
-            val patchBytes = if (hasPac) {
-                byteArrayOf(
-                    0x3F.toByte(), 0x23.toByte(), 0x03.toByte(), 0xD5.toByte(),
-                    rawPatch[0], rawPatch[1], rawPatch[2], rawPatch[3],
-                    0xBF.toByte(), 0x23.toByte(), 0x03.toByte(), 0xD5.toByte(),
-                    rawPatch[4], rawPatch[5], rawPatch[6], rawPatch[7]
-                )
-            } else {
-                rawPatch
-            }
-
-            System.arraycopy(patchBytes, 0, kernelBytes, offset, patchBytes.size)
-            patchedCount++
-            patchedSymbols.add(symName)
-            vm.tlog("[AUTO-DISCOVER OK] Found & bypassed signature symbol '$symName' at offset 0x${Integer.toHexString(offset)}", "OK")
-        }
-
         if (patchedCount > 0) {
             try {
                 targetFile.writeBytes(kernelBytes)
