@@ -1,323 +1,312 @@
 {
-    "baseUrl": "https://raw.githubusercontent.com/bmjubairdadu/kernel-loader/drivers",
-    "branch": "drivers",
-    "count": 31,
-    "drivers": [
-        {
-            "version": "4.14.113-25741605 SMP preempt mod_unload aarch64",
-            "file": "uni_4.14.113-25741605.ko",
-            "variant": "rt",
-            "label": "4.14.113-25741605",
-            "sha256": "c785ad8a5352cfb8f7ed630885bfadefdad8b1dd5d912ec3e129705e09fc7a2f",
-            "size": 231952,
-            "buildDate": "2026-10-24T16:58:06Z",
-            "source": "samsung-m31-exynos9611",
-            "verified": false
-        },
-        {
-            "buildDate": "2026-10-24T16:58:06Z",
-            "file": "uni_4.14.117-perf+.ko",
-            "label": "4.14.117",
-            "sha256": "a5118b2c93619cfdc7e3faa809869f13b79e4bbfa7ec747e5f7c227d423eaac9",
-            "size": 231952,
-            "variant": "rt",
-            "version": "4.14.117-perf+ SMP preempt mod_unload modversions aarch64"
-        },
-        {
-            "version": "4.14.141-g4e3bb1fab-dirty SMP preempt mod_unload modversions aarch64",
-            "file": "uni_4.14.141-g4e3bb1fab-dirty.ko",
-            "variant": "rt",
-            "label": "4.14.141",
-            "sha256": "7efe363ffa367fabcdcf32db1a2b23f94aeb58772b287e8be3861b60ba5a265d",
-            "size": 231952,
-            "buildDate": "2026-10-24T16:58:06Z",
-            "source": "vendor-sh",
-            "verified": false
-        },
-        {
-            "buildDate": "2026-10-24T16:58:06Z",
-            "file": "uni_4.14.180-perf-g758bb7ef5-dirty.ko",
-            "label": "4.14.180-190",
-            "sha256": "90f9551ea8d72dfc652ffcded7072aafa473eadd3a4a4b803bfe9d1fdbf04aaa",
-            "size": 231952,
-            "variant": "rt",
-            "version": "4.14.180-perf-g758bb7ef5-dirty SMP preempt mod_unload modversions aarch64"
-        },
-        {
-            "buildDate": "2026-10-24T16:58:06Z",
-            "file": "uni_4.14.186-g49c02c2de-dirty.ko",
-            "label": "4.14.186",
-            "sha256": "7ba40ee7bc4182e10f6bc9cf98e66f203531a02cea8476c2badeb219968c32c1",
-            "size": 231952,
-            "variant": "rt",
-            "version": "4.14.186-g49c02c2de-dirty SMP preempt mod_unload modversions aarch64"
-        },
-        {
-            "version": "4.14.186-perf-g30fa96c92-dirty SMP preempt mod_unload modversions aarch64",
-            "file": "uni_4.14.186-perf-g30fa96c92-dirty.ko",
-            "variant": "rt",
-            "label": "4.14.186b",
-            "sha256": "48b3cb50572f60cae80ab0d871ad94b3a719428e66fb269c8826dffe06d8a787",
-            "size": 231952,
-            "buildDate": "2026-10-24T16:58:06Z",
-            "source": "vendor-sh",
-            "verified": false
-        },
-        {
-            "buildDate": "2026-10-24T16:58:06Z",
-            "file": "uni_4.14.186-perf-g9be022c0d-dirty.ko",
-            "label": "4.14.186c",
-            "sha256": "83fd43d6827f8f4d892d36566b0a1552e873c774d8255f9d91f56cf718901134",
-            "size": 231952,
-            "variant": "rt",
-            "version": "4.14.186-perf-g9be022c0d-dirty SMP preempt mod_unload modversions aarch64"
-        },
-        {
-            "version": "4.14.190-perf-g17171cc0d-dirty SMP preempt mod_unload modversions aarch64",
-            "file": "uni_4.14.190-perf-g17171cc0d-dirty.ko",
-            "variant": "rt",
-            "label": "4.14.190",
-            "sha256": "e82100c40408a934552c3eaeeb8af6be114cbe8a66adb4f14ed730139de32cda",
-            "size": 231952,
-            "buildDate": "2026-10-24T16:58:06Z",
-            "source": "vendor-sh",
-            "verified": false
-        },
-        {
-            "version": "4.14.264-GrassKSU@c717269a78 SMP preempt mod_unload modversions aarch64",
-            "file": "uni_4.14.264-GrassKSU@c717269a78.ko",
-            "variant": "rt",
-            "label": "4.14.264-GrassKSU@c717269a78",
-            "sha256": "4091380897de56b5cf469eb51c984cc52119f230c5a0833423bf4cb69d235be3",
-            "size": 231952,
-            "buildDate": "2026-10-24T16:58:06Z",
-            "source": "samsung-universal9611-grass",
-            "verified": true,
-            "testStatus": "qemu-pass",
-            "testDate": "2026-10-19T16:53:53Z",
-            "testDetails": "QEMU 4.14.264 phone-identical kernel: load OK, node 0666 OK, read/write/cross-page/multipage OK, cross-process child R/W OK, EIO/EINVAL OK, 32-bit compat 5/5 OK, stress-race 2500x = 2500/2500 0 err; 403s stable, no crash/oops"
-        },
-        {
-            "version": "4.14.357-openela-perf-g673b80046ab9 SMP preempt mod_unload modversions aarch64",
-            "file": "uni_4.14.357-openela-perf-g673b80046ab9.ko",
-            "variant": "rt",
-            "label": "4.14.357-openela-perf-g673b80046ab9",
-            "sha256": "56254abb24a2aa25470466569c940269f3805bf51f7d04dd8f8f3769fbd08435",
-            "size": 231952,
-            "buildDate": "2026-10-24T16:58:06Z",
-            "verified": true,
-            "source": "kernel-rebuild-safe"
-        },
-        {
-            "buildDate": "2026-10-24T16:58:06Z",
-            "file": "uni_4.19.113-perf-g2fdca3872-dirty.ko",
-            "label": "4.19.113",
-            "sha256": "f428fcd0e7941ebe87ed0ec370a25c8c67b1e2085e5d67a73e862088f4d8e05e",
-            "size": 296344,
-            "variant": "rt",
-            "version": "4.19.113-perf-g2fdca3872-dirty SMP preempt mod_unload modversions aarch64"
-        },
-        {
-            "buildDate": "2026-10-24T16:58:06Z",
-            "file": "uni_4.19.157-perf-g9aba441cf6cd-dirty.ko",
-            "label": "4.19.157",
-            "sha256": "a51628b6d62e47b88f747bbf02073b69a882662d6ee9df0c48d533e9f2ded00c",
-            "size": 296344,
-            "variant": "rt",
-            "version": "4.19.157-perf-g9aba441cf6cd-dirty SMP preempt mod_unload modversions aarch64"
-        },
-        {
-            "version": "4.19.157-perf-g1a6087bc0325-dirty SMP preempt mod_unload modversions aarch64",
-            "file": "uni_4.19.157-perf-g1a6087bc0325-dirty.ko",
-            "variant": "rt",
-            "label": "4.19.157-perf-g1a6087bc0325-dirty",
-            "sha256": "f65896c7aecb8c15f9f9d599a6dad426e91af98437db704d9ee122e80191258e",
-            "size": 296344,
-            "buildDate": "2026-10-24T16:58:06Z",
-            "verified": true,
-            "source": "sm6115-3.3.4-freeze-fix"
-        },
-        {
-            "buildDate": "2026-10-24T16:58:06Z",
-            "file": "uni_4.19.157-perf+.ko",
-            "label": "4.19.157b",
-            "sha256": "89d2361097940f32f17cced1a2348d9cb1f3319b1164aa04be45fae3fcca7311",
-            "size": 296344,
-            "variant": "rt",
-            "version": "4.19.157-perf+ SMP preempt mod_unload modversions aarch64"
-        },
-        {
-            "buildDate": "2026-10-24T16:58:06Z",
-            "file": "uni_4.19.191-perf-g42825e29c289-dirty.ko",
-            "label": "4.19.191-ColorOS",
-            "sha256": "6acd48351e7b6ee67294f8d0345b5dcb501fadf99700609d77214cab5653dca4",
-            "size": 296344,
-            "variant": "rt",
-            "version": "4.19.191-perf-g42825e29c289-dirty SMP preempt mod_unload modversions aarch64"
-        },
-        {
-            "buildDate": "2026-10-24T16:58:06Z",
-            "file": "uni_4.19.191-g914ba8403bb3-dirty.ko",
-            "label": "4.19.191-note12pro",
-            "sha256": "abfaea3be53436ba66d93585e66b924949184074dbf5830018546665738834e5",
-            "size": 296344,
-            "variant": "rt",
-            "version": "4.19.191-g914ba8403bb3-dirty SMP preempt mod_unload modversions aarch64"
-        },
-        {
-            "version": "4.19.191+ SMP preempt mod_unload modversions aarch64",
-            "file": "uni_4.19.191+.ko",
-            "variant": "rt",
-            "label": "4.19.191b",
-            "sha256": "e780e241efeeeb6832e927c50ab4ec3e31f85e1091adb6b5b619390ce215921b",
-            "size": 296344,
-            "buildDate": "2026-10-24T16:58:06Z",
-            "source": "vendor-sh",
-            "verified": false
-        },
-        {
-            "buildDate": "2026-10-24T16:58:06Z",
-            "file": "uni_4.19.81-perf-g236f9eb09-dirty.ko",
-            "label": "4.19.81",
-            "sha256": "5e386ab7436547a28a4a0d0b2d02718cf8cc6c8f8154deabe1dd0c97faefe3a3",
-            "size": 296344,
-            "variant": "rt",
-            "version": "4.19.81-perf-g236f9eb09-dirty SMP preempt mod_unload modversions aarch64"
-        },
-        {
-            "buildDate": "2026-10-24T16:58:06Z",
-            "file": "uni_4.9.186-perf-gdcfb1676-dirty.ko",
-            "label": "4.9.186",
-            "sha256": "e14f5a8fa623055bf880fe25c97e5943f60e1819d7f4db2ffcedd8fced34f529",
-            "size": 45912,
-            "variant": "rt",
-            "version": "4.9.186-perf-gdcfb1676-dirty SMP preempt mod_unload modversions aarch64"
-        },
-        {
-            "version": "4.9.309-Chidori-Kernel SMP preempt mod_unload modversions aarch64",
-            "file": "uni_4.9.309-Chidori-Kernel.ko",
-            "variant": "rt",
-            "label": "4.9.309-Chidori-Kernel",
-            "sha256": "fdcf6609087b995607c71bd7bc9cd2ecb790b5fde3c5c488882db6f799dcf103",
-            "size": 45912,
-            "buildDate": "2026-10-24T16:58:06Z",
-            "verified": true,
-            "source": "onc-chidori-verified"
-        },
-        {
-            "buildDate": "2026-10-24T16:58:06Z",
-            "file": "uni_4.9.337-DaisyForGaming.ko",
-            "label": "4.9.337-DaisyForGaming",
-            "sha256": "697ccf3491cdcecca8c556a4c738b1b82f15079a4318acf9c6820e9f25759271",
-            "size": 45912,
-            "variant": "rt",
-            "version": "4.9.337-DaisyForGaming SMP preempt mod_unload modversions aarch64",
-            "verified": true,
-            "source": "pure-stealth-random-node"
-        },
-        {
-            "buildDate": "2026-10-24T16:58:06Z",
-            "file": "uni_5.10.198-00001-gcab9fa53e761-dirty.ko",
-            "label": "5.10",
-            "sha256": "f19826607fcb7a7721aa1a99bd3dde8822830d95f677367200b2d1549758c4fb",
-            "size": 457224,
-            "variant": "rt",
-            "version": "5.10.198-00001-gcab9fa53e761-dirty SMP preempt mod_unload modversions aarch64"
-        },
-        {
-            "buildDate": "2026-10-24T16:58:06Z",
-            "file": "uni_5.15.167-00023-g952e16e5fc48-dirty.ko",
-            "label": "5.15",
-            "sha256": "f3fc08f2389d878ce835a8c50a4b36290731a02a4784538b7a472a4c7bf24342",
-            "size": 167520,
-            "variant": "rt",
-            "version": "5.15.167-00023-g952e16e5fc48-dirty SMP preempt mod_unload modversions aarch64"
-        },
-        {
-            "version": "5.4.191-qgki-g7aac66291bd5-dirty SMP preempt mod_unload modversions aarch64",
-            "file": "uni_5.4.191-qgki-g7aac66291bd5-dirty.ko",
-            "variant": "rt",
-            "label": "5.4.191-qgki",
-            "sha256": "fb827d244f3168dcb7a4833c973ffcc23258b9caf0ff21db7568f97077a6db83",
-            "size": 326112,
-            "buildDate": "2026-10-24T16:58:06Z",
-            "source": "vendor-sh",
-            "verified": false
-        },
-        {
-            "buildDate": "2026-10-24T16:58:06Z",
-            "file": "uni_5.4.191-g7aac66291bd5-dirty.ko",
-            "label": "5.4oppo",
-            "sha256": "5244adcca64ca9a317aa1cedb73aa36012a1e32012b1b6f8d480226743fe056b",
-            "size": 326112,
-            "variant": "rt",
-            "version": "5.4.191-g7aac66291bd5-dirty SMP preempt mod_unload modversions aarch64"
-        },
-        {
-            "version": "5.4.61-qgki-ga9244def8-dirty SMP preempt mod_unload modversions aarch64",
-            "file": "uni_5.4.61-qgki-ga9244def8-dirty.ko",
-            "variant": "rt",
-            "label": "5.4.61-qgki",
-            "sha256": "f94bcb8fddb99146c6c9504c2694e584dfbe8713074812750cb7b67e88964a7a",
-            "size": 326112,
-            "buildDate": "2026-10-24T16:58:06Z",
-            "source": "vendor-sh",
-            "verified": false
-        },
-        {
-            "buildDate": "2026-10-24T16:58:06Z",
-            "file": "uni_6.1.112-00034-g226e9f92a06c-dirty.ko",
-            "label": "6.1",
-            "sha256": "5e4bfae3d5913fa8f000aa1af89fb98171ed3a27e9c34f9006f49947b3961ded",
-            "size": 171008,
-            "variant": "rt",
-            "version": "6.1.112-00034-g226e9f92a06c-dirty SMP preempt mod_unload modversions aarch64"
-        },
-        {
-            "version": "6.12.23-android16-5-maybe-dirty-4k SMP preempt mod_unload modversions aarch64",
-            "file": "uni_6.12.23-android16-5-maybe-dirty-4k.ko",
-            "variant": "rt",
-            "label": "6.12",
-            "sha256": "2022cdfb6c18badd6da98d96ad7eb4bff178461c1f86cc3841ddafb615de090c",
-            "size": 180248,
-            "buildDate": "2026-10-24T16:58:06Z",
-            "source": "vendor-sh",
-            "verified": false
-        },
-        {
-            "version": "6.12.30-android16-5-g1ed949324a3e-ab13881345-4k SMP preempt mod_unload modversions aarch64",
-            "file": "uni_6.12.30-android16-5-g1ed949324a3e-ab13881345-4k.ko",
-            "variant": "rt",
-            "label": "6.12.30-GrassKSU",
-            "sha256": "0fcb5353576fc683b518775eef0ea405c06462f15b2d9377daf540a87e0c2903",
-            "size": 180256,
-            "buildDate": "2026-10-24T16:58:06Z",
-            "source": "gki-unverified-perm-unverified",
-            "verified": false
-        },
-        {
-            "buildDate": "2026-10-24T16:58:06Z",
-            "file": "uni_6.6.57-4k-gd66e9166bfa1-dirty.ko",
-            "label": "6.6",
-            "sha256": "d1c5b743ac70517186080d58174ce94298e0712de0a00fc09c8f228802f6a665",
-            "size": 174824,
-            "variant": "rt",
-            "version": "6.6.57-4k-gd66e9166bfa1-dirty SMP preempt mod_unload modversions aarch64"
-        },
-        {
-            "buildDate": "2026-10-24T16:58:06Z",
-            "file": "uni_4.9.337-DaisyForGaming.ko",
-            "label": "4.9.337-DaisyForGaming (Zero-Lag)",
-            "sha256": "697ccf3491cdcecca8c556a4c738b1b82f15079a4318acf9c6820e9f25759271",
-            "size": 45912,
-            "variant": "native",
-            "version": "4.9.337-DaisyForGaming SMP preempt mod_unload modversions aarch64",
-            "verified": true,
-            "source": "pure-stealth-random-node"
-        }
-    ],
-    "updated": "2026-10-24T16:58:06Z",
-    "variants": {
-        "rt": "RT ABI - ioctl 0x801/0x802/0x803, success returns -EIO (0 on failure)"
+  "baseUrl": "https://raw.githubusercontent.com/bmjubairdadu/kernel-loader/drivers",
+  "branch": "drivers",
+  "count": 30,
+  "drivers": [
+    {
+      "version": "4.14.113-25741605 SMP preempt mod_unload aarch64",
+      "file": "uni_4.14.113-25741605.ko",
+      "variant": "rt",
+      "label": "4.14.113-25741605",
+      "sha256": "c785ad8a5352cfb8f7ed630885bfadefdad8b1dd5d912ec3e129705e09fc7a2f",
+      "size": 231952,
+      "buildDate": "2026-10-24T16:58:06Z",
+      "source": "samsung-m31-exynos9611",
+      "verified": false
+    },
+    {
+      "buildDate": "2026-10-24T16:58:06Z",
+      "file": "uni_4.14.117-perf+.ko",
+      "label": "4.14.117",
+      "sha256": "a5118b2c93619cfdc7e3faa809869f13b79e4bbfa7ec747e5f7c227d423eaac9",
+      "size": 231952,
+      "variant": "rt",
+      "version": "4.14.117-perf+ SMP preempt mod_unload modversions aarch64"
+    },
+    {
+      "version": "4.14.141-g4e3bb1fab-dirty SMP preempt mod_unload modversions aarch64",
+      "file": "uni_4.14.141-g4e3bb1fab-dirty.ko",
+      "variant": "rt",
+      "label": "4.14.141",
+      "sha256": "7efe363ffa367fabcdcf32db1a2b23f94aeb58772b287e8be3861b60ba5a265d",
+      "size": 231952,
+      "buildDate": "2026-10-24T16:58:06Z",
+      "source": "vendor-sh",
+      "verified": false
+    },
+    {
+      "buildDate": "2026-10-24T16:58:06Z",
+      "file": "uni_4.14.180-perf-g758bb7ef5-dirty.ko",
+      "label": "4.14.180-190",
+      "sha256": "90f9551ea8d72dfc652ffcded7072aafa473eadd3a4a4b803bfe9d1fdbf04aaa",
+      "size": 231952,
+      "variant": "rt",
+      "version": "4.14.180-perf-g758bb7ef5-dirty SMP preempt mod_unload modversions aarch64"
+    },
+    {
+      "buildDate": "2026-10-24T16:58:06Z",
+      "file": "uni_4.14.186-g49c02c2de-dirty.ko",
+      "label": "4.14.186",
+      "sha256": "7ba40ee7bc4182e10f6bc9cf98e66f203531a02cea8476c2badeb219968c32c1",
+      "size": 231952,
+      "variant": "rt",
+      "version": "4.14.186-g49c02c2de-dirty SMP preempt mod_unload modversions aarch64"
+    },
+    {
+      "version": "4.14.186-perf-g30fa96c92-dirty SMP preempt mod_unload modversions aarch64",
+      "file": "uni_4.14.186-perf-g30fa96c92-dirty.ko",
+      "variant": "rt",
+      "label": "4.14.186b",
+      "sha256": "48b3cb50572f60cae80ab0d871ad94b3a719428e66fb269c8826dffe06d8a787",
+      "size": 231952,
+      "buildDate": "2026-10-24T16:58:06Z",
+      "source": "vendor-sh",
+      "verified": false
+    },
+    {
+      "buildDate": "2026-10-24T16:58:06Z",
+      "file": "uni_4.14.186-perf-g9be022c0d-dirty.ko",
+      "label": "4.14.186c",
+      "sha256": "83fd43d6827f8f4d892d36566b0a1552e873c774d8255f9d91f56cf718901134",
+      "size": 231952,
+      "variant": "rt",
+      "version": "4.14.186-perf-g9be022c0d-dirty SMP preempt mod_unload modversions aarch64"
+    },
+    {
+      "version": "4.14.190-perf-g17171cc0d-dirty SMP preempt mod_unload modversions aarch64",
+      "file": "uni_4.14.190-perf-g17171cc0d-dirty.ko",
+      "variant": "rt",
+      "label": "4.14.190",
+      "sha256": "e82100c40408a934552c3eaeeb8af6be114cbe8a66adb4f14ed730139de32cda",
+      "size": 231952,
+      "buildDate": "2026-10-24T16:58:06Z",
+      "source": "vendor-sh",
+      "verified": false
+    },
+    {
+      "version": "4.14.264-GrassKSU@c717269a78 SMP preempt mod_unload modversions aarch64",
+      "file": "uni_4.14.264-GrassKSU@c717269a78.ko",
+      "variant": "rt",
+      "label": "4.14.264-GrassKSU@c717269a78",
+      "sha256": "4091380897de56b5cf469eb51c984cc52119f230c5a0833423bf4cb69d235be3",
+      "size": 231952,
+      "buildDate": "2026-10-24T16:58:06Z",
+      "source": "samsung-universal9611-grass",
+      "verified": true,
+      "testStatus": "qemu-pass",
+      "testDate": "2026-10-19T16:53:53Z",
+      "testDetails": "QEMU 4.14.264 phone-identical kernel: load OK, node 0666 OK, read/write/cross-page/multipage OK, cross-process child R/W OK, EIO/EINVAL OK, 32-bit compat 5/5 OK, stress-race 2500x = 2500/2500 0 err; 403s stable, no crash/oops"
+    },
+    {
+      "version": "4.14.357-openela-perf-g673b80046ab9 SMP preempt mod_unload modversions aarch64",
+      "file": "uni_4.14.357-openela-perf-g673b80046ab9.ko",
+      "variant": "rt",
+      "label": "4.14.357-openela-perf-g673b80046ab9",
+      "sha256": "4eb1d0c29bd06699e6b7db36d499dc72723b4ac55430b05ca06109508f105ab5",
+      "size": 35136,
+      "buildDate": "2026-10-25T06:11:25Z",
+      "verified": true,
+      "source": "kernel-rebuild-safe"
+    },
+    {
+      "buildDate": "2026-10-24T16:58:06Z",
+      "file": "uni_4.19.113-perf-g2fdca3872-dirty.ko",
+      "label": "4.19.113",
+      "sha256": "f428fcd0e7941ebe87ed0ec370a25c8c67b1e2085e5d67a73e862088f4d8e05e",
+      "size": 296344,
+      "variant": "rt",
+      "version": "4.19.113-perf-g2fdca3872-dirty SMP preempt mod_unload modversions aarch64"
+    },
+    {
+      "buildDate": "2026-10-24T16:58:06Z",
+      "file": "uni_4.19.157-perf-g9aba441cf6cd-dirty.ko",
+      "label": "4.19.157",
+      "sha256": "a51628b6d62e47b88f747bbf02073b69a882662d6ee9df0c48d533e9f2ded00c",
+      "size": 296344,
+      "variant": "rt",
+      "version": "4.19.157-perf-g9aba441cf6cd-dirty SMP preempt mod_unload modversions aarch64"
+    },
+    {
+      "version": "4.19.157-perf-g1a6087bc0325-dirty SMP preempt mod_unload modversions aarch64",
+      "file": "uni_4.19.157-perf-g1a6087bc0325-dirty.ko",
+      "variant": "rt",
+      "label": "4.19.157-perf-g1a6087bc0325-dirty",
+      "sha256": "c1c7fd5fcc40663cc5e49fcfe9cb21542c6201525ff3186dbbba7a86402d532c",
+      "size": 29776,
+      "buildDate": "2026-10-25T06:11:25Z",
+      "verified": true,
+      "source": "sm6115-3.3.4-freeze-fix"
+    },
+    {
+      "buildDate": "2026-10-25T06:11:25Z",
+      "file": "uni_4.19.157-perf+.ko",
+      "label": "4.19.157b",
+      "sha256": "f3e28132e9d4a2eb79f3790cc35254b7b28a459214f10a778cf18372c111df93",
+      "size": 29776,
+      "variant": "rt",
+      "version": "4.19.157-perf+ SMP preempt mod_unload modversions aarch64"
+    },
+    {
+      "buildDate": "2026-10-24T16:58:06Z",
+      "file": "uni_4.19.191-perf-g42825e29c289-dirty.ko",
+      "label": "4.19.191-ColorOS",
+      "sha256": "6acd48351e7b6ee67294f8d0345b5dcb501fadf99700609d77214cab5653dca4",
+      "size": 296344,
+      "variant": "rt",
+      "version": "4.19.191-perf-g42825e29c289-dirty SMP preempt mod_unload modversions aarch64"
+    },
+    {
+      "buildDate": "2026-10-24T16:58:06Z",
+      "file": "uni_4.19.191-g914ba8403bb3-dirty.ko",
+      "label": "4.19.191-note12pro",
+      "sha256": "abfaea3be53436ba66d93585e66b924949184074dbf5830018546665738834e5",
+      "size": 296344,
+      "variant": "rt",
+      "version": "4.19.191-g914ba8403bb3-dirty SMP preempt mod_unload modversions aarch64"
+    },
+    {
+      "version": "4.19.191+ SMP preempt mod_unload modversions aarch64",
+      "file": "uni_4.19.191+.ko",
+      "variant": "rt",
+      "label": "4.19.191b",
+      "sha256": "e780e241efeeeb6832e927c50ab4ec3e31f85e1091adb6b5b619390ce215921b",
+      "size": 296344,
+      "buildDate": "2026-10-24T16:58:06Z",
+      "source": "vendor-sh",
+      "verified": false
+    },
+    {
+      "buildDate": "2026-10-24T16:58:06Z",
+      "file": "uni_4.19.81-perf-g236f9eb09-dirty.ko",
+      "label": "4.19.81",
+      "sha256": "5e386ab7436547a28a4a0d0b2d02718cf8cc6c8f8154deabe1dd0c97faefe3a3",
+      "size": 296344,
+      "variant": "rt",
+      "version": "4.19.81-perf-g236f9eb09-dirty SMP preempt mod_unload modversions aarch64"
+    },
+    {
+      "buildDate": "2026-10-24T16:58:06Z",
+      "file": "uni_4.9.186-perf-gdcfb1676-dirty.ko",
+      "label": "4.9.186",
+      "sha256": "e14f5a8fa623055bf880fe25c97e5943f60e1819d7f4db2ffcedd8fced34f529",
+      "size": 45912,
+      "variant": "rt",
+      "version": "4.9.186-perf-gdcfb1676-dirty SMP preempt mod_unload modversions aarch64"
+    },
+    {
+      "version": "4.9.309-Chidori-Kernel SMP preempt mod_unload modversions aarch64",
+      "file": "uni_4.9.309-Chidori-Kernel.ko",
+      "variant": "rt",
+      "label": "4.9.309-Chidori-Kernel",
+      "sha256": "fdcf6609087b995607c71bd7bc9cd2ecb790b5fde3c5c488882db6f799dcf103",
+      "size": 45912,
+      "buildDate": "2026-10-24T16:58:06Z",
+      "verified": true,
+      "source": "onc-chidori-verified"
+    },
+    {
+      "buildDate": "2026-10-24T16:58:06Z",
+      "file": "uni_4.9.337-DaisyForGaming.ko",
+      "label": "4.9.337-DaisyForGaming",
+      "sha256": "697ccf3491cdcecca8c556a4c738b1b82f15079a4318acf9c6820e9f25759271",
+      "size": 45912,
+      "variant": "rt",
+      "version": "4.9.337-DaisyForGaming SMP preempt mod_unload modversions aarch64",
+      "verified": true,
+      "source": "pure-stealth-random-node"
+    },
+    {
+      "buildDate": "2026-10-24T16:58:06Z",
+      "file": "uni_5.10.198-00001-gcab9fa53e761-dirty.ko",
+      "label": "5.10",
+      "sha256": "f19826607fcb7a7721aa1a99bd3dde8822830d95f677367200b2d1549758c4fb",
+      "size": 457224,
+      "variant": "rt",
+      "version": "5.10.198-00001-gcab9fa53e761-dirty SMP preempt mod_unload modversions aarch64"
+    },
+    {
+      "buildDate": "2026-10-24T16:58:06Z",
+      "file": "uni_5.15.167-00023-g952e16e5fc48-dirty.ko",
+      "label": "5.15",
+      "sha256": "f3fc08f2389d878ce835a8c50a4b36290731a02a4784538b7a472a4c7bf24342",
+      "size": 167520,
+      "variant": "rt",
+      "version": "5.15.167-00023-g952e16e5fc48-dirty SMP preempt mod_unload modversions aarch64"
+    },
+    {
+      "version": "5.4.191-qgki-g7aac66291bd5-dirty SMP preempt mod_unload modversions aarch64",
+      "file": "uni_5.4.191-qgki-g7aac66291bd5-dirty.ko",
+      "variant": "rt",
+      "label": "5.4.191-qgki",
+      "sha256": "fb827d244f3168dcb7a4833c973ffcc23258b9caf0ff21db7568f97077a6db83",
+      "size": 326112,
+      "buildDate": "2026-10-24T16:58:06Z",
+      "source": "vendor-sh",
+      "verified": false
+    },
+    {
+      "buildDate": "2026-10-24T16:58:06Z",
+      "file": "uni_5.4.191-g7aac66291bd5-dirty.ko",
+      "label": "5.4oppo",
+      "sha256": "5244adcca64ca9a317aa1cedb73aa36012a1e32012b1b6f8d480226743fe056b",
+      "size": 326112,
+      "variant": "rt",
+      "version": "5.4.191-g7aac66291bd5-dirty SMP preempt mod_unload modversions aarch64"
+    },
+    {
+      "version": "5.4.61-qgki-ga9244def8-dirty SMP preempt mod_unload modversions aarch64",
+      "file": "uni_5.4.61-qgki-ga9244def8-dirty.ko",
+      "variant": "rt",
+      "label": "5.4.61-qgki",
+      "sha256": "f94bcb8fddb99146c6c9504c2694e584dfbe8713074812750cb7b67e88964a7a",
+      "size": 326112,
+      "buildDate": "2026-10-24T16:58:06Z",
+      "source": "vendor-sh",
+      "verified": false
+    },
+    {
+      "buildDate": "2026-10-24T16:58:06Z",
+      "file": "uni_6.1.112-00034-g226e9f92a06c-dirty.ko",
+      "label": "6.1",
+      "sha256": "5e4bfae3d5913fa8f000aa1af89fb98171ed3a27e9c34f9006f49947b3961ded",
+      "size": 171008,
+      "variant": "rt",
+      "version": "6.1.112-00034-g226e9f92a06c-dirty SMP preempt mod_unload modversions aarch64"
+    },
+    {
+      "version": "6.12.23-android16-5-maybe-dirty-4k SMP preempt mod_unload modversions aarch64",
+      "file": "uni_6.12.23-android16-5-maybe-dirty-4k.ko",
+      "variant": "rt",
+      "label": "6.12",
+      "sha256": "2022cdfb6c18badd6da98d96ad7eb4bff178461c1f86cc3841ddafb615de090c",
+      "size": 180248,
+      "buildDate": "2026-10-24T16:58:06Z",
+      "source": "vendor-sh",
+      "verified": false
+    },
+    {
+      "version": "6.12.30-android16-5-g1ed949324a3e-ab13881345-4k SMP preempt mod_unload modversions aarch64",
+      "file": "uni_6.12.30-android16-5-g1ed949324a3e-ab13881345-4k.ko",
+      "variant": "rt",
+      "label": "6.12.30-GrassKSU",
+      "sha256": "0fcb5353576fc683b518775eef0ea405c06462f15b2d9377daf540a87e0c2903",
+      "size": 180256,
+      "buildDate": "2026-10-24T16:58:06Z",
+      "source": "gki-unverified-perm-unverified",
+      "verified": false
+    },
+    {
+      "buildDate": "2026-10-24T16:58:06Z",
+      "file": "uni_6.6.57-4k-gd66e9166bfa1-dirty.ko",
+      "label": "6.6",
+      "sha256": "d1c5b743ac70517186080d58174ce94298e0712de0a00fc09c8f228802f6a665",
+      "size": 174824,
+      "variant": "rt",
+      "version": "6.6.57-4k-gd66e9166bfa1-dirty SMP preempt mod_unload modversions aarch64"
     }
+  ],
+  "updated": "2026-10-25T06:11:25Z",
+  "variants": {
+    "rt": "RT ABI - ioctl 0x801/0x802/0x803, success returns -EIO (0 on failure)"
+  }
 }
