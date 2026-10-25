@@ -195,10 +195,10 @@
       "file": "uni_4.14.357-openela-perf-g673b80046ab9.ko",
       "variant": "rt",
       "label": "4.14.357-openela-perf-g673b80046ab9",
-      "sha256": "b8de58a2bf8e2a5cfb90b66413b3c7a1304e243f414fc1ec910f2b230fff57f4",
-      "size": 34520,
-      "buildDate": "2026-10-25T07:18:24Z",
-      "source": "openela-lts-pure-rt-no-preempt",
+      "sha256": "e1605120c5283f08b6a7404975183363c830219adc8656167c244a27dbbcde1a",
+      "size": 29856,
+      "buildDate": "2026-10-25T08:23:32Z",
+      "source": "official-openela-4.14.357-kernel-source",
       "verified": true
     },
     {
@@ -213,7 +213,7 @@
       "verified": true
     }
   ],
-  "updated": "2026-10-25T07:18:24Z",
+  "updated": "2026-10-25T08:23:32Z",
   "variants": {
     "rt": "RT ABI - ioctl 0x801/0x802/0x803, success returns -EIO (0 on failure)"
   }
