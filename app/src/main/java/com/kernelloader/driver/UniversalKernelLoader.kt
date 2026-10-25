@@ -270,14 +270,59 @@ object UniversalKernelLoader {
     private fun viewModelModule(vm: DriverViewModel): String =
         vm.loadedModuleName.value.ifBlank { "driver" }
 
+    fun ensureProbeBinaries(context: Context) {
+        try {
+            val localMyprobe = File(context.filesDir, "myprobe")
+            if (!localMyprobe.exists() || localMyprobe.length() == 0L) {
+                context.assets.open("bin/myprobe").use { input ->
+                    localMyprobe.outputStream().use { output -> input.copyTo(output) }
+                }
+            }
+            Shell.cmd(
+                "cp \"${localMyprobe.absolutePath}\" /data/local/tmp/myprobe 2>/dev/null",
+                "chmod 755 /data/local/tmp/myprobe 2>/dev/null"
+            ).exec()
+        } catch (_: Exception) {}
+
+        try {
+            val localDriverSh = File(context.filesDir, "driver.sh")
+            if (!localDriverSh.exists() || localDriverSh.length() == 0L) {
+                context.assets.open("bin/driver.sh").use { input ->
+                    localDriverSh.outputStream().use { output -> input.copyTo(output) }
+                }
+            }
+            Shell.cmd(
+                "cp \"${localDriverSh.absolutePath}\" /data/local/tmp/driver.sh 2>/dev/null",
+                "chmod 755 /data/local/tmp/driver.sh 2>/dev/null"
+            ).exec()
+        } catch (_: Exception) {}
+    }
+
+    fun directIoctlProbe(context: Context?, node: String): Boolean {
+        if (context == null || node.isBlank()) return false
+        val cleanNode = node.removePrefix("/dev/").trim()
+        if (!isCharNode(cleanNode)) return false
+        return try {
+            ensureProbeBinaries(context)
+            val res = Shell.cmd("/data/local/tmp/myprobe /dev/$cleanNode 2>&1").exec().out
+            res.any { line ->
+                (line.contains("0x803 modbase: rc=0") && !line.contains("base=0x0")) ||
+                line.contains("0x801 read: rc=0")
+            }
+        } catch (e: Exception) {
+            false
+        }
+    }
+
     /**
      * Runs the bundled dmtest probe and returns the /dev node it verified as OUR driver
-     * (RT/QX ioctl ABI), or null. This is the authoritative node gate: it cannot be
-     * fooled by concurrently-created stock nodes because it actually issues ioctls.
+     * (RT/QX ioctl ABI), or null. If dmtest doesn't find the node (e.g. for randomized
+     * nodes from custom builds), falls back to direct IOCTL probe (0x803/0x801).
      */
     fun probeOurDriverNode(context: Context?, vm: DriverViewModel): String? {
         if (context == null) return null
-        return try {
+        ensureProbeBinaries(context)
+        try {
             val local = File(context.filesDir, "dmtest")
             if (!local.exists() || local.length() == 0L) {
                 context.assets.open("dmtest").use { input ->
@@ -289,16 +334,33 @@ object UniversalKernelLoader {
                 "chmod 755 /data/local/tmp/dmtest 2>/dev/null",
                 "/data/local/tmp/dmtest /data/local/tmp/dmtest_probe.txt 2>&1"
             ).exec()
-            val verdict = res.out.firstOrNull { it.contains("verdict: our driver") } ?: return null
-            val raw = verdict.substringAfter('=').trim()
-            val node = raw.substringBefore(' ').trim().removePrefix("/dev/").trim()
-            // dmtest prints "NOT FOUND" (and engine pick "NONE") when nothing is
-            // resident - those sentinels must never be mistaken for a node name.
-            val sentinel = node.isBlank() || node.equals("NOT", true) || node.equals("NONE", true) ||
-                node.equals("FOUND", true) || node.startsWith("!!")
-            if (sentinel || !node.all { it.isLetterOrDigit() || it == '_' || it == '-' || it == '.' }) return null
-            // The node must actually exist as a char device right now.
-            return if (Shell.cmd("test -c /dev/$node 2>/dev/null").exec().isSuccess) node else null
+            val verdict = res.out.firstOrNull { it.contains("verdict: our driver") }
+            if (verdict != null) {
+                val raw = verdict.substringAfter('=').trim()
+                val node = raw.substringBefore(' ').trim().removePrefix("/dev/").trim()
+                val sentinel = node.isBlank() || node.equals("NOT", true) || node.equals("NONE", true) ||
+                    node.equals("FOUND", true) || node.startsWith("!!")
+                if (!sentinel && node.all { it.isLetterOrDigit() || it == '_' || it == '-' || it == '.' }) {
+                    if (isCharNode(node)) return node
+                }
+            }
+        } catch (_: Exception) {}
+
+        // Fallback / Direct IOCTL probe: check random pool and known driver candidate nodes
+        return try {
+            val devNodes = Shell.cmd("ls /dev 2>/dev/null").exec().out.map { it.trim() }
+            val preferred = vm.preferredDevNode().removePrefix("/dev/").trim()
+            val poolCandidates = devNodes.filter { it.matches(Regex("^[A-GNYB]{6,8}$")) }
+            val fixedCandidates = listOfNotNull(
+                preferred.ifBlank { null }, "dmsync", "kmem_337", "memacc", "entryi"
+            )
+            val allCandidates = (poolCandidates + fixedCandidates).distinct()
+            for (cand in allCandidates) {
+                if (directIoctlProbe(context, cand)) {
+                    return cand
+                }
+            }
+            null
         } catch (e: Exception) {
             null
         }
@@ -393,6 +455,12 @@ object UniversalKernelLoader {
                     vm.tlog("[SCAN] Fresh /dev nodes: ${fresh.take(4).joinToString(", ")} — probe gate did not confirm ours yet", "INFO")
                 }
             }
+            val poolHit = devList.firstOrNull { it.matches(Regex("^[A-GNYB]{6,8}$")) && isCharNode(it) }
+            if (poolHit != null) {
+                exactNode = true
+                foundNodeName = poolHit
+                break
+            }
             val hit = candidates.firstOrNull { it in devList && isCharNode(it) }
             if (hit != null) {
                 exactNode = true
@@ -411,10 +479,20 @@ object UniversalKernelLoader {
 
         if (!exactNode) {
             vm.tlog("[SYSFS] Scanning /sys/class for registered driver devices...", "INFO")
-            val sysDevs = Shell.cmd(
+            var sysDevs = Shell.cmd(
                 "for f in /sys/class/dmsync*/dev /sys/class/sysync*/dev /sys/class/uni*/dev /sys/class/dmsync*/*/dev /sys/class/kmem*/dev /sys/class/kmem*/*/dev /sys/class/memacc*/dev; do " +
                         "if [ -f \"\$f\" ]; then echo \"\$(cat \"\$f\") \$f\"; break; fi; done 2>/dev/null"
             ).exec().out.firstOrNull()?.trim()
+
+            if (sysDevs.isNullOrBlank()) {
+                val poolCls = Shell.cmd("ls /sys/class 2>/dev/null").exec().out
+                    .map { it.trim() }
+                    .firstOrNull { it.matches(Regex("^[A-GNYB]{6,8}$")) }
+                if (poolCls != null) {
+                    val mm = Shell.cmd("cat /sys/class/$poolCls/dev 2>/dev/null").exec().out.firstOrNull()?.trim()
+                    if (!mm.isNullOrBlank()) sysDevs = "$mm /sys/class/$poolCls/dev"
+                }
+            }
 
             if (!sysDevs.isNullOrBlank()) {
                 val mm = sysDevs.substringBefore(' ').trim()

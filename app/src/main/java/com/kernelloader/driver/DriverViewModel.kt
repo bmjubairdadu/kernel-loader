@@ -705,7 +705,11 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                             it.contains("NOT ours")
                     }
 
-                    if (allFailedLines.isEmpty() && outLines.any { it.contains("PASS") }) {
+                    val directProbePassed = UniversalKernelLoader.directIoctlProbe(context, devNode)
+                    if (directProbePassed) {
+                        tlog("[0x803] ModBase & MemRead verified via direct IOCTL", "OK")
+                        tlog("[STATUS] Driver 100% active & operational! (Direct IOCTL Verified)", "OK")
+                    } else if (allFailedLines.isEmpty() && outLines.any { it.contains("PASS") }) {
                         tlog("[STATUS] Driver 100% active & operational!", "OK")
                     } else {
                         tlog("--- ROOT CAUSE & FIX GUIDE ---", "CMD")
@@ -918,31 +922,32 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
      * snapshot and mknod each fresh class device. Returns created node names.
      */
     private fun mknodNewSysClasses(before: Set<String>): List<String> {
-        if (before.isEmpty()) return emptyList()
-        val fresh = snapshotSysClasses() - before
         val made = mutableListOf<String>()
-        for (cls in fresh) {
-            val dev = Shell.cmd("cat /sys/class/$cls/dev 2>/dev/null").exec().out
-                .firstOrNull()?.trim() ?: continue
-            val mm = dev.split(":")
-            val maj = mm.getOrNull(0)?.trim()?.toIntOrNull()
-            val min = mm.getOrNull(1)?.trim()?.toIntOrNull()
-            if (maj == null || min == null) continue
-            val safe = cls.replace(Regex("[^A-Za-z0-9_.-]"), "")
-            if (safe.isBlank()) continue
-            if (Shell.cmd("test -c /dev/$safe 2>/dev/null").exec().isSuccess) continue
-            Shell.cmd(
-                "mknod -m 666 /dev/$safe c $maj $min 2>/dev/null",
-                "chcon u:object_r:device:s0 /dev/$safe 2>/dev/null"
-            ).exec()
-            if (Shell.cmd("test -c /dev/$safe").exec().isSuccess) made.add(safe)
+        if (before.isNotEmpty()) {
+            val fresh = snapshotSysClasses() - before
+            for (cls in fresh) {
+                val dev = Shell.cmd("cat /sys/class/$cls/dev 2>/dev/null").exec().out
+                    .firstOrNull()?.trim() ?: continue
+                val mm = dev.split(":")
+                val maj = mm.getOrNull(0)?.trim()?.toIntOrNull()
+                val min = mm.getOrNull(1)?.trim()?.toIntOrNull()
+                if (maj == null || min == null) continue
+                val safe = cls.replace(Regex("[^A-Za-z0-9_.-]"), "")
+                if (safe.isBlank()) continue
+                if (Shell.cmd("test -c /dev/$safe 2>/dev/null").exec().isSuccess) continue
+                Shell.cmd(
+                    "mknod -m 666 /dev/$safe c $maj $min 2>/dev/null",
+                    "chcon u:object_r:device:s0 /dev/$safe 2>/dev/null"
+                ).exec()
+                if (Shell.cmd("test -c /dev/$safe").exec().isSuccess) made.add(safe)
+            }
         }
         if (made.isEmpty()) made.addAll(mknodPatternSysClasses())
         return made
     }
 
     /**
-     * The driver's node/class names are 8 uppercase letters drawn from a fixed
+     * The driver's node/class names are uppercase letters drawn from a fixed
      * pool (B,Y,N,A,C,D,E,F,G) - no stock Android class looks like that.  When
      * the before/after diff finds nothing (e.g. the module was ALREADY resident
      * from an earlier attempt), this pattern scan still finds its classes.
@@ -950,9 +955,9 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
     private fun mknodPatternSysClasses(): List<String> {
         val made = mutableListOf<String>()
         val classes = Shell.cmd("ls /sys/class 2>/dev/null").exec().out
-            .map { it.trim() }.filter { it.matches(Regex("^[BDEFGACNY]{8}$")) }
+            .map { it.trim() }.filter { it.matches(Regex("^[A-GNYB]{6,8}$")) }
         for (cls in classes) {
-            if (!cls.all { it in "BDEFGACNY" }) continue
+            if (!cls.all { it in "ABCDEFGNYB" }) continue
             val dev = Shell.cmd("cat /sys/class/$cls/dev 2>/dev/null").exec().out
                 .firstOrNull()?.trim() ?: continue
             val mm = dev.split(":")
@@ -988,6 +993,11 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                     break
                 }
             }
+            val poolHit = nodes.firstOrNull { it.matches(Regex("^[A-GNYB]{6,8}$")) }
+            if (poolHit != null) {
+                foundNode = poolHit
+                break
+            }
             val candidates = listOf("dmsync", "kmem_337", "memacc")
             val hit = candidates.firstOrNull { it in nodes }
             if (hit != null) {
@@ -1009,15 +1019,25 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             val probedNode = try { UniversalKernelLoader.probeOurDriverNode(getApplication(), this@DriverViewModel) } catch (e: Exception) { null }
             if (probedNode != null && probedNode.isNotBlank()) {
                 foundNode = probedNode
-                tlog("[PROBE] dmtest verified /dev/$probedNode (RT/QX ABI)", "OK")
+                tlog("[PROBE] verified /dev/$probedNode (RT/QX ABI)", "OK")
             }
         }
 
         if (foundNode == null) {
-            val sysDevs = Shell.cmd(
+            var sysDevs = Shell.cmd(
                 "for f in /sys/class/dmsync*/dev /sys/class/sysync*/dev /sys/class/uni*/dev /sys/class/kmem*/dev /sys/class/memacc*/dev; do " +
                         "if [ -f \"\$f\" ]; then cat \"\$f\"; echo \" \${f}\"; break; fi; done 2>/dev/null"
             ).exec().out.firstOrNull()?.trim()
+
+            if (sysDevs.isNullOrBlank()) {
+                val poolCls = Shell.cmd("ls /sys/class 2>/dev/null").exec().out
+                    .map { it.trim() }
+                    .firstOrNull { it.matches(Regex("^[A-GNYB]{6,8}$")) }
+                if (poolCls != null) {
+                    val mm = Shell.cmd("cat /sys/class/$poolCls/dev 2>/dev/null").exec().out.firstOrNull()?.trim()
+                    if (!mm.isNullOrBlank()) sysDevs = "$mm /sys/class/$poolCls/dev"
+                }
+            }
 
             if (!sysDevs.isNullOrBlank()) {
                 val parts = sysDevs.split(Regex("\\s+"))
@@ -1049,10 +1069,11 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             // Final gate: the node must actually answer OUR ioctl ABI, else a
             // concurrently-created stock node could get adopted and remembered.
             val probedOk = try { UniversalKernelLoader.probeOurDriverNode(getApplication(), this@DriverViewModel) } catch (e: Exception) { null }
-            if (probedOk == null) {
+            val verifiedNode = probedOk ?: if (UniversalKernelLoader.directIoctlProbe(getApplication(), node)) node else null
+            if (verifiedNode == null) {
                 tlog("[PROBE FAIL] /dev/$node did not answer our ABI - rejecting node", "ERR")
                 // Only clean up node if it belongs to our random naming pool or recognized driver aliases
-                if (node.matches(Regex("^[BDEFGACNY]{8}$")) || node == "dmsync" || node == "kmem_337" || node == "memacc") {
+                if (node.matches(Regex("^[A-GNYB]{6,8}$")) || node == "dmsync" || node == "kmem_337" || node == "memacc") {
                     Shell.cmd("rm -f /dev/$node 2>/dev/null").exec()
                 }
                 // A resident module with no answering node = an earlier load is
@@ -1068,7 +1089,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                     tlog("[STALE] Reboot the phone FIRST, then tap LOAD", "ERR")
                 }
                 val poolCls = Shell.cmd("ls /sys/class 2>/dev/null").exec().out
-                    .map { it.trim() }.filter { it.matches(Regex("^[BDEFGACNY]{8}$")) }
+                    .map { it.trim() }.filter { it.matches(Regex("^[A-GNYB]{6,8}$")) }
                 if (poolCls.isNotEmpty()) {
                     tlog("[DIAG] driver classes present: ${poolCls.joinToString(",")}", "INFO")
                 }
@@ -1095,7 +1116,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                     }
                     Shell.cmd("cp \"${pbin.absolutePath}\" /data/local/tmp/myprobe 2>/dev/null", "chmod 755 /data/local/tmp/myprobe").exec()
                     val poolNodes = Shell.cmd("ls /dev 2>/dev/null").exec().out
-                        .map { it.trim() }.filter { it.matches(Regex("^[A-GNYB]{8}$")) }
+                        .map { it.trim() }.filter { it.matches(Regex("^[A-GNYB]{6,8}$")) }
                     for (n in poolNodes.take(3)) {
                         val r = Shell.cmd("/data/local/tmp/myprobe /dev/$n 2>&1").exec().out
                         r.filter { it.isNotBlank() }.take(4).forEach { tlog("[MYPROBE] /dev/$n ${it.take(80)}", "INFO") }

@@ -20,7 +20,7 @@ object SafetyGuard {
     fun hiddenDriverClass(): String? = try {
         Shell.cmd("ls /sys/class 2>/dev/null").exec().out
             .map { it.trim() }
-            .firstOrNull { it.startsWith("dmsync") || it.startsWith("kmem") || it.startsWith("memacc") }
+            .firstOrNull { it.startsWith("dmsync") || it.startsWith("kmem") || it.startsWith("memacc") || it.matches(Regex("^[A-GNYB]{6,8}$")) }
     } catch (e: Exception) {
         null
     }
