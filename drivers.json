@@ -195,10 +195,10 @@
       "file": "uni_4.14.357-openela-perf-g673b80046ab9.ko",
       "variant": "rt",
       "label": "4.14.357-openela-perf-g673b80046ab9",
-      "sha256": "624ca0b780fcfb38f11ad51a224fcc60050d5b645846f577d0e93a22708e19c6",
-      "size": 13272,
-      "buildDate": "2026-10-25T12:18:00Z",
-      "source": "kernel-drivers-safe-6char-english",
+      "sha256": "f9d12181540dddd5bfdf81cd32ed8e0d5a4970b9ca0a733af2ec10c3bf29cefc",
+      "size": 14456,
+      "buildDate": "2026-10-25T13:06:00Z",
+      "source": "kernel-drivers-safe-rocksolid-english",
       "verified": true
     },
     {
@@ -213,7 +213,7 @@
       "verified": true
     }
   ],
-  "updated": "2026-10-25T08:45:30Z",
+  "updated": "2026-10-25T13:06:00Z",
   "variants": {
     "rt": "RT ABI - ioctl 0x801/0x802/0x803, success returns -EIO (0 on failure)"
   }
