@@ -195,10 +195,10 @@
       "file": "uni_4.14.357-openela-perf-g673b80046ab9.ko",
       "variant": "rt",
       "label": "4.14.357-openela-perf-g673b80046ab9",
-      "sha256": "e1605120c5283f08b6a7404975183363c830219adc8656167c244a27dbbcde1a",
-      "size": 29856,
-      "buildDate": "2026-10-25T08:23:32Z",
-      "source": "official-openela-4.14.357-kernel-source",
+      "sha256": "52a274b853ee1560fa3bbb1b976d51e10199dfe0af6055c9e5c9b4f54c56f6c7",
+      "size": 14648,
+      "buildDate": "2026-10-25T08:45:30Z",
+      "source": "exact-kernel-drivers-kmem337-engine",
       "verified": true
     },
     {
@@ -213,7 +213,7 @@
       "verified": true
     }
   ],
-  "updated": "2026-10-25T08:23:32Z",
+  "updated": "2026-10-25T08:45:30Z",
   "variants": {
     "rt": "RT ABI - ioctl 0x801/0x802/0x803, success returns -EIO (0 on failure)"
   }
