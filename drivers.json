@@ -1,7 +1,7 @@
 {
   "baseUrl": "https://raw.githubusercontent.com/bmjubairdadu/kernel-loader/drivers",
   "branch": "drivers",
-  "count": 17,
+  "count": 19,
   "drivers": [
     {
       "version": "4.9.337-DaisyForGaming SMP preempt mod_unload modversions aarch64",
@@ -189,9 +189,31 @@
       "buildDate": "2026-10-25T07:04:21Z",
       "source": "kernel_drivers/6.6.ko",
       "verified": true
+    },
+    {
+      "version": "4.14.357-openela-perf-g673b80046ab9 SMP preempt mod_unload modversions aarch64",
+      "file": "uni_4.14.357-openela-perf-g673b80046ab9.ko",
+      "variant": "rt",
+      "label": "4.14.357-openela-perf-g673b80046ab9",
+      "sha256": "b8de58a2bf8e2a5cfb90b66413b3c7a1304e243f414fc1ec910f2b230fff57f4",
+      "size": 34520,
+      "buildDate": "2026-10-25T07:07:38Z",
+      "source": "openela-lts-pure-rt-no-preempt",
+      "verified": true
+    },
+    {
+      "version": "4.19.157-perf-g1a6087bc0325-dirty SMP preempt mod_unload modversions aarch64",
+      "file": "uni_4.19.157-perf-g1a6087bc0325-dirty.ko",
+      "variant": "rt",
+      "label": "4.19.157-perf-g1a6087bc0325-dirty",
+      "sha256": "b7910f23f0bc22934d51c2ba63192801cb7358d33a58ca8ff18890233637f38c",
+      "size": 30696,
+      "buildDate": "2026-10-25T07:07:38Z",
+      "source": "bengal-citrus-pure-rt-no-preempt",
+      "verified": true
     }
   ],
-  "updated": "2026-10-25T07:04:21Z",
+  "updated": "2026-10-25T07:07:38Z",
   "variants": {
     "rt": "RT ABI - ioctl 0x801/0x802/0x803, success returns -EIO (0 on failure)"
   }
