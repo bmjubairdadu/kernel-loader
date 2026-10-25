@@ -83,6 +83,12 @@ object OtaDriverStore {
     fun resolve(manifest: Manifest, kernelRelease: String, variant: String = ""): ResolveResult {
         val pool = variantsFor(manifest, variant)
         if (pool.isEmpty()) return ResolveResult.None
+        val cleanRel = kernelRelease.trim()
+        pool.firstOrNull {
+            it.label.equals(cleanRel, ignoreCase = true) ||
+            it.version.startsWith(cleanRel, ignoreCase = true)
+        }?.let { return ResolveResult.Exact(it) }
+
         val short = RootChecker.kernelShortVersion(kernelRelease)
         pool.firstOrNull {
             RootChecker.kernelShortVersion(it.version) == short
@@ -116,8 +122,15 @@ object OtaDriverStore {
     }
 
     fun exactFor(manifest: Manifest, kernelRelease: String, variant: String = ""): DriverEntry? {
+        val cleanRel = kernelRelease.trim()
+        val pool = variantsFor(manifest, variant)
+        pool.firstOrNull {
+            it.label.equals(cleanRel, ignoreCase = true) ||
+            it.version.startsWith(cleanRel, ignoreCase = true)
+        }?.let { return it }
+
         val short = RootChecker.kernelShortVersion(kernelRelease)
-        return variantsFor(manifest, variant).firstOrNull {
+        return pool.firstOrNull {
             RootChecker.kernelShortVersion(it.version) == short
         }
     }
