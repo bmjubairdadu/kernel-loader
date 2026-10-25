@@ -166,21 +166,21 @@ object BootPatcherEngine {
         }
 
         if (!patchSuccess && !kptoolsPath.isNullOrBlank()) {
-            vm.tstep("Tier 2: Patching via KernelPatch / FolkPatch (kptools)...")
-            vm.tlog("[PATCH] Executing patch via $kptoolsPath...", "INFO")
             val kpimgPath = findKpimg()
-            val kpCmd = if (kpimgPath != null) {
-                "$kptoolsPath -p -i $sessionBackupDir/boot_stock.img -k $kpimgPath -o $patchedBootOut 2>&1"
+            if (kpimgPath.isNullOrBlank()) {
+                vm.tlog("[PATCH INFO] kptools found but kpimg is missing — skipping Tier 2", "INFO")
             } else {
-                "$kptoolsPath -p -i $sessionBackupDir/boot_stock.img -o $patchedBootOut 2>&1"
-            }
-            val res = Shell.cmd(kpCmd).exec()
-            if (verifyBootImageMagic(patchedBootOut)) {
-                patchSuccess = true
-                methodUsed = "FolkPatch / KernelPatch (kptools)"
-                vm.tlog("[PATCH OK] Patched successfully using $methodUsed", "OK")
-            } else {
-                vm.tlog("[PATCH WARN] kptools output: ${res.out.joinToString(" ")}", "WARN")
+                vm.tstep("Tier 2: Patching via KernelPatch / FolkPatch (kptools)...")
+                vm.tlog("[PATCH] Executing patch via $kptoolsPath with $kpimgPath...", "INFO")
+                val kpCmd = "$kptoolsPath -p -i $sessionBackupDir/boot_stock.img -k $kpimgPath -o $patchedBootOut 2>&1"
+                val res = Shell.cmd(kpCmd).exec()
+                if (verifyBootImageMagic(patchedBootOut)) {
+                    patchSuccess = true
+                    methodUsed = "FolkPatch / KernelPatch (kptools)"
+                    vm.tlog("[PATCH OK] Patched successfully using $methodUsed", "OK")
+                } else {
+                    vm.tlog("[PATCH WARN] kptools output: ${res.out.joinToString(" ")}", "WARN")
+                }
             }
         }
 
@@ -297,9 +297,18 @@ object BootPatcherEngine {
     private fun findTool(name: String): String? {
         val knownPaths = listOf(
             "/data/adb/ap/bin/$name",
+            "/data/adb/ap/$name",
+            "/data/adb/apatch/$name",
+            "/data/adb/apatch/bin/$name",
             "/data/adb/ksu/bin/$name",
             "/data/adb/ksud",
             "/data/adb/magisk/$name",
+            "/data/user/0/org.apatch/files/$name",
+            "/data/data/org.apatch/files/$name",
+            "/data/user/0/com.topjohnwu.magisk/files/$name",
+            "/data/data/com.topjohnwu.magisk/files/$name",
+            "/data/user/0/io.github.a13e300.ksu/files/$name",
+            "/data/data/io.github.a13e300.ksu/files/$name",
             "/system/bin/$name",
             "/system/xbin/$name",
             "/data/local/tmp/$name"
@@ -311,7 +320,7 @@ object BootPatcherEngine {
         }
         val whichOut = Shell.cmd("which $name 2>/dev/null").exec().out.firstOrNull()?.trim()
         if (!whichOut.isNullOrBlank()) return whichOut
-        val findOut = Shell.cmd("find /data/adb/ -name $name 2>/dev/null").exec().out.firstOrNull()?.trim()
+        val findOut = Shell.cmd("find /data/ -name $name 2>/dev/null | head -n 1").exec().out.firstOrNull()?.trim()
         if (!findOut.isNullOrBlank()) return findOut
         return null
     }
@@ -319,15 +328,18 @@ object BootPatcherEngine {
     private fun findKpimg(): String? {
         val paths = listOf(
             "/data/adb/ap/kpimg",
+            "/data/adb/ap/bin/kpimg",
             "/data/adb/kpimg",
-            "/data/adb/modules/kpimg"
+            "/data/adb/modules/kpimg",
+            "/data/user/0/org.apatch/files/kpimg",
+            "/data/data/org.apatch/files/kpimg"
         )
         for (p in paths) {
             if (Shell.cmd("test -f $p 2>/dev/null && echo $p").exec().out.firstOrNull()?.trim()?.isNotEmpty() == true) {
                 return p
             }
         }
-        return Shell.cmd("find /data/adb/ -name kpimg 2>/dev/null").exec().out.firstOrNull()?.trim()
+        return Shell.cmd("find /data/ -name kpimg 2>/dev/null | head -n 1").exec().out.firstOrNull()?.trim()
     }
 
     private fun verifyFileExists(path: String, minSize: Long = 0): Boolean {
