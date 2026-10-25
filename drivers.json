@@ -74,10 +74,10 @@
       "file": "uni_4.19.157-perf-g9aba441cf6cd-dirty.ko",
       "variant": "rt",
       "label": "4.19.157-perf-g9aba441cf6cd-dirty",
-      "sha256": "8d82e893577862c1f77966b765d4328001fedf39d4fa0ada4469ecda82914d6c",
+      "sha256": "e791e1078d3b0a5add3c6d26dc1a7e607747841edcba527ef7163dcaa21ef515",
       "size": 13672,
-      "buildDate": "2026-10-25T07:18:24Z",
-      "source": "kernel_drivers/4.19.157.ko",
+      "buildDate": "2026-10-25T11:19:56Z",
+      "source": "kernel_drivers/4.19.157.ko (exact g9aba441cf6cd vermagic, english logs, 6-char random node)",
       "verified": true
     },
     {
