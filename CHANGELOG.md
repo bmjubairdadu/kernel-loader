@@ -5,6 +5,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [1.5] — 2026-10-25 (tag `v1.5` / `versionCode 6`) 🛡️ Direct Node Adoption & Probe Unblock
+
+> **Seamless In-App Update for all previous versions:** Eliminated aggressive dmtest/myprobe node deletion, adopted native Kernel_Drivers direct node activation architecture, support for OpenELA EFAULT (errno 14) and stealth classes, and 100% comment-free codebase.
+
+### ✨ Added & Improved
+* **Direct Node Adoption (Kernel_Drivers Architecture).** Replaced aggressive diagnostic probe blocking with direct sysfs/devnode adoption. When the kernel module inserts and registers its device node, the node is immediately assigned permissions (`chmod 0666`, `chcon u:object_r:device:s0`) and activated.
+* **Elimination of False Node Deletion.** Removed the flawed `rm -f /dev/$node` logic that deleted valid driver nodes when diagnostic tools returned unexpected errnos (e.g. `errno=14 EFAULT` on OpenELA 4.14 kernels with modified `addr_limit` layouts).
+* **Stealth Class & Engine Pick Detection.** Automatically detects random 6-8 letter stealth classes (e.g. `NBBGYB`) from `/sys/class` and accepts engine-picked character devices.
+* **Seamless In-App Auto-Update.** Incremented to `versionCode: 6` and `versionName: "1.5"`.
+
+---
+
 ## [1.4] — 2026-10-25 (tag `v1.4` / `versionCode 5`) 🎯 Exact Vermagic & Commit-Hash Driver Matching
 
 > **Seamless In-App Update for all previous versions:** Full vermagic & git commit-hash matching, hardware vendor `.ko` modinfo extraction, prevention of duplicate "THIS DEVICE" badges on matching major.minor.patch versions, and 100% comment-free codebase.

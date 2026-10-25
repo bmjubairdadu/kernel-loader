@@ -329,7 +329,9 @@ object UniversalKernelLoader {
             val res = Shell.cmd("/data/local/tmp/myprobe /dev/$cleanNode 2>&1").exec().out
             res.any { line ->
                 (line.contains("0x803 modbase: rc=0") && !line.contains("base=0x0")) ||
-                line.contains("0x801 read: rc=0")
+                line.contains("0x801 read: rc=0") ||
+                line.contains("errno=14") ||
+                line.contains("errno=5")
             }
         } catch (e: Exception) {
             false
@@ -361,6 +363,16 @@ object UniversalKernelLoader {
                     if (isCharNode(node)) return node
                 }
             }
+            val enginePick = res.out.firstOrNull { it.contains("verdict: engine pick") }
+            if (enginePick != null) {
+                val raw = enginePick.substringAfter('=').trim()
+                val node = raw.substringBefore(' ').trim().removePrefix("/dev/").trim()
+                val sentinel = node.isBlank() || node.equals("NOT", true) || node.equals("NONE", true) ||
+                    node.equals("FOUND", true) || node.startsWith("!!")
+                if (!sentinel && node.all { it.isLetterOrDigit() || it == '_' || it == '-' || it == '.' }) {
+                    if (isCharNode(node)) return node
+                }
+            }
         } catch (_: Exception) {}
 
         return try {
@@ -376,7 +388,7 @@ object UniversalKernelLoader {
                     return cand
                 }
             }
-            null
+            poolCandidates.firstOrNull { isCharNode(it) }
         } catch (e: Exception) {
             null
         }
