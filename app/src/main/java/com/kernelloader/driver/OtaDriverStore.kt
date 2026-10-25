@@ -27,8 +27,8 @@ object OtaDriverStore {
         val sha256: String = "",
         val size: Long = 0L,
         val buildDate: String = "",
-
-        val variant: String = ""
+        val variant: String = "",
+        val label: String = ""
     )
 
     fun variantLabel(variant: String): String = when (variant.lowercase()) {
@@ -80,19 +80,50 @@ object OtaDriverStore {
         return kotlin.math.abs(pa.third - pb.third)
     }
 
-    fun resolve(manifest: Manifest, kernelRelease: String, variant: String = ""): ResolveResult {
+    fun isExactMatch(entry: DriverEntry, kernelRelease: String, deviceVermagic: String = ""): Boolean {
+        val cleanRel = kernelRelease.trim()
+        val cleanVerm = deviceVermagic.trim()
+        if (cleanRel.isBlank() && cleanVerm.isBlank()) return false
+
+        val eLabel = entry.label.trim()
+        val eVer = entry.version.trim()
+        val eRel = eVer.substringBefore(" ").trim()
+
+        if (cleanVerm.isNotBlank()) {
+            if (eVer.equals(cleanVerm, ignoreCase = true)) return true
+            if (eVer.startsWith(cleanVerm, ignoreCase = true) || cleanVerm.startsWith(eVer, ignoreCase = true)) return true
+        }
+
+        if (cleanRel.isNotBlank()) {
+            if (eLabel.equals(cleanRel, ignoreCase = true) || eRel.equals(cleanRel, ignoreCase = true)) return true
+            val relNoDirty = cleanRel.removeSuffix("-dirty")
+            val labelNoDirty = eLabel.removeSuffix("-dirty")
+            val eRelNoDirty = eRel.removeSuffix("-dirty")
+            if (labelNoDirty.equals(relNoDirty, ignoreCase = true) || eRelNoDirty.equals(relNoDirty, ignoreCase = true)) return true
+        }
+
+        val gitRe = Regex("""-g([0-9a-f]{7,14})""", RegexOption.IGNORE_CASE)
+        val devGit = gitRe.find(cleanRel)?.groupValues?.get(1)?.lowercase()
+        val entryGit = gitRe.find(eLabel)?.groupValues?.get(1)?.lowercase()
+            ?: gitRe.find(eRel)?.groupValues?.get(1)?.lowercase()
+
+        if (devGit != null && entryGit != null) {
+            return devGit == entryGit &&
+                RootChecker.kernelShortVersion(cleanRel) == RootChecker.kernelShortVersion(eLabel)
+        }
+
+        return false
+    }
+
+    fun resolve(manifest: Manifest, kernelRelease: String, variant: String = "", deviceVermagic: String = ""): ResolveResult {
         val pool = variantsFor(manifest, variant)
         if (pool.isEmpty()) return ResolveResult.None
-        val cleanRel = kernelRelease.trim()
-        pool.firstOrNull {
-            it.label.equals(cleanRel, ignoreCase = true) ||
-            it.version.startsWith(cleanRel, ignoreCase = true)
-        }?.let { return ResolveResult.Exact(it) }
+
+        pool.firstOrNull { isExactMatch(it, kernelRelease, deviceVermagic) }?.let {
+            return ResolveResult.Exact(it)
+        }
 
         val short = RootChecker.kernelShortVersion(kernelRelease)
-        pool.firstOrNull {
-            RootChecker.kernelShortVersion(it.version) == short
-        }?.let { return ResolveResult.Exact(it) }
         var best: DriverEntry? = null
         var bestD = Int.MAX_VALUE
         for (e in pool) {
@@ -121,18 +152,9 @@ object OtaDriverStore {
         return withDate + withoutDate
     }
 
-    fun exactFor(manifest: Manifest, kernelRelease: String, variant: String = ""): DriverEntry? {
-        val cleanRel = kernelRelease.trim()
+    fun exactFor(manifest: Manifest, kernelRelease: String, variant: String = "", deviceVermagic: String = ""): DriverEntry? {
         val pool = variantsFor(manifest, variant)
-        pool.firstOrNull {
-            it.label.equals(cleanRel, ignoreCase = true) ||
-            it.version.startsWith(cleanRel, ignoreCase = true)
-        }?.let { return it }
-
-        val short = RootChecker.kernelShortVersion(kernelRelease)
-        return pool.firstOrNull {
-            RootChecker.kernelShortVersion(it.version) == short
-        }
+        return pool.firstOrNull { isExactMatch(it, kernelRelease, deviceVermagic) }
     }
 
     fun fetchManifest(url: String = manifestUrl): Manifest? {
@@ -193,6 +215,7 @@ object OtaDriverStore {
                 val version = d.optString("version", "")
                 val file = d.optString("file", "")
                 if (version.isEmpty() || file.isEmpty()) continue
+                val label = d.optString("label", "").ifBlank { version.substringBefore(" ") }
                 drivers.add(
                     DriverEntry(
                         version = version,
@@ -200,7 +223,8 @@ object OtaDriverStore {
                         sha256 = d.optString("sha256", ""),
                         size = d.optLong("size", 0L),
                         buildDate = d.optString("buildDate", ""),
-                        variant = d.optString("variant", "").trim().lowercase()
+                        variant = d.optString("variant", "").trim().lowercase(),
+                        label = label
                     )
                 )
             }

@@ -167,11 +167,9 @@ object DriverRevocationManager {
 
         val matching = manifest.drivers.filter { entry ->
             val vMatch = variant.isBlank() || OtaDriverStore.variantMatches(entry, variant)
-            val kShortMatch = RootChecker.kernelShortVersion(entry.version) == short
-            val kFullMatch = entry.version.contains(kernel, ignoreCase = true) ||
-                             kernel.contains(entry.file.removeSuffix(".ko").removePrefix("rt_").removePrefix("qx_"), ignoreCase = true) ||
-                             (record != null && record.file.isNotBlank() && entry.file.equals(record.file, ignoreCase = true))
-            vMatch && (kShortMatch || kFullMatch)
+            val kMatch = OtaDriverStore.isExactMatch(entry, kernel) ||
+                         (record != null && record.file.isNotBlank() && entry.file.equals(record.file, ignoreCase = true))
+            vMatch && kMatch
         }
 
         if (matching.isNotEmpty()) {

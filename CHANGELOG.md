@@ -5,6 +5,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [1.4] — 2026-10-25 (tag `v1.4` / `versionCode 5`) 🎯 Exact Vermagic & Commit-Hash Driver Matching
+
+> **Seamless In-App Update for all previous versions:** Full vermagic & git commit-hash matching, hardware vendor `.ko` modinfo extraction, prevention of duplicate "THIS DEVICE" badges on matching major.minor.patch versions, and 100% comment-free codebase.
+
+### ✨ Added & Improved
+* **Exact Vermagic & Release String Matching (`OtaDriverStore.isExactMatch`).** Prevents false driver resolution by strictly checking full kernel release strings (`uname -r`), git commit hashes (`-g[0-9a-f]+`), localversion suffixes (`-perf+`), and modinfo vermagic strings rather than solely relying on short 3-part versions (`4.19.157`).
+* **Accurate "THIS DEVICE" Badge & List Placement in UI.** Devices running a specific build (e.g. `4.19.157-perf-g1a6087bc0325-dirty`) now exclusively show the "THIS DEVICE" badge on their exact build match. Sibling kernels sharing the same base version (`4.19.157-perf+` and `4.19.157-perf-g9aba441cf6cd-dirty`) no longer falsely display the badge.
+* **Direct Vendor Module Vermagic Extractor (`RootChecker.getKernelVermagic`).** Reads `vermagic=` directly from `/vendor/lib/modules/`, `/odm/lib/modules/`, and `/system/lib/modules/` with fallback to toybox stream parsing, verifying complete kernel configuration compatibility prior to download and staging.
+* **Precise Revocation & Resolution Ladder.** Revocation manager and OTA resolver now resolve drivers strictly against exact vermagic and git commit hashes before falling back to nearest series.
+* **Seamless In-App Auto-Update.** Incremented to `versionCode: 5` and `versionName: "1.4"`.
+
+---
+
 ## [1.3] — 2026-10-25 (tag `v1.3` / `versionCode 4`) 🚀 Dynamic ARM64 Machine Code Patcher & Bundled Magiskboot
 
 > **Seamless In-App Update for all previous versions:** Native ARM64 kernel machine code patcher for `module_sig_check`, `check_modinfo` and `check_version` with PAC support, internal bundling of standalone `magiskboot` binary in application assets, automatic extraction and pre-flight deployment, and zero-comment codebase.

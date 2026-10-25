@@ -183,22 +183,22 @@ fun HomeScreen(
         viewModel.refreshDriverState(context)
     }
 
-    val kernelShort = remember(kernelRelease) {
-        RootChecker.kernelShortVersion(kernelRelease)
+    val deviceVermagic = remember {
+        RootChecker.getKernelVermagic()
     }
 
-    val exact = remember(manifest, kernelRelease) {
+    val exact = remember(manifest, kernelRelease, deviceVermagic) {
         manifest?.let {
-            OtaDriverStore.exactFor(it, kernelRelease, OtaDriverStore.RT)
+            OtaDriverStore.exactFor(it, kernelRelease, OtaDriverStore.RT, deviceVermagic)
         }
     }
 
-    val rtSupported = remember(manifest, kernelShort) {
+    val rtSupported = remember(manifest, kernelRelease, deviceVermagic) {
         manifest?.let {
             OtaDriverStore.supportedEntries(it, OtaDriverStore.RT)
         }?.let { list ->
             val (mine, others) = list.partition {
-                RootChecker.kernelShortVersion(it.version) == kernelShort
+                OtaDriverStore.isExactMatch(it, kernelRelease, deviceVermagic)
             }
             mine + others
         } ?: emptyList()
@@ -795,7 +795,8 @@ fun HomeScreen(
                 accent = FamilyRt,
                 entries = rtSupported,
                 status = manifestStatus,
-                kernelRelease = kernelRelease
+                kernelRelease = kernelRelease,
+                deviceVermagic = deviceVermagic
             )
 
             SupportCard(
@@ -1029,13 +1030,13 @@ private fun KernelListSection(
     accent: Color,
     entries: List<OtaDriverStore.DriverEntry>,
     status: String,
-    kernelRelease: String
+    kernelRelease: String,
+    deviceVermagic: String = ""
 ) {
-    val deviceShort = RootChecker.kernelShortVersion(kernelRelease)
     SectionTitle(title = title, accent = accent) {
         if (status == "OK" && entries.isNotEmpty()) {
             val newest = entries
-                .dropWhile { RootChecker.kernelShortVersion(it.version) == deviceShort }
+                .dropWhile { OtaDriverStore.isExactMatch(it, kernelRelease, deviceVermagic) }
                 .firstOrNull { it.buildDate.isNotBlank() }?.buildDate.orEmpty()
             Text(
                 text = "NEWEST ${newest.take(10).ifEmpty { "n/a" }}",
@@ -1053,14 +1054,14 @@ private fun KernelListSection(
         when {
             status == "OK" && entries.isNotEmpty() -> {
                 val newestIndex = entries.count {
-                    RootChecker.kernelShortVersion(it.version) == deviceShort
+                    OtaDriverStore.isExactMatch(it, kernelRelease, deviceVermagic)
                 }
                 LazyColumn(
                     modifier = Modifier.fillMaxWidth().height(170.dp).padding(10.dp)
                 ) {
                     itemsIndexed(entries) { idx, e ->
                         val v = e.version
-                        val isThis = RootChecker.kernelShortVersion(v) == deviceShort
+                        val isThis = OtaDriverStore.isExactMatch(e, kernelRelease, deviceVermagic)
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()

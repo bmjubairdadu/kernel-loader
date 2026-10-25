@@ -1265,15 +1265,16 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             otaFailReason = "Could not read kernel version"
             return false
         }
+        val deviceVermagic = RootChecker.getKernelVermagic()
         checkpoint()
-        val resolved = OtaDriverStore.resolve(manifest, kernel, variant)
+        val resolved = OtaDriverStore.resolve(manifest, kernel, variant, deviceVermagic)
         return when (resolved) {
             is OtaDriverStore.ResolveResult.Exact -> {
-                tlog("Exact match: $kernel", "OK")
+                tlog("Exact match: ${resolved.entry.label}", "OK")
                 downloadAndLoadOta(context, manifest, resolved.entry)
             }
             is OtaDriverStore.ResolveResult.Near -> {
-                tlog("Nearest match: ${resolved.entry.version}", "WARN")
+                tlog("Nearest match: ${resolved.entry.label}", "WARN")
                 downloadAndLoadOta(context, manifest, resolved.entry)
             }
             is OtaDriverStore.ResolveResult.None -> {
@@ -1477,9 +1478,8 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                 delay(400L)
                 tstep("Detecting kernel...")
                 val kernel = RootChecker.getKernelRelease() ?: "unknown"
-                val short = RootChecker.kernelShortVersion(kernel)
                 val arch = android.os.Build.SUPPORTED_ABIS.firstOrNull() ?: "arm64-v8a"
-                tlog("Kernel detected: $short ($arch)", "OK")
+                tlog("Kernel detected: $kernel ($arch)", "OK")
 
                 delay(350L)
                 tstep("Checking signature security...")

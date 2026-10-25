@@ -73,4 +73,67 @@ object RootChecker {
         val short = kernelShortVersion(kernelRelease)
         return driverVersions.any { kernelShortVersion(it) == short }
     }
+
+    @Volatile
+    private var cachedVermagic: String? = null
+
+    fun getKernelVermagic(): String {
+        cachedVermagic?.let { return it }
+        val v = detectKernelVermagic()
+        if (v.isNotBlank()) cachedVermagic = v
+        return v
+    }
+
+    private fun detectKernelVermagic(): String {
+        val candidateDirs = listOf(
+            java.io.File("/vendor/lib/modules"),
+            java.io.File("/odm/lib/modules"),
+            java.io.File("/system/lib/modules")
+        )
+        for (dir in candidateDirs) {
+            if (!dir.isDirectory) continue
+            val names = dir.list { _, name -> name.endsWith(".ko") } ?: continue
+            for (name in names) {
+                val vm = readVermagicFast(java.io.File(dir, name))
+                if (vm.isNotBlank()) return vm
+            }
+        }
+        for (candidate in listOf("/vendor/lib/modules/*.ko", "/odm/lib/modules/*.ko", "/system/lib/modules/*.ko")) {
+            val file = try {
+                val res = Shell.cmd("ls $candidate 2>/dev/null | head -n 1").exec()
+                if (res.isSuccess && res.out.isNotEmpty()) res.out[0].trim() else ""
+            } catch (e: Exception) { "" }
+            if (file.isNotBlank()) {
+                val raw = try {
+                    val res = Shell.cmd("cat \"$file\" 2>/dev/null | tr '\\0' '\\n' | grep -m1 '^vermagic='").exec()
+                    if (res.isSuccess && res.out.isNotEmpty()) res.out[0].substringAfter("vermagic=").trim() else ""
+                } catch (e: Exception) { "" }
+                if (raw.isNotBlank()) return raw
+            }
+        }
+        return ""
+    }
+
+    private fun readVermagicFast(file: java.io.File): String {
+        return try {
+            val buf = ByteArray(131072)
+            val n = java.io.FileInputStream(file).use { it.read(buf) }
+            if (n <= 0) return ""
+            val tag = "vermagic=".toByteArray(Charsets.US_ASCII)
+            var idx = -1
+            outer@ for (i in 0 until n - tag.size) {
+                for (j in tag.indices) {
+                    if (buf[i + j] != tag[j]) continue@outer
+                }
+                idx = i
+                break
+            }
+            if (idx < 0) return ""
+            var end = idx + tag.size
+            while (end < n && buf[end] != 0.toByte()) end++
+            String(buf, idx + tag.size, end - (idx + tag.size), Charsets.US_ASCII).trim()
+        } catch (e: Exception) {
+            ""
+        }
+    }
 }
