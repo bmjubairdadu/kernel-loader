@@ -173,6 +173,10 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
     var lastBundleTried = mutableStateOf("")
     var lastLoadError = mutableStateOf("")
 
+    fun clearLoadedDriver(context: Context) {
+        DriverRevocationManager.clearLoadedDriver(context)
+    }
+
     fun setLoadedModule(name: String) {
         if (loadedModuleName.value != name) loadedModuleName.value = name
         driverLoaded.value = name.isNotBlank()
@@ -1196,6 +1200,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                 variant = activePipelineVariant.value,
                 isOta = false
             )
+            DriverRevocationManager.recordLoadedNode(context, devNode)
             tlog("[STEALTH] Driver ready. Clear app from recents before launching game!", "OK")
             true
         } finally {
@@ -1300,6 +1305,14 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                 driverLoaded.value = true
                 autoLoadOk.value = true
                 autoLoadStatus.value = "Already loaded: /dev/$preProbe"
+                DriverRevocationManager.recordLoadedDriver(
+                    context = context,
+                    entry = entry,
+                    kernelRelease = kernel,
+                    variant = entry.variant,
+                    isOta = true
+                )
+                DriverRevocationManager.recordLoadedNode(context, preProbe)
                 return true
             }
             val devNodesBefore = snapshotDevCharNodes()
@@ -1383,6 +1396,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                 variant = entry.variant,
                 isOta = true
             )
+            DriverRevocationManager.recordLoadedNode(context, devNode)
             upgradeNotified = false
             tlog("[STEALTH] Driver ready. Clear app from recents before launching game!", "OK")
             return true
@@ -1662,9 +1676,23 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
 
     fun refreshDriverState(context: Context) {
         viewModelScope.launch(Dispatchers.IO) {
+            val isSessionLive = DriverRevocationManager.isSessionActive(context)
+            val savedNode = DriverRevocationManager.getLoadedNode(context)
+
+            if (isSessionLive) {
+                if (savedNode.isNotBlank()) {
+                    rememberDevNode(savedNode)
+                }
+                withContext(Dispatchers.Main) {
+                    driverLoaded.value = true
+                    hiddenLoaded.value = true
+                    tlog("Driver active in current session (/dev/${savedNode.ifBlank { preferredDevNode() }})", "OK")
+                }
+                return@launch
+            }
+
             Shell.cmd(
-                "rm -f /data/local/tmp/kloader*.ko /data/local/tmp/kmem*.ko /data/local/tmp/dmtest* /data/local/tmp/myprobe 2>/dev/null",
-                "for n in /dev/[A-GNYB][A-GNYB][A-GNYB][A-GNYB][A-GNYB][A-GNYB]* /dev/dmsync*; do [ -c \"\$n\" ] && rm -f \"\$n\" 2>/dev/null; done"
+                "rm -f /data/local/tmp/kloader*.ko /data/local/tmp/kmem*.ko /data/local/tmp/dmtest* /data/local/tmp/myprobe 2>/dev/null"
             ).exec()
             val loadedMods = SafetyGuard.loadedModuleNames()
             val currentMod = loadedModuleName.value

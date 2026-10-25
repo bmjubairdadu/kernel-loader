@@ -21,6 +21,8 @@ object DriverRevocationManager {
     private const val KEY_LOADED_FROM_OTA = "loaded_from_ota"
     private const val KEY_IS_REVOKED = "is_revoked"
     private const val KEY_REVOKED_REASON = "revoked_reason"
+    private const val KEY_BOOT_ID = "loaded_boot_id"
+    private const val KEY_LOADED_NODE = "loaded_dev_node"
 
     data class LoadedRecord(
         val kernelRelease: String,
@@ -45,6 +47,33 @@ object DriverRevocationManager {
     private fun prefs(context: Context): SharedPreferences =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
+    fun currentBootId(): String = try {
+        Shell.cmd("cat /proc/sys/kernel/random/boot_id 2>/dev/null").exec().out.firstOrNull()?.trim() ?: ""
+    } catch (_: Exception) {
+        ""
+    }
+
+    fun recordLoadedNode(context: Context, node: String) {
+        val clean = node.removePrefix("/dev/").trim()
+        prefs(context).edit().putString(KEY_LOADED_NODE, clean).apply()
+    }
+
+    fun getLoadedNode(context: Context): String =
+        prefs(context).getString(KEY_LOADED_NODE, "") ?: ""
+
+    fun isSessionActive(context: Context): Boolean {
+        val p = prefs(context)
+        val savedBootId = p.getString(KEY_BOOT_ID, null) ?: return false
+        val curBootId = currentBootId()
+        if (curBootId.isBlank() || savedBootId != curBootId) return false
+        val node = p.getString(KEY_LOADED_NODE, "") ?: ""
+        if (node.isNotBlank()) {
+            return Shell.cmd("test -c /dev/$node 2>/dev/null").exec().isSuccess
+        }
+        val record = getLoadedRecord(context)
+        return record != null
+    }
+
     fun recordLoadedDriver(
         context: Context,
         entry: OtaDriverStore.DriverEntry?,
@@ -54,6 +83,7 @@ object DriverRevocationManager {
     ) {
         val short = RootChecker.kernelShortVersion(kernelRelease)
         val file = entry?.file ?: ""
+        val bootId = currentBootId()
         prefs(context).edit().apply {
             putString(KEY_LOADED_KERNEL, kernelRelease)
             putString(KEY_LOADED_SHORT, short)
@@ -65,6 +95,7 @@ object DriverRevocationManager {
             putBoolean(KEY_LOADED_FROM_OTA, isOta)
             putBoolean(KEY_IS_REVOKED, false)
             putString(KEY_REVOKED_REASON, "")
+            putString(KEY_BOOT_ID, bootId)
             apply()
         }
 
@@ -80,6 +111,8 @@ object DriverRevocationManager {
             remove(KEY_LOADED_VERSION)
             remove(KEY_LOADED_TIME)
             remove(KEY_LOADED_FROM_OTA)
+            remove(KEY_BOOT_ID)
+            remove(KEY_LOADED_NODE)
             apply()
         }
         stopRootDaemon()

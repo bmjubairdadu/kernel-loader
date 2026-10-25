@@ -455,6 +455,7 @@ fun HomeScreen(
                     busy = rebooting,
                     onUnload = { viewModel.rebootDevice(context) },
                     onReload = {
+                        viewModel.clearLoadedDriver(context)
                         viewModel.driverLoaded.value = false
                         viewModel.hiddenLoaded.value = false
                         viewModel.autoLoadUniversal(context, preferOta = true, variant = OtaDriverStore.RT)
