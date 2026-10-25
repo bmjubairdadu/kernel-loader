@@ -159,16 +159,25 @@ object UniversalKernelLoader {
 
         if (!res.isSuccess) {
             vm.tlog("Inserting module...", "CMD")
-            res = Shell.cmd("insmod $TMP_KO").exec()
+            val insmodCmd = listOf(
+                "insmod",
+                "/data/adb/ap/bin/busybox insmod",
+                "/data/adb/ksu/bin/busybox insmod",
+                "/data/adb/magisk/busybox insmod",
+                "/system/bin/insmod",
+                "busybox insmod"
+            ).firstOrNull { Shell.cmd("test -x \"$it\" 2>/dev/null || which \"$it\" 2>/dev/null").exec().isSuccess } ?: "insmod"
+
+            res = Shell.cmd("$insmodCmd $TMP_KO").exec()
             if (!res.isSuccess) {
-                res = Shell.cmd("insmod $TMP_KO devname=$devNode").exec()
+                res = Shell.cmd("$insmodCmd $TMP_KO devname=$devNode").exec()
             }
             if (!res.isSuccess) {
-                res = Shell.cmd("insmod $TMP_KO devicename=$devNode").exec()
+                res = Shell.cmd("$insmodCmd $TMP_KO devicename=$devNode").exec()
             }
             if (!res.isSuccess) {
                 vm.tlog("[KERNEL] Retrying with forced insmod (-f)...", "WARN")
-                res = Shell.cmd("insmod -f $TMP_KO 2>/dev/null || insmod -f $TMP_KO devname=$devNode 2>/dev/null").exec()
+                res = Shell.cmd("$insmodCmd -f $TMP_KO 2>/dev/null || $insmodCmd -f $TMP_KO devname=$devNode 2>/dev/null").exec()
             }
         }
 
@@ -314,11 +323,6 @@ object UniversalKernelLoader {
         }
     }
 
-    /**
-     * Runs the bundled dmtest probe and returns the /dev node it verified as OUR driver
-     * (RT/QX ioctl ABI), or null. If dmtest doesn't find the node (e.g. for randomized
-     * nodes from custom builds), falls back to direct IOCTL probe (0x803/0x801).
-     */
     fun probeOurDriverNode(context: Context?, vm: DriverViewModel): String? {
         if (context == null) return null
         ensureProbeBinaries(context)
@@ -346,7 +350,6 @@ object UniversalKernelLoader {
             }
         } catch (_: Exception) {}
 
-        // Fallback / Direct IOCTL probe: check random pool and known driver candidate nodes
         return try {
             val devNodes = Shell.cmd("ls /dev 2>/dev/null").exec().out.map { it.trim() }
             val preferred = vm.preferredDevNode().removePrefix("/dev/").trim()
@@ -428,10 +431,7 @@ object UniversalKernelLoader {
         var foundNodeName = ""
 
         for (attempt in 1..10) {
-            // PROBE GATE: only trust a node that answers OUR ioctl ABI (RT/QX probe).
-            // Stock nodes created concurrently by other processes (e.g. /dev/ramdump_wlan
-            // spawned by subsystem_ramdump) otherwise win the fresh-node diff race and
-            // every later ioctl reports ENOTTY.
+
             val probed = probeOurDriverNode(context, vm)
             if (probed != null && isCharNode(probed)) {
                 exactNode = true
@@ -450,8 +450,7 @@ object UniversalKernelLoader {
             if (devNodesBefore.isNotEmpty()) {
                 val fresh = (snapshotDevCharNodes() - devNodesBefore).sorted()
                 if (fresh.isNotEmpty()) {
-                    // Diagnostic only: a concurrent stock node (ramdump_*, vcsa*, ...)
-                    // must NEVER be accepted without the ABI probe passing.
+
                     vm.tlog("[SCAN] Fresh /dev nodes: ${fresh.take(4).joinToString(", ")} — probe gate did not confirm ours yet", "INFO")
                 }
             }
@@ -605,8 +604,7 @@ object UniversalKernelLoader {
                     variant = vm.activePipelineVariant.value,
                     isOta = false
                 )
-                // Watchdog service disabled to avoid anti-cheat detection
-                // try { DriverWatchdogService.start(ctx) } catch (_: Exception) {}
+
             }
         } else {
             vm.lastLoadError.value = msg
@@ -627,14 +625,9 @@ object UniversalKernelLoader {
             }
         }
 
-        val kptoolsBin = listOf("kptools", "/data/adb/ap/bin/kptools", "/data/adb/apatch/kptools", "/system/bin/kptools")
-            .firstOrNull { Shell.cmd("test -x \"$it\" 2>/dev/null || which \"$it\" 2>/dev/null").exec().isSuccess }
-        if (kptoolsBin != null) {
-            val apatchRes = Shell.cmd("$kptoolsBin --load-module \"$koPath\" 2>/dev/null").exec()
-            if (apatchRes.isSuccess) {
-                vm?.tlog("[KERNEL] Module loaded via APatch ($kptoolsBin)", "OK")
-                return apatchRes
-            }
+        val isApatch = Shell.cmd("test -d /data/adb/ap 2>/dev/null && echo yes").exec().out.firstOrNull() == "yes"
+        if (isApatch) {
+            vm?.tlog("[ROOT] FolkPatch / KernelPatch root environment active", "INFO")
         }
         return null
     }
@@ -649,7 +642,8 @@ object UniversalKernelLoader {
             Shell.cmd(
                 "echo 0 > /proc/sys/kernel/module_sig_enforce 2>/dev/null",
                 "sysctl -w kernel.module_sig_enforce=0 2>/dev/null",
-                "echo 0 > /sys/module/module/parameters/sig_enforce 2>/dev/null"
+                "echo 0 > /sys/module/module/parameters/sig_enforce 2>/dev/null",
+                "chmod 666 /proc/sys/kernel/module_sig_enforce 2>/dev/null; echo 0 > /proc/sys/kernel/module_sig_enforce 2>/dev/null"
             ).exec()
 
             val afterCheck = Shell.cmd("cat /proc/sys/kernel/module_sig_enforce 2>/dev/null").exec()
@@ -662,8 +656,7 @@ object UniversalKernelLoader {
         } else if (sigValue == "0") {
             vm?.tlog("Signature enforcement: Disabled (sysctl 0)", "OK")
         } else {
-            // sysctl module_sig_enforce is not exposed by kernel (e.g. strict CONFIG_MODULE_SIG_FORCE=y)
-            // Do not falsely log "Signature verification: OK" here
+
         }
     }
 

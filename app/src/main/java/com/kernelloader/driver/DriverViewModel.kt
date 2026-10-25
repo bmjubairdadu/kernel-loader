@@ -215,8 +215,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     suspend fun checkRevocationInternal(silent: Boolean = false) {
-        // Evaluate whenever a load record exists (the driver may be resident but
-        // hidden with randomized names that isDriverResident cannot see).
+
         val isLoaded = driverLoaded.value ||
             DriverRevocationManager.isDriverResident() ||
             DriverRevocationManager.getLoadedRecord(getApplication()) != null
@@ -529,8 +528,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch(Dispatchers.IO) {
             runCatching { Shell.cmd("killall insmod 2>/dev/null; true").exec() }
         }
-        // NOTE: isBusy stays true until the cancelled job's finally block runs -
-        // clearing it here allowed a second load pipeline to start mid-insmod.
+
         busyStep.value = ""
         autoLoadOk.value = false
         autoLoadStatus.value = "Stopped by user"
@@ -591,7 +589,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                 try {
                     var devNode = preferredDevNode()
                     if (devNode.isBlank()) {
-                        // Remembered node is lost on restart - ask the driver directly.
+
                         val probed = try { UniversalKernelLoader.probeOurDriverNode(getApplication(), this@DriverViewModel) } catch (e: Exception) { null }
                         if (probed != null) {
                             devNode = probed
@@ -816,14 +814,21 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                 delay(500)
                 val now = Shell.cmd("cat /proc/modules 2>/dev/null; cat /proc/devices 2>/dev/null").exec().out
                 if (now.any { it.isNotBlank() && it !in kstateBefore }) { registered = true; break }
+                val probeNode = try { UniversalKernelLoader.probeOurDriverNode(getApplication(), this@DriverViewModel) } catch (_: Exception) { null }
+                if (!probeNode.isNullOrBlank()) { registered = true; break }
             }
             if (registered) return fwRes
             tlog("[KERNEL] Framework loader exited 0 but the kernel did not register the module - falling back to insmod", "WARN")
         }
 
         val bins = listOf(
-            "insmod", "/system/bin/insmod", "/vendor/bin/insmod",
-            "/data/adb/magisk/busybox insmod", "busybox insmod"
+            "insmod",
+            "/data/adb/ap/bin/busybox insmod",
+            "/data/adb/ksu/bin/busybox insmod",
+            "/data/adb/magisk/busybox insmod",
+            "/system/bin/insmod",
+            "/vendor/bin/insmod",
+            "busybox insmod"
         )
         val hideParam = if (supportsStealthHide()) "hide=1" else "hide=0"
         val paramVariants = if (devNode.isNotBlank()) {
@@ -843,8 +848,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                 res = Shell.cmd(cmd).exec()
                 if (res.isSuccess) return res
                 val err = (res.out + res.err).joinToString(" ").lowercase(Locale.US)
-                // A hidden/still-registering module makes insmod return EEXIST -
-                // the module IS resident, which is success as far as loading goes.
+
                 if (err.contains("file exists")) {
                     tlog("[KERNEL] Module already resident (File exists) - verifying live node", "OK")
                     return Shell.cmd("true").exec()
@@ -866,7 +870,8 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                     errAll.contains("rejected") ||
                     errAll.contains("operation not permitted") ||
                     dmesg.contains("module verification failed") ||
-                    dmesg.contains("module signature")
+                    dmesg.contains("module signature") ||
+                    dmesg.contains("required key")
             if (isSig) {
                 tlog("Signature verification active, bypassing...", "WARN")
                 UniversalKernelLoader.disableModuleSigEnforce(this@DriverViewModel)
@@ -875,7 +880,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             val force = Shell.cmd("insmod -f $koPath devname=$devNode 2>/dev/null || insmod -f $koPath devicename=$devNode 2>/dev/null || insmod -f $koPath 2>/dev/null").exec()
             if (force.isSuccess) return force
             (force.out + force.err).firstOrNull { it.isNotBlank() }?.let {
-                tlog("insmod -f: ${it.trim().take(35)}", "ERR")
+                tlog("insmod -f: ${it.trim().take(45)}", "ERR")
             }
             val isLocked = errAll.contains("required key not available") ||
                     errAll.contains("key rejected") ||
@@ -885,7 +890,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                     dmesg.contains("key rejected")
             if (isLocked) {
                 tlog("[SIGNATURE LOCKED] Kernel enforces strict CONFIG_MODULE_SIG_FORCE=y.", "ERR")
-                tlog("[GUIDANCE] This device requires a patched boot image via official APatch / KernelSU or a custom kernel to allow unsigned modules.", "WARN")
+                tlog("[GUIDANCE] Tap 'PATCH BOOT' in Kernel Loader (or enable BypassSig KPM) to unlock unsigned drivers.", "WARN")
             }
         }
         return res
@@ -895,12 +900,6 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
         Shell.cmd("for f in /dev/*; do [ -c \"\$f\" ] && echo \"\${f##*/}\"; done 2>/dev/null")
             .exec().out.map { it.trim() }.filter { it.isNotEmpty() }.toSet()
 
-    /**
-     * Reference-driver behavior: hide the module from lsmod/sysfs on load.
-     * Safe on Magisk/KernelSU (proven for years by the RT/QX reference
-     * drivers), but KernelPatch (APatch) tracks the module list itself and
-     * the unlink corrupts kernel state there - so hide stays OFF on APatch.
-     */
     private fun supportsStealthHide(): Boolean {
         val suV = Shell.cmd("su -v 2>/dev/null").exec().out.firstOrNull()?.lowercase() ?: ""
         if (suV.contains("apatch") || suV.contains("kernelpatch")) return false
@@ -914,13 +913,6 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
         Shell.cmd("ls /sys/class 2>/dev/null").exec().out
             .map { it.trim() }.filter { it.isNotEmpty() }.toSet()
 
-    /**
-     * Devices where /dev is not devtmpfs-driven never materialize our
-     * device_create() nodes, and randomized class names defeat every
-     * prefix-glob fallback. The driver ALWAYS registers its classes in
-     * /sys/class though, so: diff the class list against the pre-insmod
-     * snapshot and mknod each fresh class device. Returns created node names.
-     */
     private fun mknodNewSysClasses(before: Set<String>): List<String> {
         val made = mutableListOf<String>()
         if (before.isNotEmpty()) {
@@ -946,12 +938,6 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
         return made
     }
 
-    /**
-     * The driver's node/class names are uppercase letters drawn from a fixed
-     * pool (B,Y,N,A,C,D,E,F,G) - no stock Android class looks like that.  When
-     * the before/after diff finds nothing (e.g. the module was ALREADY resident
-     * from an earlier attempt), this pattern scan still finds its classes.
-     */
     private fun mknodPatternSysClasses(): List<String> {
         val made = mutableListOf<String>()
         val classes = Shell.cmd("ls /sys/class 2>/dev/null").exec().out
@@ -964,7 +950,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             val maj = mm.getOrNull(0)?.trim()?.toIntOrNull() ?: continue
             val min = mm.getOrNull(1)?.trim()?.toIntOrNull() ?: continue
             if (Shell.cmd("test -c /dev/$cls 2>/dev/null").exec().isSuccess) {
-                made.add(cls)  // node already exists - still a valid candidate
+                made.add(cls)
                 continue
             }
             Shell.cmd(
@@ -1014,8 +1000,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
         }
 
         if (foundNode == null) {
-            // Probe first: node/class names are random, so ask the driver directly
-            // before trusting any name-based guess.
+
             val probedNode = try { UniversalKernelLoader.probeOurDriverNode(getApplication(), this@DriverViewModel) } catch (e: Exception) { null }
             if (probedNode != null && probedNode.isNotBlank()) {
                 foundNode = probedNode
@@ -1060,26 +1045,21 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
         }
 
         if (foundNode != null) {
-            val node = foundNode  // smart-cast anchor
+            val node = foundNode
             Shell.cmd(
                 "chmod 0666 /dev/$node",
                 "chcon u:object_r:device:s0 /dev/$node 2>/dev/null"
             ).exec()
 
-            // Final gate: the node must actually answer OUR ioctl ABI, else a
-            // concurrently-created stock node could get adopted and remembered.
             val probedOk = try { UniversalKernelLoader.probeOurDriverNode(getApplication(), this@DriverViewModel) } catch (e: Exception) { null }
             val verifiedNode = probedOk ?: if (UniversalKernelLoader.directIoctlProbe(getApplication(), node)) node else null
             if (verifiedNode == null) {
                 tlog("[PROBE FAIL] /dev/$node did not answer our ABI - rejecting node", "ERR")
-                // Only clean up node if it belongs to our random naming pool or recognized driver aliases
+
                 if (node.matches(Regex("^[A-GNYB]{6,8}$")) || node == "dmsync" || node == "kmem_337" || node == "memacc") {
                     Shell.cmd("rm -f /dev/$node 2>/dev/null").exec()
                 }
-                // A resident module with no answering node = an earlier load is
-                // stuck in kernel memory (hidden, nodes lost). Only a reboot clears it.
-                // Hidden modules vanish from lsmod but their chrdev registration
-                // stays visible in /proc/devices - check both.
+
                 val resident = Shell.cmd("lsmod 2>/dev/null; cat /proc/modules 2>/dev/null; cat /proc/devices 2>/dev/null").exec().out
                 val hit = resident.filter {
                     it.contains("sysync") || it.contains("dmsync") || it.contains("memacc") || it.contains("kmem")
@@ -1093,22 +1073,20 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                 if (poolCls.isNotEmpty()) {
                     tlog("[DIAG] driver classes present: ${poolCls.joinToString(",")}", "INFO")
                 }
-                // One-paste diagnostics: kernel's own view of what happened.
+
                 Shell.cmd(
                     "dmesg | grep -i -E 'sysync|dmsync|kptools|WARNING:|RIP:' | tail -n 12"
                 ).exec().out.filter { it.isNotBlank() }.take(8)
                     .forEach { tlog("[DIAG] ${it.take(160)}", "INFO") }
                 val up = Shell.cmd("cat /proc/uptime 2>/dev/null").exec().out.firstOrNull()?.trim() ?: ""
                 tlog("[DIAG] uptime: ${up.take(20)} (a short value means the phone WAS rebooted)", "INFO")
-                // dmtest's own report: per-node open/probe results WITH errno -
-                // this is the line that says exactly why the node did not answer.
+
                 val dmr = Shell.cmd("tail -n 25 /data/local/tmp/dmtest_probe.txt 2>/dev/null; tail -n 25 /data/local/tmp/dmtest_report.txt 2>/dev/null").exec().out
                     .filter { it.isNotBlank() }
                     .filter { it.contains("probe") || it.contains("verdict") || it.contains("open") || it.contains("SUMMARY") || it.contains("!!") }
                     .take(8)
                 dmr.forEach { tlog("[DIAG] ${it.take(110)}", "INFO") }
-                // Own-probe: per-ioctl rc/errno with known-good buffers -
-                // distinguishes a dmtest quirk from a real uaccess fault.
+
                 try {
                     val pbin = java.io.File(getApplication<Application>().filesDir, "myprobe")
                     getApplication<Application>().assets.open("bin/myprobe").use { input ->
@@ -1210,9 +1188,20 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             tlog("Inserting module into kernel...", "CMD")
             val res = runInsmodLadder(staged.absolutePath, devNode)
             if (!res.isSuccess) {
-                (res.out + res.err).firstOrNull { it.isNotBlank() }?.let {
-                    tlog("Error: ${it.trim().take(35)}", "ERR")
-                    lastLoadError.value = it.trim().take(300)
+                val errText = (res.out + res.err).joinToString(" ")
+                val errLower = errText.lowercase(Locale.US)
+                val isSigLocked = errLower.contains("required key not available") ||
+                        errLower.contains("key rejected") ||
+                        errLower.contains("key was rejected")
+                if (isSigLocked) {
+                    val sigMsg = "Signature Locked: Kernel enforces CONFIG_MODULE_SIG_FORCE. Tap 'PATCH BOOT' in Tools to unlock."
+                    lastLoadError.value = sigMsg
+                    tlog("Fix: Tap 'PATCH BOOT' in Tools tab (or enable BypassSig KPM)", "FIX")
+                } else {
+                    (res.out + res.err).firstOrNull { it.isNotBlank() }?.let {
+                        tlog("Error: ${it.trim().take(35)}", "ERR")
+                        lastLoadError.value = it.trim().take(300)
+                    }
                 }
                 return false
             }
@@ -1253,8 +1242,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
 
     private suspend fun runOtaLoad(context: Context, variant: String = ""): Boolean {
         checkpoint()
-        // Database is the ONLY driver source - no bundled or leftover local .ko
-        // is ever loaded. The OTA download always happens fresh.
+
         tlog("Checking driver DB...", "INFO")
         val manifest = OtaDriverStore.fetchManifest() ?: run {
             tlog("DB unreachable", "WARN")
@@ -1338,9 +1326,6 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             UniversalKernelLoader.disableModuleSigEnforce(this@DriverViewModel)
             UniversalKernelLoader.stripModuleSig(staged, this@DriverViewModel)
 
-            // A hidden resident module is invisible to the kernel's duplicate
-            // check - asking the driver first is the only safe way to avoid a
-            // second (state-corrupting) load.
             val preProbe = try { UniversalKernelLoader.probeOurDriverNode(getApplication(), this@DriverViewModel) } catch (e: Exception) { null }
             if (preProbe != null) {
                 tlog("[RESIDENT] Driver already answering on /dev/$preProbe - skipping insert", "OK")
@@ -1357,8 +1342,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             val res = runInsmodLadder(staged.absolutePath, devNode)
             if (res.isSuccess) {
                 tlog("Module inserted into kernel", "OK")
-                // /dev may not be devtmpfs on every device - re-create nodes
-                // from any class the module just registered in /sys/class.
+
                 val mknodded = mknodNewSysClasses(sysClassesBefore)
                 if (mknodded.isNotEmpty()) {
                     tlog("[SYSFS] Created /dev nodes from new classes: ${mknodded.joinToString(", ")}", "FIX")
@@ -1368,28 +1352,43 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             if (!res.isSuccess) {
                 tlog("Module insert failed", "ERR")
                 val errText = (res.out + res.err).joinToString("\n").trim()
-                if (errText.isNotBlank()) lastLoadError.value = errText.take(300)
-                (res.out + res.err).firstOrNull { it.isNotBlank() }?.let {
-                    tlog("Error: ${it.trim().take(90)}", "ERR")
-                }
-                // Kernel rejection (Unknown symbol / format error) is NOT a network
-                // problem - give the right message so users report the dmesg lines.
-                otaFailReason = "The kernel rejected this driver build - send the DMESG lines above to support if it repeats"
-
-                Shell.cmd(
-                    "dmesg 2>/dev/null | grep -i -E 'kmem|module|insmod|version magic|disagrees|Unknown symbol|format error|taint' | tail -n 8"
+                val errLower = errText.lowercase(Locale.US)
+                val dmesgOut = Shell.cmd(
+                    "dmesg 2>/dev/null | grep -i -E 'kmem|module|insmod|version magic|disagrees|Unknown symbol|format error|taint|required key|signature' | tail -n 8"
                 ).exec().out.filter { it.isNotBlank() }.take(5)
-                    .forEach { tlog("DMESG: ${it.take(90)}", "INFO") }
+                val dmesgLower = dmesgOut.joinToString(" ").lowercase(Locale.US)
 
-                if (errText.contains("Invalid module format", true) ||
+                dmesgOut.forEach { tlog("DMESG: ${it.take(90)}", "INFO") }
+
+                val isSigLocked = errLower.contains("required key not available") ||
+                        errLower.contains("key rejected") ||
+                        errLower.contains("key was rejected") ||
+                        dmesgLower.contains("module verification failed") ||
+                        dmesgLower.contains("required key not available")
+
+                if (isSigLocked) {
+                    val sigMsg = "Signature Locked: Kernel enforces CONFIG_MODULE_SIG_FORCE. Tap 'PATCH BOOT' in Tools to unlock."
+                    lastLoadError.value = sigMsg
+                    otaFailReason = sigMsg
+                    tlog("Fix: Tap 'PATCH BOOT' in Tools tab (or enable BypassSig KPM)", "FIX")
+                } else if (errText.contains("Invalid module format", true) ||
                     errText.contains("vermagic", true) ||
                     errText.contains("Exec format error", true)
                 ) {
-                    tlog("Kernel mismatch", "WARN")
+                    lastLoadError.value = errText.take(300)
+                    tlog("Kernel mismatch - build rejected by kernel", "WARN")
+                    otaFailReason = "The kernel rejected this driver build - send the DMESG lines above to support if it repeats"
+                    tlog("Need custom loader - tap Support", "FIX")
                 } else if (errText.contains("No such file or directory", true)) {
+                    lastLoadError.value = errText.take(300)
                     tlog("Staged file not readable", "WARN")
+                    otaFailReason = "Staged driver file not readable"
+                    tlog("Need custom loader - tap Support", "FIX")
+                } else {
+                    lastLoadError.value = errText.take(300)
+                    otaFailReason = "Driver insert failed: ${errText.take(60)}"
+                    tlog("Need custom loader - tap Support", "FIX")
                 }
-                tlog("Need custom loader - tap Support", "FIX")
                 return false
             }
 
@@ -1516,13 +1515,12 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                     return@launch
                 }
                 if (pickedFileUri.value != null) {
-                    // User-provided .ko (BROWSE) - not bundled, their own file.
+
                     tlog("Loading custom file: ${pickedFileName.value}", "CMD")
                     tstep("Loading custom file...")
                     UniversalKernelLoader.autoLoad(context, this@DriverViewModel, OtaDriverStore.RT)
                 } else {
-                    // Drivers are NEVER bundled in the APK - the OTA database is the
-                    // only source, so every load is a fresh DB download.
+
                     activePipelineVariant.value = primaryVariant
                     tlog("Loading RT driver...", "CMD")
                     tstep("Stage 1/1: RT driver (OTA / DB)")
@@ -1625,15 +1623,14 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                 driverModule.value = ours.joinToString(", ")
                 tlog("${ours.first()} loaded", "OK", variant = variantOfModule(ours.first()))
             } else {
-                // Randomized node/class means lsmod says nothing - confirm via ABI probe.
+
                 val probed = try { UniversalKernelLoader.probeOurDriverNode(getApplication(), this@DriverViewModel) } catch (e: Exception) { null }
                 if (probed != null) {
                     rememberDevNode(probed)
                     markHiddenLoaded()
                     tlog("Driver running in stealth mode (/dev/$probed)", "OK")
                 } else {
-                    // Probe says nothing of ours is resident - clear stale state
-                    // so the UI falls back to LOAD and revocation logic stays sane.
+
                     setLoadedModule("")
                     hiddenLoaded.value = false
                     driverLoaded.value = false
@@ -1724,9 +1721,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             val loadedMods = SafetyGuard.loadedModuleNames()
             val currentMod = loadedModuleName.value
             val isModuleInLsmod = currentMod.isNotBlank() && currentMod in loadedMods
-            // Probe gate runs on IO (it shells out - never block Main): with randomized
-            // node/class names a fixed-prefix hiddenClass check can't see the driver.
-            // Skipped entirely when lsmod already shows our module.
+
             val probed = if (!isModuleInLsmod) try {
                 UniversalKernelLoader.probeOurDriverNode(getApplication(), this@DriverViewModel)
             } catch (e: Exception) {
@@ -1735,7 +1730,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
 
             withContext(Dispatchers.Main) {
                 if (isModuleInLsmod) {
-                    // Visible load wins over the probe's hidden classification.
+
                     driverLoaded.value = true
                     setLoadedModule(currentMod)
                 } else if (probed != null) {
@@ -1746,8 +1741,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                     driverLoaded.value = true
                     markHiddenLoaded()
                 } else {
-                    // Nothing resident: a leftover mknod node survives until reboot
-                    // and must NOT read as "loaded" - remove it and clear state.
+
                     if (nodeChar) {
                         Shell.cmd("rm -f $nodePath 2>/dev/null").exec()
                         tlog("[CLEAN] Removed stale node $nodePath", "INFO")

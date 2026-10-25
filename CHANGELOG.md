@@ -5,6 +5,24 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [1.2] — 2026-10-25 (tag `v1.2` / `versionCode 3`) 🛡️ FolkPatch & Signature Bypass Overhaul
+
+> **Seamless In-App Update for v1.0 & v1.1:** Prioritized kernel signature bypass via Magiskboot hex-patching, elimination of phantom `kptools` framework execution, stealth driver detection via direct IOCTL probes, expanded busybox insmod ladder for FolkPatch/APatch, and clean zero-comment codebase.
+
+### ✨ Added & Improved
+* **Prioritized Kernel Signature Bypass in Boot Patcher.** `BootPatcherEngine.kt` now prioritizes Unpack -> Kernel Decompress -> HexPatch (`CONFIG_MODULE_SIG_FORCE=y` → `n`, `CONFIG_MODULE_SIG_ALL=y` → `n`, `module_sig_enforce` → `module_sig_disable`, and cmdline `module.sig_enforce=0`) -> Repack. Permanently unlocks unsigned driver insertion on Oppo, Realme, OnePlus, Xiaomi, and other strict vendor kernels while keeping existing FolkPatch / APatch / Magisk root completely intact.
+* **Stealth Driver Detection in Framework & Ladder.** In addition to `/proc/modules`, the loading ladder now actively probes the driver node via direct IOCTL (`0x803`/`0x801`). Stealth modules (like RT Stealth Engine) that unlink themselves from `/proc/modules` immediately on load are instantly detected and verified.
+* **Expanded Busybox Insmod Ladder.** Added native binary checks for `/data/adb/ap/bin/busybox insmod`, `/data/adb/ksu/bin/busybox insmod`, and `/data/adb/magisk/busybox insmod` across both `UniversalKernelLoader.kt` and `DriverViewModel.kt`.
+* **Clear Signature-Lock Guidance.** When encountering `CONFIG_MODULE_SIG_FORCE=y` (`Required key not available`), the UI accurately diagnoses kernel signature enforcement and guides the user directly to tap `PATCH BOOT` or use a BypassSig KPM, eliminating misleading error descriptions.
+* **Zero-Comment Clean Codebase.** Completely stripped all inline, block, and docstring comments from project source code files.
+* **Seamless In-App Auto-Update.** Bumped to `versionCode: 3` and `versionName: "1.2"` for automatic background discovery and installation on existing installations.
+
+### 🛠️ Fixed
+* **Phantom APatch `kptools --load-module` Removed.** Removed the non-existent `kptools --load-module` framework call that printed usage help, exited 0, and caused false-positive success logs followed by a 3-second delay.
+* **Recompression Safety Guard.** Added file verification guard so `magiskboot compress=auto` is only executed when `kernel.raw` is decompressed, preventing kernel truncation on uncompressed kernels.
+
+---
+
 ## [1.1] — 2026-10-25 (tag `v1.1` / `versionCode 2`) ⚡ Direct IOCTL Probe & 6-8 Char Random Node Support
 
 > **Seamless In-App Update for v1.0:** Total elimination of erroneous node deletion, universal 6-character and 8-character random node detection (`^[A-GNYB]{6,8}$`), direct IOCTL probing (IOCTL `0x803` ModBase & `0x801` MemRead), auto mknod recovery via sysfs, and bundled `driver.sh` standalone diagnostic deployment.

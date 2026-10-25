@@ -94,16 +94,73 @@ object BootPatcherEngine {
         val ksudPath = findTool("ksud")
         val magiskbootPath = findTool("magiskboot")
 
-        vm.tlog("[TOOLS] kptools: ${kptoolsPath ?: "missing"} | ksud: ${ksudPath ?: "missing"} | magiskboot: ${magiskbootPath ?: "missing"}", "INFO")
+        vm.tlog("[TOOLS] magiskboot: ${magiskbootPath ?: "missing"} | kptools: ${kptoolsPath ?: "missing"} | ksud: ${ksudPath ?: "missing"}", "INFO")
 
         var patchSuccess = false
         var methodUsed = ""
         val patchedBootOut = "$tmpDir/patched_boot.img"
         Shell.cmd("rm -f $patchedBootOut 2>/dev/null").exec()
 
-        if (!kptoolsPath.isNullOrBlank()) {
-            vm.tstep("Tier 1: Patching via KernelPatch / FolkPatch...")
-            vm.tlog("[PATCH] Executing dynamic symbol hook via $kptoolsPath...", "INFO")
+        if (!magiskbootPath.isNullOrBlank()) {
+            vm.tstep("Tier 1: Unpacking & Kernel Hex-Patching via magiskboot...")
+            vm.tlog("[PATCH] Executing Signature Bypass: Unpack -> HexPatch (CONFIG_MODULE_SIG_FORCE=n) -> AVB Repack...", "INFO")
+
+            val workDir = "$tmpDir/work"
+            Shell.cmd("rm -rf $workDir && mkdir -p $workDir").exec()
+            Shell.cmd("cp $sessionBackupDir/boot_stock.img $workDir/boot.img").exec()
+
+            val unpackRes = Shell.cmd("cd $workDir && $magiskbootPath unpack boot.img 2>&1").exec()
+            if (!unpackRes.isSuccess || !verifyFileExists("$workDir/kernel", 1024)) {
+                vm.tlog("[PATCH WARN] magiskboot unpack failed: ${unpackRes.out.joinToString(" ")}", "WARN")
+            } else {
+                vm.tlog("[UNPACK OK] Header and kernel extracted from boot.img", "OK")
+
+                vm.tstep("Decompressing kernel...")
+                Shell.cmd("cd $workDir && $magiskbootPath decompress kernel kernel.raw 2>/dev/null").exec()
+                val targetKernel = if (verifyFileExists("$workDir/kernel.raw", 1024)) "$workDir/kernel.raw" else "$workDir/kernel"
+                vm.tlog("[DECOMPRESS OK] Target kernel binary: $targetKernel (${fileSize(targetKernel)} bytes)", "OK")
+
+                vm.tstep("Hex-patching module_sig_check & sig_enforce...")
+                val hexPatches = listOf(
+                    "6d6f64756c655f7369675f656e666f726365" to "6d6f64756c655f7369675f64697361626c65",
+                    "434f4e4649475f4d4f44554c455f5349475f464f5243453d79" to "434f4e4649475f4d4f44554c455f5349475f464f5243453d6e",
+                    "434f4e4649475f4d4f44554c455f5349475f414c4c3d79" to "434f4e4649475f4d4f44554c455f5349475f414c4c3d6e",
+                    "6d6f64756c652e7369675f656e666f7263653d31" to "6d6f64756c652e7369675f656e666f7263653d30"
+                )
+                var hexCount = 0
+                for ((src, rep) in hexPatches) {
+                    val patchOut = Shell.cmd("cd $workDir && $magiskbootPath hexpatch $targetKernel $src $rep 2>&1").exec()
+                    if (patchOut.isSuccess) {
+                        hexCount++
+                    }
+                }
+                Shell.cmd("cd $workDir && sed -i 's/module.sig_enforce=1/module.sig_enforce=0/g' header 2>/dev/null").exec()
+                Shell.cmd("cd $workDir && sed -i 's/cmdline=/cmdline=module.sig_enforce=0 /g' header 2>/dev/null").exec()
+                vm.tlog("[HEXPATCH] Applied $hexCount kernel signature bypass patches", "OK")
+
+                if (verifyFileExists("$workDir/kernel.raw", 1024)) {
+                    vm.tstep("Recompressing kernel...")
+                    Shell.cmd("cd $workDir && $magiskbootPath compress=auto kernel.raw kernel 2>/dev/null").exec()
+                }
+
+                vm.tstep("Repacking boot image & updating AVB / SHA-256 hashes...")
+                val repackRes = Shell.cmd("cd $workDir && $magiskbootPath repack boot.img new-boot.img 2>&1").exec()
+                if (verifyFileExists("$workDir/new-boot.img", 4 * 1024 * 1024)) {
+                    Shell.cmd("cp $workDir/new-boot.img $patchedBootOut").exec()
+                    if (verifyBootImageMagic(patchedBootOut)) {
+                        patchSuccess = true
+                        methodUsed = "Magiskboot Unpack + HexPatch + AVB Repack"
+                        vm.tlog("[REPACK OK] Signature-bypassed boot image assembled successfully", "OK")
+                    }
+                } else {
+                    vm.tlog("[REPACK ERR] magiskboot repack failed: ${repackRes.out.joinToString(" ")}", "ERR")
+                }
+            }
+        }
+
+        if (!patchSuccess && !kptoolsPath.isNullOrBlank()) {
+            vm.tstep("Tier 2: Patching via KernelPatch / FolkPatch (kptools)...")
+            vm.tlog("[PATCH] Executing patch via $kptoolsPath...", "INFO")
             val kpimgPath = findKpimg()
             val kpCmd = if (kpimgPath != null) {
                 "$kptoolsPath -p -i $sessionBackupDir/boot_stock.img -k $kpimgPath -o $patchedBootOut 2>&1"
@@ -121,7 +178,7 @@ object BootPatcherEngine {
         }
 
         if (!patchSuccess && !ksudPath.isNullOrBlank()) {
-            vm.tstep("Tier 2: Patching via KernelSU...")
+            vm.tstep("Tier 3: Patching via KernelSU (ksud)...")
             vm.tlog("[PATCH] Executing boot patch via $ksudPath...", "INFO")
             val res = Shell.cmd("$ksudPath boot-patch -i $sessionBackupDir/boot_stock.img -o $patchedBootOut 2>&1").exec()
             if (verifyBootImageMagic(patchedBootOut)) {
@@ -130,57 +187,6 @@ object BootPatcherEngine {
                 vm.tlog("[PATCH OK] Patched successfully using $methodUsed", "OK")
             } else {
                 vm.tlog("[PATCH WARN] ksud output: ${res.out.joinToString(" ")}", "WARN")
-            }
-        }
-
-        if (!patchSuccess && !magiskbootPath.isNullOrBlank()) {
-            vm.tstep("Tier 3: Unpacking & Kernel Hex-Patching via magiskboot...")
-            vm.tlog("[PATCH] Running custom Unpack -> Decompress -> HexPatch -> Recompress -> AVB Repack pipeline...", "INFO")
-
-            val workDir = "$tmpDir/work"
-            Shell.cmd("rm -rf $workDir && mkdir -p $workDir").exec()
-            Shell.cmd("cp $sessionBackupDir/boot_stock.img $workDir/boot.img").exec()
-
-            val unpackRes = Shell.cmd("cd $workDir && $magiskbootPath unpack boot.img 2>&1").exec()
-            if (!unpackRes.isSuccess || !verifyFileExists("$workDir/kernel", 1024)) {
-                vm.tlog("[PATCH ERR] magiskboot unpack failed: ${unpackRes.out.joinToString(" ")}", "ERR")
-            } else {
-                vm.tlog("[UNPACK OK] Header and kernel extracted from boot.img", "OK")
-
-                vm.tstep("Decompressing kernel...")
-                Shell.cmd("cd $workDir && $magiskbootPath decompress kernel kernel.raw 2>/dev/null").exec()
-                val targetKernel = if (verifyFileExists("$workDir/kernel.raw", 1024)) "$workDir/kernel.raw" else "$workDir/kernel"
-                vm.tlog("[DECOMPRESS OK] Target kernel binary: $targetKernel (${fileSize(targetKernel)} bytes)", "OK")
-
-                vm.tstep("Hex-patching module_sig_check & sig_enforce...")
-                val hexPatches = listOf(
-                    "6d6f64756c655f7369675f656e666f726365" to "6d6f64756c655f7369675f64697361626c65",
-                    "434f4e4649475f4d4f44554c455f5349475f464f5243453d79" to "434f4e4649475f4d4f44554c455f5349475f464f5243453d6e"
-                )
-                var hexCount = 0
-                for ((src, rep) in hexPatches) {
-                    val patchOut = Shell.cmd("cd $workDir && $magiskbootPath hexpatch $targetKernel $src $rep 2>&1").exec()
-                    if (patchOut.isSuccess) {
-                        hexCount++
-                    }
-                }
-                vm.tlog("[HEXPATCH] Applied $hexCount instruction and symbol patches to kernel", "OK")
-
-                vm.tstep("Recompressing kernel...")
-                Shell.cmd("cd $workDir && $magiskbootPath compress=auto kernel.raw kernel 2>/dev/null").exec()
-
-                vm.tstep("Repacking boot image & updating AVB / SHA-256 hashes...")
-                val repackRes = Shell.cmd("cd $workDir && $magiskbootPath repack boot.img new-boot.img 2>&1").exec()
-                if (verifyFileExists("$workDir/new-boot.img", 4 * 1024 * 1024)) {
-                    Shell.cmd("cp $workDir/new-boot.img $patchedBootOut").exec()
-                    if (verifyBootImageMagic(patchedBootOut)) {
-                        patchSuccess = true
-                        methodUsed = "Magiskboot Unpack + HexPatch + AVB Repack"
-                        vm.tlog("[REPACK OK] New boot image assembled with updated vendor/kernel hashes", "OK")
-                    }
-                } else {
-                    vm.tlog("[REPACK ERR] magiskboot repack failed: ${repackRes.out.joinToString(" ")}", "ERR")
-                }
             }
         }
 

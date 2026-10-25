@@ -68,8 +68,6 @@ object DriverRevocationManager {
             apply()
         }
 
-        // Daemon disabled to ensure zero-footprint stealth
-        // startRootDaemon(context, kernelRelease, variant, file, isOta)
     }
 
     fun clearLoadedDriver(context: Context) {
@@ -140,12 +138,12 @@ object DriverRevocationManager {
         file: String,
         isOta: Boolean
     ) {
-        // Disabled for anti-cheat stealth (no background shell processes)
+
         stopRootDaemon()
     }
 
     fun stopRootDaemon() {
-        // Disabled for anti-cheat stealth
+
     }
 
     fun evaluate(

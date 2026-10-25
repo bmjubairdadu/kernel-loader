@@ -6,13 +6,6 @@ import android.os.IBinder
 import android.os.Process
 import kotlin.system.exitProcess
 
-/**
- * CleanExitService monitors the application task state.
- * When the user clears the app from background / recents (swipes it away),
- * onTaskRemoved() is triggered by the Android framework.
- * This service ensures the entire process is terminated cleanly and immediately,
- * leaving zero residual background memory, cached threads, or processes.
- */
 class CleanExitService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
