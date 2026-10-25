@@ -85,10 +85,10 @@
       "file": "uni_4.19.157-perf+.ko",
       "variant": "rt",
       "label": "4.19.157-perf+",
-      "sha256": "56f874687a9e23a0c93a6cfa0e5185d6707c000fe35557899cfc18c7a4f14f14",
-      "size": 13504,
-      "buildDate": "2026-10-25T16:08:00Z",
-      "source": "compiled from desktop entry.c master template (Linux 4.19.157 tree, universal CRC-clean, 6-char random node)",
+      "sha256": "94cfd8811dbbe9577dd97a372d311af61e320daa3b16a28c65378b09039784d2",
+      "size": 13720,
+      "buildDate": "2026-10-25T16:22:00Z",
+      "source": "compiled from desktop entry.c master template (Linux 4.19.157, full ABI probe compatible, 6-char random node)",
       "verified": true
     },
     {
@@ -195,10 +195,10 @@
       "file": "uni_4.14.357-openela-perf-g673b80046ab9.ko",
       "variant": "rt",
       "label": "4.14.357-openela-perf-g673b80046ab9",
-      "sha256": "d1c82d06e14dc211914182b2ecfd61651fb62f0b774f51972307c15d1e73cb66",
-      "size": 13720,
-      "buildDate": "2026-10-25T16:08:00Z",
-      "source": "compiled from desktop entry.c master template (OpenELA 4.14 tree, universal CRC-clean, 6-char random node)",
+      "sha256": "a1c8ed5a1e1bdd332ce9d52e91c611a77552edd9b79b5cf4670445e1472342bf",
+      "size": 14024,
+      "buildDate": "2026-10-25T16:22:00Z",
+      "source": "compiled from desktop entry.c master template (OpenELA 4.14, full ABI probe compatible, 6-char random node)",
       "verified": true
     },
     {
@@ -206,14 +206,14 @@
       "file": "uni_4.19.157-perf-g1a6087bc0325-dirty.ko",
       "variant": "rt",
       "label": "4.19.157-perf-g1a6087bc0325-dirty",
-      "sha256": "75df6418cc4853f13618a6830cd74e5a267d981d877f5057a5b5e88a55e31c46",
-      "size": 13568,
-      "buildDate": "2026-10-25T16:08:00Z",
-      "source": "compiled from desktop entry.c master template (Linux 4.19.157 tree, universal CRC-clean, 6-char random node)",
+      "sha256": "4bfd99f71d0c1ea3578797ded2ba46a4939540171516ada10b6d89511ce0458c",
+      "size": 13784,
+      "buildDate": "2026-10-25T16:22:00Z",
+      "source": "compiled from desktop entry.c master template (Linux 4.19.157, full ABI probe compatible, 6-char random node)",
       "verified": true
     }
   ],
-  "updated": "2026-10-25T16:08:00Z",
+  "updated": "2026-10-25T16:22:00Z",
   "variants": {
     "rt": "RT ABI - ioctl 0x801/0x802/0x803, success returns -EIO (0 on failure)"
   }
