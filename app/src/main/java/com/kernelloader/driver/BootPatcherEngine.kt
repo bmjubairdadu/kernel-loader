@@ -120,7 +120,14 @@ object BootPatcherEngine {
                 val targetKernel = if (verifyFileExists("$workDir/kernel.raw", 1024)) "$workDir/kernel.raw" else "$workDir/kernel"
                 vm.tlog("[DECOMPRESS OK] Target kernel binary: $targetKernel (${fileSize(targetKernel)} bytes)", "OK")
 
-                vm.tstep("Hex-patching module_sig_check & sig_enforce...")
+                vm.tstep("Patching kernel symbols (module_sig_check, check_modinfo, check_version)...")
+                val dynamicCount = patchKernelSymbols(targetKernel, vm)
+                if (dynamicCount > 0) {
+                    vm.tlog("[PATCH OK] ARM64 machine code patched: module signature verification permanently neutralized!", "OK")
+                } else {
+                    vm.tlog("[PATCH INFO] Falling back to text and cmdline patches", "INFO")
+                }
+
                 val hexPatches = listOf(
                     "6d6f64756c655f7369675f656e666f726365" to "6d6f64756c655f7369675f64697361626c65",
                     "434f4e4649475f4d4f44554c455f5349475f464f5243453d79" to "434f4e4649475f4d4f44554c455f5349475f464f5243453d6e",
@@ -338,5 +345,115 @@ object BootPatcherEngine {
         val hex = Shell.cmd("dd if=$path bs=1 count=8 2>/dev/null | xxd -p 2>/dev/null || od -A n -N 8 -t x1 $path 2>/dev/null")
             .exec().out.joinToString("").replace(" ", "").trim().lowercase()
         return hex.startsWith("414e44524f494421")
+    }
+
+    private fun patchKernelSymbols(targetKernelPath: String, vm: DriverViewModel): Int {
+        // Ensure kallsyms addresses are visible
+        Shell.cmd("echo 0 > /proc/sys/kernel/kptr_restrict").exec()
+
+        // 1. Get base address
+        val baseLine = Shell.cmd("head -n 1 /proc/kallsyms").exec().out.firstOrNull()?.trim() ?: ""
+        val baseParts = baseLine.split(Regex("\\s+"))
+        if (baseParts.isEmpty() || baseParts[0].length < 8) {
+            vm.tlog("[PATCH WARN] Could not determine kernel base address from /proc/kallsyms", "WARN")
+            return 0
+        }
+        val baseAddrStr = baseParts[0]
+        val baseAddr = try {
+            java.lang.Long.parseUnsignedLong(baseAddrStr, 16)
+        } catch (e: Exception) {
+            vm.tlog("[PATCH WARN] Invalid base address: $baseAddrStr", "WARN")
+            return 0
+        }
+        vm.tlog("[KALLSYMS] Kernel base address: 0x$baseAddrStr", "INFO")
+
+        val targetFile = File(targetKernelPath)
+        Shell.cmd("chmod 666 $targetKernelPath").exec()
+        if (!targetFile.exists() || targetFile.length() < 1024) {
+            vm.tlog("[PATCH ERR] Target kernel does not exist or is too small", "ERR")
+            return 0
+        }
+
+        val kernelBytes = try {
+            targetFile.readBytes()
+        } catch (e: Exception) {
+            vm.tlog("[PATCH ERR] Could not read target kernel: ${e.message}", "ERR")
+            return 0
+        }
+
+        val symbolsToPatch = listOf(
+            Triple("module_sig_check", "00 00 80 52 C0 03 5F D6", "Bypass module signature enforce (mov w0, #0; ret)"),
+            Triple("check_modinfo", "00 00 80 52 C0 03 5F D6", "Bypass vermagic check (mov w0, #0; ret)"),
+            Triple("check_version", "20 00 80 52 C0 03 5F D6", "Bypass symbol CRC version check (mov w0, #1; ret)")
+        )
+
+        var patchedCount = 0
+        val pacPattern = byteArrayOf(0x3F.toByte(), 0x23.toByte(), 0x03.toByte(), 0xD5.toByte()) // PACIASP
+
+        for ((symName, patchHex, desc) in symbolsToPatch) {
+            val symLine = Shell.cmd("grep -w -E '[Tt] $symName' /proc/kallsyms | head -n 1").exec().out.firstOrNull()?.trim() ?: ""
+            if (symLine.isBlank()) {
+                vm.tlog("[KALLSYMS] Symbol '$symName' not found in kallsyms (skipping)", "INFO")
+                continue
+            }
+            val symParts = symLine.split(Regex("\\s+"))
+            if (symParts.isEmpty()) continue
+            val symAddrStr = symParts[0]
+            val symAddr = try {
+                java.lang.Long.parseUnsignedLong(symAddrStr, 16)
+            } catch (e: Exception) {
+                continue
+            }
+
+            val offsetLong = symAddr - baseAddr
+            if (offsetLong < 0 || offsetLong + 16 > kernelBytes.size) {
+                vm.tlog("[PATCH WARN] Symbol '$symName' offset ($offsetLong) out of bounds", "WARN")
+                continue
+            }
+            val offset = offsetLong.toInt()
+
+            val hasPac = (kernelBytes[offset] == pacPattern[0] &&
+                          kernelBytes[offset + 1] == pacPattern[1] &&
+                          kernelBytes[offset + 2] == pacPattern[2] &&
+                          kernelBytes[offset + 3] == pacPattern[3])
+
+            val rawPatch = hexToBytes(patchHex)
+            val patchBytes = if (hasPac) {
+                byteArrayOf(
+                    0x3F.toByte(), 0x23.toByte(), 0x03.toByte(), 0xD5.toByte(),
+                    rawPatch[0], rawPatch[1], rawPatch[2], rawPatch[3],
+                    0xBF.toByte(), 0x23.toByte(), 0x03.toByte(), 0xD5.toByte(),
+                    rawPatch[4], rawPatch[5], rawPatch[6], rawPatch[7]
+                )
+            } else {
+                rawPatch
+            }
+
+            System.arraycopy(patchBytes, 0, kernelBytes, offset, patchBytes.size)
+            patchedCount++
+            vm.tlog("[PATCH OK] Patched $symName at offset 0x${Integer.toHexString(offset)} ($desc, PAC: $hasPac)", "OK")
+        }
+
+        if (patchedCount > 0) {
+            try {
+                targetFile.writeBytes(kernelBytes)
+            } catch (e: Exception) {
+                val tempFile = File.createTempFile("kpatch", ".bin", targetFile.parentFile)
+                tempFile.writeBytes(kernelBytes)
+                Shell.cmd("cp ${tempFile.absolutePath} $targetKernelPath && chmod 644 $targetKernelPath").exec()
+                tempFile.delete()
+            }
+            vm.tlog("[PATCH OK] Applied $patchedCount dynamic symbol patches directly into kernel binary", "OK")
+        }
+        return patchedCount
+    }
+
+    private fun hexToBytes(hex: String): ByteArray {
+        val clean = hex.replace(" ", "")
+        val bytes = ByteArray(clean.length / 2)
+        for (i in bytes.indices) {
+            bytes[i] = clean.substring(i * 2, i * 2 + 2).toInt(16).toByte()
+        }
+        return bytes
     }
 }
