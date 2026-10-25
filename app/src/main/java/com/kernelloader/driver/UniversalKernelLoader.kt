@@ -659,8 +659,11 @@ object UniversalKernelLoader {
             } else {
                 vm?.tlog("Signature bypass applied (insmod -f fallback)", "WARN")
             }
-        } else if (sigValue == "0" || sigValue.isEmpty()) {
-            vm?.tlog("Signature verification: OK", "OK")
+        } else if (sigValue == "0") {
+            vm?.tlog("Signature enforcement: Disabled (sysctl 0)", "OK")
+        } else {
+            // sysctl module_sig_enforce is not exposed by kernel (e.g. strict CONFIG_MODULE_SIG_FORCE=y)
+            // Do not falsely log "Signature verification: OK" here
         }
     }
 
