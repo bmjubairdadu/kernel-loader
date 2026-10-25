@@ -5,6 +5,23 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [1.1] — 2026-10-25 (tag `v1.1` / `versionCode 2`) ⚡ Direct IOCTL Probe & 6-8 Char Random Node Support
+
+> **Seamless In-App Update for v1.0:** Total elimination of erroneous node deletion, universal 6-character and 8-character random node detection (`^[A-GNYB]{6,8}$`), direct IOCTL probing (IOCTL `0x803` ModBase & `0x801` MemRead), auto mknod recovery via sysfs, and bundled `driver.sh` standalone diagnostic deployment.
+
+### ✨ Added & Improved
+* **Direct IOCTL Verification Engine (`directIoctlProbe`).** Implemented high-reliability direct IOCTL testing (`0x803` ModBase & `0x801` MemRead) replicating `Driver.sh` behaviour. Once a candidate device node answers validly, the app adopts it instantly with zero risk of premature rejection.
+* **Universal 6 & 8 Character Node Support (`^[A-GNYB]{6,8}$`).** Replaced legacy strict 8-character limits with universal `{6,8}` regex matching across `SafetyGuard.kt`, `DriverViewModel.kt`, and `UniversalKernelLoader.kt`. Supports both legacy 6-char `entry.c` builds and modern 8-char random-name drivers.
+* **Standalone Driver Diagnostic Tool (`driver.sh`).** Bundled `driver.sh` in application assets (`bin/driver.sh`) and automatically extracted to `/data/local/tmp/driver.sh` (`chmod 0755`) on launch for independent terminal diagnostic checks.
+* **Sysfs Class mknod Auto-Recovery.** When a module successfully registers with the kernel but devtmpfs fails to instantiate `/dev` nodes, the loader parses `/sys/class` major:minor numbers and executes safe `mknod -m 666` and SELinux label injection (`chcon u:object_r:device:s0`).
+* **Interactive VERIFY Button Integration.** Tap-to-verify action in UI now triggers direct IOCTL interrogation to report `"Driver 100% active & operational! (Direct IOCTL Verified)"`.
+* **Seamless In-App Auto-Update.** Built with `versionCode: 2` and `versionName: "1.1"`, allowing existing v1.0 installations to automatically detect, download, and install this update via the built-in updater.
+
+### 🛠️ Fixed
+* **Permanent Resolution of Node Deletion Bug.** Completely eliminated the bug where unverified random nodes were mistakenly removed with `rm -f /dev/$node` (which caused "Node /dev/ missing"). Nodes are verified non-destructively through direct ABI probes.
+
+---
+
 ## [1.0] — 2026-10-25 (tag `v1.0` / `versionCode 1`) 🚀 Official Stability & General Release
 
 > **Official Stable Release:** Full compatibility with `Kernel_Drivers` zero-param insmod ladder, critical revocation watcher reboot-loop fix, safe sysfs and `/dev` device node discovery, hardened anti-tamper with debug support, and foreground service lifecycle reliability.
