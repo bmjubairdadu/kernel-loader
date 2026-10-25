@@ -348,10 +348,9 @@ object BootPatcherEngine {
     }
 
     private fun patchKernelSymbols(targetKernelPath: String, vm: DriverViewModel): Int {
-        // Ensure kallsyms addresses are visible
+
         Shell.cmd("echo 0 > /proc/sys/kernel/kptr_restrict").exec()
 
-        // 1. Get base address
         val baseLine = Shell.cmd("head -n 1 /proc/kallsyms").exec().out.firstOrNull()?.trim() ?: ""
         val baseParts = baseLine.split(Regex("\\s+"))
         if (baseParts.isEmpty() || baseParts[0].length < 8) {
@@ -388,7 +387,7 @@ object BootPatcherEngine {
         )
 
         var patchedCount = 0
-        val pacPattern = byteArrayOf(0x3F.toByte(), 0x23.toByte(), 0x03.toByte(), 0xD5.toByte()) // PACIASP
+        val pacPattern = byteArrayOf(0x3F.toByte(), 0x23.toByte(), 0x03.toByte(), 0xD5.toByte())
 
         for ((symName, patchHex, desc) in symbolsToPatch) {
             val symLine = Shell.cmd("grep -w -E '[Tt] $symName' /proc/kallsyms | head -n 1").exec().out.firstOrNull()?.trim() ?: ""
