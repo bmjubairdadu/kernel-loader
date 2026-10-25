@@ -1,7 +1,7 @@
 {
   "baseUrl": "https://raw.githubusercontent.com/bmjubairdadu/kernel-loader/drivers",
   "branch": "drivers",
-  "count": 19,
+  "count": 20,
   "drivers": [
     {
       "version": "4.9.337-DaisyForGaming SMP preempt mod_unload modversions aarch64",
@@ -211,9 +211,20 @@
       "buildDate": "2026-10-25T16:31:00Z",
       "source": "compiled from desktop entry.c master template (Linux 4.19.157, strncpy fix, 6-char random node)",
       "verified": true
+    },
+    {
+      "version": "4.19.191+ SMP preempt mod_unload modversions aarch64",
+      "file": "uni_4.19.191+.ko",
+      "variant": "rt",
+      "label": "4.19.191+",
+      "sha256": "9d170909def7e0e313cb99f535b00c6ca20544c11267966701cea5e043fbf077",
+      "size": 13848,
+      "buildDate": "2026-10-25T17:44:00Z",
+      "source": "compiled from desktop entry.c master template (Realme RMX3195 MediaTek MT6769V/CZ)",
+      "verified": true
     }
   ],
-  "updated": "2026-10-25T16:31:00Z",
+  "updated": "2026-10-25T17:44:00Z",
   "variants": {
     "rt": "RT ABI - ioctl 0x801/0x802/0x803, success returns -EIO (0 on failure)"
   }
