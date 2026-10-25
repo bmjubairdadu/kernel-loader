@@ -21,23 +21,25 @@ object AppGuard {
         false
     }
 
-    fun isSignatureValid(context: Context): Boolean = try {
+    fun isSignatureValid(context: Context): Boolean {
         if (com.kernelloader.BuildConfig.DEBUG) return true
-        val sigs = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            val info = context.packageManager.getPackageInfo(
-                context.packageName, PackageManager.GET_SIGNING_CERTIFICATES
-            )
-            info.signingInfo?.apkContentsSigners ?: emptyArray()
-        } else {
-            @Suppress("DEPRECATION")
-            val info = context.packageManager.getPackageInfo(
-                context.packageName, PackageManager.GET_SIGNATURES
-            )
-            info.signatures ?: emptyArray()
+        return try {
+            val sigs = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                val info = context.packageManager.getPackageInfo(
+                    context.packageName, PackageManager.GET_SIGNING_CERTIFICATES
+                )
+                info.signingInfo?.apkContentsSigners ?: emptyArray()
+            } else {
+                @Suppress("DEPRECATION")
+                val info = context.packageManager.getPackageInfo(
+                    context.packageName, PackageManager.GET_SIGNATURES
+                )
+                info.signatures ?: emptyArray()
+            }
+            sigs.isNotEmpty() && (TRUSTED_SIG_SHA256.isBlank() || sigs.any { sha256Hex(it.toByteArray()) == TRUSTED_SIG_SHA256 })
+        } catch (_: Throwable) {
+            false
         }
-        sigs.isNotEmpty() && (TRUSTED_SIG_SHA256.isBlank() || sigs.any { sha256Hex(it.toByteArray()) == TRUSTED_SIG_SHA256 })
-    } catch (_: Throwable) {
-        false
     }
 
     fun isTampered(context: Context): Boolean {
