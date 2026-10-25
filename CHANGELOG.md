@@ -5,6 +5,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [1.3] — 2026-10-25 (tag `v1.3` / `versionCode 4`) 🚀 Dynamic ARM64 Machine Code Patcher & Bundled Magiskboot
+
+> **Seamless In-App Update for all previous versions:** Native ARM64 kernel machine code patcher for `module_sig_check`, `check_modinfo` and `check_version` with PAC support, internal bundling of standalone `magiskboot` binary in application assets, automatic extraction and pre-flight deployment, and zero-comment codebase.
+
+### ✨ Added & Improved
+* **Dynamic ARM64 Machine Code Patcher (`patchKernelSymbols`).** Directly parses `/proc/kallsyms` to identify symbol offsets and patches kernel instructions in memory/binary:
+  - `module_sig_check` patched to `mov w0, #0; ret` (permanently neutralizing signature enforcement).
+  - `check_modinfo` patched to `mov w0, #0; ret` (bypassing vermagic rejection).
+  - `check_version` patched to `mov w0, #1; ret` (bypassing symbol CRC version mismatches).
+  - Full ARM64 PAC (`PACIASP` / `AUTIASP`) awareness to preserve control flow integrity.
+* **Bundled Standalone `magiskboot` Tool.** Directly bundled static ARM64 `magiskboot` binary inside application assets (`bin/magiskboot`), automatically extracted to `/data/local/tmp/magiskboot` (`chmod 755`) on boot patch or diagnostic initialization.
+* **Seamless In-App Auto-Update.** Incremented to `versionCode: 4` and `versionName: "1.3"`. All existing installations (v1.0, v1.1, v1.2) automatically detect, download, and install this release.
+* **Clean Zero-Comment Codebase.** Fully preserved comment-free codebase across all source files.
+
+---
+
 ## [1.2] — 2026-10-25 (tag `v1.2` / `versionCode 3`) 🛡️ FolkPatch & Signature Bypass Overhaul
 
 > **Seamless In-App Update for v1.0 & v1.1:** Prioritized kernel signature bypass via Magiskboot hex-patching, elimination of phantom `kptools` framework execution, stealth driver detection via direct IOCTL probes, expanded busybox insmod ladder for FolkPatch/APatch, and clean zero-comment codebase.

@@ -305,6 +305,19 @@ object UniversalKernelLoader {
                 "chmod 755 /data/local/tmp/driver.sh 2>/dev/null"
             ).exec()
         } catch (_: Exception) {}
+
+        try {
+            val localMagiskboot = File(context.filesDir, "magiskboot")
+            if (!localMagiskboot.exists() || localMagiskboot.length() == 0L) {
+                context.assets.open("bin/magiskboot").use { input ->
+                    localMagiskboot.outputStream().use { output -> input.copyTo(output) }
+                }
+            }
+            Shell.cmd(
+                "cp \"${localMagiskboot.absolutePath}\" /data/local/tmp/magiskboot 2>/dev/null",
+                "chmod 755 /data/local/tmp/magiskboot 2>/dev/null"
+            ).exec()
+        } catch (_: Exception) {}
     }
 
     fun directIoctlProbe(context: Context?, node: String): Boolean {

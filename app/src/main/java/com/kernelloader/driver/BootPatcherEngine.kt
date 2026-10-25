@@ -31,6 +31,7 @@ object BootPatcherEngine {
     ): PatchResult = withContext(Dispatchers.IO) {
         vm.tstep("Initializing Boot Patch Pipeline...")
         vm.tlog("[BOOT] Starting Kernel Signature Bypass pipeline...", "INFO")
+        UniversalKernelLoader.ensureProbeBinaries(context)
 
         val isRoot = runCatching { Shell.getShell().isRoot }.getOrDefault(false)
         if (!isRoot) {
