@@ -631,7 +631,10 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                         local.outputStream().use { output -> input.copyTo(output) }
                     }
 
-                    Shell.cmd("rm -f /dev/entryi /dev/wanbai /dev/dmsync /dev/memacc 2>/dev/null").exec()
+                    Shell.cmd(
+                        "chmod 0666 /dev/entryi 2>/dev/null",
+                        "chcon u:object_r:device:s0 /dev/entryi 2>/dev/null"
+                    ).exec()
 
                     val testRun = Shell.cmd(
                         "cp \"${local.absolutePath}\" /data/local/tmp/dmtest 2>/dev/null",
@@ -1060,7 +1063,8 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             val setupCmds = mutableListOf(
                 "chmod 0666 /dev/$node",
                 "chcon u:object_r:device:s0 /dev/$node 2>/dev/null",
-                "rm -f /dev/entryi /dev/wanbai /dev/dmsync /dev/memacc 2>/dev/null"
+                "chmod 0666 /dev/entryi 2>/dev/null",
+                "chcon u:object_r:device:s0 /dev/entryi 2>/dev/null"
             )
             Shell.cmd(*setupCmds.toTypedArray()).exec()
 

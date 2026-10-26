@@ -550,7 +550,8 @@ object UniversalKernelLoader {
             val setupCmds = mutableListOf(
                 "chmod 666 $targetPath 2>/dev/null",
                 "chcon u:object_r:device:s0 $targetPath 2>/dev/null",
-                "rm -f /dev/entryi /dev/wanbai /dev/dmsync /dev/memacc 2>/dev/null"
+                "chmod 666 /dev/entryi 2>/dev/null",
+                "chcon u:object_r:device:s0 /dev/entryi 2>/dev/null"
             )
             Shell.cmd(*setupCmds.toTypedArray()).exec()
 
