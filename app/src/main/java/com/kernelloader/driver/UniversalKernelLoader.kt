@@ -549,20 +549,13 @@ object UniversalKernelLoader {
             val targetPath = "/dev/$foundNodeName"
             val setupCmds = mutableListOf(
                 "chmod 666 $targetPath 2>/dev/null",
-                "chcon u:object_r:device:s0 $targetPath 2>/dev/null"
+                "chcon u:object_r:device:s0 $targetPath 2>/dev/null",
+                "rm -f /dev/entryi /dev/wanbai /dev/dmsync /dev/memacc 2>/dev/null"
             )
-            val clientAliases = listOf("entryi", "wanbai", "dmsync", "memacc")
-            for (alias in clientAliases) {
-                if (alias != foundNodeName) {
-                    setupCmds.add("ln -sf $targetPath /dev/$alias 2>/dev/null")
-                    setupCmds.add("chmod 666 /dev/$alias 2>/dev/null")
-                    setupCmds.add("chcon -h u:object_r:device:s0 /dev/$alias 2>/dev/null")
-                }
-            }
             Shell.cmd(*setupCmds.toTypedArray()).exec()
 
             vm.rememberDevNode(foundNodeName)
-            vm.tlog("[DEVNODE] Active node: $targetPath (0666, device:s0, aliases: entryi, wanbai, dmsync, memacc)", "OK")
+            vm.tlog("[DEVNODE] Active node: $targetPath (0666, device:s0 · Pure Stealth)", "OK")
         }
 
         val lsmod = Shell.cmd("lsmod").exec()

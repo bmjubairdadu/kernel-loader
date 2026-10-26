@@ -631,20 +631,8 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                         local.outputStream().use { output -> input.copyTo(output) }
                     }
 
-                    val clientAliases = listOf("/dev/entryi", "/dev/wanbai", "/dev/dmsync", "/dev/memacc")
-                    if (nodeExists) {
-                        val setupCmds = mutableListOf<String>()
-                        for (alias in clientAliases) {
-                            if (alias != nodePath) {
-                                setupCmds.add("ln -sf $nodePath $alias 2>/dev/null")
-                                setupCmds.add("chmod 0666 $alias 2>/dev/null")
-                                setupCmds.add("chcon -h u:object_r:device:s0 $alias 2>/dev/null")
-                            }
-                        }
-                        if (setupCmds.isNotEmpty()) {
-                            Shell.cmd(*setupCmds.toTypedArray()).exec()
-                        }
-                    }
+                    // Pure Stealth: Clean up known blacklist alias symlinks to prevent anti-cheat detection
+                    Shell.cmd("rm -f /dev/entryi /dev/wanbai /dev/dmsync /dev/memacc 2>/dev/null").exec()
 
                     val testRun = Shell.cmd(
                         "cp \"${local.absolutePath}\" /data/local/tmp/dmtest 2>/dev/null",
@@ -1072,20 +1060,13 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             val node = foundNode
             val setupCmds = mutableListOf(
                 "chmod 0666 /dev/$node",
-                "chcon u:object_r:device:s0 /dev/$node 2>/dev/null"
+                "chcon u:object_r:device:s0 /dev/$node 2>/dev/null",
+                "rm -f /dev/entryi /dev/wanbai /dev/dmsync /dev/memacc 2>/dev/null"
             )
-            val clientAliases = listOf("entryi", "wanbai", "dmsync", "memacc")
-            for (alias in clientAliases) {
-                if (alias != node) {
-                    setupCmds.add("ln -sf /dev/$node /dev/$alias 2>/dev/null")
-                    setupCmds.add("chmod 0666 /dev/$alias 2>/dev/null")
-                    setupCmds.add("chcon -h u:object_r:device:s0 /dev/$alias 2>/dev/null")
-                }
-            }
             Shell.cmd(*setupCmds.toTypedArray()).exec()
 
             rememberDevNode(node)
-            tlog("Node /dev/$node active (0666, aliases: entryi, wanbai, dmsync, memacc)", "OK")
+            tlog("Node /dev/$node active (0666 · Pure Stealth)", "OK")
             val rwOk = Shell.cmd("test -r /dev/$node && test -w /dev/$node").exec().isSuccess
             if (rwOk) {
                 tlog("/dev/$node verified (R/W OK)", "OK")
