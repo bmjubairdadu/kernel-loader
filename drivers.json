@@ -195,9 +195,9 @@
       "file": "uni_4.14.357-openela-perf-g673b80046ab9.ko",
       "variant": "rt",
       "label": "4.14.357-openela-perf-g673b80046ab9",
-      "sha256": "07dc40842a3ceb6941d9fc936bba813a52d53fbb3cb4f37e1b7316d69bc24475",
-      "size": 14352,
-      "buildDate": "2026-10-26T15:45:00Z",
+      "sha256": "0a535999dcb60f50dada721541421e430339e96679448dffedea60ca159977a5",
+      "size": 13776,
+      "buildDate": "2026-10-26T16:03:00Z",
       "source": "compiled from desktop entry.c master template (OpenELA 4.14, strncpy fix, 6-char random node)",
       "verified": true
     },
@@ -224,7 +224,7 @@
       "verified": true
     }
   ],
-  "updated": "2026-10-26T15:45:00Z",
+  "updated": "2026-10-26T16:03:00Z",
   "variants": {
     "rt": "RT ABI - ioctl 0x801/0x802/0x803, success returns -EIO (0 on failure)"
   }
