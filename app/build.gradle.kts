@@ -61,6 +61,11 @@ androidComponents {
             variantBuilder.enable = false
         }
     }
+    onVariants { variant ->
+        variant.outputs.forEach { output ->
+            output.outputFileName.set("Kernel-Loader-v2.0.apk")
+        }
+    }
 }
 
 dependencies {

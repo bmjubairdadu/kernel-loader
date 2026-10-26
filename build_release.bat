@@ -22,7 +22,7 @@ if %errorlevel% equ 0 (
     echo ========================================================
     echo.
     echo Release APK লোকেশন:
-    echo %~dp0app\build\outputs\apk\release\app-release.apk
+    echo %~dp0app\build\outputs\apk\release\Kernel-Loader-v2.0.apk
     echo.
 ) else (
     color 0C

@@ -108,7 +108,7 @@ cd kernel-loader
 ```
 
 The release APK will be generated at:
-`app/build/outputs/apk/release/app-release.apk`
+`app/build/outputs/apk/release/Kernel-Loader-v2.0.apk`
 
 - Language: Kotlin
 - UI Framework: Jetpack Compose
