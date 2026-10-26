@@ -195,8 +195,8 @@
       "file": "uni_4.14.357-openela-perf-g673b80046ab9.ko",
       "variant": "rt",
       "label": "4.14.357-openela-perf-g673b80046ab9",
-      "sha256": "0a535999dcb60f50dada721541421e430339e96679448dffedea60ca159977a5",
-      "size": 13776,
+      "sha256": "6a1b66ad2c6805568cca8397f025e650694c3693366d04792a3221c0ad73aec9",
+      "size": 13928,
       "buildDate": "2026-10-26T16:03:00Z",
       "source": "compiled from desktop entry.c master template (OpenELA 4.14, strncpy fix, 6-char random node)",
       "verified": true
