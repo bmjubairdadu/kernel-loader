@@ -327,9 +327,9 @@
       "file": "uni_4.14.357-openela-perf-g673b80046ab9.ko",
       "variant": "rt",
       "label": "4.14.357-openela-perf-g673b80046ab9",
-      "sha256": "13fd9a66daea7c050570f1fdbc972965bb1df3344597f96848c44ae54cc463df",
-      "size": 31944,
-      "buildDate": "2026-10-26T20:03:00Z",
+      "sha256": "bc3dead251b2d12c3b5375d99ce34d656aefbd8590896ca673355ec19d766a2f",
+      "size": 17040,
+      "buildDate": "2026-10-26T20:17:00Z",
       "source": "custom_build/openela-414",
       "verified": true
     },
