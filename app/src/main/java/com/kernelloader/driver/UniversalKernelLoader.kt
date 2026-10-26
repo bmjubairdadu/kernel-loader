@@ -546,13 +546,23 @@ object UniversalKernelLoader {
         }
 
         if (exactNode && foundNodeName.isNotEmpty()) {
-            Shell.cmd(
-                "chmod 666 /dev/$foundNodeName 2>/dev/null",
-                "chcon u:object_r:device:s0 /dev/$foundNodeName 2>/dev/null"
-            ).exec()
+            val targetPath = "/dev/$foundNodeName"
+            val setupCmds = mutableListOf(
+                "chmod 666 $targetPath 2>/dev/null",
+                "chcon u:object_r:device:s0 $targetPath 2>/dev/null"
+            )
+            val clientAliases = listOf("entryi", "wanbai", "dmsync", "memacc")
+            for (alias in clientAliases) {
+                if (alias != foundNodeName) {
+                    setupCmds.add("ln -sf $targetPath /dev/$alias 2>/dev/null")
+                    setupCmds.add("chmod 666 /dev/$alias 2>/dev/null")
+                    setupCmds.add("chcon -h u:object_r:device:s0 /dev/$alias 2>/dev/null")
+                }
+            }
+            Shell.cmd(*setupCmds.toTypedArray()).exec()
 
             vm.rememberDevNode(foundNodeName)
-            vm.tlog("[DEVNODE] Active node: /dev/$foundNodeName (0666, device:s0, no alias symlinks)", "OK")
+            vm.tlog("[DEVNODE] Active node: $targetPath (0666, device:s0, aliases: entryi, wanbai, dmsync, memacc)", "OK")
         }
 
         val lsmod = Shell.cmd("lsmod").exec()

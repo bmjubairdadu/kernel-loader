@@ -633,23 +633,26 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                         local.outputStream().use { output -> input.copyTo(output) }
                     }
 
-                    val aliasLink = "/dev/entryi"
-                    val aliasCreated = if (nodeExists) {
-                        Shell.cmd(
-                            "ln -sf $nodePath $aliasLink 2>/dev/null",
-                            "chmod 0666 $aliasLink 2>/dev/null"
-                        ).exec().isSuccess
-                    } else false
+                    val clientAliases = listOf("/dev/entryi", "/dev/wanbai", "/dev/dmsync", "/dev/memacc")
+                    if (nodeExists) {
+                        val setupCmds = mutableListOf<String>()
+                        for (alias in clientAliases) {
+                            if (alias != nodePath) {
+                                setupCmds.add("ln -sf $nodePath $alias 2>/dev/null")
+                                setupCmds.add("chmod 0666 $alias 2>/dev/null")
+                                setupCmds.add("chcon -h u:object_r:device:s0 $alias 2>/dev/null")
+                            }
+                        }
+                        if (setupCmds.isNotEmpty()) {
+                            Shell.cmd(*setupCmds.toTypedArray()).exec()
+                        }
+                    }
 
                     val testRun = Shell.cmd(
                         "cp \"${local.absolutePath}\" /data/local/tmp/dmtest 2>/dev/null",
                         "chmod 755 /data/local/tmp/dmtest 2>/dev/null",
                         "/data/local/tmp/dmtest /data/local/tmp/dmtest_report.txt 2>&1"
                     ).exec()
-
-                    if (aliasCreated) {
-                        Shell.cmd("rm -f $aliasLink 2>/dev/null").exec()
-                    }
 
                     val outLines = testRun.out
                     val directProbePassed = UniversalKernelLoader.directIoctlProbe(context, devNode)
@@ -773,7 +776,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                 } catch (e: Exception) {
                     tlog("[TEST ERR] ${e.message?.take(36)}", "ERR")
                 } finally {
-                    Shell.cmd("rm -f /dev/entryi /data/local/tmp/dmtest /data/local/tmp/dmtest_report.txt 2>/dev/null").exec()
+                    Shell.cmd("rm -f /data/local/tmp/dmtest /data/local/tmp/dmtest_report.txt 2>/dev/null").exec()
                     tstep("")
                 }
             }
@@ -1069,13 +1072,22 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
 
         if (foundNode != null) {
             val node = foundNode
-            Shell.cmd(
+            val setupCmds = mutableListOf(
                 "chmod 0666 /dev/$node",
                 "chcon u:object_r:device:s0 /dev/$node 2>/dev/null"
-            ).exec()
+            )
+            val clientAliases = listOf("entryi", "wanbai", "dmsync", "memacc")
+            for (alias in clientAliases) {
+                if (alias != node) {
+                    setupCmds.add("ln -sf /dev/$node /dev/$alias 2>/dev/null")
+                    setupCmds.add("chmod 0666 /dev/$alias 2>/dev/null")
+                    setupCmds.add("chcon -h u:object_r:device:s0 /dev/$alias 2>/dev/null")
+                }
+            }
+            Shell.cmd(*setupCmds.toTypedArray()).exec()
 
             rememberDevNode(node)
-            tlog("Node /dev/$node active (0666)", "OK")
+            tlog("Node /dev/$node active (0666, aliases: entryi, wanbai, dmsync, memacc)", "OK")
             val rwOk = Shell.cmd("test -r /dev/$node && test -w /dev/$node").exec().isSuccess
             if (rwOk) {
                 tlog("/dev/$node verified (R/W OK)", "OK")
