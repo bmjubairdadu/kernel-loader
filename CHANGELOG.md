@@ -5,6 +5,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [1.9] — 2026-10-26 (tag `v1.9` / `versionCode 10`) 🥷 Pure Stealth Engine & Online OTA Pipeline
+
+> **Seamless In-App Update for all previous versions:** Pure stealth mode enforcement by removing static blacklisted aliases (`entryi`, `wanbai`, `dmsync`, `memacc`), asset size optimization by utilizing online OTA driver store exclusively, and 100% comment-free codebase.
+
+### ✨ Added & Improved
+* **Pure Stealth Mode Enforcement.** Automatically removes known blacklisted aliases (`/dev/entryi`, `/dev/wanbai`, `/dev/dmsync`, `/dev/memacc`) and relies purely on dynamic randomized character nodes to evade anti-cheat heuristics.
+* **Streamlined Online OTA Pipeline.** Removed redundant bundled driver files from app assets, optimizing APK footprint while ensuring the freshest builds are resolved directly from the live OTA database.
+* **Seamless In-App Auto-Update.** Incremented to `versionCode: 10` and `versionName: "1.9"`.
+* **Zero Comments.** 100% comment-free across all source files.
+
+---
+
 ## [1.8] — 2026-10-26 (tag `v1.8` / `versionCode 9`) 🌐 Live OTA Cache-Control & Binary Asset Attributes
 
 > **Seamless In-App Update for all previous versions:** Disabled HTTP caching in OtaDriverStore to guarantee real-time fresh manifest and driver downloads, fixed asset binary gitattributes, smart boot session persistence, and 100% comment-free codebase.

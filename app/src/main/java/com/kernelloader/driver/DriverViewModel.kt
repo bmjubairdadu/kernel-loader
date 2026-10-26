@@ -631,7 +631,6 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                         local.outputStream().use { output -> input.copyTo(output) }
                     }
 
-                    // Pure Stealth: Clean up known blacklist alias symlinks to prevent anti-cheat detection
                     Shell.cmd("rm -f /dev/entryi /dev/wanbai /dev/dmsync /dev/memacc 2>/dev/null").exec()
 
                     val testRun = Shell.cmd(
