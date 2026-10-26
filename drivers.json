@@ -85,8 +85,8 @@
       "file": "uni_4.19.157-perf+.ko",
       "variant": "rt",
       "label": "4.19.157-perf+",
-      "sha256": "313f8272f4cba19ec59472c88ce27f795827ec3e8893da6c29746b4d13a75279",
-      "size": 13984,
+      "sha256": "311fa1af5cbd747e3d11c56f6269a162376c0dcf890c8712dd657aa7a5d7f48c",
+      "size": 14672,
       "buildDate": "2026-10-26T15:45:00Z",
       "source": "compiled from desktop entry.c master template (Linux 4.19.157, strncpy fix, 6-char random node)",
       "verified": true
@@ -195,8 +195,8 @@
       "file": "uni_4.14.357-openela-perf-g673b80046ab9.ko",
       "variant": "rt",
       "label": "4.14.357-openela-perf-g673b80046ab9",
-      "sha256": "6a1b66ad2c6805568cca8397f025e650694c3693366d04792a3221c0ad73aec9",
-      "size": 13928,
+      "sha256": "797e5dea7d06a99d22de7f80fc656d1d8222aad7ca703bcce9cec6073758e5be",
+      "size": 14984,
       "buildDate": "2026-10-26T16:03:00Z",
       "source": "compiled from desktop entry.c master template (OpenELA 4.14, strncpy fix, 6-char random node)",
       "verified": true
@@ -206,8 +206,8 @@
       "file": "uni_4.19.157-perf-g1a6087bc0325-dirty.ko",
       "variant": "rt",
       "label": "4.19.157-perf-g1a6087bc0325-dirty",
-      "sha256": "046ba2de35ecd5524f78a9145edbe3cad970e4a836de1b23458d4d9c1dc1b4e2",
-      "size": 13984,
+      "sha256": "c91905a92d2452e04cfe4ba1ebeb50418d555b70ffdc11b0346a281148a49747",
+      "size": 14672,
       "buildDate": "2026-10-26T15:45:00Z",
       "source": "compiled from desktop entry.c master template (Linux 4.19.157, strncpy fix, 6-char random node)",
       "verified": true
@@ -217,8 +217,8 @@
       "file": "uni_4.19.191+.ko",
       "variant": "rt",
       "label": "4.19.191+",
-      "sha256": "33ab9a45dce1a1340a750f9a77c5313504b5b48e02d315b9acefd35684ba24d0",
-      "size": 13984,
+      "sha256": "875bfa2d04d72e12ab909a855e481b3dd5755af03cb5b05e6580436c4629e200",
+      "size": 14672,
       "buildDate": "2026-10-26T15:45:00Z",
       "source": "compiled from desktop entry.c master template (Realme RMX3195 MT6769, 4.19.191+, universal CRC-clean, 6-char random node)",
       "verified": true
