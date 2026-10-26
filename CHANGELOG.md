@@ -5,6 +5,42 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [1.8] — 2026-10-26 (tag `v1.8` / `versionCode 9`) 🌐 Live OTA Cache-Control & Binary Asset Attributes
+
+> **Seamless In-App Update for all previous versions:** Disabled HTTP caching in OtaDriverStore to guarantee real-time fresh manifest and driver downloads, fixed asset binary gitattributes, smart boot session persistence, and 100% comment-free codebase.
+
+### ✨ Added & Improved
+* **HTTP No-Cache Bypass (`OtaDriverStore.kt`).** Added explicit `Cache-Control: no-cache`, `Pragma: no-cache`, and disabled internal HTTP caching (`useCaches = false`) to ensure the app never receives stale cached driver manifests or driver binaries from GitHub/CDN proxies, guaranteeing that fresh and updated fixed drivers are always downloaded directly in real-time.
+* **Binary Asset Protection (`.gitattributes`).** Explicitly configured Git attributes to treat internal asset binaries (`driver.sh`, `dmtest`, `myprobe`) as binary files (`-text`), preventing any newline conversion (CRLF/LF) corruption during checkout and builds.
+* **Smart Boot Session & Active Node Protection.** Preserves active `/dev` nodes across app minimization and resumes, preventing game disconnects while maintaining clean startup on device reboot.
+* **Seamless In-App Auto-Update.** Incremented to `versionCode: 9` and `versionName: "1.8"`.
+* **Zero Comments.** 100% comment-free across all source files.
+
+---
+
+## [1.7] — 2026-10-26 (tag `v1.7` / `versionCode 8`) 🛡️ Smart Boot Session Tracking & Active Node Guard
+
+> **Seamless In-App Update for all previous versions:** Smart Linux `boot_id` session tracking, active device node protection on app switch/resume, clean fresh boot detection, and 100% comment-free codebase.
+
+### ✨ Added & Improved
+* **Active Node Guard (App Switch Safety).** Solved the issue where re-entering the app after loading would mistakenly wipe active device nodes. The app now tracks the active session via Linux `/proc/sys/kernel/random/boot_id` and protects live `/dev` nodes so running games/tools are never disconnected.
+* **Smart Boot Session Tracking.** Differentiates between clean phone reboot (starts fresh with LOAD button) and active driver sessions on app resume.
+* **Seamless In-App Auto-Update.** Incremented to `versionCode: 8` and `versionName: "1.7"`.
+
+---
+
+## [1.6] — 2026-10-25 (tag `v1.6` / `versionCode 7`) ⚡ Fresh Launch State Fix & Force Reload Control
+
+> **Seamless In-App Update for all previous versions:** Fixed premature "RESTART" button state on app launch, ensured "LOAD" is always ready and available, eliminated false-positive resident locks, added direct "FORCE RELOAD DRIVER" control, and maintained 100% comment-free codebase.
+
+### ✨ Added & Improved
+* **App Launch Button State Fix.** Fixed the issue where the action button erroneously showed "RESTART" upon opening the app before the user ever tapped "LOAD". On app launch, `driverLoaded` starts clean and the primary button is always **LOAD**.
+* **Elimination of False-Positive Residency Locks.** Fixed `SafetyGuard.hiddenDriverClass()` and startup state checks so unverified sysfs directories or previous dead entries in `/sys/class` do not hijack the app into a locked "RESTART" state.
+* **Direct "FORCE RELOAD DRIVER" Action.** Added a dedicated secondary action inside the Unload panel allowing users to instantly re-run the driver loading pipeline without having to reboot their device.
+* **Seamless In-App Auto-Update.** Incremented to `versionCode: 7` and `versionName: "1.6"`.
+
+---
+
 ## [1.5] — 2026-10-25 (tag `v1.5` / `versionCode 6`) 🛡️ Direct Node Adoption & Probe Unblock
 
 > **Seamless In-App Update for all previous versions:** Eliminated aggressive dmtest/myprobe node deletion, adopted native Kernel_Drivers direct node activation architecture, support for OpenELA EFAULT (errno 14) and stealth classes, and 100% comment-free codebase.
