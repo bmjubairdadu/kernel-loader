@@ -85,9 +85,9 @@
       "file": "uni_4.19.157-perf+.ko",
       "variant": "rt",
       "label": "4.19.157-perf+",
-      "sha256": "3da5aed4dbdfc2484acf5fe800b6befaba32e74825ddf152e2c7b84cbc93b7b4",
-      "size": 14152,
-      "buildDate": "2026-10-26T14:00:00Z",
+      "sha256": "313f8272f4cba19ec59472c88ce27f795827ec3e8893da6c29746b4d13a75279",
+      "size": 13984,
+      "buildDate": "2026-10-26T15:45:00Z",
       "source": "compiled from desktop entry.c master template (Linux 4.19.157, strncpy fix, 6-char random node)",
       "verified": true
     },
@@ -195,9 +195,9 @@
       "file": "uni_4.14.357-openela-perf-g673b80046ab9.ko",
       "variant": "rt",
       "label": "4.14.357-openela-perf-g673b80046ab9",
-      "sha256": "fda72d72188a50403546d5f80d46fcf2a284d10b29a0a2ceca766c76e69d8d77",
-      "size": 14592,
-      "buildDate": "2026-10-26T14:00:00Z",
+      "sha256": "07dc40842a3ceb6941d9fc936bba813a52d53fbb3cb4f37e1b7316d69bc24475",
+      "size": 14352,
+      "buildDate": "2026-10-26T15:45:00Z",
       "source": "compiled from desktop entry.c master template (OpenELA 4.14, strncpy fix, 6-char random node)",
       "verified": true
     },
@@ -206,9 +206,9 @@
       "file": "uni_4.19.157-perf-g1a6087bc0325-dirty.ko",
       "variant": "rt",
       "label": "4.19.157-perf-g1a6087bc0325-dirty",
-      "sha256": "125878b5e1f1b847f3d59f9ddcf3c742f7ae9188224b0b60fca7b3e0d66235e0",
-      "size": 14152,
-      "buildDate": "2026-10-26T14:00:00Z",
+      "sha256": "046ba2de35ecd5524f78a9145edbe3cad970e4a836de1b23458d4d9c1dc1b4e2",
+      "size": 13984,
+      "buildDate": "2026-10-26T15:45:00Z",
       "source": "compiled from desktop entry.c master template (Linux 4.19.157, strncpy fix, 6-char random node)",
       "verified": true
     },
@@ -217,14 +217,14 @@
       "file": "uni_4.19.191+.ko",
       "variant": "rt",
       "label": "4.19.191+",
-      "sha256": "30b0a5f9156177c01c4071b872acf22801faefbe024a508276862b887e6250cc",
-      "size": 14152,
-      "buildDate": "2026-10-26T14:00:00Z",
+      "sha256": "33ab9a45dce1a1340a750f9a77c5313504b5b48e02d315b9acefd35684ba24d0",
+      "size": 13984,
+      "buildDate": "2026-10-26T15:45:00Z",
       "source": "compiled from desktop entry.c master template (Realme RMX3195 MT6769, 4.19.191+, universal CRC-clean, 6-char random node)",
       "verified": true
     }
   ],
-  "updated": "2026-10-26T14:00:00Z",
+  "updated": "2026-10-26T15:45:00Z",
   "variants": {
     "rt": "RT ABI - ioctl 0x801/0x802/0x803, success returns -EIO (0 on failure)"
   }
