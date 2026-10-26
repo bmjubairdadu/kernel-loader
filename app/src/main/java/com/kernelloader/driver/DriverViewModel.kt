@@ -78,9 +78,7 @@ object EmbeddedDrivers {
     fun readVermagic(context: Context, assetPath: String): String {
         return try {
             val bytes = context.resources.assets.open(assetPath).use { input ->
-                val buf = ByteArray(1 shl 20)
-                val n = input.read(buf)
-                if (n <= 0) ByteArray(0) else buf.copyOf(n)
+                input.readBytes()
             }
             val tag = "vermagic=".toByteArray(Charsets.US_ASCII)
             outer@ for (i in 0..(bytes.size - tag.size)) {
@@ -1516,15 +1514,25 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
 
                     activePipelineVariant.value = primaryVariant
                     tlog("Loading RT driver...", "CMD")
-                    tstep("Stage 1/1: RT driver (OTA / DB)")
-                    val handled = runOtaLoad(context, primaryVariant)
-                    if (handled) return@launch
+                    tstep("Stage 1/3: Checking OTA database...")
+                    val otaHandled = runOtaLoad(context, primaryVariant)
+                    if (otaHandled) return@launch
                     checkpoint()
 
-                    tlog("[NET] ${otaFailReason.ifBlank { "No internet connection - connect to the internet first, then tap LOAD" }}", "ERR")
-                    tlog("[NET] Drivers always download from the database - no offline build is bundled.", "INFO")
+                    tlog("OTA database unreachable or no match, falling back to embedded offline drivers...", "INFO")
+                    tstep("Stage 2/3: Embedded offline driver (.ko)...")
+                    UniversalKernelLoader.autoLoad(context, this@DriverViewModel, primaryVariant)
+                    if (autoLoadOk.value == true || driverLoaded.value) return@launch
+                    checkpoint()
+
+                    tlog("Falling back to offline script driver bundle (Kernel_Drivers.zip)...", "INFO")
+                    tstep("Stage 3/3: Running offline driver script...")
+                    val scriptHandled = UniversalKernelLoader.runOfflineScriptDriver(context, this@DriverViewModel, primaryVariant)
+                    if (scriptHandled || autoLoadOk.value == true || driverLoaded.value) return@launch
+
+                    tlog("[ERR] ${otaFailReason.ifBlank { "Could not load driver from OTA, embedded assets, or scripts" }}", "ERR")
                     autoLoadOk.value = false
-                    autoLoadStatus.value = "Load failed - driver database unreachable"
+                    autoLoadStatus.value = "Load failed - no compatible driver found"
                 }
                 if (autoLoadOk.value != true && !driverLoaded.value) {
                     tlog("RT pipeline failed", "ERR")

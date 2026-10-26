@@ -10,6 +10,7 @@ build/
 local.properties
 /app/src/main/assets/*.apk
 /app/src/main/assets/*.zip
+!/app/src/main/assets/Kernel_Drivers.zip
 
 # ===== APK at repo root is the official release file - DO push it =====
 !/Kernel-Loder-*.apk
