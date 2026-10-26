@@ -119,7 +119,6 @@ fun ConsoleScreen(
     }
 
     val shown = when (filter) {
-        "RT" -> viewModel.terminalLines.filter { it.variant == OtaDriverStore.RT }
         "CMD" -> viewModel.terminalLines.filter { it.type == "CMD" }
         "ERR" -> viewModel.terminalLines.filter { it.type == "ERR" }
         else -> viewModel.terminalLines
@@ -163,7 +162,7 @@ fun ConsoleScreen(
                 Text(
                     text = "Kernel Loader Console",
                     style = MaterialTheme.typography.titleLarge.copy(
-                        brush = Brush.linearGradient(listOf(Color.White, GradientRtStart))
+                        brush = Brush.linearGradient(listOf(Color.White, AccentGreen))
                     )
                 )
                 Spacer(modifier = Modifier.weight(1f))
@@ -217,8 +216,7 @@ fun ConsoleScreen(
                 listOf(
                     "ALL" to TextSecondary,
                     "CMD" to LogCmd,
-                    "ERR" to LogErr,
-                    "RT" to FamilyRt
+                    "ERR" to LogErr
                 ).forEach { (label, tint) ->
                     val selected = filter == label
                     Surface(

@@ -1,5 +1,6 @@
 package com.kernelloader.driver
 
+import android.content.ClipData
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -94,9 +95,16 @@ object SupportContact {
         val uri = FileProvider.getUriForFile(
             context, "${context.packageName}.fileprovider", zip
         )
+        val targets = listOf("com.whatsapp", "com.whatsapp.w4b")
+        for (pkg in targets) {
+            try {
+                context.grantUriPermission(pkg, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            } catch (_: Exception) {}
+        }
         fun newIntent(): Intent = Intent(Intent.ACTION_SEND).apply {
             type = "application/zip"
             putExtra(Intent.EXTRA_STREAM, uri)
+            clipData = ClipData.newRawUri("report.zip", uri)
             putExtra(Intent.EXTRA_TEXT, caption)
             putExtra("jid", "$WHATSAPP_NUMBER@s.whatsapp.net")
             addFlags(
@@ -104,7 +112,6 @@ object SupportContact {
                         Intent.FLAG_ACTIVITY_NEW_TASK
             )
         }
-        val targets = listOf("com.whatsapp", "com.whatsapp.w4b")
         for (pkg in targets) {
             val intent = newIntent().apply { setPackage(pkg) }
             val resolved = try {
@@ -122,11 +129,9 @@ object SupportContact {
             }
         }
         return try {
-            if (newIntent().resolveActivity(context.packageManager) == null) {
-                return false
-            }
-            val chooser = Intent.createChooser(newIntent(), "Send report via WhatsApp").apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            val fallback = newIntent()
+            val chooser = Intent.createChooser(fallback, "Send report via WhatsApp").apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
             context.startActivity(chooser)
             true
@@ -139,15 +144,6 @@ object SupportContact {
         val uri = FileProvider.getUriForFile(
             context, "${context.packageName}.fileprovider", zip
         )
-        fun newIntent(): Intent = Intent(Intent.ACTION_SEND).apply {
-            type = "application/zip"
-            putExtra(Intent.EXTRA_STREAM, uri)
-            putExtra(Intent.EXTRA_TEXT, "$caption\nTelegram: $TELEGRAM_HANDLE")
-            addFlags(
-                Intent.FLAG_GRANT_READ_URI_PERMISSION or
-                        Intent.FLAG_ACTIVITY_NEW_TASK
-            )
-        }
         val targets = listOf(
             "org.telegram.messenger",
             "org.telegram.messenger.web",
@@ -155,6 +151,21 @@ object SupportContact {
             "org.thunderdog.challegram",
             "nekox.messenger"
         )
+        for (pkg in targets) {
+            try {
+                context.grantUriPermission(pkg, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            } catch (_: Exception) {}
+        }
+        fun newIntent(): Intent = Intent(Intent.ACTION_SEND).apply {
+            type = "application/zip"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            clipData = ClipData.newRawUri("report.zip", uri)
+            putExtra(Intent.EXTRA_TEXT, "$caption\nTelegram: $TELEGRAM_HANDLE")
+            addFlags(
+                Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                        Intent.FLAG_ACTIVITY_NEW_TASK
+            )
+        }
         for (pkg in targets) {
             val intent = newIntent().apply { setPackage(pkg) }
             val resolved = try {
@@ -172,11 +183,9 @@ object SupportContact {
             }
         }
         return try {
-            if (newIntent().resolveActivity(context.packageManager) == null) {
-                return false
-            }
-            val chooser = Intent.createChooser(newIntent(), "Send report via Telegram ($TELEGRAM_HANDLE)").apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            val fallback = newIntent()
+            val chooser = Intent.createChooser(fallback, "Send report via Telegram ($TELEGRAM_HANDLE)").apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
             context.startActivity(chooser)
             true

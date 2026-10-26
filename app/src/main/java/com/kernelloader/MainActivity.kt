@@ -25,19 +25,12 @@ import com.kernelloader.ui.MainRoute
 import com.kernelloader.ui.SafetyWarningDialog
 import com.kernelloader.ui.WarningRoute
 import com.kernelloader.ui.theme.KernelLoderTheme
-import com.kernelloader.security.AppGuard
 import com.topjohnwu.superuser.Shell
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        if (AppGuard.isTampered(this)) {
-            android.widget.Toast.makeText(
-                this, "Integrity check failed - app closed", android.widget.Toast.LENGTH_LONG
-            ).show()
-            finish()
-            return
-        }
+        com.kernelloader.security.SecurityShield.protect(this)
         if (!shellConfigured) {
             shellConfigured = true
             Shell.setDefaultBuilder(
@@ -95,6 +88,11 @@ class MainActivity : ComponentActivity() {
                 stopService(Intent(this, CleanExitService::class.java))
             } catch (_: Exception) {}
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        com.kernelloader.security.SecurityShield.protect(this)
     }
 
     companion object {

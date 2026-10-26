@@ -15,8 +15,8 @@ android {
         applicationId = "com.kernelloader"
         minSdk = 28
         targetSdk = 34
-        versionCode = 10
-        versionName = "1.9"
+        versionCode = 20
+        versionName = "2.0"
 
         buildConfigField(
             "String",
@@ -52,6 +52,14 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+}
+
+androidComponents {
+    beforeVariants { variantBuilder ->
+        if (variantBuilder.buildType == "debug") {
+            variantBuilder.enable = false
+        }
     }
 }
 

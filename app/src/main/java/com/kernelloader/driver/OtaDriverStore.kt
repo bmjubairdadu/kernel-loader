@@ -10,12 +10,11 @@ import java.net.URL
 object OtaDriverStore {
 
     var manifestUrl: String =
-        "https://raw.githubusercontent.com/bmjubairdadu/kernel-loader/drivers/drivers.json"
+        com.kernelloader.security.SecurityShield.decodeProtectedString("aHR0cHM6Ly9yYXcuZ2l0aHVidXNlcmNvbnRlbnQuY29tL2JtanViYWlyZGFkdS9rZXJuZWwtbG9hZGVyL2RyaXZlcnMvZHJpdmVycy5qc29u")
 
     val fallbackManifestUrls: List<String> = listOf(
-
-        "https://cdn.jsdelivr.net/gh/bmjubairdadu/kernel-loader@drivers/drivers.json",
-        "https://github.com/bmjubairdadu/kernel-loader/releases/latest/download/drivers.json"
+        com.kernelloader.security.SecurityShield.decodeProtectedString("aHR0cHM6Ly9jZG4uanNkZWxpdnIubmV0L2doL2JtanViYWlyZGFkdS9rZXJuZWwtbG9hZGVyQGRyaXZlcnMvZHJpdmVycy5qc29u"),
+        com.kernelloader.security.SecurityShield.decodeProtectedString("aHR0cHM6Ly9naXRodWIuY29tL2JtanViYWlyZGFkdS9rZXJuZWwtbG9hZGVyL3JlbGVhc2VzL2xhdGVzdC9kb3dubG9hZC9kcml2ZXJzLmpzb24=")
     )
 
     const val RT = "rt"
@@ -45,11 +44,13 @@ object OtaDriverStore {
         return have == want
     }
 
-    fun variantsFor(manifest: Manifest, variant: String): List<DriverEntry> {
+    fun variantsFor(manifest: Manifest, variant: String = ""): List<DriverEntry> {
         val want = variant.trim().lowercase()
+        if (want.isEmpty()) return manifest.drivers
         val exact = manifest.drivers.filter { it.variant.trim().lowercase() == want }
         val generic = manifest.drivers.filter { it.variant.isBlank() }
-        return exact + generic
+        val res = exact + generic
+        return if (res.isNotEmpty()) res else manifest.drivers
     }
 
     data class Manifest(
@@ -178,7 +179,7 @@ object OtaDriverStore {
 
     private fun fetchOneDetailed(url: String): Pair<Manifest?, String?> {
         return try {
-            val conn = (URL(url).openConnection() as HttpURLConnection).apply {
+            val conn = com.kernelloader.security.SecurityShield.openSecureConnection(url).apply {
                 connectTimeout = 15000; readTimeout = 15000
                 instanceFollowRedirects = true
                 useCaches = false
@@ -271,7 +272,7 @@ object OtaDriverStore {
             val url = if (entry.file.startsWith("http")) entry.file
                       else baseUrl.trimEnd('/') + "/" + entry.file.trimStart('/')
             onLog("Downloading driver...", "INFO")
-            val conn = (URL(url).openConnection() as HttpURLConnection).apply {
+            val conn = com.kernelloader.security.SecurityShield.openSecureConnection(url).apply {
                 connectTimeout = 20000; readTimeout = 60000
                 instanceFollowRedirects = true
                 useCaches = false

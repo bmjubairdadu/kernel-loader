@@ -153,7 +153,6 @@ fun HomeScreen(
         val obs = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 resync()
-                viewModel.checkRevocationOnResume(context)
             }
         }
         lifecycleOwner.lifecycle.addObserver(obs)
@@ -189,13 +188,13 @@ fun HomeScreen(
 
     val exact = remember(manifest, kernelRelease, deviceVermagic) {
         manifest?.let {
-            OtaDriverStore.exactFor(it, kernelRelease, OtaDriverStore.RT, deviceVermagic)
+            OtaDriverStore.exactFor(it, kernelRelease, "", deviceVermagic)
         }
     }
 
-    val rtSupported = remember(manifest, kernelRelease, deviceVermagic) {
+    val supportedDrivers = remember(manifest, kernelRelease, deviceVermagic) {
         manifest?.let {
-            OtaDriverStore.supportedEntries(it, OtaDriverStore.RT)
+            OtaDriverStore.supportedEntries(it, "")
         }?.let { list ->
             val (mine, others) = list.partition {
                 OtaDriverStore.isExactMatch(it, kernelRelease, deviceVermagic)
@@ -382,13 +381,13 @@ fun HomeScreen(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     RingButton(
-                        accentStart = if (running) GradientAmberStart else GradientRtStart,
-                        accentEnd = if (running) GradientAmberEnd else GradientRtEnd,
+                        accentStart = if (running) GradientAmberStart else GradientGreenStart,
+                        accentEnd = if (running) GradientAmberEnd else GradientGreenEnd,
                         busy = running,
-                        enabled = loadsTapable && !busy && rootAvailable && !viewModel.isDriverRevoked.value,
+                        enabled = loadsTapable && !busy && rootAvailable,
                         animated = true,
                         onClick = {
-                            viewModel.autoLoadUniversal(context, preferOta = true, variant = OtaDriverStore.RT)
+                            viewModel.autoLoadUniversal(context, preferOta = true, variant = "")
                         }
                     ) {
                         if (running) {
@@ -401,47 +400,27 @@ fun HomeScreen(
                             Icon(
                                 Icons.Default.Bolt,
                                 contentDescription = null,
-                                tint = if (loadsTapable && !busy && !viewModel.isDriverRevoked.value) GradientRtStart else TextDisabled,
+                                tint = if (loadsTapable && !busy) GradientGreenStart else TextDisabled,
                                 modifier = Modifier.size(28.dp)
                             )
                         }
                         Spacer(Modifier.height(5.dp))
                         Text(
-                            text = if (running) "LOADING" else if (viewModel.isDriverRevoked.value) "REVOKED" else "LOAD",
+                            text = if (running) "LOADING" else "LOAD",
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold,
-                            color = if (loadsTapable && !busy && !viewModel.isDriverRevoked.value) TextPrimary else TextDisabled
+                            color = if (loadsTapable && !busy) TextPrimary else TextDisabled
                         )
                     }
                     Spacer(Modifier.height(6.dp))
-                    if (viewModel.isDriverRevoked.value) {
-                        Text(
-                            text = "⛔ ACCESS REVOKED: Driver removed from DB by admin",
-                            style = MonoTiny,
-                            color = AccentRed,
-                            fontWeight = FontWeight.Bold,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.padding(horizontal = 24.dp)
-                        )
-                    } else if (viewModel.isDriverUpgraded.value && loaded) {
-                        Text(
-                            text = "⚡ Upgraded driver available in DB (loads on next restart)",
-                            style = MonoTiny,
-                            color = AccentGreen,
-                            fontWeight = FontWeight.Bold,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.padding(horizontal = 24.dp)
-                        )
-                    } else {
-                        Text(
-                            text = if (running) busyStep.ifBlank { "working..." }
-                            else "Modern RT Stealth Engine",
-                            style = MonoTiny,
-                            color = if (running) AccentAmber else FamilyRt,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.padding(horizontal = 24.dp)
-                        )
-                    }
+                    Text(
+                        text = if (running) busyStep.ifBlank { "working..." }
+                        else "Modern Stealth Engine",
+                        style = MonoTiny,
+                        color = if (running) AccentAmber else AccentGreen,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(horizontal = 24.dp)
+                    )
                     if (running) {
                         Spacer(Modifier.height(8.dp))
                         StopLoadButton(onStop = { viewModel.stopLoad() })
@@ -458,7 +437,7 @@ fun HomeScreen(
                         viewModel.clearLoadedDriver(context)
                         viewModel.driverLoaded.value = false
                         viewModel.hiddenLoaded.value = false
-                        viewModel.autoLoadUniversal(context, preferOta = true, variant = OtaDriverStore.RT)
+                        viewModel.autoLoadUniversal(context, preferOta = true, variant = "")
                     }
                 )
             }
@@ -472,8 +451,8 @@ fun HomeScreen(
                     1.dp,
                     if (loaded) Brush.horizontalGradient(
                         listOf(
-                            GradientRtStart.copy(alpha = 0.65f),
-                            GradientRtEnd.copy(alpha = 0.65f)
+                            GradientGreenStart.copy(alpha = 0.65f),
+                            GradientGreenEnd.copy(alpha = 0.65f)
                         )
                     ) else Brush.horizontalGradient(listOf(BorderSubtle, BorderSubtle))
                 )
@@ -611,7 +590,7 @@ fun HomeScreen(
                         busyStep.isNotBlank() -> busyStep
                         viewModel.autoLoadStatus.value.isNotBlank() -> viewModel.autoLoadStatus.value
                         exact != null ->
-                            "Ready: ${exact.version} ${OtaDriverStore.variantLabel(exact.variant)} loader on GitHub"
+                            "Ready: ${exact.version} loader on GitHub"
                         else -> "Tap LOAD · detect kernel + download loader"
                     },
                     style = MonoTiny,
@@ -673,116 +652,6 @@ fun HomeScreen(
                 }
             }
 
-            Spacer(Modifier.height(10.dp))
-
-            var switchSlotState by remember { mutableStateOf(false) }
-            val isBootPatching = viewModel.isBootPatching.value
-            val bootResult = viewModel.bootPatchResult.value
-            val bootStatus = viewModel.bootPatchStatus.value
-            val bootBackup = viewModel.bootBackupPath.value
-
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = Surface1),
-                border = BorderStroke(1.dp, if (bootResult == true) AccentGreen.copy(alpha = 0.5f) else AccentAmber.copy(alpha = 0.4f))
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 10.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(Modifier.weight(1f)) {
-                            Text(
-                                text = "Kernel Signature Bypass (Boot Patcher)",
-                                style = MaterialTheme.typography.titleSmall,
-                                color = TextPrimary
-                            )
-                            Spacer(Modifier.height(2.dp))
-                            Text(
-                                text = "Unpack · HexPatch · AVB re-sign · Anti-bootloop",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = TextMuted
-                            )
-                        }
-                        Spacer(Modifier.width(8.dp))
-                        Button(
-                            onClick = { viewModel.patchBootImage(context, switchSlotState) },
-                            enabled = !busy && rootAvailable && !isBootPatching,
-                            colors = ButtonDefaults.buttonColors(containerColor = AccentAmber),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-                        ) {
-                            if (isBootPatching) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(16.dp),
-                                    color = TextOnAccent,
-                                    strokeWidth = 2.dp
-                                )
-                            } else {
-                                Icon(
-                                    Icons.Default.SystemUpdate,
-                                    contentDescription = null,
-                                    tint = TextOnAccent,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            }
-                            Spacer(Modifier.width(6.dp))
-                            Text(
-                                text = if (isBootPatching) "PATCHING..." else "PATCH BOOT",
-                                color = TextOnAccent,
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-
-                    if (bootStatus.isNotBlank()) {
-                        Spacer(Modifier.height(6.dp))
-                        Text(
-                            text = bootStatus,
-                            style = MonoTiny,
-                            color = if (bootResult == true) AccentGreen else if (bootResult == false) AccentRed else AccentAmber
-                        )
-                    }
-
-                    if (bootBackup.isNotBlank()) {
-                        Spacer(Modifier.height(4.dp))
-                        Text(
-                            text = "Backup: $bootBackup",
-                            style = MonoTiny,
-                            color = TextMuted
-                        )
-                    }
-
-                    if (bootResult == true) {
-                        Spacer(Modifier.height(8.dp))
-                        Button(
-                            onClick = { viewModel.rebootDevice(context) },
-                            colors = ButtonDefaults.buttonColors(containerColor = AccentGreen),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Icon(
-                                Icons.Default.Refresh,
-                                contentDescription = null,
-                                tint = TextOnAccent,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(Modifier.width(6.dp))
-                            Text(
-                                text = "REBOOT TO APPLY BYPASS",
-                                color = TextOnAccent,
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-                }
-            }
-
             Spacer(Modifier.height(14.dp))
 
             VariantConsoleSection(
@@ -797,9 +666,9 @@ fun HomeScreen(
             Spacer(Modifier.height(14.dp))
 
             KernelListSection(
-                title = "SUPPORTED KERNELS (${rtSupported.size})",
-                accent = FamilyRt,
-                entries = rtSupported,
+                title = "SUPPORTED KERNELS (${supportedDrivers.size})",
+                accent = AccentGreen,
+                entries = supportedDrivers,
                 status = manifestStatus,
                 kernelRelease = kernelRelease,
                 deviceVermagic = deviceVermagic
@@ -1374,19 +1243,6 @@ private fun SupportCard(
 
     val matchStatus = if (hasExact) "EXACT MATCH FOUND" else "NO MATCH IN DB"
 
-    var wipeOnResume by remember { mutableStateOf(false) }
-    val lifecycleOwner = LocalLifecycleOwner.current
-    DisposableEffect(lifecycleOwner) {
-        val obs = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME && wipeOnResume) {
-                wipeOnResume = false
-                scope.launch(Dispatchers.IO) { ReportPackBuilder.wipeReportDir(context) }
-            }
-        }
-        lifecycleOwner.lifecycle.addObserver(obs)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(obs) }
-    }
-
     fun collectReport(): DeviceReportCollector.DeviceReport =
         DeviceReportCollector.collect(
             rootAvailable = RootChecker.isRootAvailable(),
@@ -1429,8 +1285,7 @@ private fun SupportCard(
                 textAlign = TextAlign.Center
             )
             Text(
-                text = "One tap packs report.txt, Module.symvers.txt (CRC table), " +
-                        "config.txt, dmesg.txt & applog.txt into a ZIP — you just hit send.",
+                text = "One tap extracts boot.img, kallsyms, kernel config, vendor module & diagnostics into a ZIP for driver building.",
                 style = MaterialTheme.typography.bodySmall,
                 color = TextSecondary,
                 textAlign = TextAlign.Center,
@@ -1486,7 +1341,6 @@ private fun SupportCard(
                                             SupportContact.sendZipViaWhatsApp(context, it, pack.caption)
                                         } ?: false
 
-                                        wipeOnResume = true
                                         if (!sent) {
                                             context.startActivity(
                                                 Intent(
@@ -1562,7 +1416,6 @@ private fun SupportCard(
                                         val sent = pack.zipFile?.let {
                                             SupportContact.sendZipViaTelegram(context, it, pack.caption)
                                         } ?: false
-                                        wipeOnResume = true
                                         if (!sent) {
                                             context.startActivity(
                                                 Intent(

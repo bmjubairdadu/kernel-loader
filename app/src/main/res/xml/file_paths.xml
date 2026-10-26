@@ -3,4 +3,5 @@
 
     <cache-path name="updates" path="updates/" />
     <cache-path name="report" path="report/" />
+    <cache-path name="report_pack" path="report_pack/" />
 </paths>

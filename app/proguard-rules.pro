@@ -1,8 +1,15 @@
-# Kernel Loder - release protection rules
-# R8: obfuscate + shrink + optimize. Keeps reflection-sensitive code alive.
+# Kernel Loder - Maximum Security Hardening Rules
+# R8: Aggressive Obfuscation + Code Flattening + Anti-Reverse Engineering
 
 -allowaccessmodification
 -repackageclasses ''
+-overloadaggressively
+
+# Rename SourceFile attribute to blank to completely wipe source file names from DEX
+-renamesourcefileattribute ""
+
+# Strip all line numbers, local variable tables, source attributes
+-keepattributes !SourceFile,!LineNumberTable,!LocalVariableTable,!LocalVariableTypeTable
 
 # --- libsu (root shell) reads config via reflection -> must survive ---
 -keep class com.topjohnwu.superuser.** { *; }
@@ -10,17 +17,6 @@
 
 # --- Coroutines internals ---
 -dontwarn kotlinx.coroutines.**
-
-# --- Compose runtime ships its own AAPT rules; nothing extra needed ---
-
-# --- Protection extras ---------------------------------------------------
-# Rename the SourceFile attribute so original .kt file names never leak into
-# stack traces / crash reports. (R8 does NOT support -dontattributes, so this
-# is the supported way to hide source-file names.)
--renamesourcefileattribute SourceFile
-
-# Strip debug info R8 does not need -> smaller dex, less reversible
--keepattributes Exceptions,InnerClasses,Signature,*Annotation*
 
 # Reflection / JSON / enum access that must survive shrinking
 -keepclassmembers enum * {
@@ -35,12 +31,17 @@
 }
 -keep class com.kernelloader.update.AppUpdateChecker$** { *; }
 -keep class com.kernelloader.driver.OtaDriverStore$** { *; }
+-keep class com.kernelloader.security.SecurityShield { *; }
 -dontwarn org.jetbrains.annotations.**
 
-# Strip verbose logging from release builds: less surface for logcat-based
-# reversing, no internal details leak at runtime.
+# Strip all logging and print statements from bytecode
 -assumenosideeffects class android.util.Log {
     public static int v(...);
     public static int d(...);
     public static int i(...);
+    public static int w(...);
+}
+-assumenosideeffects class java.io.PrintStream {
+    public void println(...);
+    public void print(...);
 }

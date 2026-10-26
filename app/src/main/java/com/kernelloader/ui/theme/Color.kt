@@ -37,8 +37,10 @@ val SurfaceDeep = Color(0xFF071016)
 val GridLine = Color(0x0AFFFFFF)
 val TopGlow = Color(0xFF2BE08A)
 
-val GradientRtStart = Color(0xFF34E89E)
-val GradientRtEnd = Color(0xFF0F9B8E)
+val GradientGreenStart = Color(0xFF34E89E)
+val GradientGreenEnd = Color(0xFF0F9B8E)
+val GradientRtStart = GradientGreenStart
+val GradientRtEnd = GradientGreenEnd
 val GradientQxStart = Color(0xFF5AC8FA)
 val GradientQxEnd = Color(0xFF7C6BFF)
 val GradientRedStart = Color(0xFFFF8A8A)

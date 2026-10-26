@@ -1,11 +1,27 @@
-# 📋 Changelog — Kernel Loader
+# Changelog — Kernel Loader
 
 All notable changes are documented here (newest first).
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [1.9] — 2026-10-26 (tag `v1.9` / `versionCode 10`) 🥷 Pure Stealth Engine & Online OTA Pipeline
+## [2.0] — 2026-10-27 (tag `v2.0` / `versionCode 20`) Unified Pipeline, Boot Image Diagnostics & Hardened Security
+
+> **Major Release v2.0:** Unified driver architecture, in-app Driver.sh memory verification, boot.img and kallsyms diagnostic pack generator, anti-Frida and anti-debug security shield, and full R8 code obfuscation.
+
+### Added & Improved
+* **Unified Driver Loading Pipeline.** Replaced legacy multi-variant switching logic with a unified single-pipeline driver engine.
+* **In-App R/W Memory Verification.** Integrated direct execution of the `Driver.sh` memory engine within the terminal screen to verify physical memory read and write operations.
+* **Kernel-Level Error Reporting.** Eliminated generic verification error messages; replaced with exact root-cause failure output extracted directly from `Driver.sh` and kernel `dmesg`.
+* **Automated Boot Image Extraction.** Automatically discovers active boot partition block devices across Qualcomm, MediaTek, Exynos, and Tensor platforms and dumps `boot.img` for custom driver compilation.
+* **Kernel Symbol & Vendor Module Collection.** Captures `/proc/kallsyms`, decompresses `/proc/config.gz`, extracts sample OEM vendor modules (`.ko`) from `/vendor/lib/modules/`, and records vermagic string metadata.
+* **Hardened Security & Anti-Tamper Shield.** Added runtime protection against Frida instrumentation, debuggers, and Xposed hooks, combined with full-mode R8 code obfuscation and strict proxy-bypass network security policies.
+* **Clean Codebase Architecture.** Completely removed dead engines, legacy assets, and unused APK binaries.
+* **Version Bump.** Incremented to `versionCode: 20` and `versionName: "2.0"`.
+
+---
+
+## [1.9] — 2026-10-26 (tag `v1.9` / `versionCode 10`) Pure Stealth Engine & Online OTA Pipeline
 
 > **Seamless In-App Update for all previous versions:** Pure stealth mode enforcement by removing static blacklisted aliases (`entryi`, `wanbai`, `dmsync`, `memacc`), asset size optimization by utilizing online OTA driver store exclusively, and 100% comment-free codebase.
 

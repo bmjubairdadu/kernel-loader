@@ -43,7 +43,11 @@ object DeviceReportCollector {
         val loadedOurs: List<String>,
         val dmesgTail: List<String>,
         val lastError: String,
-        val collectedAt: String
+        val collectedAt: String,
+        val bootPartition: String = "",
+        val slotSuffix: String = "",
+        val cmdline: String = "",
+        val selinuxMode: String = ""
     ) {
         private val kernelShort: String =
             Regex("""\d+\.\d+\.\d+""").find(kernelRelease)?.value ?: "unknown"
@@ -72,6 +76,15 @@ object DeviceReportCollector {
             appendLine("PAGE SIZE : $pageSize")
             appendLine("DEVICE    : $deviceLine (board: $board, soc: $soc)")
             appendLine("ANDROID   : $androidVersion (API $sdkInt)")
+            if (selinuxMode.isNotBlank()) {
+                appendLine("SELINUX   : $selinuxMode")
+            }
+            if (bootPartition.isNotBlank()) {
+                appendLine("BOOT DEV  : $bootPartition (slot: ${slotSuffix.ifBlank { "none" }})")
+            }
+            if (cmdline.isNotBlank()) {
+                appendLine("CMDLINE   : ${cmdline.take(240)}")
+            }
             appendLine("FP        : ${fingerprint.take(140)}")
             appendLine("ROOT      : ${if (rootAvailable) "yes ($rootType)" else "no"}")
             appendLine("BUNDLE    : ${bundleTried.ifBlank { "auto (RT → QX → built-in)" }}")
@@ -158,6 +171,10 @@ object DeviceReportCollector {
                     .take(20)
             }
 
+        val cmdline = cmdOut("cat /proc/cmdline 2>/dev/null").lineSequence().firstOrNull().orEmpty().trim()
+        val selinuxMode = cmdOut("getenforce 2>/dev/null").lineSequence().firstOrNull().orEmpty().trim()
+        val (bootPartition, slotSuffix) = detectBootPartition()
+
         return DeviceReport(
             kernelRelease = kernelRelease.ifBlank { RootChecker.getKernelRelease().orEmpty() },
             kernelArch = arch,
@@ -180,8 +197,34 @@ object DeviceReportCollector {
             loadedOurs = loadedModules.filter { it.isNotBlank() },
             dmesgTail = dmesgTail,
             lastError = lastError.trim(),
-            collectedAt = dateFormat.format(Date())
+            collectedAt = dateFormat.format(Date()),
+            bootPartition = bootPartition,
+            slotSuffix = slotSuffix,
+            cmdline = cmdline,
+            selinuxMode = selinuxMode
         )
+    }
+
+    fun detectBootPartition(): Pair<String, String> {
+        val slot = cmdOut("getprop ro.boot.slot_suffix").ifBlank {
+            cmdOut("getprop ro.boot.slot").let { if (it.isNotBlank() && !it.startsWith("_")) "_$it" else it }
+        }.trim()
+        val candidatePatterns = listOf(
+            "/dev/block/bootdevice/by-name/boot$slot",
+            "/dev/block/by-name/boot$slot",
+            "/dev/block/platform/*/by-name/boot$slot",
+            "/dev/block/mapper/boot$slot",
+            "/dev/block/bootdevice/by-name/boot",
+            "/dev/block/by-name/boot"
+        )
+        for (pattern in candidatePatterns) {
+            val hit = cmdOut("for p in $pattern; do [ -b \"\$p\" ] && (readlink -f \"\$p\" 2>/dev/null || echo \"\$p\") && break; done")
+                .lineSequence().firstOrNull()?.trim().orEmpty()
+            if (hit.isNotBlank()) return Pair(hit, slot)
+        }
+        val wildcardHit = cmdOut("for p in /dev/block/by-name/boot* /dev/block/bootdevice/by-name/boot*; do [ -b \"\$p\" ] && (readlink -f \"\$p\" 2>/dev/null || echo \"\$p\") && break; done")
+            .lineSequence().firstOrNull()?.trim().orEmpty()
+        return Pair(wildcardHit, slot)
     }
 
     private fun detectRootType(): String {

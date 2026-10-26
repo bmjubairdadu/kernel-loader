@@ -151,7 +151,7 @@ object AppUpdateChecker {
         Regex("""/releases/tag/([^/?#]+)""").find(url)?.groupValues?.get(1)
 
     private fun fetch(url: String): Pair<String, String>? = try {
-        val conn = (URL(url).openConnection() as HttpURLConnection).apply {
+        val conn = com.kernelloader.security.SecurityShield.openSecureConnection(url).apply {
             connectTimeout = 12000; readTimeout = 12000
             instanceFollowRedirects = true
             setRequestProperty("User-Agent", UA)
@@ -168,7 +168,7 @@ object AppUpdateChecker {
     }
 
     private fun headContentLength(url: String): Long? = try {
-        val conn = (URL(url).openConnection() as HttpURLConnection).apply {
+        val conn = com.kernelloader.security.SecurityShield.openSecureConnection(url).apply {
             connectTimeout = 12000; readTimeout = 12000
             requestMethod = "HEAD"
             instanceFollowRedirects = true
@@ -191,7 +191,7 @@ object AppUpdateChecker {
     ): UpdateCheck {
         if (apiUrl.isBlank()) return UpdateCheck.Offline
         val text = try {
-            val conn = (URL(apiUrl).openConnection() as HttpURLConnection).apply {
+            val conn = com.kernelloader.security.SecurityShield.openSecureConnection(apiUrl).apply {
                 connectTimeout = 12000; readTimeout = 12000
                 instanceFollowRedirects = true
                 setRequestProperty("User-Agent", UA)
@@ -282,7 +282,7 @@ object AppUpdateChecker {
         val tempFile = File(dir, "kloader_update_${info.versionCode}.apk.part")
         if (tempFile.exists()) tempFile.delete()
 
-        val conn = (URL(info.apkUrl).openConnection() as HttpURLConnection).apply {
+        val conn = com.kernelloader.security.SecurityShield.openSecureConnection(info.apkUrl).apply {
             connectTimeout = 15000; readTimeout = 30000
             instanceFollowRedirects = true
             setRequestProperty("User-Agent", UA)

@@ -14,9 +14,6 @@ object UniversalKernelLoader {
 
     private const val TMP_KO = "/data/local/tmp/kloader_auto.ko"
 
-    private fun lsmodKnownRegex(candidates: List<String>): String =
-        candidates.joinToString("|") { it.replace(".", "\\.") }
-
     fun autoLoad(context: Context, vm: DriverViewModel, variant: String = "") {
         vm.tstep("Checking superuser...")
         vm.tlog("Starting load...", "INFO")
@@ -75,31 +72,9 @@ object UniversalKernelLoader {
                 return
             }
         } else {
-            val best = findBestEmbeddedDriver(context, kernel, variant)
-            if (best == null) {
-                vm.tlog("[ERR] No compatible driver found in assets", "ERR")
-                finish(vm, false, "No .ko found - pick a file")
-                return
-            }
-            sourceName = best.displayName
-
-            val realVerm = EmbeddedDrivers.readVermagic(context, best.filename)
-            val exactCover = realVerm.isNotEmpty() &&
-                    RootChecker.kernelShortVersion(realVerm) == RootChecker.kernelShortVersion(kernel)
-            vm.tlog(
-                "[SOURCE] Driver: $sourceName" + if (exactCover) " (exact build match)" else " (nearest series)",
-                "INFO"
-            )
-            try {
-                context.resources.assets.open(best.filename).use { input ->
-                    FileOutputStream(cacheFile).use { output -> input.copyTo(output) }
-                }
-                vm.tlog("[STAGE] Extracted asset: ${best.filename} -> ${cacheFile.name} (${cacheFile.length()} bytes)", "INFO")
-            } catch (e: Exception) {
-                vm.tlog("[ERR] Extract failed: ${e.message}", "ERR")
-                finish(vm, false, "Driver extract failed")
-                return
-            }
+            vm.tlog("[ERR] No custom driver file selected", "ERR")
+            finish(vm, false, "No custom file selected")
+            return
         }
 
         vm.tstep("Validating .ko...")
@@ -152,8 +127,6 @@ object UniversalKernelLoader {
         val devNodesBefore = snapshotDevCharNodes()
         val charMajorsBefore = snapshotCharMajors()
         vm.tlog("[SCAN] ${devNodesBefore.size} char nodes present in /dev before insmod", "INFO")
-
-        stripModuleSig(File(TMP_KO), vm)
 
         var res = loadViaFramework(TMP_KO, devNode, vm) ?: Shell.cmd("false").exec()
 
@@ -279,107 +252,17 @@ object UniversalKernelLoader {
     private fun viewModelModule(vm: DriverViewModel): String =
         vm.loadedModuleName.value.ifBlank { "driver" }
 
-    fun ensureProbeBinaries(context: Context) {
-        try {
-            val localMyprobe = File(context.filesDir, "myprobe")
-            if (!localMyprobe.exists() || localMyprobe.length() == 0L) {
-                context.assets.open("bin/myprobe").use { input ->
-                    localMyprobe.outputStream().use { output -> input.copyTo(output) }
-                }
-            }
-            Shell.cmd(
-                "cp \"${localMyprobe.absolutePath}\" /data/local/tmp/myprobe 2>/dev/null",
-                "chmod 755 /data/local/tmp/myprobe 2>/dev/null"
-            ).exec()
-        } catch (_: Exception) {}
-
-        try {
-            val localDriverSh = File(context.filesDir, "driver.sh")
-            if (!localDriverSh.exists() || localDriverSh.length() == 0L) {
-                context.assets.open("bin/driver.sh").use { input ->
-                    localDriverSh.outputStream().use { output -> input.copyTo(output) }
-                }
-            }
-            Shell.cmd(
-                "cp \"${localDriverSh.absolutePath}\" /data/local/tmp/driver.sh 2>/dev/null",
-                "chmod 755 /data/local/tmp/driver.sh 2>/dev/null"
-            ).exec()
-        } catch (_: Exception) {}
-
-        try {
-            val localMagiskboot = File(context.filesDir, "magiskboot")
-            if (!localMagiskboot.exists() || localMagiskboot.length() == 0L) {
-                context.assets.open("bin/magiskboot").use { input ->
-                    localMagiskboot.outputStream().use { output -> input.copyTo(output) }
-                }
-            }
-            Shell.cmd(
-                "cp \"${localMagiskboot.absolutePath}\" /data/local/tmp/magiskboot 2>/dev/null",
-                "chmod 755 /data/local/tmp/magiskboot 2>/dev/null"
-            ).exec()
-        } catch (_: Exception) {}
-    }
-
-    fun directIoctlProbe(context: Context?, node: String): Boolean {
-        if (context == null || node.isBlank()) return false
-        val cleanNode = node.removePrefix("/dev/").trim()
-        if (!isCharNode(cleanNode)) return false
-        return try {
-            ensureProbeBinaries(context)
-            val res = Shell.cmd("/data/local/tmp/myprobe /dev/$cleanNode 2>&1").exec().out
-            res.any { line ->
-                (line.contains("0x803 modbase: rc=0") && !line.contains("base=0x0")) ||
-                line.contains("0x801 read: rc=0") ||
-                line.contains("errno=14") ||
-                line.contains("errno=5")
-            }
-        } catch (e: Exception) {
-            false
-        }
-    }
-
     fun probeOurDriverNode(context: Context?, vm: DriverViewModel): String? {
         if (context == null) return null
-        ensureProbeBinaries(context)
-        try {
-            val local = File(context.filesDir, "dmtest")
-            if (!local.exists() || local.length() == 0L) {
-                context.assets.open("dmtest").use { input ->
-                    local.outputStream().use { output -> input.copyTo(output) }
-                }
-            }
-            val res = Shell.cmd(
-                "cp \"${local.absolutePath}\" /data/local/tmp/dmtest 2>/dev/null",
-                "chmod 755 /data/local/tmp/dmtest 2>/dev/null",
-                "/data/local/tmp/dmtest /data/local/tmp/dmtest_probe.txt 2>&1"
-            ).exec()
-            val verdict = res.out.firstOrNull { it.contains("verdict: our driver") }
-            if (verdict != null) {
-                val raw = verdict.substringAfter('=').trim()
-                val node = raw.substringBefore(' ').trim().removePrefix("/dev/").trim()
-                val sentinel = node.isBlank() || node.equals("NOT", true) || node.equals("NONE", true) ||
-                    node.equals("FOUND", true) || node.startsWith("!!")
-                if (!sentinel && node.all { it.isLetterOrDigit() || it == '_' || it == '-' || it == '.' }) {
-                    if (isCharNode(node)) return node
-                }
-            }
-        } catch (_: Exception) {}
-
         return try {
             val devNodes = Shell.cmd("ls /dev 2>/dev/null").exec().out.map { it.trim() }
             val preferred = vm.preferredDevNode().removePrefix("/dev/").trim()
-            val poolCandidates = devNodes.filter { it.matches(Regex("^[A-GNYB]{6,8}$")) }
-            val fixedCandidates = listOfNotNull(
-                preferred.ifBlank { null }, "dmsync", "kmem_337", "memacc", "entryi"
-            )
-            val allCandidates = (poolCandidates + fixedCandidates).distinct()
-            for (cand in allCandidates) {
-                if (directIoctlProbe(context, cand)) {
-                    return cand
-                }
+            if (preferred.isNotBlank() && preferred in devNodes && isCharNode(preferred)) {
+                return preferred
             }
-            null
-        } catch (e: Exception) {
+            val poolCandidates = devNodes.filter { it.matches(Regex("^[A-GNYB]{6,8}$")) && isCharNode(it) }
+            poolCandidates.firstOrNull()
+        } catch (_: Exception) {
             null
         }
     }
@@ -452,7 +335,7 @@ object UniversalKernelLoader {
                 exactNode = true
                 foundNodeName = probed
                 if (probed != expectedNode) {
-                    vm.tlog("[PROBE] dmtest verified /dev/$probed (RT/QX ABI)", "OK")
+                    vm.tlog("[PROBE] Verified /dev/$probed (RT/QX ABI)", "OK")
                 }
                 break
             }
@@ -614,17 +497,7 @@ object UniversalKernelLoader {
         vm.autoLoadOk.value = ok
         vm.autoLoadStatus.value = msg
         if (ok) {
-            context?.let { ctx ->
-                val kVer = RootChecker.getKernelRelease() ?: ""
-                DriverRevocationManager.recordLoadedDriver(
-                    context = ctx,
-                    entry = null,
-                    kernelRelease = kVer,
-                    variant = vm.activePipelineVariant.value,
-                    isOta = false
-                )
-
-            }
+            // Driver loaded successfully
         } else {
             vm.lastLoadError.value = msg
             vm.tlog("Need custom loader - tap Telegram / WhatsApp", "FIX")
@@ -679,81 +552,12 @@ object UniversalKernelLoader {
         }
     }
 
-    fun stripModuleSig(koFile: File, vm: DriverViewModel? = null): Boolean {
-        try {
-            val bytes = koFile.readBytes()
-            if (!isElf(bytes)) return false
-
-            val sigMarker = "~Module signature appended~".toByteArray(Charsets.US_ASCII)
-            val markerIdx = indexOfFromEnd(bytes, sigMarker)
-            if (markerIdx < 0) return false
-
-            val sigInfoLen = 12
-            val sigInfoStart = markerIdx - sigInfoLen
-            if (sigInfoStart < 4) return false
-
-            val sigLen = ((bytes[sigInfoStart + 8].toInt() and 0xFF) shl 24) or
-                    ((bytes[sigInfoStart + 9].toInt() and 0xFF) shl 16) or
-                    ((bytes[sigInfoStart + 10].toInt() and 0xFF) shl 8) or
-                    (bytes[sigInfoStart + 11].toInt() and 0xFF)
-
-            val stripAt = sigInfoStart - sigLen
-            if (stripAt < 100 || stripAt > bytes.size) return false
-
-            val stripped = bytes.copyOf(stripAt)
-            koFile.writeBytes(stripped)
-            vm?.tlog("Module signature stripped", "OK")
-            return true
-        } catch (e: Exception) {
-            vm?.tlog("Signature strip failed", "WARN")
-            return false
-        }
-    }
-
-    private fun indexOfFromEnd(haystack: ByteArray, needle: ByteArray): Int {
-        if (needle.isEmpty() || haystack.size < needle.size) return -1
-        val searchStart = (haystack.size - needle.size - 128).coerceAtLeast(haystack.size / 2)
-        outer@ for (i in (haystack.size - needle.size) downTo searchStart) {
-            for (j in needle.indices) {
-                if (haystack[i + j] != needle[j]) continue@outer
-            }
-            return i
-        }
-        return -1
-    }
-
     fun ensureElf(file: File): Boolean {
-        val bytes = file.readBytes()
-        if (isElf(bytes)) return true
         return try {
-            val decoded = Base64.getMimeDecoder().decode(bytes)
-            if (isElf(decoded)) {
-                file.writeBytes(decoded)
-                true
-            } else extractEmbeddedKo(bytes)?.let { file.writeBytes(it); true } ?: false
+            val bytes = file.readBytes()
+            isElf(bytes)
         } catch (e: Exception) {
-            extractEmbeddedKo(bytes)?.let { file.writeBytes(it); true } ?: false
-        }
-    }
-
-    private fun extractEmbeddedKo(bytes: ByteArray): ByteArray? {
-
-        if (bytes.size > (16 shl 20)) return null
-        return try {
-            val text = String(bytes, Charsets.ISO_8859_1)
-            var best: ByteArray? = null
-
-            for (m in Regex("""[A-Za-z0-9+/=\s]{4096,}""").findAll(text)) {
-                val b64 = m.value.replace(Regex("""\s"""), "")
-                val cut = b64.substring(0, b64.length / 4 * 4)
-                try {
-                    val decoded = Base64.getDecoder().decode(cut)
-                    if (isElf(decoded) && (best == null || decoded.size > best!!.size)) best = decoded
-                } catch (_: Exception) {  }
-            }
-            best
-        } catch (e: Exception) {
-            null
+            false
         }
     }
 
@@ -810,88 +614,5 @@ object UniversalKernelLoader {
             return i
         }
         return null
-    }
-
-    fun findBestEmbeddedDriver(
-        context: Context,
-        kernelRelease: String,
-        variant: String = ""
-    ): DriverInfo? {
-        val all = EmbeddedDrivers.getAvailableDrivers(context)
-        if (all.isEmpty()) return null
-        val want = variant.trim().lowercase()
-        val pool = if (want.isEmpty()) all
-                   else all.filter { it.variant.isBlank() || it.variant == want }
-        if (pool.isEmpty()) return null
-
-        val ver = Regex("""(\d+)\.(\d+)\.(\d+)""")
-        val km = ver.find(kernelRelease)
-        val kMajor = km?.groupValues?.get(1)?.toIntOrNull()
-        val kMinor = km?.groupValues?.get(2)?.toIntOrNull()
-        val kPatch = km?.groupValues?.get(3)?.toIntOrNull()
-
-        fun score(d: DriverInfo): Int {
-            var s = 0
-
-            val realRelease = EmbeddedDrivers.readVermagic(context, d.filename)
-            val realShort = if (realRelease.isNotEmpty()) RootChecker.kernelShortVersion(realRelease) else ""
-            val dm = ver.find(if (realShort.isNotEmpty()) realShort else d.version)
-            val dMajor = dm?.groupValues?.get(1)?.toIntOrNull()
-            val dMinor = dm?.groupValues?.get(2)?.toIntOrNull()
-            val dPatch = dm?.groupValues?.get(3)?.toIntOrNull()
-            val exactShort = realShort.isNotEmpty() &&
-                realShort == RootChecker.kernelShortVersion(kernelRelease)
-
-            if (exactShort) {
-
-                s = 1200
-                if (realRelease == kernelRelease) s = 1500
-            } else if (realRelease == kernelRelease) {
-                s = 1500
-            } else if (d.version == kernelRelease) {
-                s = 1000
-            } else if (kernelRelease.startsWith(d.version)) {
-                s = 900
-            } else if (d.version.startsWith(kernelRelease)) {
-                s = 800
-            } else if (kMajor != null && dMajor != null) {
-                if (dMajor == kMajor && dMinor != null && dMinor == kMinor) {
-
-                    val patchBonus = if (dPatch != null && kPatch != null)
-                        (255 - kotlin.math.abs(dPatch - kPatch)).coerceAtLeast(0) else 0
-                    s = 600 + patchBonus
-                } else if (dMajor == kMajor) {
-
-                    val minorDist = dMinor?.let { kotlin.math.abs(it - (kMinor ?: it)) } ?: 0
-                    s = 300 + (255 - minorDist * 8).coerceAtLeast(0)
-                } else {
-
-                    val majorDist = kotlin.math.abs(dMajor - kMajor)
-                    s = (80 - majorDist * 12).coerceAtLeast(8)
-                }
-            }
-            if (s > 0) {
-
-                val realName = realRelease.lowercase()
-                val runningName = kernelRelease.lowercase()
-                val daisyPair =
-                    realName.contains("daisy") && runningName.contains("daisy")
-                if (d.type == "UNI") s += 60
-                if ((d.type == "NATIVE" || d.type == "KERNEL" || d.type == "DAISY") && daisyPair) {
-                    s += 200
-                }
-
-                if (want.isNotEmpty()) {
-                    if (d.variant == want) s += 40
-                    else if (d.variant.isBlank()) s += 10
-                } else {
-                    if (d.variant == OtaDriverStore.RT) s += 20
-                }
-            }
-            return s
-        }
-
-        return pool.map { it to score(it) }.filter { it.second > 0 }
-                .maxByOrNull { it.second }?.first
     }
 }
