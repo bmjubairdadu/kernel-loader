@@ -16,6 +16,8 @@
 *.webp  binary
 *.jar   binary
 *.aab   binary
+app/src/main/assets/bin/* binary
+app/src/main/assets/dmtest binary
 
 # Source / docs languages
 *.kt    text

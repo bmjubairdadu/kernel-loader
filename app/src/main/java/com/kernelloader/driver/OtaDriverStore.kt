@@ -181,7 +181,10 @@ object OtaDriverStore {
             val conn = (URL(url).openConnection() as HttpURLConnection).apply {
                 connectTimeout = 15000; readTimeout = 15000
                 instanceFollowRedirects = true
+                useCaches = false
                 setRequestProperty("User-Agent", "KernelLoder-OTA/1.0")
+                setRequestProperty("Cache-Control", "no-cache")
+                setRequestProperty("Pragma", "no-cache")
             }
             conn.connect()
             if (conn.responseCode !in 200..299) {
@@ -271,7 +274,10 @@ object OtaDriverStore {
             val conn = (URL(url).openConnection() as HttpURLConnection).apply {
                 connectTimeout = 20000; readTimeout = 60000
                 instanceFollowRedirects = true
+                useCaches = false
                 setRequestProperty("User-Agent", "KernelLoder-OTA/1.0")
+                setRequestProperty("Cache-Control", "no-cache")
+                setRequestProperty("Pragma", "no-cache")
             }
             conn.connect()
             if (conn.responseCode !in 200..299) {
