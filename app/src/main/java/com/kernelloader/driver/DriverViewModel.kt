@@ -1514,25 +1514,14 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
 
                     activePipelineVariant.value = primaryVariant
                     tlog("Loading RT driver...", "CMD")
-                    tstep("Stage 1/3: Checking OTA database...")
-                    val otaHandled = runOtaLoad(context, primaryVariant)
-                    if (otaHandled) return@launch
+                    tstep("Stage 1/1: RT driver (OTA / DB)")
+                    val handled = runOtaLoad(context, primaryVariant)
+                    if (handled) return@launch
                     checkpoint()
 
-                    tlog("OTA database unreachable or no match, falling back to embedded offline drivers...", "INFO")
-                    tstep("Stage 2/3: Embedded offline driver (.ko)...")
-                    UniversalKernelLoader.autoLoad(context, this@DriverViewModel, primaryVariant)
-                    if (autoLoadOk.value == true || driverLoaded.value) return@launch
-                    checkpoint()
-
-                    tlog("Falling back to offline script driver bundle (Kernel_Drivers.zip)...", "INFO")
-                    tstep("Stage 3/3: Running offline driver script...")
-                    val scriptHandled = UniversalKernelLoader.runOfflineScriptDriver(context, this@DriverViewModel, primaryVariant)
-                    if (scriptHandled || autoLoadOk.value == true || driverLoaded.value) return@launch
-
-                    tlog("[ERR] ${otaFailReason.ifBlank { "Could not load driver from OTA, embedded assets, or scripts" }}", "ERR")
+                    tlog("[NET] ${otaFailReason.ifBlank { "Could not load RT driver from database" }}", "ERR")
                     autoLoadOk.value = false
-                    autoLoadStatus.value = "Load failed - no compatible driver found"
+                    autoLoadStatus.value = "Load failed - ${otaFailReason.ifBlank { "database error" }}"
                 }
                 if (autoLoadOk.value != true && !driverLoaded.value) {
                     tlog("RT pipeline failed", "ERR")
