@@ -327,9 +327,9 @@
       "file": "4.19.191-Realme-RMX3195.ko",
       "variant": "rt",
       "label": "4.19.191-Realme-RMX3195",
-      "sha256": "498d16972b0211d0f9c3440e2e3e08d1a303d2865d192e0b785907293880ead4",
-      "size": 252696,
-      "buildDate": "2026-10-27T14:52:24Z",
+      "sha256": "00939b35cd493094b4929a3e02c9b5bc72ee81de339990d299e93cef47da7753",
+      "size": 253680,
+      "buildDate": "2026-10-27T19:03:12Z",
       "source": "realme_c25s_rmx3195-4.19",
       "verified": true
     },
