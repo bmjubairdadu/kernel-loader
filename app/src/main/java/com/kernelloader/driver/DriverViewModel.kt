@@ -86,12 +86,17 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
         driverLoaded.value = false
         hiddenLoaded.value = false
         loadedModuleName.value = ""
+        driverModule.value = ""
+        BootSessionTracker.clear(context)
     }
 
     fun setLoadedModule(name: String) {
         if (loadedModuleName.value != name) loadedModuleName.value = name
         driverLoaded.value = name.isNotBlank()
-        if (name.isNotBlank()) hiddenLoaded.value = false
+        if (name.isNotBlank()) {
+            hiddenLoaded.value = false
+            BootSessionTracker.recordLoaded(getApplication(), name, preferredDevNode(), false)
+        }
     }
 
     fun markHiddenLoaded() {
@@ -99,6 +104,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
         driverModule.value = ""
         driverLoaded.value = true
         hiddenLoaded.value = true
+        BootSessionTracker.recordLoaded(getApplication(), "", preferredDevNode(), true)
     }
 
     var hiddenLoaded = mutableStateOf(false)
@@ -254,6 +260,20 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
     private val logFile: File = File(application.filesDir, "console_history.log")
 
     init {
+        try {
+            val session = BootSessionTracker.checkSession(application)
+            if (session.isLoaded) {
+                driverLoaded.value = true
+                hiddenLoaded.value = session.isHidden
+                if (session.moduleName.isNotBlank()) {
+                    loadedModuleName.value = session.moduleName
+                    driverModule.value = session.moduleName
+                }
+                if (session.devNode.isNotBlank() && session.devNode != DEFAULT_DEV_NODE) {
+                    devNodeOverride.value = session.devNode
+                }
+            }
+        } catch (_: Exception) {}
         try {
             if (logFile.exists() && logFile.length() > 0) {
                 val rawLines = logFile.readLines(Charsets.UTF_8).takeLast(MAX_TERMINAL_LINES)
@@ -1123,29 +1143,70 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
 
     fun refreshDriverState(context: Context) {
         viewModelScope.launch(Dispatchers.IO) {
+            val session = BootSessionTracker.checkSession(context)
             val loadedMods = SafetyGuard.loadedModuleNames()
+
+            if (session.isLoaded) {
+                val isModuleInLsmod = session.moduleName.isNotBlank() && session.moduleName in loadedMods
+                withContext(Dispatchers.Main) {
+                    driverLoaded.value = true
+                    hiddenLoaded.value = session.isHidden || !isModuleInLsmod
+                    if (session.moduleName.isNotBlank()) {
+                        loadedModuleName.value = session.moduleName
+                        driverModule.value = session.moduleName
+                    }
+                    if (session.devNode.isNotBlank() && session.devNode != DEFAULT_DEV_NODE) {
+                        rememberDevNode(session.devNode)
+                    }
+                }
+                return@launch
+            }
+
             val currentMod = loadedModuleName.value
             val isModuleInLsmod = currentMod.isNotBlank() && currentMod in loadedMods
 
-            val probed = if (!isModuleInLsmod) try {
+            if (isModuleInLsmod) {
+                withContext(Dispatchers.Main) {
+                    driverLoaded.value = true
+                    setLoadedModule(currentMod)
+                    BootSessionTracker.recordLoaded(context, currentMod, preferredDevNode(), false)
+                }
+                return@launch
+            }
+
+            val knownCandidates = (knownDriverModules() + listOf("rmx3195_driver", "daisy_driver", "kloader", "kmem", "dmsync", "memacc", "suvhwvwrtnb")).distinct()
+            val candidateMatch = loadedMods.firstOrNull { mod ->
+                knownCandidates.any { it.equals(mod, ignoreCase = true) || mod.contains(it, ignoreCase = true) }
+            }
+
+            if (candidateMatch != null) {
+                withContext(Dispatchers.Main) {
+                    driverLoaded.value = true
+                    setLoadedModule(candidateMatch)
+                    driverModule.value = candidateMatch
+                    BootSessionTracker.recordLoaded(context, candidateMatch, preferredDevNode(), false)
+                }
+                return@launch
+            }
+
+            val probed = try {
                 UniversalKernelLoader.probeOurDriverNode(getApplication(), this@DriverViewModel)
             } catch (e: Exception) {
                 null
-            } else null
+            }
 
             withContext(Dispatchers.Main) {
-                if (isModuleInLsmod) {
-                    driverLoaded.value = true
-                    setLoadedModule(currentMod)
+                if (probed != null) {
+                    rememberDevNode(probed)
+                    markHiddenLoaded()
+                    BootSessionTracker.recordLoaded(context, "", probed, true)
                 } else {
-                    if (probed != null) {
-                        rememberDevNode(probed)
-                    }
                     if (!driverLoaded.value) {
                         setLoadedModule("")
                         hiddenLoaded.value = false
                         driverLoaded.value = false
                         driverModule.value = ""
+                        BootSessionTracker.clear(context)
                     }
                 }
             }

@@ -260,7 +260,7 @@ object UniversalKernelLoader {
             if (preferred.isNotBlank() && preferred in devNodes && isCharNode(preferred)) {
                 return preferred
             }
-            val poolCandidates = devNodes.filter { it.matches(Regex("^[A-GNYB]{6,8}$")) && isCharNode(it) }
+            val poolCandidates = devNodes.filter { (it.matches(Regex("^[A-Za-z0-9]{6,8}$")) || it.matches(Regex("^[A-GNYB]{6,8}$"))) && isCharNode(it) }
             poolCandidates.firstOrNull()
         } catch (_: Exception) {
             null
@@ -352,7 +352,7 @@ object UniversalKernelLoader {
                     vm.tlog("[SCAN] Fresh /dev nodes: ${fresh.take(4).joinToString(", ")} — probe gate did not confirm ours yet", "INFO")
                 }
             }
-            val poolHit = devList.firstOrNull { it.matches(Regex("^[A-GNYB]{6,8}$")) && isCharNode(it) }
+            val poolHit = devList.firstOrNull { (it.matches(Regex("^[A-Za-z0-9]{6,8}$")) || it.matches(Regex("^[A-GNYB]{6,8}$"))) && isCharNode(it) }
             if (poolHit != null) {
                 exactNode = true
                 foundNodeName = poolHit
