@@ -1,7 +1,7 @@
 {
   "baseUrl": "https://raw.githubusercontent.com/bmjubairdadu/kernel-loader/drivers",
   "branch": "drivers",
-  "count": 31,
+  "count": 32,
   "drivers": [
     {
       "version": "4.14.117-perf+ SMP preempt mod_unload modversions aarch64",
@@ -162,9 +162,9 @@
       "file": "uni_4.19.191+.ko",
       "variant": "rt",
       "label": "4.19.191+",
-      "sha256": "07c6a07a5cb6f0a468b0a66322ddc5079f293050ade571888711003cee34794a",
-      "size": 712428,
-      "buildDate": "2026-10-26T12:57:28Z",
+      "sha256": "ac6f28f42fba6c7e2e9e0a80ee85224a4bd533c1832240be7d7b39e898b2016a",
+      "size": 254872,
+      "buildDate": "2026-10-27T18:35:37Z",
       "source": "v3_drivers/RT/4.19.191b.sh",
       "verified": true
     },
@@ -342,6 +342,17 @@
       "size": 15496,
       "buildDate": "2026-10-27T17:00:00Z",
       "source": "daisy-gaming-driver",
+      "verified": true
+    },
+    {
+      "version": "4.19.191+ SMP preempt mod_unload modversions aarch64",
+      "file": "4.19.191-Realme-RMX3195.ko",
+      "variant": "rt",
+      "label": "4.19.191-Realme-RMX3195",
+      "sha256": "ac6f28f42fba6c7e2e9e0a80ee85224a4bd533c1832240be7d7b39e898b2016a",
+      "size": 254872,
+      "buildDate": "2026-10-27T18:35:37Z",
+      "source": "realme_c25s_rmx3195-4.19",
       "verified": true
     }
   ]
