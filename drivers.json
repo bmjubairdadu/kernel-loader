@@ -312,17 +312,6 @@
       "verified": true
     },
     {
-      "version": "4.14.357-openela-perf-g673b80046ab9 SMP preempt mod_unload modversions aarch64",
-      "file": "uni_4.14.357-openela-perf-g673b80046ab9.ko",
-      "variant": "rt",
-      "label": "4.14.357-openela-perf-g673b80046ab9",
-      "sha256": "bc3dead251b2d12c3b5375d99ce34d656aefbd8590896ca673355ec19d766a2f",
-      "size": 17040,
-      "buildDate": "2026-10-26T20:17:00Z",
-      "source": "custom_build/openela-414",
-      "verified": true
-    },
-    {
       "version": "4.9.337-DaisyForGaming SMP preempt mod_unload modversions aarch64",
       "file": "4.9.337-DaisyForGaming.ko",
       "variant": "rt",
@@ -342,6 +331,17 @@
       "size": 253680,
       "buildDate": "2026-10-27T19:03:12Z",
       "source": "realme_c25s_rmx3195-4.19",
+      "verified": true
+    },
+    {
+      "version": "4.14.357-openela-perf-g673b80046ab9 SMP preempt mod_unload modversions aarch64",
+      "file": "4.14.357-Realme-RMX5070.ko",
+      "variant": "rt",
+      "label": "4.14.357-Realme-RMX5070",
+      "sha256": "54af1be4971f5c471356cc521f8c74baddf1404776c2aaec62d7ffa21caccde2",
+      "size": 197336,
+      "buildDate": "2026-10-27T14:37:16Z",
+      "source": "realme_rmx5070_4.14",
       "verified": true
     }
   ]
