@@ -1,7 +1,7 @@
 {
   "baseUrl": "https://raw.githubusercontent.com/bmjubairdadu/kernel-loader/drivers",
   "branch": "drivers",
-  "count": 32,
+  "count": 31,
   "drivers": [
     {
       "version": "4.14.117-perf+ SMP preempt mod_unload modversions aarch64",
@@ -155,17 +155,6 @@
       "size": 710659,
       "buildDate": "2026-10-26T12:57:28Z",
       "source": "v3_drivers/RT/4.19.191.sh",
-      "verified": true
-    },
-    {
-      "version": "4.19.191+ SMP preempt mod_unload modversions aarch64",
-      "file": "uni_4.19.191+.ko",
-      "variant": "rt",
-      "label": "4.19.191+",
-      "sha256": "00939b35cd493094b4929a3e02c9b5bc72ee81de339990d299e93cef47da7753",
-      "size": 253680,
-      "buildDate": "2026-10-27T19:03:12Z",
-      "source": "v3_drivers/RT/4.19.191b.sh",
       "verified": true
     },
     {
