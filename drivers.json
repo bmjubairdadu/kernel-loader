@@ -1,7 +1,7 @@
 {
   "baseUrl": "https://raw.githubusercontent.com/bmjubairdadu/kernel-loader/drivers",
   "branch": "drivers",
-  "count": 31,
+  "count": 32,
   "drivers": [
     {
       "version": "4.14.117-perf+ SMP preempt mod_unload modversions aarch64",
@@ -342,6 +342,17 @@
       "size": 196712,
       "buildDate": "2026-10-27T14:52:24Z",
       "source": "realme_rmx5070_4.14",
+      "verified": true
+    },
+    {
+      "version": "4.9.309-Chidori-Kernel SMP preempt mod_unload modversions aarch64",
+      "file": "4.9.309-Xiaomi-Redmi-Y3.ko",
+      "variant": "rt",
+      "label": "4.9.309-Xiaomi-Redmi-Y3",
+      "sha256": "9867e1102390ab264736f4c11700b54ba78361f792cb1a7d12e33682e26e1ab7",
+      "size": 195000,
+      "buildDate": "2026-10-27T15:12:33Z",
+      "source": "xiaomi_redmi_y3_4.9",
       "verified": true
     }
   ]
