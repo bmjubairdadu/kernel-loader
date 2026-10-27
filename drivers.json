@@ -327,9 +327,9 @@
       "file": "4.19.191-Realme-RMX3195.ko",
       "variant": "rt",
       "label": "4.19.191-Realme-RMX3195",
-      "sha256": "00939b35cd493094b4929a3e02c9b5bc72ee81de339990d299e93cef47da7753",
-      "size": 253680,
-      "buildDate": "2026-10-27T19:03:12Z",
+      "sha256": "74d7bfab2c56faa7540cf3dd818e1b325f65313cb6597fbc887b0aac60b139c7",
+      "size": 254216,
+      "buildDate": "2026-10-27T15:41:15Z",
       "source": "realme_c25s_rmx3195-4.19",
       "verified": true
     },
@@ -338,9 +338,9 @@
       "file": "4.14.357-Realme-RMX5070.ko",
       "variant": "rt",
       "label": "4.14.357-Realme-RMX5070",
-      "sha256": "7ed17ac2a059422b918027745727579a4796a6b36c6b96aa310c7135595c9b02",
-      "size": 196712,
-      "buildDate": "2026-10-27T14:52:24Z",
+      "sha256": "4e59875c22e7231b7e03351e30c5dd594921431a92805d68e7b52be2e79c2aab",
+      "size": 197120,
+      "buildDate": "2026-10-27T15:41:15Z",
       "source": "realme_rmx5070_4.14",
       "verified": true
     },
@@ -349,9 +349,9 @@
       "file": "4.9.309-Xiaomi-Redmi-Y3.ko",
       "variant": "rt",
       "label": "4.9.309-Xiaomi-Redmi-Y3",
-      "sha256": "df97fe6b0f72fef1c2a3632ddbf144859a8dbb917da357cb8414cbcaa1d6d0e2",
-      "size": 198168,
-      "buildDate": "2026-10-27T15:21:36Z",
+      "sha256": "96af2d58f9385ab55b24cbef595f60aa6327e8db42ec6a0c24c4f07df2dec41c",
+      "size": 198376,
+      "buildDate": "2026-10-27T15:41:15Z",
       "source": "CraftRom/Chidori-Kernel_onclite",
       "verified": true
     }
