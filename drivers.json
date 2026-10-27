@@ -338,9 +338,9 @@
       "file": "4.19.157-OnePlus-IN2021.ko",
       "variant": "rt",
       "label": "4.19.157-OnePlus-IN2021",
-      "sha256": "3392034d13217794e434ebd80195842cc1a1f41903d3c332e52330dc8543bb82",
-      "size": 258760,
-      "buildDate": "2026-10-27T16:26:44Z",
+      "sha256": "3e46b24ec4bda39f9bcade31afe3e38299981b38235607db42d774e4ab0dee89",
+      "size": 260752,
+      "buildDate": "2026-10-27T16:50:00Z",
       "source": "OnePlusOSS/android_kernel_oneplus_sm8250",
       "verified": true
     }
