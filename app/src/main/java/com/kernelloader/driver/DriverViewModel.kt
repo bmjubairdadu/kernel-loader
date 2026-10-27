@@ -85,6 +85,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
     fun clearLoadedDriver(context: Context) {
         driverLoaded.value = false
         hiddenLoaded.value = false
+        autoLoadOk.value = null
         loadedModuleName.value = ""
         driverModule.value = ""
         BootSessionTracker.clear(context)
@@ -263,6 +264,9 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
         try {
             val session = BootSessionTracker.checkSession(application)
             if (session.isLoaded) {
+                driverLoaded.value = true
+                hiddenLoaded.value = session.isHidden
+                autoLoadOk.value = true
                 if (session.moduleName.isNotBlank()) {
                     loadedModuleName.value = session.moduleName
                     driverModule.value = session.moduleName
@@ -879,6 +883,14 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             withContext(Dispatchers.Main) {
                 if (ours != null) setLoadedModule(ours)
                 else markHiddenLoaded()
+                driverLoaded.value = true
+                autoLoadOk.value = true
+                BootSessionTracker.recordLoaded(
+                    context,
+                    loadedModuleName.value,
+                    preferredDevNode(),
+                    hiddenLoaded.value
+                )
             }
             tlog("[STEALTH] Driver ready. Clear app from recents before launching game!", "OK")
             return true
@@ -1117,7 +1129,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
         busyStep.value = "Rebooting..."
         loadJob = viewModelScope.launch(Dispatchers.IO) {
             try {
-
+                BootSessionTracker.clear(context)
                 tlog("Rebooting to unload driver...", "INFO")
                 val res = Shell.cmd("reboot 2>/dev/null || svc power reboot 2>/dev/null").exec()
                 if (!res.isSuccess) {
@@ -1142,38 +1154,30 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
     fun refreshDriverState(context: Context) {
         viewModelScope.launch(Dispatchers.IO) {
             val session = BootSessionTracker.checkSession(context)
-            val loadedMods = SafetyGuard.loadedModuleNames()
-
             if (session.isLoaded) {
-                val isModuleInLsmod = session.moduleName.isNotBlank() && session.moduleName in loadedMods
-                val isNodeAlive = session.devNode.isNotBlank() &&
-                        !SafetyGuard.isSystemNode(session.devNode) &&
-                        UniversalKernelLoader.isCharNode(session.devNode)
-
-                if (isModuleInLsmod || (session.isHidden && isNodeAlive)) {
-                    withContext(Dispatchers.Main) {
-                        driverLoaded.value = true
-                        hiddenLoaded.value = session.isHidden || !isModuleInLsmod
-                        if (session.moduleName.isNotBlank()) {
-                            loadedModuleName.value = session.moduleName
-                            driverModule.value = session.moduleName
-                        }
-                        if (session.devNode.isNotBlank() && session.devNode != DEFAULT_DEV_NODE) {
-                            rememberDevNode(session.devNode)
-                        }
+                withContext(Dispatchers.Main) {
+                    driverLoaded.value = true
+                    hiddenLoaded.value = session.isHidden
+                    autoLoadOk.value = true
+                    if (session.moduleName.isNotBlank()) {
+                        loadedModuleName.value = session.moduleName
+                        driverModule.value = session.moduleName
                     }
-                    return@launch
-                } else {
-                    BootSessionTracker.clear(context)
+                    if (session.devNode.isNotBlank() && session.devNode != DEFAULT_DEV_NODE && !SafetyGuard.isSystemNode(session.devNode)) {
+                        rememberDevNode(session.devNode)
+                    }
                 }
+                return@launch
             }
 
+            val loadedMods = SafetyGuard.loadedModuleNames()
             val currentMod = loadedModuleName.value
             val isModuleInLsmod = currentMod.isNotBlank() && currentMod in loadedMods
 
             if (isModuleInLsmod) {
                 withContext(Dispatchers.Main) {
                     driverLoaded.value = true
+                    autoLoadOk.value = true
                     setLoadedModule(currentMod)
                     BootSessionTracker.recordLoaded(context, currentMod, preferredDevNode(), false)
                 }
@@ -1188,6 +1192,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             if (candidateMatch != null) {
                 withContext(Dispatchers.Main) {
                     driverLoaded.value = true
+                    autoLoadOk.value = true
                     setLoadedModule(candidateMatch)
                     driverModule.value = candidateMatch
                     BootSessionTracker.recordLoaded(context, candidateMatch, preferredDevNode(), false)
@@ -1205,6 +1210,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                 if (probed != null && !SafetyGuard.isSystemNode(probed)) {
                     rememberDevNode(probed)
                     markHiddenLoaded()
+                    autoLoadOk.value = true
                     BootSessionTracker.recordLoaded(context, "", probed, true)
                 } else {
                     setLoadedModule("")

@@ -508,7 +508,15 @@ object UniversalKernelLoader {
         vm.autoLoadOk.value = ok
         vm.autoLoadStatus.value = msg
         if (ok) {
-            // Driver loaded successfully
+            vm.driverLoaded.value = true
+            if (context != null) {
+                BootSessionTracker.recordLoaded(
+                    context,
+                    vm.loadedModuleName.value,
+                    vm.preferredDevNode(),
+                    vm.hiddenLoaded.value
+                )
+            }
         } else {
             vm.lastLoadError.value = msg
             vm.tlog("Need custom loader - tap Telegram / WhatsApp", "FIX")
