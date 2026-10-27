@@ -335,12 +335,12 @@
     },
     {
       "version": "4.9.337-DaisyForGaming SMP preempt mod_unload modversions aarch64",
-      "file": "uni_4.9.337-DaisyForGaming.ko",
+      "file": "4.9.337-DaisyForGaming.ko",
       "variant": "rt",
       "label": "4.9.337-DaisyForGaming",
-      "sha256": "e91a5520fa1f36fc7cf67b53ea2d81cae3a2a9824332f33a8231abe2b08d51ec",
-      "size": 45088,
-      "buildDate": "2026-10-26T12:57:28Z",
+      "sha256": "b4aeb991d19b2b604b69793ab39b887e17d418ea2d2226933376799b6a109b1f",
+      "size": 15496,
+      "buildDate": "2026-10-27T17:00:00Z",
       "source": "daisy-gaming-driver",
       "verified": true
     }
