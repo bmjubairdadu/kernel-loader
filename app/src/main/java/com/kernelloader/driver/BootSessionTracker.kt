@@ -36,13 +36,15 @@ object BootSessionTracker {
 
     fun recordLoaded(context: Context, moduleName: String, devNode: String, hidden: Boolean) {
         try {
+            val cleanNode = devNode.removePrefix("/dev/").trim()
+            if (cleanNode.isNotBlank() && SafetyGuard.isSystemNode(cleanNode)) return
             val p = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             val bootId = getBootId()
             p.edit()
                 .putBoolean(KEY_DRIVER_LOADED, true)
                 .putString(KEY_BOOT_ID, bootId)
                 .putString(KEY_MODULE_NAME, moduleName)
-                .putString(KEY_DEV_NODE, devNode.removePrefix("/dev/").trim())
+                .putString(KEY_DEV_NODE, cleanNode)
                 .putBoolean(KEY_HIDDEN, hidden)
                 .putLong(KEY_LOAD_TIME, System.currentTimeMillis())
                 .apply()
@@ -69,6 +71,19 @@ object BootSessionTracker {
             val isLoaded = p.getBoolean(KEY_DRIVER_LOADED, false)
             if (!isLoaded) return SessionState(false, "", "", false)
 
+            val devNode = p.getString(KEY_DEV_NODE, "") ?: ""
+            if (devNode.isNotBlank() && SafetyGuard.isSystemNode(devNode)) {
+                clear(context)
+                return SessionState(false, "", "", false)
+            }
+
+            val loadTime = p.getLong(KEY_LOAD_TIME, 0L)
+            val bootTime = System.currentTimeMillis() - SystemClock.elapsedRealtime()
+            if (loadTime > 0L && bootTime > loadTime + 3000L) {
+                clear(context)
+                return SessionState(false, "", "", false)
+            }
+
             val savedBootId = p.getString(KEY_BOOT_ID, "") ?: ""
             val currentBootId = getBootId()
 
@@ -78,7 +93,6 @@ object BootSessionTracker {
             }
 
             val moduleName = p.getString(KEY_MODULE_NAME, "") ?: ""
-            val devNode = p.getString(KEY_DEV_NODE, "") ?: ""
             val isHidden = p.getBoolean(KEY_HIDDEN, false)
             return SessionState(true, moduleName, devNode, isHidden)
         } catch (_: Exception) {
@@ -86,3 +100,4 @@ object BootSessionTracker {
         }
     }
 }
+

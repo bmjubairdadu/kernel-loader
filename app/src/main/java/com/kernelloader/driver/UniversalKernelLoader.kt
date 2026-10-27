@@ -257,17 +257,20 @@ object UniversalKernelLoader {
         return try {
             val devNodes = Shell.cmd("ls /dev 2>/dev/null").exec().out.map { it.trim() }
             val preferred = vm.preferredDevNode().removePrefix("/dev/").trim()
-            if (preferred.isNotBlank() && preferred in devNodes && isCharNode(preferred)) {
+            if (preferred.isNotBlank() && !SafetyGuard.isSystemNode(preferred) && preferred in devNodes && isCharNode(preferred)) {
                 return preferred
             }
-            val poolCandidates = devNodes.filter { (it.matches(Regex("^[A-Za-z0-9]{6,8}$")) || it.matches(Regex("^[A-GNYB]{6,8}$"))) && isCharNode(it) }
-            poolCandidates.firstOrNull()
+            val sysfsClass = SafetyGuard.hiddenDriverClass()
+            if (sysfsClass != null && sysfsClass in devNodes && isCharNode(sysfsClass)) {
+                return sysfsClass
+            }
+            null
         } catch (_: Exception) {
             null
         }
     }
 
-    private fun isCharNode(name: String): Boolean =
+    fun isCharNode(name: String): Boolean =
         name.isNotBlank() && Shell.cmd("test -c /dev/$name 2>/dev/null").exec().isSuccess
 
     private fun snapshotDevCharNodes(): Set<String> =
@@ -346,13 +349,21 @@ object UniversalKernelLoader {
                 break
             }
             if (devNodesBefore.isNotEmpty()) {
-                val fresh = (snapshotDevCharNodes() - devNodesBefore).sorted()
+                val fresh = (snapshotDevCharNodes() - devNodesBefore)
+                    .filter { !SafetyGuard.isSystemNode(it) }
+                    .sorted()
                 if (fresh.isNotEmpty()) {
-
-                    vm.tlog("[SCAN] Fresh /dev nodes: ${fresh.take(4).joinToString(", ")} — probe gate did not confirm ours yet", "INFO")
+                    exactNode = true
+                    foundNodeName = fresh.first()
+                    vm.tlog("[SCAN] Detected fresh driver node: /dev/$foundNodeName", "OK")
+                    break
                 }
             }
-            val poolHit = devList.firstOrNull { (it.matches(Regex("^[A-Za-z0-9]{6,8}$")) || it.matches(Regex("^[A-GNYB]{6,8}$"))) && isCharNode(it) }
+            val poolHit = devList.firstOrNull {
+                !SafetyGuard.isSystemNode(it) &&
+                (it.matches(Regex("^[A-Za-z0-9]{6,8}$")) || it.matches(Regex("^[A-GNYB]{6,8}$"))) &&
+                isCharNode(it)
+            }
             if (poolHit != null) {
                 exactNode = true
                 foundNodeName = poolHit

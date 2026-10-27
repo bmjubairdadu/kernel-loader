@@ -263,13 +263,11 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
         try {
             val session = BootSessionTracker.checkSession(application)
             if (session.isLoaded) {
-                driverLoaded.value = true
-                hiddenLoaded.value = session.isHidden
                 if (session.moduleName.isNotBlank()) {
                     loadedModuleName.value = session.moduleName
                     driverModule.value = session.moduleName
                 }
-                if (session.devNode.isNotBlank() && session.devNode != DEFAULT_DEV_NODE) {
+                if (session.devNode.isNotBlank() && session.devNode != DEFAULT_DEV_NODE && !SafetyGuard.isSystemNode(session.devNode)) {
                     devNodeOverride.value = session.devNode
                 }
             }
@@ -802,7 +800,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             UniversalKernelLoader.disableModuleSigEnforce(this@DriverViewModel)
 
             val preProbe = try { UniversalKernelLoader.probeOurDriverNode(getApplication(), this@DriverViewModel) } catch (e: Exception) { null }
-            if (preProbe != null) {
+            if (preProbe != null && !SafetyGuard.isSystemNode(preProbe)) {
                 tlog("[RESIDENT] Driver already answering on /dev/$preProbe - skipping insert", "OK")
                 rememberDevNode(preProbe)
                 markHiddenLoaded()
@@ -1148,18 +1146,26 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
 
             if (session.isLoaded) {
                 val isModuleInLsmod = session.moduleName.isNotBlank() && session.moduleName in loadedMods
-                withContext(Dispatchers.Main) {
-                    driverLoaded.value = true
-                    hiddenLoaded.value = session.isHidden || !isModuleInLsmod
-                    if (session.moduleName.isNotBlank()) {
-                        loadedModuleName.value = session.moduleName
-                        driverModule.value = session.moduleName
+                val isNodeAlive = session.devNode.isNotBlank() &&
+                        !SafetyGuard.isSystemNode(session.devNode) &&
+                        UniversalKernelLoader.isCharNode(session.devNode)
+
+                if (isModuleInLsmod || (session.isHidden && isNodeAlive)) {
+                    withContext(Dispatchers.Main) {
+                        driverLoaded.value = true
+                        hiddenLoaded.value = session.isHidden || !isModuleInLsmod
+                        if (session.moduleName.isNotBlank()) {
+                            loadedModuleName.value = session.moduleName
+                            driverModule.value = session.moduleName
+                        }
+                        if (session.devNode.isNotBlank() && session.devNode != DEFAULT_DEV_NODE) {
+                            rememberDevNode(session.devNode)
+                        }
                     }
-                    if (session.devNode.isNotBlank() && session.devNode != DEFAULT_DEV_NODE) {
-                        rememberDevNode(session.devNode)
-                    }
+                    return@launch
+                } else {
+                    BootSessionTracker.clear(context)
                 }
-                return@launch
             }
 
             val currentMod = loadedModuleName.value
@@ -1174,9 +1180,9 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                 return@launch
             }
 
-            val knownCandidates = (knownDriverModules() + listOf("rmx3195_driver", "daisy_driver", "kloader", "kmem", "dmsync", "memacc", "suvhwvwrtnb")).distinct()
+            val knownCandidates = listOf("rmx3195_driver", "daisy_driver", "kloader", "suvhwvwrtnb").distinct()
             val candidateMatch = loadedMods.firstOrNull { mod ->
-                knownCandidates.any { it.equals(mod, ignoreCase = true) || mod.contains(it, ignoreCase = true) }
+                knownCandidates.any { it.equals(mod, ignoreCase = true) }
             }
 
             if (candidateMatch != null) {
@@ -1196,18 +1202,16 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             }
 
             withContext(Dispatchers.Main) {
-                if (probed != null) {
+                if (probed != null && !SafetyGuard.isSystemNode(probed)) {
                     rememberDevNode(probed)
                     markHiddenLoaded()
                     BootSessionTracker.recordLoaded(context, "", probed, true)
                 } else {
-                    if (!driverLoaded.value) {
-                        setLoadedModule("")
-                        hiddenLoaded.value = false
-                        driverLoaded.value = false
-                        driverModule.value = ""
-                        BootSessionTracker.clear(context)
-                    }
+                    setLoadedModule("")
+                    hiddenLoaded.value = false
+                    driverLoaded.value = false
+                    driverModule.value = ""
+                    BootSessionTracker.clear(context)
                 }
             }
         }

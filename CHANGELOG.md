@@ -5,6 +5,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [2.2] — 2026-10-27 (tag `v2.2` / `versionCode 22`) Fix False Positive Driver Detection & Cold Boot Restart Button
+
+> **Release v2.2:** Fixes premature "RESTART" button display on cold launch before any driver is loaded. Adds strict system character device filtering and verified boot state validation.
+
+### Fixed
+* **False Positive Driver Detection Fixed:** Resolved critical issue where standard Android character devices (`/dev/ashmem`, `/dev/binder`, `/dev/random`) matched the generic alphanumeric regex in `probeOurDriverNode`, causing the app to falsely detect a resident driver and display "RESTART" instead of "LOAD" upon startup.
+* **System Node Blacklist (`SafetyGuard.SYSTEM_DEV_NODES`):** Hardened device node and sysfs class detection against all core Linux/Android system devices (`ashmem`, `binder`, `random`, `ion`, etc.) so only genuine custom drivers are ever recognized.
+* **Cold Boot State Sanitization:** In `DriverViewModel`, `driverLoaded` now stays strictly `false` until background active verification confirms a live custom module in `/proc/modules` or an active custom node. Corrupted or stale session states are automatically cleared on startup.
+* **Reboot Timing Invalidation:** Enhanced `BootSessionTracker` with uptime-based boot timestamp comparison (`bootTime > loadTime`) to guarantee cached sessions are immediately invalidated across device reboots even if root access is delayed on launch.
+
+---
+
 ## [2.1] — 2026-10-27 (tag `v2.1` / `versionCode 21`) Boot Session Persistence & Background Recents State Fix
 
 > **Release v2.1:** Fixes driver state reset after clearing app from background/recents. Introduces persistent boot session tracking so the "RESTART" button correctly stays active across process restarts while the kernel driver is loaded.
