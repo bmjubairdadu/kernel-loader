@@ -162,9 +162,9 @@
       "file": "uni_4.19.191+.ko",
       "variant": "rt",
       "label": "4.19.191+",
-      "sha256": "ac6f28f42fba6c7e2e9e0a80ee85224a4bd533c1832240be7d7b39e898b2016a",
-      "size": 254872,
-      "buildDate": "2026-10-27T18:35:37Z",
+      "sha256": "00939b35cd493094b4929a3e02c9b5bc72ee81de339990d299e93cef47da7753",
+      "size": 253680,
+      "buildDate": "2026-10-27T19:03:12Z",
       "source": "v3_drivers/RT/4.19.191b.sh",
       "verified": true
     },
@@ -349,9 +349,9 @@
       "file": "4.19.191-Realme-RMX3195.ko",
       "variant": "rt",
       "label": "4.19.191-Realme-RMX3195",
-      "sha256": "ac6f28f42fba6c7e2e9e0a80ee85224a4bd533c1832240be7d7b39e898b2016a",
-      "size": 254872,
-      "buildDate": "2026-10-27T18:35:37Z",
+      "sha256": "00939b35cd493094b4929a3e02c9b5bc72ee81de339990d299e93cef47da7753",
+      "size": 253680,
+      "buildDate": "2026-10-27T19:03:12Z",
       "source": "realme_c25s_rmx3195-4.19",
       "verified": true
     }
