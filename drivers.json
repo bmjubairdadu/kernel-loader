@@ -327,9 +327,9 @@
       "file": "4.19.191-Realme-RMX3195.ko",
       "variant": "rt",
       "label": "4.19.191-Realme-RMX3195",
-      "sha256": "00939b35cd493094b4929a3e02c9b5bc72ee81de339990d299e93cef47da7753",
-      "size": 253680,
-      "buildDate": "2026-10-27T19:03:12Z",
+      "sha256": "498d16972b0211d0f9c3440e2e3e08d1a303d2865d192e0b785907293880ead4",
+      "size": 252696,
+      "buildDate": "2026-10-27T14:52:24Z",
       "source": "realme_c25s_rmx3195-4.19",
       "verified": true
     },
@@ -338,9 +338,9 @@
       "file": "4.14.357-Realme-RMX5070.ko",
       "variant": "rt",
       "label": "4.14.357-Realme-RMX5070",
-      "sha256": "54af1be4971f5c471356cc521f8c74baddf1404776c2aaec62d7ffa21caccde2",
-      "size": 197336,
-      "buildDate": "2026-10-27T14:37:16Z",
+      "sha256": "7ed17ac2a059422b918027745727579a4796a6b36c6b96aa310c7135595c9b02",
+      "size": 196712,
+      "buildDate": "2026-10-27T14:52:24Z",
       "source": "realme_rmx5070_4.14",
       "verified": true
     }
