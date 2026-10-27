@@ -1,7 +1,7 @@
 {
   "baseUrl": "https://raw.githubusercontent.com/bmjubairdadu/kernel-loader/drivers",
   "branch": "drivers",
-  "count": 32,
+  "count": 31,
   "drivers": [
     {
       "version": "4.14.117-perf+ SMP preempt mod_unload modversions aarch64",
@@ -100,28 +100,6 @@
       "size": 183408,
       "buildDate": "2026-10-26T12:57:28Z",
       "source": "v3_drivers/RT/4.19.157.sh",
-      "verified": true
-    },
-    {
-      "version": "4.19.157-perf+ SMP preempt mod_unload modversions aarch64",
-      "file": "uni_4.19.157-perf+.ko",
-      "variant": "rt",
-      "label": "4.19.157-perf+",
-      "sha256": "928da78caaee171a1d3f0555c12ad2d9527767c8a31803941b08632120ceb744",
-      "size": 182912,
-      "buildDate": "2026-10-26T12:57:28Z",
-      "source": "v3_drivers/RT/4.19.157b.sh",
-      "verified": true
-    },
-    {
-      "version": "4.19.157-perf+ SMP preempt mod_unload modversions aarch64",
-      "file": "uni_4.19.157c-perf+.ko",
-      "variant": "rt",
-      "label": "4.19.157-perf+",
-      "sha256": "a0c1ff07f4ab92b52ff7406949c589dffd7f2c9a7d29119cb4061ea03f1d74d8",
-      "size": 661578,
-      "buildDate": "2026-10-26T12:57:28Z",
-      "source": "v3_drivers/RT/4.19.157c.sh",
       "verified": true
     },
     {
@@ -353,6 +331,17 @@
       "size": 198376,
       "buildDate": "2026-10-27T15:41:15Z",
       "source": "CraftRom/Chidori-Kernel_onclite",
+      "verified": true
+    },
+    {
+      "version": "4.19.157-perf+ SMP preempt mod_unload modversions aarch64",
+      "file": "4.19.157-OnePlus-IN2021.ko",
+      "variant": "rt",
+      "label": "4.19.157-OnePlus-IN2021",
+      "sha256": "3392034d13217794e434ebd80195842cc1a1f41903d3c332e52330dc8543bb82",
+      "size": 258760,
+      "buildDate": "2026-10-27T16:26:44Z",
+      "source": "OnePlusOSS/android_kernel_oneplus_sm8250",
       "verified": true
     }
   ]
