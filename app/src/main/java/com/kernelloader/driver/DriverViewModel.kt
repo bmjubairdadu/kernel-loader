@@ -576,7 +576,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                     dmesg.contains("key rejected")
             if (isLocked) {
                 tlog("[SIGNATURE LOCKED] Kernel enforces strict CONFIG_MODULE_SIG_FORCE=y.", "ERR")
-                tlog("[GUIDANCE] Tap 'PATCH BOOT' in Kernel Loader (or enable BypassSig KPM) to unlock unsigned drivers.", "WARN")
+                tlog("[GUIDANCE] Enable BypassSig KPM (or flash SigBypass zip) to unlock unsigned drivers.", "WARN")
             }
         }
         return res
