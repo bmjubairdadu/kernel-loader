@@ -5,6 +5,23 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [2.5] — 2026-10-28 (tag `v2.5` / `versionCode 25`) Bilingual Error Resolution Dialog & Signature Lock Guidance
+
+> **Release v2.5:** Introduces modern rounded bilingual (Bengali/English) error guidance dialogs on driver load failure, exact kernel signature lock detection (`CONFIG_MODULE_SIG_FORCE`), sanitized insmod fallback verification for APatch/KernelPatch/KernelSU, and Linux 6.6 support.
+
+### Added
+* **Modern Rounded Bilingual Error Dialog (`DriverErrorDialog`):** Beautiful 26.dp rounded-corner popup dialog with dark glassmorphic styling, warning accent badge, and instant one-tap bilingual switching between 🇧🇩 বাংলা and 🇬🇧 English.
+* **Actionable Step-by-Step Fixes:** Intelligently categorizes errors (Signature Locked, Root Denied, Vermagic Mismatch, No DB Match, etc.) and gives users exact numbered steps to resolve them.
+* **One-Tap Diagnostic Copy:** Includes a "Copy Log / লগ কপি" button inside the dialog to instantly copy terminal output and dmesg traces to the clipboard.
+
+### Fixed
+* **Sanitized Insmod Fallback Execution:** Fixed confusing `/data/adb/magisk/busybox: inaccessible or not found` errors by validating binary executable status (`test -x`) before fallback execution on non-Magisk root setups (KernelPatch / APatch / KernelSU).
+* **Accurate Kernel Signature Lock Detection:** Added detection for `Loading of unsigned module is rejected` in dmesg to accurately guide users to enable `BypassSig` KPM or flash `Universal_Kernel_Sig_Bypass.zip`.
+* **Cleaned Obsolete Guidance:** Removed obsolete "PATCH BOOT" UI references.
+* **Linux 6.1+ & 6.6 Modern Maple Tree VMAs:** Updated driver core with `VMA_ITERATOR` and `for_each_vma` for full compatibility with modern 6.6 kernels.
+
+---
+
 ## [2.2] — 2026-10-27 (tag `v2.2` / `versionCode 22`) Fix False Positive Driver Detection & Cold Boot Restart Button
 
 > **Release v2.2:** Fixes premature "RESTART" button display on cold launch before any driver is loaded. Adds strict system character device filtering and verified boot state validation.
