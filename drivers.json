@@ -365,6 +365,61 @@
       "buildDate": "2026-10-28T08:41:22Z",
       "source": "OnePlus_CPH2381_5.4.254",
       "verified": true
+    },
+    {
+      "version": "4.19.127-g060a87d7c41a-dirty SMP preempt mod_unload modversions aarch64",
+      "file": "4.19.127-Infinix-X688B.ko",
+      "variant": "rt",
+      "label": "4.19.127-Infinix-X688B",
+      "sha256": "99afe0ed5db047e621bdb6fc95bfc14f1645e3e223ac90577f49a1c96f5bce59",
+      "size": 289088,
+      "buildDate": "2026-10-28T09:12:55Z",
+      "source": "Infinix_X688B_4.19.127",
+      "verified": true
+    },
+    {
+      "version": "4.19.157-perf-27940246-abA235FXXS4DXA5 SMP preempt mod_unload modversions aarch64",
+      "file": "4.19.157-Samsung-SM-A235F.ko",
+      "variant": "rt",
+      "label": "4.19.157-Samsung-SM-A235F",
+      "sha256": "67f49cf8d8aec73f5c0f7902f0b64a04fc1c9498219fa8e250563b4c43ca689d",
+      "size": 288064,
+      "buildDate": "2026-10-28T09:12:55Z",
+      "source": "Samsung_SM_A235F_4.19.157",
+      "verified": true
+    },
+    {
+      "version": "5.4.210-android12-9-g6b8e8e96f0d6-ab395 SMP preempt mod_unload modversions aarch64",
+      "file": "5.4.210-Realme-RMX3511.ko",
+      "variant": "rt",
+      "label": "5.4.210-Realme-RMX3511",
+      "sha256": "6e5a6cb6f3fdc98da300291432414e76f4a579f83a480ab220b6fe7f4ca34aac",
+      "size": 407160,
+      "buildDate": "2026-10-28T09:12:55Z",
+      "source": "Realme_RMX3511_5.4.210",
+      "verified": true
+    },
+    {
+      "version": "4.14.186+ SMP preempt mod_unload modversions aarch64",
+      "file": "4.14.186-OPPO-CPH2001.ko",
+      "variant": "rt",
+      "label": "4.14.186-OPPO-CPH2001",
+      "sha256": "2495fa0d879f5bf911969a6b9e752a3384554d83d18999cf1411bccb64188a56",
+      "size": 276544,
+      "buildDate": "2026-10-28T09:12:55Z",
+      "source": "OPPO_CPH2001_4.14.186",
+      "verified": true
+    },
+    {
+      "version": "4.14.190-26004139-abSC03LOMU1DWC1 SMP preempt mod_unload modversions aarch64",
+      "file": "4.14.190-Samsung-SC-03L.ko",
+      "variant": "rt",
+      "label": "4.14.190-Samsung-SC-03L",
+      "sha256": "d836753c5df0710c377370b77109eea522651018123e8906c501ac8aedcc5e1b",
+      "size": 279408,
+      "buildDate": "2026-10-28T09:12:55Z",
+      "source": "Samsung_SC-03L_4.14.190",
+      "verified": true
     }
   ]
 }
