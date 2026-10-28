@@ -134,13 +134,10 @@ object UniversalKernelLoader {
         if (!res.isSuccess) {
             val hasEngine = Shell.cmd("test -f /data/adb/kernel_loader/load_driver.sh || test -x /data/adb/kernel_loader/load_driver.sh").exec().isSuccess
             if (hasEngine) {
-                vm.tlog("[ENGINE] Kernel Loader Engine Module Connected", "OK")
-                vm.tlog("[ENGINE] Inserting module via Engine Bridge...", "CMD")
+                vm.tlog("Inserting module via Engine Bridge...", "CMD")
                 res = Shell.cmd("sh /data/adb/kernel_loader/load_driver.sh \"$TMP_KO\" \"$devNode\"").exec()
                 if (res.isSuccess) {
-                    vm.tlog("[ENGINE] Driver successfully loaded via Engine Bridge!", "OK")
-                } else {
-                    vm.tlog("[ENGINE] Engine Bridge fallback needed...", "WARN")
+                    vm.tlog("Driver loaded successfully via Engine Bridge", "OK")
                 }
             }
         }
