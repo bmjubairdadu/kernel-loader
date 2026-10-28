@@ -5,6 +5,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [2.8] — 2026-10-28 (tag `v2.8` / `versionCode 28`) 1-Click In-App Kernel Signature Auto-Unlock & English-First Dialogs
+
+> **Release v2.8:** Autonomous in-app kernel boot image patching for `CONFIG_MODULE_SIG_FORCE`, embedded `magiskboot` for zero-dependency execution across APatch, Magisk, and KernelSU, English-default error guidance dialogs, and instant 1-click reboot action.
+
+### Added
+* **1-Click In-App Auto-Unlock (`autoUnlockKernelSignature`):** Automatically detects `CONFIG_MODULE_SIG_FORCE` signature enforcement upon driver insertion, dumps the active boot partition, hexpatches `is_module_sig_enforced` for OnePlus, Realme, Infinix, Samsung, and Xiaomi kernels, repacks, and writes back to boot partition via root within 2 seconds.
+* **Embedded `magiskboot` in APK Assets:** Bundled `magiskboot` directly inside the APK for universal, self-contained kernel patching without relying on external root directories.
+* **Instant 1-Click Reboot Action:** Displays a dedicated "🔄 Reboot Now" action button inside the dialog that triggers clean device restart via `svc power reboot`.
+* **English-First Default UI:** Error guidance dialogs now open in 100% English by default, while retaining the one-tap Bengali toggle option.
+* **Engine Bridge Integration:** Fully connected with `/data/adb/kernel_loader` for enhanced driver staging and insertion.
+
+---
+
 ## [2.5] — 2026-10-28 (tag `v2.5` / `versionCode 25`) Bilingual Error Resolution Dialog & Signature Lock Guidance
 
 > **Release v2.5:** Introduces modern rounded bilingual (Bengali/English) error guidance dialogs on driver load failure, exact kernel signature lock detection (`CONFIG_MODULE_SIG_FORCE`), sanitized insmod fallback verification for APatch/KernelPatch/KernelSU, and Linux 6.6 support.
