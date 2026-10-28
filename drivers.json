@@ -1,7 +1,7 @@
 {
   "baseUrl": "https://raw.githubusercontent.com/bmjubairdadu/kernel-loader/drivers",
   "branch": "drivers",
-  "count": 31,
+  "count": 32,
   "drivers": [
     {
       "version": "4.14.117-perf+ SMP preempt mod_unload modversions aarch64",
@@ -342,6 +342,17 @@
       "size": 260752,
       "buildDate": "2026-10-27T16:50:00Z",
       "source": "OnePlusOSS/android_kernel_oneplus_sm8250",
+      "verified": true
+    },
+    {
+      "version": "4.19.157-perf-g1a6087bc0325-dirty SMP preempt mod_unload modversions aarch64",
+      "file": "4.19.157-Realme-RMX5070.ko",
+      "variant": "rt",
+      "label": "4.19.157-Realme-RMX5070",
+      "sha256": "c919724d42b29b6b42fd159bad2cc030cef039defe8bbd16ed669f791fcf714d",
+      "size": 260736,
+      "buildDate": "2026-10-28T12:04:33Z",
+      "source": "Realme_RMX5070_4.19.157",
       "verified": true
     }
   ]
