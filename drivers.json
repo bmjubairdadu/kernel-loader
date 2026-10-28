@@ -453,6 +453,17 @@
       "buildDate": "2026-10-28T10:18:24Z",
       "source": "Xiaomi_M2010J19CG_4.19.157",
       "verified": true
+    },
+    {
+      "version": "4.14.113-27176651 SMP preempt mod_unload modversions aarch64",
+      "file": "4.14.113-Samsung-SM-A515F.ko",
+      "variant": "rt",
+      "label": "4.14.113-Samsung-SM-A515F",
+      "sha256": "504affa17eb6148e2d143500220132dbf99c871162bd126c907ff880754d3acd",
+      "size": 271824,
+      "buildDate": "2026-10-28T13:34:35Z",
+      "source": "Samsung_SM-A515F_4.14.113",
+      "verified": true
     }
   ]
 }
