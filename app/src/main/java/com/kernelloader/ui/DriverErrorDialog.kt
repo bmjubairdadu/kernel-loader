@@ -61,7 +61,7 @@ fun DriverErrorDialog(
     onDismiss: () -> Unit,
     onCopyLog: () -> Unit
 ) {
-    var isBengali by remember { mutableStateOf(true) }
+    var isBengali by remember { mutableStateOf(false) }
     val scrollState = rememberScrollState()
 
     Dialog(
@@ -129,14 +129,14 @@ fun DriverErrorDialog(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         LanguageTabButton(
-                            label = "বাংলা",
-                            selected = isBengali,
-                            onClick = { isBengali = true }
-                        )
-                        LanguageTabButton(
                             label = "EN",
                             selected = !isBengali,
                             onClick = { isBengali = false }
+                        )
+                        LanguageTabButton(
+                            label = "বাংলা",
+                            selected = isBengali,
+                            onClick = { isBengali = true }
                         )
                     }
                 }
