@@ -442,6 +442,17 @@
       "buildDate": "2026-10-28T09:22:23Z",
       "source": "Xiaomi_2310FPCA4I_6.6.30",
       "verified": true
+    },
+    {
+      "version": "4.19.157-perf-g1a6087bc0325-dirty SMP preempt mod_unload modversions aarch64",
+      "file": "4.19.157-Xiaomi-M2010J19CG.ko",
+      "variant": "rt",
+      "label": "4.19.157-Xiaomi-M2010J19CG",
+      "sha256": "c919724d42b29b6b42fd159bad2cc030cef039defe8bbd16ed669f791fcf714d",
+      "size": 260736,
+      "buildDate": "2026-10-28T10:18:24Z",
+      "source": "Xiaomi_M2010J19CG_4.19.157",
+      "verified": true
     }
   ]
 }
