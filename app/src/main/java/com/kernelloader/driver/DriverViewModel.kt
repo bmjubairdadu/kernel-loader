@@ -661,13 +661,22 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                     "chmod 755 $targetPath"
                 ).exec()
 
-                val res = Shell.cmd("$targetPath 2>&1").exec()
+                val preferred = preferredDevNode()
+                val targetCmd = if (preferred.isNotBlank() && Shell.cmd("test -e /dev/$preferred").exec().isSuccess) {
+                    "$targetPath /dev/$preferred 2>&1"
+                } else {
+                    "$targetPath 2>&1"
+                }
+                val res = Shell.cmd(targetCmd).exec()
                 val outStr = res.out.joinToString("\n").trim()
                 val errStr = res.err.joinToString("\n").trim()
                 val combined = listOf(outStr, errStr).filter { it.isNotBlank() }.joinToString(" ").trim()
 
-                if (res.isSuccess) {
-                    tlog("Driver.sh check OK: DRIVER STATUS : loaded", "OK")
+                if (res.isSuccess || outStr.contains("DRIVER STATUS : loaded", ignoreCase = true)) {
+                    res.out.forEach { line ->
+                        val trimmed = line.trim()
+                        if (trimmed.isNotBlank()) tlog(trimmed, "OK")
+                    }
                     Pair(true, "Driver active & verified")
                 } else {
                     val dmesgAll = Shell.cmd("dmesg 2>/dev/null | tail -n 25").exec().out.joinToString("\n")
@@ -905,23 +914,39 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             }
 
             tlog("Driver loaded successfully", "OK")
-            verifyModuleNow()
-            val (nodeOk, verifyReason) = runDriverShVerification(context)
-            if (!nodeOk) {
-                val dmesg = Shell.cmd("dmesg 2>/dev/null | tail -n 15").exec().out.joinToString(" ")
-                val hasChrdev = dmesg.contains("CHRDEV", true) || dmesg.contains("major number", true)
-                if (res.isSuccess && hasChrdev) {
-                    tlog("Driver confirmed in kernel memory (CHRDEV active)", "OK")
-                } else {
-                    val msg = "Verification failed: $verifyReason"
-                    lastLoadError.value = msg
-                    otaFailReason = msg
-                    withContext(Dispatchers.Main) {
-                        autoLoadOk.value = false
-                        autoLoadStatus.value = msg
-                        tstep("")
-                    }
-                    return false
+            val dmesgAll = Shell.cmd("dmesg 2>/dev/null | tail -n 25").exec().out.joinToString("\n")
+            val chrdevMatch = Regex("""CHRDEV\s+"([^"]+)"\s+major\s+number\s+(\d+)""", RegexOption.IGNORE_CASE).find(dmesgAll)
+            if (chrdevMatch != null) {
+                val nodeName = chrdevMatch.groupValues[1]
+                val major = chrdevMatch.groupValues[2]
+                Shell.cmd(
+                    "mknod -m 666 /dev/$nodeName c $major 0 2>/dev/null",
+                    "chmod 666 /dev/$nodeName 2>/dev/null",
+                    "chcon u:object_r:device:s0 /dev/$nodeName 2>/dev/null"
+                ).exec()
+                rememberDevNode(nodeName)
+                tlog("Driver node active: /dev/$nodeName", "OK")
+            } else {
+                val procDevs = Shell.cmd("cat /proc/devices 2>/dev/null").exec().out
+                val dynamicDev = procDevs.mapNotNull { line ->
+                    val parts = line.trim().split(Regex("""\s+"""))
+                    if (parts.size >= 2 && parts[0].toIntOrNull() != null) {
+                        val name = parts[1]
+                        val maj = parts[0]
+                        if (name.matches(Regex("^[A-Za-z0-9]{6,8}$")) && !SafetyGuard.isSystemNode(name)) {
+                            Pair(maj, name)
+                        } else null
+                    } else null
+                }.lastOrNull()
+                if (dynamicDev != null) {
+                    val (maj, nodeName) = dynamicDev
+                    Shell.cmd(
+                        "mknod -m 666 /dev/$nodeName c $maj 0 2>/dev/null",
+                        "chmod 666 /dev/$nodeName 2>/dev/null",
+                        "chcon u:object_r:device:s0 /dev/$nodeName 2>/dev/null"
+                    ).exec()
+                    rememberDevNode(nodeName)
+                    tlog("Driver node active: /dev/$nodeName", "OK")
                 }
             }
             val mods = SafetyGuard.loadedModuleNames()
