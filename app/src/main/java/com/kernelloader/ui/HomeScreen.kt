@@ -623,7 +623,7 @@ fun HomeScreen(
                         )
                         Spacer(Modifier.height(2.dp))
                         Text(
-                            text = "read/write check (0x801/0x802/0x803) & clients",
+                            text = "safe handshake check (0x803)",
                             style = MaterialTheme.typography.bodySmall,
                             color = TextMuted
                         )
