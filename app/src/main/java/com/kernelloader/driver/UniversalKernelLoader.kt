@@ -746,6 +746,14 @@ object UniversalKernelLoader {
                 # 8. Realme RMX5070 (4.14.357)
                 "${d}MB" hexpatch "${d}WORK/kernel" 0828019000214c39c0035fd6 ${d}P >/dev/null 2>&1 && PATCHED=1
 
+                # Dynamic scan via native arm64 disassembler engine
+                if [ ${d}PATCHED -eq 0 ] && [ -x /data/local/tmp/sigpatch ]; then
+                  /data/local/tmp/sigpatch "${d}WORK/kernel" >/dev/null 2>&1
+                  if [ ${d}? -eq 0 ]; then
+                    PATCHED=1
+                  fi
+                fi
+
                 if [ ${d}PATCHED -eq 0 ]; then
                   echo "PATTERN_NOT_FOUND"
                   rm -rf "${d}WORK"

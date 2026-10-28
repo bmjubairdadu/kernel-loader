@@ -938,7 +938,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                     tlog("Signature verification rejected by kernel", "ERR")
                     tlog("[AUTO-FIX] Detected Kernel Signature Lock (CONFIG_MODULE_SIG_FORCE)", "WARN")
                     tlog("[AUTO-FIX] Unlocking kernel signature check in boot partition...", "CMD")
-                    val unlocked = autoUnlockKernelSignature()
+                    val (unlocked, detail) = autoUnlockKernelSignature()
                     if (unlocked) {
                         tlog("[AUTO-FIX] ✅ Kernel signature check successfully unlocked in boot partition!", "OK")
                         tlog("[REBOOT REQUIRED] Please restart your phone to apply the unlock.", "WARN")
@@ -946,6 +946,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                         lastLoadError.value = sigMsg
                         otaFailReason = sigMsg
                     } else {
+                        tlog("[AUTO-FIX FAILED] $detail", "ERR")
                         val sigMsg = "Signature Locked: Kernel enforces CONFIG_MODULE_SIG_FORCE"
                         lastLoadError.value = sigMsg
                         otaFailReason = sigMsg
@@ -1387,7 +1388,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
         return name
     }
 
-    private fun autoUnlockKernelSignature(): Boolean {
+    private fun autoUnlockKernelSignature(): Pair<Boolean, String> {
         return try {
             val mbTarget = File(getApplication<Application>().cacheDir, "magiskboot")
             if (!mbTarget.exists() || mbTarget.length() == 0L) {
@@ -1399,6 +1400,18 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             }
             if (mbTarget.exists() && mbTarget.length() > 0L) {
                 Shell.cmd("chmod 755 ${mbTarget.absolutePath}; cp -f ${mbTarget.absolutePath} /data/local/tmp/magiskboot; chmod 755 /data/local/tmp/magiskboot").exec()
+            }
+
+            val spTarget = File(getApplication<Application>().cacheDir, "sigpatch")
+            if (!spTarget.exists() || spTarget.length() == 0L) {
+                try {
+                    getApplication<Application>().assets.open("sigpatch").use { input ->
+                        spTarget.outputStream().use { output -> input.copyTo(output) }
+                    }
+                } catch (_: Exception) {}
+            }
+            if (spTarget.exists() && spTarget.length() > 0L) {
+                Shell.cmd("chmod 755 ${spTarget.absolutePath}; cp -f ${spTarget.absolutePath} /data/local/tmp/sigpatch; chmod 755 /data/local/tmp/sigpatch").exec()
             }
 
             val d = "$"
@@ -1484,6 +1497,14 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                 # 8. Realme RMX5070 (4.14.357)
                 "${d}MB" hexpatch "${d}WORK/kernel" 0828019000214c39c0035fd6 ${d}P >/dev/null 2>&1 && PATCHED=1
 
+                # Dynamic scan via native arm64 disassembler engine
+                if [ ${d}PATCHED -eq 0 ] && [ -x /data/local/tmp/sigpatch ]; then
+                  /data/local/tmp/sigpatch "${d}WORK/kernel" >/dev/null 2>&1
+                  if [ ${d}? -eq 0 ]; then
+                    PATCHED=1
+                  fi
+                fi
+
                 if [ ${d}PATCHED -eq 0 ]; then
                   echo "PATTERN_NOT_FOUND"
                   rm -rf "${d}WORK"
@@ -1508,9 +1529,9 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
 
             val res = Shell.cmd(script).exec()
             val out = (res.out + res.err).joinToString("\n").trim()
-            out.contains("PATCH_SUCCESS")
-        } catch (_: Exception) {
-            false
+            Pair(out.contains("PATCH_SUCCESS"), out)
+        } catch (e: Exception) {
+            Pair(false, e.message ?: "Exception")
         }
     }
 }
