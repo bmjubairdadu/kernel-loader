@@ -164,6 +164,8 @@ object UniversalKernelLoader {
                     errAll.contains("permission denied") ||
                     dmesgTail5.contains("module verification failed") ||
                     dmesgTail5.contains("module signature") ||
+                    dmesgTail5.contains("unsigned module is rejected") ||
+                    dmesgTail5.contains("loading of unsigned module") ||
                     dmesgTail5.contains("required key")
 
             if (isSigWarning) {

@@ -509,7 +509,10 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             "/system/bin/insmod",
             "/vendor/bin/insmod",
             "busybox insmod"
-        )
+        ).filter { b ->
+            val bin = b.substringBefore(" ")
+            bin == "insmod" || Shell.cmd("test -x \"$bin\" 2>/dev/null || which \"$bin\" 2>/dev/null").exec().isSuccess
+        }.ifEmpty { listOf("insmod") }
         val hideParam = if (supportsStealthHide()) "hide=1" else "hide=0"
         val paramVariants = if (devNode.isNotBlank()) {
             listOf("", "devname=$devNode $hideParam", "devicename=$devNode $hideParam", hideParam)
@@ -545,12 +548,14 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
         }
         if (!res.isSuccess) {
             val errAll = (res.out + res.err).joinToString(" ").lowercase(Locale.US)
-            val dmesg = Shell.cmd("dmesg 2>/dev/null | tail -n 10").exec().out.joinToString(" ").lowercase(Locale.US)
+            val dmesg = Shell.cmd("dmesg 2>/dev/null | tail -n 15").exec().out.joinToString(" ").lowercase(Locale.US)
             val isSig = errAll.contains("required key") ||
                     errAll.contains("rejected") ||
                     errAll.contains("operation not permitted") ||
                     dmesg.contains("module verification failed") ||
                     dmesg.contains("module signature") ||
+                    dmesg.contains("unsigned module is rejected") ||
+                    dmesg.contains("loading of unsigned module") ||
                     dmesg.contains("required key")
             if (isSig) {
                 tlog("Signature verification active, bypassing...", "WARN")
@@ -565,6 +570,8 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                     errAll.contains("key rejected") ||
                     errAll.contains("key was rejected") ||
                     dmesg.contains("module verification failed") ||
+                    dmesg.contains("unsigned module is rejected") ||
+                    dmesg.contains("loading of unsigned module") ||
                     dmesg.contains("required key not available") ||
                     dmesg.contains("key rejected")
             if (isLocked) {
