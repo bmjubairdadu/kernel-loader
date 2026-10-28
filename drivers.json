@@ -464,6 +464,17 @@
       "buildDate": "2026-10-28T13:34:35Z",
       "source": "Samsung_SM-A515F_4.14.113",
       "verified": true
+    },
+    {
+      "version": "4.19.191+ SMP preempt mod_unload modversions aarch64",
+      "file": "4.19.191-Realme-RMX3241.ko",
+      "variant": "rt",
+      "label": "4.19.191-Realme-RMX3241",
+      "sha256": "1fae332e7928c5c900516ec7f58dfb3ea6783496a08995d00327f1c3627c8bde",
+      "size": 282840,
+      "buildDate": "2026-10-28T14:50:00Z",
+      "source": "realme_rmx3241_4.19",
+      "verified": true
     }
   ]
 }
