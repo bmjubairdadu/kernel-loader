@@ -522,6 +522,7 @@ object UniversalKernelLoader {
         } else {
             vm.lastLoadError.value = msg
             vm.tlog("Need custom loader - tap Telegram / WhatsApp", "FIX")
+            vm.triggerErrorDialog(msg)
             runCatching { Shell.cmd("rm -f $TMP_KO 2>/dev/null").exec() }
         }
         vm.tstep("")

@@ -687,6 +687,15 @@ fun HomeScreen(
             )
         }
     }
+
+    val errorInfo = viewModel.loadErrorDialogData.value
+    if (errorInfo != null) {
+        DriverErrorDialog(
+            info = errorInfo,
+            onDismiss = { viewModel.dismissErrorDialog() },
+            onCopyLog = { viewModel.copyTerminalToClipboard(context) }
+        )
+    }
 }
 
 @Composable

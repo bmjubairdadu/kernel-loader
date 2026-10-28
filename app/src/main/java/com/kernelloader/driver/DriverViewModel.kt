@@ -1,9 +1,12 @@
 package com.kernelloader.driver
 
 import android.app.Application
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.net.Uri
 import android.provider.OpenableColumns
+import android.widget.Toast
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.AndroidViewModel
@@ -81,6 +84,30 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
 
     var lastBundleTried = mutableStateOf("")
     var lastLoadError = mutableStateOf("")
+    var loadErrorDialogData = mutableStateOf<DriverErrorInfo?>(null)
+
+    fun triggerErrorDialog(reason: String) {
+        val dmesg = Shell.cmd("dmesg 2>/dev/null | tail -n 25").exec().out.joinToString(" ")
+        viewModelScope.launch(Dispatchers.Main) {
+            loadErrorDialogData.value = DriverErrorInfo.fromError(reason, dmesg, getTerminalText())
+        }
+    }
+
+    fun dismissErrorDialog() {
+        loadErrorDialogData.value = null
+    }
+
+    fun copyTerminalToClipboard(context: Context) {
+        try {
+            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            val text = getTerminalText()
+            val clip = ClipData.newPlainText("Kernel Loader Log", text)
+            clipboard.setPrimaryClip(clip)
+            Toast.makeText(context, "Log copied to clipboard!", Toast.LENGTH_SHORT).show()
+        } catch (e: Exception) {
+            tlog("Failed to copy log: ${e.message}", "ERR")
+        }
+    }
 
     fun clearLoadedDriver(context: Context) {
         driverLoaded.value = false
@@ -995,6 +1022,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
         autoLoadOk.value = null
         autoLoadStatus.value = ""
         lastLoadError.value = ""
+        loadErrorDialogData.value = null
         if (pickedFileUri.value != null) {
             lastBundleTried.value = pickedFileName.value ?: "custom file"
         } else {
@@ -1013,6 +1041,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                     tlog("Root permission: DENIED", "ERR")
                     autoLoadOk.value = false
                     autoLoadStatus.value = "Root access denied"
+                    triggerErrorDialog("Root permission: DENIED")
                     return@launch
                 }
 
@@ -1059,12 +1088,14 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                     tlog("Load failed: $finalReason", "ERR")
                     autoLoadOk.value = false
                     autoLoadStatus.value = "Load failed: $finalReason"
+                    triggerErrorDialog(finalReason)
                 }
             } catch (e: CancellationException) {
             } catch (e: Exception) {
                 tlog("FATAL: ${e.message}", "ERR")
                 autoLoadStatus.value = "FATAL: ${e.message}"
                 autoLoadOk.value = false
+                triggerErrorDialog(e.message ?: "Fatal loading error")
             } finally {
                 activePipelineVariant.value = ""
                 viewModelScope.launch(Dispatchers.Main) {
