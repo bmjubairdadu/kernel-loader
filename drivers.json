@@ -371,9 +371,9 @@
       "file": "4.19.127-Infinix-X688B.ko",
       "variant": "rt",
       "label": "4.19.127-Infinix-X688B",
-      "sha256": "99afe0ed5db047e621bdb6fc95bfc14f1645e3e223ac90577f49a1c96f5bce59",
-      "size": 289088,
-      "buildDate": "2026-10-28T09:12:55Z",
+      "sha256": "00c520965e1eaba75402a25acc47db07815359087162362742a04e7642d2be5e",
+      "size": 224224,
+      "buildDate": "2026-10-28T13:47:27Z",
       "source": "Infinix_X688B_4.19.127",
       "verified": true
     },
