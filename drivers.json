@@ -1,7 +1,7 @@
 {
   "baseUrl": "https://raw.githubusercontent.com/bmjubairdadu/kernel-loader/drivers",
   "branch": "drivers",
-  "count": 32,
+  "count": 44,
   "drivers": [
     {
       "version": "4.14.117-perf+ SMP preempt mod_unload modversions aarch64",
@@ -474,6 +474,17 @@
       "size": 282840,
       "buildDate": "2026-10-28T14:50:00Z",
       "source": "realme_rmx3241_4.19",
+      "verified": true
+    },
+    {
+      "version": "4.9.186-perf-g131f907 SMP preempt mod_unload modversions aarch64",
+      "file": "4.9.186-Xiaomi-Redmi-7.ko",
+      "variant": "rt",
+      "label": "4.9.186-Xiaomi-Redmi-7",
+      "sha256": "ebdbab95b6e436c99cb74ac6440293bcfbbca7d66bb11a831cd8fac697360220",
+      "size": 22304,
+      "buildDate": "2026-10-28T15:38:21Z",
+      "source": "Xiaomi_Redmi_7_4.9.186",
       "verified": true
     }
   ]
