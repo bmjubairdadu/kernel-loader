@@ -360,9 +360,9 @@
       "file": "5.4.254-OnePlus-CPH2381.ko",
       "variant": "rt",
       "label": "5.4.254-OnePlus-CPH2381",
-      "sha256": "389cd0102e025da7a2514a86b7bf44bf5e9f69b4faf3eccbecab2ee6d54bf6d7",
-      "size": 394800,
-      "buildDate": "2026-10-28T08:21:55Z",
+      "sha256": "0e9a381bd9245cd22cafe92759fc5ad1be541f721af2bdc72eb2ed76e1d77878",
+      "size": 388504,
+      "buildDate": "2026-10-28T08:41:22Z",
       "source": "OnePlus_CPH2381_5.4.254",
       "verified": true
     }
