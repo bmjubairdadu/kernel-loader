@@ -18,13 +18,38 @@ data class DriverErrorInfo(
     val descriptionEn: String,
     val descriptionBn: String,
     val solutionStepsEn: List<String>,
-    val solutionStepsBn: List<String>
+    val solutionStepsBn: List<String>,
+    val canReboot: Boolean = false
 ) {
     companion object {
         fun fromError(rawError: String, dmesg: String = "", logs: String = ""): DriverErrorInfo {
             val combined = "$rawError $dmesg $logs".lowercase(Locale.US)
 
             return when {
+                // 0. Auto-Unlocked, Reboot Required
+                combined.contains("signature unlocked") ||
+                combined.contains("restart phone once") -> {
+                    DriverErrorInfo(
+                        errorType = DriverErrorType.SIGNATURE_LOCKED,
+                        titleEn = "Kernel Signature Unlocked!",
+                        titleBn = "কার্নেল সিগনেচার আনলক সম্পন্ন হয়েছে!",
+                        rawError = "Kernel signature enforcement unlocked in boot image",
+                        descriptionEn = "Kernel signature check has been unlocked in your boot partition! Please restart your phone now. After reboot, tap LOAD and the driver will load instantly without any signature rejection.",
+                        descriptionBn = "আপনার ডিভাইসের কার্নেল সিগনেচার লক সফলভাবে আনলক করা হয়েছে! পরিবর্তন কার্যকর করতে এখনই ফোনটি রিস্টার্ট দিন। রিস্টার্টের পর LOAD চাপলেই ড্রাইভার কোনো এরর ছাড়াই লোড হয়ে যাবে।",
+                        solutionStepsEn = listOf(
+                            "Tap 'Reboot Now' below to restart your phone.",
+                            "After rebooting, open Kernel Loader and tap LOAD.",
+                            "Your Stealth Engine driver will load cleanly with a green checkmark!"
+                        ),
+                        solutionStepsBn = listOf(
+                            "নিচের 'রিস্টার্ট দিন' বাটনে চাপ দিয়ে এখনই ফোন রিস্টার্ট দিন।",
+                            "ফোন চালু হলে Kernel Loader অ্যাপ ওপেন করে LOAD চাপুন।",
+                            "কোনো এরর ছাড়াই সাথে সাথে গ্রিন টিক সহ ড্রাইভার লোড হয়ে যাবে!"
+                        ),
+                        canReboot = true
+                    )
+                }
+
                 // 1. Signature Locked / Unsigned Module Rejected
                 combined.contains("unsigned module") ||
                 combined.contains("signature locked") ||

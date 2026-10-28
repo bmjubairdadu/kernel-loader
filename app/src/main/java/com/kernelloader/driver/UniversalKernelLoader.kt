@@ -209,16 +209,27 @@ object UniversalKernelLoader {
             val isSignatureLocked = errLower.contains("required key not available") ||
                     errLower.contains("key rejected") ||
                     errLower.contains("key was rejected") ||
+                    errLower.contains("operation not permitted") ||
                     errLower.contains("module verification failed") ||
                     dmesgLower.contains("module verification failed") ||
+                    dmesgLower.contains("unsigned module is rejected") ||
+                    dmesgLower.contains("loading of unsigned module") ||
                     dmesgLower.contains("required key not available") ||
                     dmesgLower.contains("key rejected") ||
                     dmesgLower.contains("key was rejected")
 
             if (isSignatureLocked) {
-                vm.tlog("[SIGNATURE LOCKED] Kernel enforces strict CONFIG_MODULE_SIG_FORCE=y.", "ERR")
-                vm.tlog("[GUIDANCE] Flash 'KernelLoader-Engine.zip' in APatch/Magisk Modules tab and reboot.", "WARN")
-                finish(vm, false, "Signature Locked: Flash KernelLoader-Engine module in APatch/Magisk")
+                vm.tlog("[AUTO-FIX] Detected Kernel Signature Lock (CONFIG_MODULE_SIG_FORCE)", "WARN")
+                vm.tlog("[AUTO-FIX] Unlocking kernel signature check in boot partition...", "CMD")
+                val unlocked = autoUnlockSignatureStandalone()
+                if (unlocked) {
+                    vm.tlog("[AUTO-FIX] ✅ Kernel signature check successfully unlocked in boot partition!", "OK")
+                    vm.tlog("[REBOOT REQUIRED] Please restart your phone to apply the unlock.", "WARN")
+                    finish(vm, false, "Signature Unlocked: Please restart phone once to apply")
+                } else {
+                    vm.tlog("[SIGNATURE LOCKED] Kernel enforces strict CONFIG_MODULE_SIG_FORCE=y.", "ERR")
+                    finish(vm, false, "Signature Locked: Kernel enforces CONFIG_MODULE_SIG_FORCE")
+                }
                 return
             }
 
@@ -648,5 +659,116 @@ object UniversalKernelLoader {
             return i
         }
         return null
+    }
+
+    private fun autoUnlockSignatureStandalone(): Boolean {
+        return try {
+            val d = "$"
+            val script = """
+                slot=${d}(getprop ro.boot.slot_suffix 2>/dev/null)
+                [ -z "${d}slot" ] && slot=${d}(grep -o 'androidboot.slot_suffix=[^ ]*' /proc/cmdline 2>/dev/null | cut -d= -f2)
+                if [ -z "${d}slot" ]; then
+                  s=${d}(getprop ro.boot.slot 2>/dev/null)
+                  [ -n "${d}s" ] && slot="_${d}s"
+                fi
+
+                BOOT_DEV=""
+                for p in /dev/block/by-name/boot${d}slot \
+                         /dev/block/bootdevice/by-name/boot${d}slot \
+                         /dev/block/platform/*/by-name/boot${d}slot \
+                         /dev/block/platform/*/*/by-name/boot${d}slot \
+                         /dev/block/by-name/boot \
+                         /dev/block/bootdevice/by-name/boot; do
+                  if [ -b "${d}p" ]; then
+                    BOOT_DEV="${d}p"
+                    break
+                  fi
+                done
+
+                if [ -z "${d}BOOT_DEV" ]; then
+                  echo "BOOT_DEV_NOT_FOUND"
+                  exit 1
+                fi
+
+                MB=""
+                for b in /data/local/tmp/magiskboot \
+                         /data/adb/ap/bin/magiskboot \
+                         /data/adb/magisk/magiskboot \
+                         /data/adb/ksu/bin/magiskboot \
+                         /system/bin/magiskboot; do
+                  if [ -x "${d}b" ]; then
+                    MB="${d}b"
+                    break
+                  fi
+                done
+
+                if [ -z "${d}MB" ]; then
+                  echo "MAGISKBOOT_NOT_FOUND"
+                  exit 2
+                fi
+
+                WORK="/data/local/tmp/kl_sig_unlock"
+                rm -rf "${d}WORK"
+                mkdir -p "${d}WORK"
+                cd "${d}WORK" || exit 3
+
+                dd if="${d}BOOT_DEV" of="${d}WORK/boot.img" bs=4096 2>/dev/null
+                if [ ! -s "${d}WORK/boot.img" ]; then
+                  echo "DUMP_FAILED"
+                  rm -rf "${d}WORK"
+                  exit 4
+                fi
+
+                "${d}MB" unpack "${d}WORK/boot.img" >/dev/null 2>&1
+                if [ ! -f "${d}WORK/kernel" ]; then
+                  echo "UNPACK_FAILED"
+                  rm -rf "${d}WORK"
+                  exit 5
+                fi
+
+                PATCHED=0
+                P="00008052c0035fd61f2003d5"
+
+                # 1. OnePlus CPH2381 (5.4.254)
+                "${d}MB" hexpatch "${d}WORK/kernel" 4841019000c14339c0035fd6 ${d}P >/dev/null 2>&1 && PATCHED=1
+                # 2. Realme RMX3511 (5.4.210)
+                "${d}MB" hexpatch "${d}WORK/kernel" e8d000b000614239c0035fd6 ${d}P >/dev/null 2>&1 && PATCHED=1
+                # 3. Infinix X6525 (5.4.210)
+                "${d}MB" hexpatch "${d}WORK/kernel" c80601f000415039c0035fd6 ${d}P >/dev/null 2>&1 && PATCHED=1
+                # 4. OnePlus IN2021 (4.19.157)
+                "${d}MB" hexpatch "${d}WORK/kernel" 2835019000816c39c0035fd6 ${d}P >/dev/null 2>&1 && PATCHED=1
+                # 5. Realme RMX3195 (4.19.191)
+                "${d}MB" hexpatch "${d}WORK/kernel" a8f6009000817439c0035fd6 ${d}P >/dev/null 2>&1 && PATCHED=1
+                # 6. Samsung SM-A235F (4.19.157)
+                "${d}MB" hexpatch "${d}WORK/kernel" c839019000c15739c0035fd6 ${d}P >/dev/null 2>&1 && PATCHED=1
+                # 7. Xiaomi M2010J19CG (4.19.157)
+                "${d}MB" hexpatch "${d}WORK/kernel" c8f000d000614739c0035fd6 ${d}P >/dev/null 2>&1 && PATCHED=1
+
+                if [ ${d}PATCHED -eq 0 ]; then
+                  echo "PATTERN_NOT_FOUND"
+                  rm -rf "${d}WORK"
+                  exit 6
+                fi
+
+                "${d}MB" repack "${d}WORK/boot.img" >/dev/null 2>&1
+                if [ ! -f "${d}WORK/new-boot.img" ] || [ ! -s "${d}WORK/new-boot.img" ]; then
+                  echo "REPACK_FAILED"
+                  rm -rf "${d}WORK"
+                  exit 7
+                fi
+
+                dd if="${d}WORK/new-boot.img" of="${d}BOOT_DEV" bs=4096 2>/dev/null
+                rm -rf "${d}WORK"
+                mkdir -p /data/adb/kernel_loader 2>/dev/null
+                echo "sig_unlocked=true" > /data/adb/kernel_loader/status.prop 2>/dev/null
+                echo "PATCH_SUCCESS"
+            """.trimIndent()
+
+            val res = Shell.cmd(script).exec()
+            val out = (res.out + res.err).joinToString("\n").trim()
+            out.contains("PATCH_SUCCESS")
+        } catch (_: Exception) {
+            false
+        }
     }
 }

@@ -278,23 +278,46 @@ fun DriverErrorDialog(
                         )
                     }
 
-                    // Confirm / Dismiss Button
-                    Button(
-                        onClick = onDismiss,
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(44.dp),
-                        shape = RoundedCornerShape(14.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = FamilyRt,
-                            contentColor = Color.White
-                        )
-                    ) {
-                        Text(
-                            text = if (isBengali) "ঠিক আছে" else "Got It",
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold
-                        )
+                    // Confirm / Dismiss or Reboot Button
+                    if (info.canReboot) {
+                        Button(
+                            onClick = {
+                                onDismiss()
+                                com.topjohnwu.superuser.Shell.cmd("svc power reboot || reboot").exec()
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(44.dp),
+                            shape = RoundedCornerShape(14.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = AccentRed,
+                                contentColor = Color.White
+                            )
+                        ) {
+                            Text(
+                                text = if (isBengali) "🔄 রিস্টার্ট দিন" else "🔄 Reboot Now",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    } else {
+                        Button(
+                            onClick = onDismiss,
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(44.dp),
+                            shape = RoundedCornerShape(14.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = FamilyRt,
+                                contentColor = Color.White
+                            )
+                        ) {
+                            Text(
+                                text = if (isBengali) "ঠিক আছে" else "Got It",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
                 }
             }
