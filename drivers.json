@@ -354,6 +354,17 @@
       "buildDate": "2026-10-28T12:04:33Z",
       "source": "Realme_RMX5070_4.19.157",
       "verified": true
+    },
+    {
+      "version": "5.4.254-qgki-gb7cf43a24af5 SMP preempt mod_unload modversions aarch64",
+      "file": "5.4.254-OnePlus-CPH2381.ko",
+      "variant": "rt",
+      "label": "5.4.254-OnePlus-CPH2381",
+      "sha256": "389cd0102e025da7a2514a86b7bf44bf5e9f69b4faf3eccbecab2ee6d54bf6d7",
+      "size": 394800,
+      "buildDate": "2026-10-28T08:21:55Z",
+      "source": "OnePlus_CPH2381_5.4.254",
+      "verified": true
     }
   ]
 }
