@@ -1481,6 +1481,8 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                 "${d}MB" hexpatch "${d}WORK/kernel" c839019000c15739c0035fd6 ${d}P >/dev/null 2>&1 && PATCHED=1
                 # 7. Xiaomi M2010J19CG (4.19.157)
                 "${d}MB" hexpatch "${d}WORK/kernel" c8f000d000614739c0035fd6 ${d}P >/dev/null 2>&1 && PATCHED=1
+                # 8. Realme RMX5070 (4.14.357)
+                "${d}MB" hexpatch "${d}WORK/kernel" 0828019000214c39c0035fd6 ${d}P >/dev/null 2>&1 && PATCHED=1
 
                 if [ ${d}PATCHED -eq 0 ]; then
                   echo "PATTERN_NOT_FOUND"
