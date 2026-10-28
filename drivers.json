@@ -420,6 +420,28 @@
       "buildDate": "2026-10-28T09:12:55Z",
       "source": "Samsung_SC-03L_4.14.190",
       "verified": true
+    },
+    {
+      "version": "5.4.210-android12-9-667269-g856cdf2f247e-ab665 SMP preempt mod_unload modversions aarch64",
+      "file": "5.4.210-Infinix-X6525.ko",
+      "variant": "rt",
+      "label": "5.4.210-Infinix-X6525",
+      "sha256": "8164a7b72c1a763e4ef025c944f95d9b48f073ea1362bc4a43f6530097277dcd",
+      "size": 407208,
+      "buildDate": "2026-10-28T09:22:23Z",
+      "source": "Infinix_X6525_5.4.210",
+      "verified": true
+    },
+    {
+      "version": "6.6.30-android15-8-g6b55ce738535-4k SMP preempt mod_unload modversions aarch64",
+      "file": "6.6.30-Xiaomi-2310FPCA4I.ko",
+      "variant": "rt",
+      "label": "6.6.30-Xiaomi-2310FPCA4I",
+      "sha256": "6b686de5d6be6330d2fdd5925bc1d204c15379f05bcee6d04a7add0f17cd33f9",
+      "size": 559008,
+      "buildDate": "2026-10-28T09:22:23Z",
+      "source": "Xiaomi_2310FPCA4I_6.6.30",
+      "verified": true
     }
   ]
 }
