@@ -316,9 +316,9 @@
       "file": "4.14.357-Realme-RMX5070.ko",
       "variant": "rt",
       "label": "4.14.357-Realme-RMX5070",
-      "sha256": "4e59875c22e7231b7e03351e30c5dd594921431a92805d68e7b52be2e79c2aab",
-      "size": 197120,
-      "buildDate": "2026-10-27T15:41:15Z",
+      "sha256": "2afc1b36a332d30c02c610b0591f5651e3e440b432b5b43301e630c8511eccc7",
+      "size": 195040,
+      "buildDate": "2026-10-28T12:47:00Z",
       "source": "realme_rmx5070_4.14",
       "verified": true
     },
