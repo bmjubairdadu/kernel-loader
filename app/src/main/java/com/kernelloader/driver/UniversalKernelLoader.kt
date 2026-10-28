@@ -130,6 +130,21 @@ object UniversalKernelLoader {
 
         var res = loadViaFramework(TMP_KO, devNode, vm) ?: Shell.cmd("false").exec()
 
+        // 1. Check for Kernel Loader Engine Module Bridge
+        if (!res.isSuccess) {
+            val hasEngine = Shell.cmd("test -f /data/adb/kernel_loader/load_driver.sh || test -x /data/adb/kernel_loader/load_driver.sh").exec().isSuccess
+            if (hasEngine) {
+                vm.tlog("[ENGINE] Kernel Loader Engine Module Connected", "OK")
+                vm.tlog("[ENGINE] Inserting module via Engine Bridge...", "CMD")
+                res = Shell.cmd("sh /data/adb/kernel_loader/load_driver.sh \"$TMP_KO\" \"$devNode\"").exec()
+                if (res.isSuccess) {
+                    vm.tlog("[ENGINE] Driver successfully loaded via Engine Bridge!", "OK")
+                } else {
+                    vm.tlog("[ENGINE] Engine Bridge fallback needed...", "WARN")
+                }
+            }
+        }
+
         if (!res.isSuccess) {
             vm.tlog("Inserting module...", "CMD")
             val insmodCmd = listOf(
@@ -205,8 +220,8 @@ object UniversalKernelLoader {
 
             if (isSignatureLocked) {
                 vm.tlog("[SIGNATURE LOCKED] Kernel enforces strict CONFIG_MODULE_SIG_FORCE=y.", "ERR")
-                vm.tlog("[GUIDANCE] Enable BypassSig KPM (or flash SigBypass zip) to bypass kernel signature locks.", "WARN")
-                finish(vm, false, "Signature Locked: Kernel enforces CONFIG_MODULE_SIG_FORCE")
+                vm.tlog("[GUIDANCE] Flash 'KernelLoader-Engine.zip' in APatch/Magisk Modules tab and reboot.", "WARN")
+                finish(vm, false, "Signature Locked: Flash KernelLoader-Engine module in APatch/Magisk")
                 return
             }
 

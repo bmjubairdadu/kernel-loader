@@ -41,14 +41,16 @@ data class DriverErrorInfo(
                         descriptionEn = "Your device's kernel enforces strict module signature verification (CONFIG_MODULE_SIG_FORCE=y) and rejects unsigned drivers.",
                         descriptionBn = "আপনার ডিভাইসের কার্নেলে কঠোর সিগনেচার যাচাইকরণ (CONFIG_MODULE_SIG_FORCE) সক্রিয় থাকায় আনসাইন্ড ড্রাইভার রিজেক্ট করা হচ্ছে।",
                         solutionStepsEn = listOf(
-                            "If using APatch / FolkPatch / KernelPatch: Open APatch app ➔ Go to KPM tab ➔ Enable the 'BypassSig' module.",
-                            "If using Magisk / KernelSU / Recovery: Flash 'Universal_Kernel_Sig_Bypass.zip' via Recovery (TWRP/OrangeFox) or Root Modules.",
-                            "Reboot your phone once, open Kernel Loader, and tap LOAD again."
+                            "Open APatch, FolkPatch, or Magisk app on your phone.",
+                            "Go to 'Modules' tab (NOT KPM tab) ➔ Tap 'Install a module' (or 'Install from storage').",
+                            "Select and flash 'KernelLoader-Engine.zip' (or 'Universal_Kernel_Sig_Bypass.zip').",
+                            "Reboot your phone once, open Kernel Loader, and tap LOAD — it will connect via Engine Bridge and load instantly!"
                         ),
                         solutionStepsBn = listOf(
-                            "APatch / FolkPatch / KernelPatch ব্যবহারকারী হলে: APatch অ্যাপ ওপেন করুন ➔ KPM ট্যাবে যান ➔ 'BypassSig' KPM মডিউলটি অন (Enable) করুন।",
-                            "Magisk / KernelSU বা রিকভারি ব্যবহারকারী হলে: 'Universal_Kernel_Sig_Bypass.zip' ফাইলটি TWRP/OrangeFox অথবা রুট মডিউল থেকে ফ্ল্যাশ করুন।",
-                            "এরপর ফোনটি একবার রিস্টার্ট দিন এবং Kernel Loader অ্যাপে পুনরায় LOAD বাটনে ট্যাপ করুন।"
+                            "আপনার ফোনে APatch, FolkPatch বা Magisk অ্যাপ ওপেন করুন।",
+                            "KPM ট্যাবে নয়, সোজা 'Modules' (মডিউল) ট্যাবে যান ➔ 'Install a module' (বা Install from storage) চাপুন।",
+                            "'KernelLoader-Engine.zip' ফাইলটি সিলেক্ট করে ফ্ল্যাশ করুন।",
+                            "ফ্ল্যাশ শেষে ফোন একবার Reboot (রিস্টার্ট) দিন। এরপর Kernel Loader অ্যাপ ওপেন করলেই Engine Bridge কানেক্ট হয়ে সাথে সাথে ড্রাইভার লোড হয়ে যাবে!"
                         )
                     )
                 }
