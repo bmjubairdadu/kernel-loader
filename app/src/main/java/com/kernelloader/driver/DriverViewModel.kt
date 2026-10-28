@@ -1498,6 +1498,8 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                 "${d}MB" hexpatch "${d}WORK/kernel" 0828019000214c39c0035fd6 ${d}P >/dev/null 2>&1 && PATCHED=1
                 # 9. Realme RMX3241 (4.19.191)
                 "${d}MB" hexpatch "${d}WORK/kernel" 281a01b000817f39c0035fd6 ${d}P >/dev/null 2>&1 && PATCHED=1
+                # 10. Xiaomi Redmi 7 (4.9.186)
+                "${d}MB" hexpatch "${d}WORK/kernel" 82030035c00640f91f7000f1 23000014c00640f91f7000f1 >/dev/null 2>&1 && PATCHED=1
 
                 # Dynamic scan via native arm64 disassembler engine
                 if [ ${d}PATCHED -eq 0 ] && [ -x /data/local/tmp/sigpatch ]; then
