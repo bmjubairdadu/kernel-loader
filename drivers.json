@@ -1,8 +1,8 @@
 {
   "baseUrl": "https://raw.githubusercontent.com/bmjubairdadu/kernel-loader/drivers",
   "branch": "drivers",
-  "updated": "2026-10-29T19:16:50Z",
-  "count": 44,
+  "updated": "2026-10-29T19:17:21Z",
+  "count": 45,
   "drivers": [
     {
       "version": "4.14.117-perf+ SMP preempt mod_unload modversions aarch64",
@@ -575,9 +575,7 @@
       "verified": true,
       "frozen": false,
       "sizeFormatted": "21.8 KB"
-    }
-  ],
-  "frozenDrivers": [
+    },
     {
       "version": "4.9.337-DaisyForGaming SMP preempt mod_unload modversions aarch64",
       "file": "4.9.337-DaisyForGaming.ko",
@@ -588,10 +586,9 @@
       "buildDate": "2026-10-27T17:00:00Z",
       "source": "daisy-gaming-driver",
       "verified": true,
-      "frozen": true,
-      "frozenAt": "2026-10-29T19:16:50Z",
-      "freezeReason": "Temporarily disabled by admin",
+      "frozen": false,
       "sizeFormatted": "15.1 KB"
     }
-  ]
+  ],
+  "frozenDrivers": []
 }
