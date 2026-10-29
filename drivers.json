@@ -1,7 +1,8 @@
 {
   "baseUrl": "https://raw.githubusercontent.com/bmjubairdadu/kernel-loader/drivers",
   "branch": "drivers",
-  "count": 45,
+  "updated": "2026-10-29T19:16:50Z",
+  "count": 44,
   "drivers": [
     {
       "version": "4.14.117-perf+ SMP preempt mod_unload modversions aarch64",
@@ -12,7 +13,9 @@
       "size": 169704,
       "buildDate": "2026-10-26T12:57:28Z",
       "source": "v3_drivers/RT/4.14.117.sh",
-      "verified": true
+      "verified": true,
+      "frozen": false,
+      "sizeFormatted": "165.7 KB"
     },
     {
       "version": "4.14.141-g4e3bb1fab-dirty SMP preempt mod_unload modversions aarch64",
@@ -23,7 +26,9 @@
       "size": 561254,
       "buildDate": "2026-10-26T12:57:28Z",
       "source": "v3_drivers/RT/4.14.141.sh",
-      "verified": true
+      "verified": true,
+      "frozen": false,
+      "sizeFormatted": "548.1 KB"
     },
     {
       "version": "4.14.180-perf-g758bb7ef5-dirty SMP preempt mod_unload modversions aarch64",
@@ -34,7 +39,9 @@
       "size": 170984,
       "buildDate": "2026-10-26T12:57:28Z",
       "source": "v3_drivers/RT/4.14.180+190.sh",
-      "verified": true
+      "verified": true,
+      "frozen": false,
+      "sizeFormatted": "167.0 KB"
     },
     {
       "version": "4.14.186-g49c02c2de-dirty SMP preempt mod_unload modversions aarch64",
@@ -45,7 +52,9 @@
       "size": 169392,
       "buildDate": "2026-10-26T12:57:28Z",
       "source": "v3_drivers/RT/4.14.186.sh",
-      "verified": true
+      "verified": true,
+      "frozen": false,
+      "sizeFormatted": "165.4 KB"
     },
     {
       "version": "4.14.186-perf-g30fa96c92-dirty SMP preempt mod_unload modversions aarch64",
@@ -56,7 +65,9 @@
       "size": 566460,
       "buildDate": "2026-10-26T12:57:28Z",
       "source": "v3_drivers/RT/4.14.186b.sh",
-      "verified": true
+      "verified": true,
+      "frozen": false,
+      "sizeFormatted": "553.2 KB"
     },
     {
       "version": "4.14.186-perf-g9be022c0d-dirty SMP preempt mod_unload modversions aarch64",
@@ -67,7 +78,9 @@
       "size": 194128,
       "buildDate": "2026-10-26T12:57:28Z",
       "source": "v3_drivers/RT/4.14.186c.sh",
-      "verified": true
+      "verified": true,
+      "frozen": false,
+      "sizeFormatted": "189.6 KB"
     },
     {
       "version": "4.14.190-perf-g17171cc0d-dirty SMP preempt mod_unload modversions aarch64",
@@ -78,7 +91,9 @@
       "size": 573882,
       "buildDate": "2026-10-26T12:57:28Z",
       "source": "v3_drivers/RT/4.14.X(190).sh",
-      "verified": true
+      "verified": true,
+      "frozen": false,
+      "sizeFormatted": "560.4 KB"
     },
     {
       "version": "4.19.113-perf-g2fdca3872-dirty SMP preempt mod_unload modversions aarch64",
@@ -89,7 +104,9 @@
       "size": 179520,
       "buildDate": "2026-10-26T12:57:28Z",
       "source": "v3_drivers/RT/4.19.113.sh",
-      "verified": true
+      "verified": true,
+      "frozen": false,
+      "sizeFormatted": "175.3 KB"
     },
     {
       "version": "4.19.157-perf-g9aba441cf6cd-dirty SMP preempt mod_unload modversions aarch64",
@@ -100,7 +117,9 @@
       "size": 183408,
       "buildDate": "2026-10-26T12:57:28Z",
       "source": "v3_drivers/RT/4.19.157.sh",
-      "verified": true
+      "verified": true,
+      "frozen": false,
+      "sizeFormatted": "179.1 KB"
     },
     {
       "version": "4.19.191-perf-g42825e29c289-dirty SMP preempt mod_unload modversions aarch64",
@@ -111,7 +130,9 @@
       "size": 197032,
       "buildDate": "2026-10-26T12:57:28Z",
       "source": "v3_drivers/RT/4.19.191-ColorOS.sh",
-      "verified": true
+      "verified": true,
+      "frozen": false,
+      "sizeFormatted": "192.4 KB"
     },
     {
       "version": "4.19.191-g914ba8403bb3-dirty SMP preempt mod_unload modversions aarch64",
@@ -122,7 +143,9 @@
       "size": 187096,
       "buildDate": "2026-10-26T12:57:28Z",
       "source": "v3_drivers/RT/4.19.191-note12pro.sh",
-      "verified": true
+      "verified": true,
+      "frozen": false,
+      "sizeFormatted": "182.7 KB"
     },
     {
       "version": "4.19.191-perf-g42825e29c289-dirty SMP preempt mod_unload modversions aarch64",
@@ -133,7 +156,9 @@
       "size": 710659,
       "buildDate": "2026-10-26T12:57:28Z",
       "source": "v3_drivers/RT/4.19.191.sh",
-      "verified": true
+      "verified": true,
+      "frozen": false,
+      "sizeFormatted": "694.0 KB"
     },
     {
       "version": "4.19.191-g914ba8403bb3-dirty SMP preempt mod_unload modversions aarch64",
@@ -144,7 +169,9 @@
       "size": 720980,
       "buildDate": "2026-10-26T12:57:28Z",
       "source": "v3_drivers/RT/4.19.191c.sh",
-      "verified": true
+      "verified": true,
+      "frozen": false,
+      "sizeFormatted": "704.1 KB"
     },
     {
       "version": "4.19.81-perf-g236f9eb09-dirty SMP preempt mod_unload modversions aarch64",
@@ -155,7 +182,9 @@
       "size": 175328,
       "buildDate": "2026-10-26T12:57:28Z",
       "source": "v3_drivers/RT/4.19.81.sh",
-      "verified": true
+      "verified": true,
+      "frozen": false,
+      "sizeFormatted": "171.2 KB"
     },
     {
       "version": "4.9.186-perf-gdcfb1676-dirty SMP preempt mod_unload modversions aarch64",
@@ -166,7 +195,9 @@
       "size": 207576,
       "buildDate": "2026-10-26T12:57:28Z",
       "source": "v3_drivers/RT/4.9.186.sh",
-      "verified": true
+      "verified": true,
+      "frozen": false,
+      "sizeFormatted": "202.7 KB"
     },
     {
       "version": "5.10.198-00001-gcab9fa53e761-dirty SMP preempt mod_unload modversions aarch64",
@@ -177,7 +208,9 @@
       "size": 389896,
       "buildDate": "2026-10-26T12:57:28Z",
       "source": "v3_drivers/RT/5.10.sh",
-      "verified": true
+      "verified": true,
+      "frozen": false,
+      "sizeFormatted": "380.8 KB"
     },
     {
       "version": "5.15.167-00023-g952e16e5fc48-dirty SMP preempt mod_unload modversions aarch64",
@@ -188,7 +221,9 @@
       "size": 397304,
       "buildDate": "2026-10-26T12:57:28Z",
       "source": "v3_drivers/RT/5.15.sh",
-      "verified": true
+      "verified": true,
+      "frozen": false,
+      "sizeFormatted": "388.0 KB"
     },
     {
       "version": "5.4.61-qgki-ga9244def8-dirty SMP preempt mod_unload modversions aarch64",
@@ -199,7 +234,9 @@
       "size": 920001,
       "buildDate": "2026-10-26T12:57:28Z",
       "source": "v3_drivers/RT/5.4.sh",
-      "verified": true
+      "verified": true,
+      "frozen": false,
+      "sizeFormatted": "898.4 KB"
     },
     {
       "version": "5.4.191-g7aac66291bd5-dirty SMP preempt mod_unload modversions aarch64",
@@ -210,7 +247,9 @@
       "size": 910606,
       "buildDate": "2026-10-26T12:57:28Z",
       "source": "v3_drivers/RT/5.4b.sh",
-      "verified": true
+      "verified": true,
+      "frozen": false,
+      "sizeFormatted": "889.3 KB"
     },
     {
       "version": "5.4.191-qgki-g7aac66291bd5-dirty SMP preempt mod_unload modversions aarch64",
@@ -221,7 +260,9 @@
       "size": 919556,
       "buildDate": "2026-10-26T12:57:28Z",
       "source": "v3_drivers/RT/5.4c.sh",
-      "verified": true
+      "verified": true,
+      "frozen": false,
+      "sizeFormatted": "898.0 KB"
     },
     {
       "version": "5.4.191-g7aac66291bd5-dirty SMP preempt mod_unload modversions aarch64",
@@ -232,7 +273,9 @@
       "size": 301216,
       "buildDate": "2026-10-26T12:57:28Z",
       "source": "v3_drivers/RT/5.4oppo.sh",
-      "verified": true
+      "verified": true,
+      "frozen": false,
+      "sizeFormatted": "294.2 KB"
     },
     {
       "version": "6.1.112-00034-g226e9f92a06c-dirty SMP preempt mod_unload modversions aarch64",
@@ -243,7 +286,9 @@
       "size": 391736,
       "buildDate": "2026-10-26T12:57:28Z",
       "source": "v3_drivers/RT/6.1.sh",
-      "verified": true
+      "verified": true,
+      "frozen": false,
+      "sizeFormatted": "382.6 KB"
     },
     {
       "version": "6.12.23-android16-5-maybe-dirty-4k SMP preempt mod_unload modversions aarch64",
@@ -254,7 +299,9 @@
       "size": 943994,
       "buildDate": "2026-10-26T12:57:28Z",
       "source": "v3_drivers/RT/6.12.X.sh",
-      "verified": true
+      "verified": true,
+      "frozen": false,
+      "sizeFormatted": "921.9 KB"
     },
     {
       "version": "6.12.23-android16-5-maybe-dirty-4k SMP preempt mod_unload modversions aarch64",
@@ -265,7 +312,9 @@
       "size": 950218,
       "buildDate": "2026-10-26T12:57:28Z",
       "source": "v3_drivers/RT/6.12.sh",
-      "verified": true
+      "verified": true,
+      "frozen": false,
+      "sizeFormatted": "927.9 KB"
     },
     {
       "version": "6.6.57-4k-gd66e9166bfa1-dirty SMP preempt mod_unload modversions aarch64",
@@ -276,7 +325,9 @@
       "size": 904555,
       "buildDate": "2026-10-26T12:57:28Z",
       "source": "v3_drivers/RT/6.6.X.sh",
-      "verified": true
+      "verified": true,
+      "frozen": false,
+      "sizeFormatted": "883.4 KB"
     },
     {
       "version": "6.6.57-4k-gd66e9166bfa1-dirty SMP preempt mod_unload modversions aarch64",
@@ -287,18 +338,9 @@
       "size": 327560,
       "buildDate": "2026-10-26T12:57:28Z",
       "source": "v3_drivers/RT/6.6.sh",
-      "verified": true
-    },
-    {
-      "version": "4.9.337-DaisyForGaming SMP preempt mod_unload modversions aarch64",
-      "file": "4.9.337-DaisyForGaming.ko",
-      "variant": "rt",
-      "label": "4.9.337-DaisyForGaming",
-      "sha256": "b4aeb991d19b2b604b69793ab39b887e17d418ea2d2226933376799b6a109b1f",
-      "size": 15496,
-      "buildDate": "2026-10-27T17:00:00Z",
-      "source": "daisy-gaming-driver",
-      "verified": true
+      "verified": true,
+      "frozen": false,
+      "sizeFormatted": "319.9 KB"
     },
     {
       "version": "4.19.191+ SMP preempt mod_unload modversions aarch64",
@@ -309,7 +351,9 @@
       "size": 254216,
       "buildDate": "2026-10-27T15:41:15Z",
       "source": "realme_c25s_rmx3195-4.19",
-      "verified": true
+      "verified": true,
+      "frozen": false,
+      "sizeFormatted": "248.3 KB"
     },
     {
       "version": "4.14.357-openela-perf-g673b80046ab9 SMP preempt mod_unload modversions aarch64",
@@ -320,7 +364,9 @@
       "size": 217976,
       "buildDate": "2026-10-29T12:51:03Z",
       "source": "realme_rmx5070_4.14",
-      "verified": true
+      "verified": true,
+      "frozen": false,
+      "sizeFormatted": "212.9 KB"
     },
     {
       "version": "4.9.309-Chidori-Kernel SMP preempt mod_unload modversions aarch64",
@@ -331,7 +377,9 @@
       "size": 198376,
       "buildDate": "2026-10-27T15:41:15Z",
       "source": "CraftRom/Chidori-Kernel_onclite",
-      "verified": true
+      "verified": true,
+      "frozen": false,
+      "sizeFormatted": "193.7 KB"
     },
     {
       "version": "4.19.157-perf+ SMP preempt mod_unload modversions aarch64",
@@ -342,7 +390,9 @@
       "size": 260752,
       "buildDate": "2026-10-27T16:50:00Z",
       "source": "OnePlusOSS/android_kernel_oneplus_sm8250",
-      "verified": true
+      "verified": true,
+      "frozen": false,
+      "sizeFormatted": "254.6 KB"
     },
     {
       "version": "4.19.157-perf-g1a6087bc0325-dirty SMP preempt mod_unload modversions aarch64",
@@ -353,7 +403,9 @@
       "size": 223624,
       "buildDate": "2026-10-29T07:41:08Z",
       "source": "Xiaomi_M2010J19SI_4.19.157",
-      "verified": true
+      "verified": true,
+      "frozen": false,
+      "sizeFormatted": "218.4 KB"
     },
     {
       "version": "4.19.157-perf-g1a6087bc0325-dirty SMP preempt mod_unload modversions aarch64",
@@ -364,7 +416,9 @@
       "size": 260736,
       "buildDate": "2026-10-28T12:04:33Z",
       "source": "Realme_RMX5070_4.19.157",
-      "verified": true
+      "verified": true,
+      "frozen": false,
+      "sizeFormatted": "254.6 KB"
     },
     {
       "version": "5.4.254-qgki-gb7cf43a24af5 SMP preempt mod_unload modversions aarch64",
@@ -375,7 +429,9 @@
       "size": 388504,
       "buildDate": "2026-10-28T08:41:22Z",
       "source": "OnePlus_CPH2381_5.4.254",
-      "verified": true
+      "verified": true,
+      "frozen": false,
+      "sizeFormatted": "379.4 KB"
     },
     {
       "version": "4.19.127-g060a87d7c41a-dirty SMP preempt mod_unload modversions aarch64",
@@ -386,7 +442,9 @@
       "size": 224224,
       "buildDate": "2026-10-28T13:47:27Z",
       "source": "Infinix_X688B_4.19.127",
-      "verified": true
+      "verified": true,
+      "frozen": false,
+      "sizeFormatted": "219.0 KB"
     },
     {
       "version": "4.19.157-perf-27940246-abA235FXXS4DXA5 SMP preempt mod_unload modversions aarch64",
@@ -397,7 +455,9 @@
       "size": 288064,
       "buildDate": "2026-10-28T09:12:55Z",
       "source": "Samsung_SM_A235F_4.19.157",
-      "verified": true
+      "verified": true,
+      "frozen": false,
+      "sizeFormatted": "281.3 KB"
     },
     {
       "version": "5.4.210-android12-9-g6b8e8e96f0d6-ab395 SMP preempt mod_unload modversions aarch64",
@@ -408,7 +468,9 @@
       "size": 407160,
       "buildDate": "2026-10-28T09:12:55Z",
       "source": "Realme_RMX3511_5.4.210",
-      "verified": true
+      "verified": true,
+      "frozen": false,
+      "sizeFormatted": "397.6 KB"
     },
     {
       "version": "4.14.186+ SMP preempt mod_unload modversions aarch64",
@@ -419,7 +481,9 @@
       "size": 276544,
       "buildDate": "2026-10-28T09:12:55Z",
       "source": "OPPO_CPH2001_4.14.186",
-      "verified": true
+      "verified": true,
+      "frozen": false,
+      "sizeFormatted": "270.1 KB"
     },
     {
       "version": "4.14.190-26004139-abSC03LOMU1DWC1 SMP preempt mod_unload modversions aarch64",
@@ -430,7 +494,9 @@
       "size": 279408,
       "buildDate": "2026-10-28T09:12:55Z",
       "source": "Samsung_SC-03L_4.14.190",
-      "verified": true
+      "verified": true,
+      "frozen": false,
+      "sizeFormatted": "272.9 KB"
     },
     {
       "version": "5.4.210-android12-9-667269-g856cdf2f247e-ab665 SMP preempt mod_unload modversions aarch64",
@@ -441,7 +507,9 @@
       "size": 407208,
       "buildDate": "2026-10-28T09:22:23Z",
       "source": "Infinix_X6525_5.4.210",
-      "verified": true
+      "verified": true,
+      "frozen": false,
+      "sizeFormatted": "397.7 KB"
     },
     {
       "version": "6.6.30-android15-8-g6b55ce738535-4k SMP preempt mod_unload modversions aarch64",
@@ -452,7 +520,9 @@
       "size": 559008,
       "buildDate": "2026-10-28T09:22:23Z",
       "source": "Xiaomi_2310FPCA4I_6.6.30",
-      "verified": true
+      "verified": true,
+      "frozen": false,
+      "sizeFormatted": "545.9 KB"
     },
     {
       "version": "4.19.157-perf-g1a6087bc0325-dirty SMP preempt mod_unload modversions aarch64",
@@ -463,7 +533,9 @@
       "size": 260736,
       "buildDate": "2026-10-28T10:18:24Z",
       "source": "Xiaomi_M2010J19CG_4.19.157",
-      "verified": true
+      "verified": true,
+      "frozen": false,
+      "sizeFormatted": "254.6 KB"
     },
     {
       "version": "4.14.113-27176651 SMP preempt mod_unload modversions aarch64",
@@ -474,7 +546,9 @@
       "size": 271824,
       "buildDate": "2026-10-28T13:34:35Z",
       "source": "Samsung_SM-A515F_4.14.113",
-      "verified": true
+      "verified": true,
+      "frozen": false,
+      "sizeFormatted": "265.5 KB"
     },
     {
       "version": "4.19.191+ SMP preempt mod_unload modversions aarch64",
@@ -485,7 +559,9 @@
       "size": 282840,
       "buildDate": "2026-10-28T14:50:00Z",
       "source": "realme_rmx3241_4.19",
-      "verified": true
+      "verified": true,
+      "frozen": false,
+      "sizeFormatted": "276.2 KB"
     },
     {
       "version": "4.9.186-perf-g131f907 SMP preempt mod_unload modversions aarch64",
@@ -496,7 +572,26 @@
       "size": 22304,
       "buildDate": "2026-10-28T15:38:21Z",
       "source": "Xiaomi_Redmi_7_4.9.186",
-      "verified": true
+      "verified": true,
+      "frozen": false,
+      "sizeFormatted": "21.8 KB"
+    }
+  ],
+  "frozenDrivers": [
+    {
+      "version": "4.9.337-DaisyForGaming SMP preempt mod_unload modversions aarch64",
+      "file": "4.9.337-DaisyForGaming.ko",
+      "variant": "rt",
+      "label": "4.9.337-DaisyForGaming",
+      "sha256": "b4aeb991d19b2b604b69793ab39b887e17d418ea2d2226933376799b6a109b1f",
+      "size": 15496,
+      "buildDate": "2026-10-27T17:00:00Z",
+      "source": "daisy-gaming-driver",
+      "verified": true,
+      "frozen": true,
+      "frozenAt": "2026-10-29T19:16:50Z",
+      "freezeReason": "Temporarily disabled by admin",
+      "sizeFormatted": "15.1 KB"
     }
   ]
 }
