@@ -1,7 +1,7 @@
 {
   "baseUrl": "https://raw.githubusercontent.com/bmjubairdadu/kernel-loader/drivers",
   "branch": "drivers",
-  "count": 44,
+  "count": 45,
   "drivers": [
     {
       "version": "4.14.117-perf+ SMP preempt mod_unload modversions aarch64",
@@ -316,9 +316,9 @@
       "file": "4.14.357-Realme-RMX5070.ko",
       "variant": "rt",
       "label": "4.14.357-Realme-RMX5070",
-      "sha256": "ebce18346f34b1f0383535cf1898bfb672f0b717e3364bc45bc94614c85b1c01",
-      "size": 219984,
-      "buildDate": "2026-10-28T14:12:00Z",
+      "sha256": "787d8e035e647becdd06b379162f4cfce886ca5a95732e3f8ee2eb329e1dc3c5",
+      "size": 217976,
+      "buildDate": "2026-10-29T12:51:03Z",
       "source": "realme_rmx5070_4.14",
       "verified": true
     },
@@ -342,6 +342,17 @@
       "size": 260752,
       "buildDate": "2026-10-27T16:50:00Z",
       "source": "OnePlusOSS/android_kernel_oneplus_sm8250",
+      "verified": true
+    },
+    {
+      "version": "4.19.157-perf-g1a6087bc0325-dirty SMP preempt mod_unload modversions aarch64",
+      "file": "4.19.157-Xiaomi-M2010J19SI.ko",
+      "variant": "rt",
+      "label": "4.19.157-Xiaomi-M2010J19SI",
+      "sha256": "657f80748bd4b1fb300f77ac424e7b601c2efc24c0cac4c3efd566a9d878121c",
+      "size": 223624,
+      "buildDate": "2026-10-29T07:41:08Z",
+      "source": "Xiaomi_M2010J19SI_4.19.157",
       "verified": true
     },
     {
