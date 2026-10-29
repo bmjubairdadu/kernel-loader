@@ -1,8 +1,8 @@
 {
   "baseUrl": "https://raw.githubusercontent.com/bmjubairdadu/kernel-loader/drivers",
   "branch": "drivers",
-  "updated": "2026-10-29T19:17:21Z",
-  "count": 45,
+  "updated": "2026-10-29T19:23:26Z",
+  "count": 37,
   "drivers": [
     {
       "version": "4.14.117-perf+ SMP preempt mod_unload modversions aarch64",
@@ -148,32 +148,6 @@
       "sizeFormatted": "182.7 KB"
     },
     {
-      "version": "4.19.191-perf-g42825e29c289-dirty SMP preempt mod_unload modversions aarch64",
-      "file": "uni_4.19.191-perf-g42825e29c289-dirty.ko",
-      "variant": "rt",
-      "label": "4.19.191-perf-g42825e29c289-dirty",
-      "sha256": "32627514c4bc3402d382ffeb5640343f0e5cd63c3d44d2c1ad99e77f4ad1c81c",
-      "size": 710659,
-      "buildDate": "2026-10-26T12:57:28Z",
-      "source": "v3_drivers/RT/4.19.191.sh",
-      "verified": true,
-      "frozen": false,
-      "sizeFormatted": "694.0 KB"
-    },
-    {
-      "version": "4.19.191-g914ba8403bb3-dirty SMP preempt mod_unload modversions aarch64",
-      "file": "uni_4.19.191c-g914ba8403bb3-dirty.ko",
-      "variant": "rt",
-      "label": "4.19.191-g914ba8403bb3-dirty",
-      "sha256": "934ca8a348cb728f484a74aa19dfedbdaeb7c91af5ea5512d86bdc12d203082f",
-      "size": 720980,
-      "buildDate": "2026-10-26T12:57:28Z",
-      "source": "v3_drivers/RT/4.19.191c.sh",
-      "verified": true,
-      "frozen": false,
-      "sizeFormatted": "704.1 KB"
-    },
-    {
       "version": "4.19.81-perf-g236f9eb09-dirty SMP preempt mod_unload modversions aarch64",
       "file": "uni_4.19.81-perf-g236f9eb09-dirty.ko",
       "variant": "rt",
@@ -239,19 +213,6 @@
       "sizeFormatted": "898.4 KB"
     },
     {
-      "version": "5.4.191-g7aac66291bd5-dirty SMP preempt mod_unload modversions aarch64",
-      "file": "uni_5.4.191-g7aac66291bd5-dirty.ko",
-      "variant": "rt",
-      "label": "5.4.191-g7aac66291bd5-dirty",
-      "sha256": "6a1890882707f7160d7b6f2ea10c74f639d86967aefe40cc95c3f28c608c232f",
-      "size": 910606,
-      "buildDate": "2026-10-26T12:57:28Z",
-      "source": "v3_drivers/RT/5.4b.sh",
-      "verified": true,
-      "frozen": false,
-      "sizeFormatted": "889.3 KB"
-    },
-    {
       "version": "5.4.191-qgki-g7aac66291bd5-dirty SMP preempt mod_unload modversions aarch64",
       "file": "uni_5.4.191-qgki-g7aac66291bd5-dirty.ko",
       "variant": "rt",
@@ -304,32 +265,6 @@
       "sizeFormatted": "921.9 KB"
     },
     {
-      "version": "6.12.23-android16-5-maybe-dirty-4k SMP preempt mod_unload modversions aarch64",
-      "file": "uni_6.12.23-android16-4k.ko",
-      "variant": "rt",
-      "label": "6.12.23-android16-5-maybe-dirty-4k",
-      "sha256": "6a71491cf16118365c28bdd6e7e4321d9e35e5c041e0201fd36bdb60c57cdb42",
-      "size": 950218,
-      "buildDate": "2026-10-26T12:57:28Z",
-      "source": "v3_drivers/RT/6.12.sh",
-      "verified": true,
-      "frozen": false,
-      "sizeFormatted": "927.9 KB"
-    },
-    {
-      "version": "6.6.57-4k-gd66e9166bfa1-dirty SMP preempt mod_unload modversions aarch64",
-      "file": "uni_6.6.57-X-4k.ko",
-      "variant": "rt",
-      "label": "6.6.57-4k-gd66e9166bfa1-dirty",
-      "sha256": "449615ec980ee83fc2baf8ff8d24e9498e4377ded99248df870549fd853e60de",
-      "size": 904555,
-      "buildDate": "2026-10-26T12:57:28Z",
-      "source": "v3_drivers/RT/6.6.X.sh",
-      "verified": true,
-      "frozen": false,
-      "sizeFormatted": "883.4 KB"
-    },
-    {
       "version": "6.6.57-4k-gd66e9166bfa1-dirty SMP preempt mod_unload modversions aarch64",
       "file": "uni_6.6.57-4k-gd66e9166bfa1-dirty.ko",
       "variant": "rt",
@@ -341,19 +276,6 @@
       "verified": true,
       "frozen": false,
       "sizeFormatted": "319.9 KB"
-    },
-    {
-      "version": "4.19.191+ SMP preempt mod_unload modversions aarch64",
-      "file": "4.19.191-Realme-RMX3195.ko",
-      "variant": "rt",
-      "label": "4.19.191-Realme-RMX3195",
-      "sha256": "74d7bfab2c56faa7540cf3dd818e1b325f65313cb6597fbc887b0aac60b139c7",
-      "size": 254216,
-      "buildDate": "2026-10-27T15:41:15Z",
-      "source": "realme_c25s_rmx3195-4.19",
-      "verified": true,
-      "frozen": false,
-      "sizeFormatted": "248.3 KB"
     },
     {
       "version": "4.14.357-openela-perf-g673b80046ab9 SMP preempt mod_unload modversions aarch64",
@@ -406,19 +328,6 @@
       "verified": true,
       "frozen": false,
       "sizeFormatted": "218.4 KB"
-    },
-    {
-      "version": "4.19.157-perf-g1a6087bc0325-dirty SMP preempt mod_unload modversions aarch64",
-      "file": "4.19.157-Realme-RMX5070.ko",
-      "variant": "rt",
-      "label": "4.19.157-Realme-RMX5070",
-      "sha256": "c919724d42b29b6b42fd159bad2cc030cef039defe8bbd16ed669f791fcf714d",
-      "size": 260736,
-      "buildDate": "2026-10-28T12:04:33Z",
-      "source": "Realme_RMX5070_4.19.157",
-      "verified": true,
-      "frozen": false,
-      "sizeFormatted": "254.6 KB"
     },
     {
       "version": "5.4.254-qgki-gb7cf43a24af5 SMP preempt mod_unload modversions aarch64",
@@ -523,19 +432,6 @@
       "verified": true,
       "frozen": false,
       "sizeFormatted": "545.9 KB"
-    },
-    {
-      "version": "4.19.157-perf-g1a6087bc0325-dirty SMP preempt mod_unload modversions aarch64",
-      "file": "4.19.157-Xiaomi-M2010J19CG.ko",
-      "variant": "rt",
-      "label": "4.19.157-Xiaomi-M2010J19CG",
-      "sha256": "c919724d42b29b6b42fd159bad2cc030cef039defe8bbd16ed669f791fcf714d",
-      "size": 260736,
-      "buildDate": "2026-10-28T10:18:24Z",
-      "source": "Xiaomi_M2010J19CG_4.19.157",
-      "verified": true,
-      "frozen": false,
-      "sizeFormatted": "254.6 KB"
     },
     {
       "version": "4.14.113-27176651 SMP preempt mod_unload modversions aarch64",
