@@ -1,8 +1,8 @@
 {
   "baseUrl": "https://raw.githubusercontent.com/bmjubairdadu/kernel-loader/drivers",
   "branch": "drivers",
-  "updated": "2026-10-29T19:23:26Z",
-  "count": 37,
+  "updated": "2026-10-30T03:54:57Z",
+  "count": 31,
   "drivers": [
     {
       "version": "4.14.117-perf+ SMP preempt mod_unload modversions aarch64",
@@ -16,19 +16,6 @@
       "verified": true,
       "frozen": false,
       "sizeFormatted": "165.7 KB"
-    },
-    {
-      "version": "4.14.141-g4e3bb1fab-dirty SMP preempt mod_unload modversions aarch64",
-      "file": "uni_4.14.141-g4e3bb1fab-dirty.ko",
-      "variant": "rt",
-      "label": "4.14.141-g4e3bb1fab-dirty",
-      "sha256": "e52721bb8d4dbf4588903bf226112aaa9d69b413ec2917c8a70bc4ac55b479be",
-      "size": 561254,
-      "buildDate": "2026-10-26T12:57:28Z",
-      "source": "v3_drivers/RT/4.14.141.sh",
-      "verified": true,
-      "frozen": false,
-      "sizeFormatted": "548.1 KB"
     },
     {
       "version": "4.14.180-perf-g758bb7ef5-dirty SMP preempt mod_unload modversions aarch64",
@@ -57,19 +44,6 @@
       "sizeFormatted": "165.4 KB"
     },
     {
-      "version": "4.14.186-perf-g30fa96c92-dirty SMP preempt mod_unload modversions aarch64",
-      "file": "uni_4.14.186-perf-g30fa96c92-dirty.ko",
-      "variant": "rt",
-      "label": "4.14.186-perf-g30fa96c92-dirty",
-      "sha256": "8fa885ee15ae6a3327fa6c9b047c06173d0b9d72d2db96cef5d7f2a39220c711",
-      "size": 566460,
-      "buildDate": "2026-10-26T12:57:28Z",
-      "source": "v3_drivers/RT/4.14.186b.sh",
-      "verified": true,
-      "frozen": false,
-      "sizeFormatted": "553.2 KB"
-    },
-    {
       "version": "4.14.186-perf-g9be022c0d-dirty SMP preempt mod_unload modversions aarch64",
       "file": "uni_4.14.186-perf-g9be022c0d-dirty.ko",
       "variant": "rt",
@@ -81,19 +55,6 @@
       "verified": true,
       "frozen": false,
       "sizeFormatted": "189.6 KB"
-    },
-    {
-      "version": "4.14.190-perf-g17171cc0d-dirty SMP preempt mod_unload modversions aarch64",
-      "file": "uni_4.14.190-perf-g17171cc0d-dirty.ko",
-      "variant": "rt",
-      "label": "4.14.190-perf-g17171cc0d-dirty",
-      "sha256": "f73177ccca3cd56ce731b607d0f6db345c9baddbe809074b080f23bdd89189c5",
-      "size": 573882,
-      "buildDate": "2026-10-26T12:57:28Z",
-      "source": "v3_drivers/RT/4.14.X(190).sh",
-      "verified": true,
-      "frozen": false,
-      "sizeFormatted": "560.4 KB"
     },
     {
       "version": "4.19.113-perf-g2fdca3872-dirty SMP preempt mod_unload modversions aarch64",
@@ -200,32 +161,6 @@
       "sizeFormatted": "388.0 KB"
     },
     {
-      "version": "5.4.61-qgki-ga9244def8-dirty SMP preempt mod_unload modversions aarch64",
-      "file": "uni_5.4.61-qgki-ga9244def8-dirty.ko",
-      "variant": "rt",
-      "label": "5.4.61-qgki-ga9244def8-dirty",
-      "sha256": "672e34723c2ab3351a977fee242ae276e1461a3479c35bae64c703ad13990e97",
-      "size": 920001,
-      "buildDate": "2026-10-26T12:57:28Z",
-      "source": "v3_drivers/RT/5.4.sh",
-      "verified": true,
-      "frozen": false,
-      "sizeFormatted": "898.4 KB"
-    },
-    {
-      "version": "5.4.191-qgki-g7aac66291bd5-dirty SMP preempt mod_unload modversions aarch64",
-      "file": "uni_5.4.191-qgki-g7aac66291bd5-dirty.ko",
-      "variant": "rt",
-      "label": "5.4.191-qgki-g7aac66291bd5-dirty",
-      "sha256": "141a906e86025a34a2791660d761424116a973039a21890c34f4b42c02b904d2",
-      "size": 919556,
-      "buildDate": "2026-10-26T12:57:28Z",
-      "source": "v3_drivers/RT/5.4c.sh",
-      "verified": true,
-      "frozen": false,
-      "sizeFormatted": "898.0 KB"
-    },
-    {
       "version": "5.4.191-g7aac66291bd5-dirty SMP preempt mod_unload modversions aarch64",
       "file": "uni_5.4oppo-191-g7aac66291bd5-dirty.ko",
       "variant": "rt",
@@ -250,19 +185,6 @@
       "verified": true,
       "frozen": false,
       "sizeFormatted": "382.6 KB"
-    },
-    {
-      "version": "6.12.23-android16-5-maybe-dirty-4k SMP preempt mod_unload modversions aarch64",
-      "file": "uni_6.12.23-X-4k.ko",
-      "variant": "rt",
-      "label": "6.12.23-android16-5-maybe-dirty-4k",
-      "sha256": "a1d1c940a41250333c9d03bec9687e442d727c29491f31085f1e816777715ee3",
-      "size": 943994,
-      "buildDate": "2026-10-26T12:57:28Z",
-      "source": "v3_drivers/RT/6.12.X.sh",
-      "verified": true,
-      "frozen": false,
-      "sizeFormatted": "921.9 KB"
     },
     {
       "version": "6.6.57-4k-gd66e9166bfa1-dirty SMP preempt mod_unload modversions aarch64",
@@ -486,5 +408,96 @@
       "sizeFormatted": "15.1 KB"
     }
   ],
-  "frozenDrivers": []
+  "frozenDrivers": [
+    {
+      "version": "4.14.141-g4e3bb1fab-dirty SMP preempt mod_unload modversions aarch64",
+      "file": "uni_4.14.141-g4e3bb1fab-dirty.ko",
+      "variant": "rt",
+      "label": "4.14.141-g4e3bb1fab-dirty",
+      "sha256": "e52721bb8d4dbf4588903bf226112aaa9d69b413ec2917c8a70bc4ac55b479be",
+      "size": 561254,
+      "buildDate": "2026-10-26T12:57:28Z",
+      "source": "v3_drivers/RT/4.14.141.sh",
+      "verified": true,
+      "frozen": true,
+      "sizeFormatted": "548.1 KB",
+      "frozenAt": "2026-10-30T03:54:57Z",
+      "freezeReason": "corrupt .ko (V3 UTF-8 packaging bug, e_machine=49135) - no intact copy exists in Driver Loader V3 APK; rebuild via DriverForge"
+    },
+    {
+      "version": "4.14.186-perf-g30fa96c92-dirty SMP preempt mod_unload modversions aarch64",
+      "file": "uni_4.14.186-perf-g30fa96c92-dirty.ko",
+      "variant": "rt",
+      "label": "4.14.186-perf-g30fa96c92-dirty",
+      "sha256": "8fa885ee15ae6a3327fa6c9b047c06173d0b9d72d2db96cef5d7f2a39220c711",
+      "size": 566460,
+      "buildDate": "2026-10-26T12:57:28Z",
+      "source": "v3_drivers/RT/4.14.186b.sh",
+      "verified": true,
+      "frozen": true,
+      "sizeFormatted": "553.2 KB",
+      "frozenAt": "2026-10-30T03:54:57Z",
+      "freezeReason": "corrupt .ko (V3 UTF-8 packaging bug, e_machine=49135) - no intact copy exists in Driver Loader V3 APK; rebuild via DriverForge"
+    },
+    {
+      "version": "4.14.190-perf-g17171cc0d-dirty SMP preempt mod_unload modversions aarch64",
+      "file": "uni_4.14.190-perf-g17171cc0d-dirty.ko",
+      "variant": "rt",
+      "label": "4.14.190-perf-g17171cc0d-dirty",
+      "sha256": "f73177ccca3cd56ce731b607d0f6db345c9baddbe809074b080f23bdd89189c5",
+      "size": 573882,
+      "buildDate": "2026-10-26T12:57:28Z",
+      "source": "v3_drivers/RT/4.14.X(190).sh",
+      "verified": true,
+      "frozen": true,
+      "sizeFormatted": "560.4 KB",
+      "frozenAt": "2026-10-30T03:54:57Z",
+      "freezeReason": "corrupt .ko (V3 UTF-8 packaging bug, e_machine=49135) - no intact copy exists in Driver Loader V3 APK; rebuild via DriverForge"
+    },
+    {
+      "version": "5.4.61-qgki-ga9244def8-dirty SMP preempt mod_unload modversions aarch64",
+      "file": "uni_5.4.61-qgki-ga9244def8-dirty.ko",
+      "variant": "rt",
+      "label": "5.4.61-qgki-ga9244def8-dirty",
+      "sha256": "672e34723c2ab3351a977fee242ae276e1461a3479c35bae64c703ad13990e97",
+      "size": 920001,
+      "buildDate": "2026-10-26T12:57:28Z",
+      "source": "v3_drivers/RT/5.4.sh",
+      "verified": true,
+      "frozen": true,
+      "sizeFormatted": "898.4 KB",
+      "frozenAt": "2026-10-30T03:54:57Z",
+      "freezeReason": "corrupt .ko (V3 UTF-8 packaging bug, e_machine=49135) - no intact copy exists in Driver Loader V3 APK; rebuild via DriverForge"
+    },
+    {
+      "version": "5.4.191-qgki-g7aac66291bd5-dirty SMP preempt mod_unload modversions aarch64",
+      "file": "uni_5.4.191-qgki-g7aac66291bd5-dirty.ko",
+      "variant": "rt",
+      "label": "5.4.191-qgki-g7aac66291bd5-dirty",
+      "sha256": "141a906e86025a34a2791660d761424116a973039a21890c34f4b42c02b904d2",
+      "size": 919556,
+      "buildDate": "2026-10-26T12:57:28Z",
+      "source": "v3_drivers/RT/5.4c.sh",
+      "verified": true,
+      "frozen": true,
+      "sizeFormatted": "898.0 KB",
+      "frozenAt": "2026-10-30T03:54:57Z",
+      "freezeReason": "corrupt .ko (V3 UTF-8 packaging bug, e_machine=49135) - no intact copy exists in Driver Loader V3 APK; rebuild via DriverForge"
+    },
+    {
+      "version": "6.12.23-android16-5-maybe-dirty-4k SMP preempt mod_unload modversions aarch64",
+      "file": "uni_6.12.23-X-4k.ko",
+      "variant": "rt",
+      "label": "6.12.23-android16-5-maybe-dirty-4k",
+      "sha256": "a1d1c940a41250333c9d03bec9687e442d727c29491f31085f1e816777715ee3",
+      "size": 943994,
+      "buildDate": "2026-10-26T12:57:28Z",
+      "source": "v3_drivers/RT/6.12.X.sh",
+      "verified": true,
+      "frozen": true,
+      "sizeFormatted": "921.9 KB",
+      "frozenAt": "2026-10-30T03:54:57Z",
+      "freezeReason": "corrupt .ko (V3 UTF-8 packaging bug, e_machine=49135) - no intact copy exists in Driver Loader V3 APK; rebuild via DriverForge"
+    }
+  ]
 }
