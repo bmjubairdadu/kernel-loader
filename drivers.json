@@ -269,13 +269,13 @@
       "file": "4.19.127-Infinix-X688B.ko",
       "variant": "rt",
       "label": "4.19.127-Infinix-X688B",
-      "sha256": "00c520965e1eaba75402a25acc47db07815359087162362742a04e7642d2be5e",
-      "size": 224224,
-      "buildDate": "2026-10-28T13:47:27Z",
+      "sha256": "674c4b9b0f814ee22bfad6962cc84fef01df550532371dbc6b668a332a127708",
+      "size": 221648,
+      "buildDate": "2026-10-30T18:46:06Z",
       "source": "Infinix_X688B_4.19.127",
       "verified": true,
       "frozen": false,
-      "sizeFormatted": "219.0 KB"
+      "sizeFormatted": "216.5 KB"
     },
     {
       "version": "4.19.157-perf-27940246-abA235FXXS4DXA5 SMP preempt mod_unload modversions aarch64",
