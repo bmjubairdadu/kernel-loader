@@ -91,13 +91,11 @@ fun DriverErrorDialog(
                     .verticalScroll(scrollState),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Top Header with Warning Icon Badge & Language Toggle
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Warning Icon Badge
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(
                             modifier = Modifier
@@ -120,7 +118,6 @@ fun DriverErrorDialog(
                         )
                     }
 
-                    // Language Switcher Tabs (Bengali / English)
                     Row(
                         modifier = Modifier
                             .clip(RoundedCornerShape(14.dp))
@@ -143,7 +140,6 @@ fun DriverErrorDialog(
 
                 Spacer(Modifier.height(16.dp))
 
-                // Title
                 Text(
                     text = if (isBengali) info.titleBn else info.titleEn,
                     color = TextPrimary,
@@ -154,7 +150,6 @@ fun DriverErrorDialog(
 
                 Spacer(Modifier.height(8.dp))
 
-                // Raw Error Pill
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -181,14 +176,12 @@ fun DriverErrorDialog(
 
                 Spacer(Modifier.height(12.dp))
 
-                // Dynamic Animated Description & Steps
                 AnimatedContent(
                     targetState = isBengali,
                     transitionSpec = { fadeIn() togetherWith fadeOut() },
                     label = "langTransition"
                 ) { bengaliActive ->
                     Column(modifier = Modifier.fillMaxWidth()) {
-                        // Explanation
                         Text(
                             text = if (bengaliActive) info.descriptionBn else info.descriptionEn,
                             color = TextSecondary,
@@ -198,7 +191,6 @@ fun DriverErrorDialog(
 
                         Spacer(Modifier.height(14.dp))
 
-                        // Solution Steps Card
                         Card(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(16.dp),
@@ -253,12 +245,10 @@ fun DriverErrorDialog(
 
                 Spacer(Modifier.height(18.dp))
 
-                // Action Buttons (Copy Log & Close)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    // Copy Log Button
                     Button(
                         onClick = onCopyLog,
                         modifier = Modifier
@@ -278,7 +268,6 @@ fun DriverErrorDialog(
                         )
                     }
 
-                    // Confirm / Dismiss or Reboot Button
                     if (info.canReboot) {
                         Button(
                             onClick = {
@@ -347,4 +336,3 @@ private fun LanguageTabButton(
         )
     }
 }
-

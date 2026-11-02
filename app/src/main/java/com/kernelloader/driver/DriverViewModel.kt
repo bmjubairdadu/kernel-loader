@@ -27,6 +27,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.coroutineContext
 import java.io.File
+import java.io.FileOutputStream
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -503,9 +504,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
         "disagrees about version",
         "vermagic",
         "exec format error",
-        "operation not permitted",
         "required key not available",
-        "permission denied",
         "file exists",
         "unknown symbol"
     )
@@ -528,7 +527,6 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             tlog("[KERNEL] Framework loader exited 0 but the kernel did not register the module - falling back to insmod", "WARN")
         }
 
-        // Check Kernel Loader Engine Bridge
         val hasEngine = Shell.cmd("test -x /data/adb/kernel_loader/load_driver.sh || test -f /data/adb/kernel_loader/load_driver.sh").exec().isSuccess
         if (hasEngine) {
             tlog("Inserting module via Engine Bridge...", "CMD")
@@ -588,8 +586,9 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             val errAll = (res.out + res.err).joinToString(" ").lowercase(Locale.US)
             val dmesg = Shell.cmd("dmesg 2>/dev/null | tail -n 15").exec().out.joinToString(" ").lowercase(Locale.US)
             val isSig = errAll.contains("required key") ||
-                    errAll.contains("rejected") ||
-                    errAll.contains("operation not permitted") ||
+                    errAll.contains("key rejected") ||
+                    errAll.contains("key was rejected") ||
+                    errAll.contains("unsigned module") ||
                     dmesg.contains("module verification failed") ||
                     dmesg.contains("module signature") ||
                     dmesg.contains("unsigned module is rejected") ||
@@ -767,7 +766,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                     val dmesg = Shell.cmd("dmesg 2>/dev/null | tail -n 8").exec().out
                         .map { it.trim() }
                         .filter { it.isNotBlank() }
-                    val dmesgHint = dmesg.lastOrNull { 
+                    val dmesgHint = dmesg.lastOrNull {
                         it.contains("error", true) || it.contains("fail", true) || it.contains("denied", true) || it.contains("segfault", true)
                     } ?: dmesg.lastOrNull() ?: ""
 
@@ -858,7 +857,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             return false
         }
         try {
-            if (!UniversalKernelLoader.ensureElf(downloaded)) {
+            if (!UniversalKernelLoader.ensureElf(downloaded, this@DriverViewModel)) {
                 val failMsg = "Downloaded file is corrupted (ELF verification failed)"
                 otaFailReason = failMsg
                 lastLoadError.value = failMsg
@@ -898,7 +897,11 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             UniversalKernelLoader.disableModuleSigEnforce(this@DriverViewModel)
 
             val preProbe = try { UniversalKernelLoader.probeOurDriverNode(getApplication(), this@DriverViewModel) } catch (e: Exception) { null }
-            if (preProbe != null && !SafetyGuard.isSystemNode(preProbe)) {
+            val residentModules = SafetyGuard.loadedModuleNames()
+            val session = BootSessionTracker.checkSession(getApplication())
+            if (preProbe != null && !SafetyGuard.isSystemNode(preProbe) &&
+                (residentModules.isNotEmpty() || session.isLoaded)
+            ) {
                 tlog("[RESIDENT] Driver already answering on /dev/$preProbe - skipping insert", "OK")
                 rememberDevNode(preProbe)
                 markHiddenLoaded()
@@ -907,6 +910,10 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                 autoLoadStatus.value = "Already loaded: /dev/$preProbe"
                 return true
             }
+            val baselineMods = SafetyGuard.loadedModuleNames()
+            val procMajorsBefore = Shell.cmd("cat /proc/devices 2>/dev/null").exec().out
+                .mapNotNull { l -> l.trim().split(Regex("""\s+""")).firstOrNull()?.toIntOrNull() }
+                .toSet()
             tlog("Inserting module into kernel...", "CMD")
             val res = runInsmodLadder(staged.absolutePath, devNode)
             if (res.isSuccess) {
@@ -927,7 +934,6 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                 val isSigLocked = errLower.contains("required key not available") ||
                         errLower.contains("key rejected") ||
                         errLower.contains("key was rejected") ||
-                        errLower.contains("operation not permitted") ||
                         dmesgLower.contains("module verification failed") ||
                         dmesgLower.contains("unsigned module is rejected") ||
                         dmesgLower.contains("loading of unsigned module") ||
@@ -974,6 +980,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             }
 
             tlog("Driver loaded successfully", "OK")
+            var nodeFound = false
             val dmesgAll = Shell.cmd("dmesg 2>/dev/null | tail -n 25").exec().out.joinToString("\n")
             val chrdevMatch = Regex("""CHRDEV\s+"([^"]+)"\s+major\s+number\s+(\d+)""", RegexOption.IGNORE_CASE).find(dmesgAll)
             if (chrdevMatch != null) {
@@ -985,6 +992,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                     "chcon u:object_r:device:s0 /dev/$nodeName 2>/dev/null"
                 ).exec()
                 rememberDevNode(nodeName)
+                nodeFound = true
                 tlog("Driver node active: /dev/$nodeName", "OK")
             } else {
                 val procDevs = Shell.cmd("cat /proc/devices 2>/dev/null").exec().out
@@ -993,7 +1001,10 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                     if (parts.size >= 2 && parts[0].toIntOrNull() != null) {
                         val name = parts[1]
                         val maj = parts[0]
-                        if (name.matches(Regex("^[A-Za-z0-9]{6,8}$")) && !SafetyGuard.isSystemNode(name)) {
+                        if (maj.toIntOrNull() !in procMajorsBefore &&
+                            name.matches(Regex("^[A-Za-z0-9]{6,8}$")) &&
+                            !SafetyGuard.isSystemNode(name)
+                        ) {
                             Pair(maj, name)
                         } else null
                     } else null
@@ -1006,12 +1017,33 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                         "chcon u:object_r:device:s0 /dev/$nodeName 2>/dev/null"
                     ).exec()
                     rememberDevNode(nodeName)
+                    nodeFound = true
                     tlog("Driver node active: /dev/$nodeName", "OK")
                 }
             }
-            val mods = SafetyGuard.loadedModuleNames()
-            val stagedBase = staged.nameWithoutExtension
-            val ours = mods.firstOrNull { it.contains(stagedBase, ignoreCase = true) || stagedBase.contains(it, ignoreCase = true) }
+            val ours = SafetyGuard.newlyLoaded(baselineMods).firstOrNull()
+            if (ours != null) {
+                tlog("[MODULE] Registered in /proc/modules as $ours", "OK")
+            }
+            val probed = UniversalKernelLoader.driverShProbe(context, this@DriverViewModel, preferredDevNode())
+            if (probed) {
+                tlog("[PROBE] Driver.sh 0x803 handshake OK — driver verified", "OK")
+            } else if (ours != null) {
+                tlog("[PROBE] 0x803 handshake not answered — module present in lsmod; accepting with warning", "WARN")
+            } else if (nodeFound) {
+                val msg = "Adopted node did not answer the 0x803 driver handshake — load not verified"
+                lastLoadError.value = msg
+                otaFailReason = msg
+                tlog("[FAIL] $msg", "ERR")
+                return false
+            }
+            if (!nodeFound && ours == null) {
+                val msg = "insmod exited 0 but no driver node or module appeared — load not verified"
+                lastLoadError.value = msg
+                otaFailReason = msg
+                tlog("[FAIL] $msg", "ERR")
+                return false
+            }
             withContext(Dispatchers.Main) {
                 if (ours != null) setLoadedModule(ours)
                 else markHiddenLoaded()
@@ -1030,7 +1062,6 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                 Shell.cmd("rm -f ${staged.absolutePath} 2>/dev/null").exec()
             }
         } finally {
-            if (downloaded.exists()) downloaded.delete()
         }
     }
 
@@ -1039,6 +1070,159 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
 
     fun determineBestVariant(context: Context, kernelRelease: String): String {
         return ""
+    }
+
+    fun flashKernelUpdate(context: Context, packageUri: Uri, superkey: String = "") {
+        if (isBusy.value) return
+        isBusy.value = true
+        busyStep.value = "Kernel update..."
+        autoLoadOk.value = null
+        loadJob = viewModelScope.launch(Dispatchers.IO) {
+            try {
+                tstep("Kernel update...")
+                tlog("[KFIX] Kernel fix package নেওয়া হচ্ছে...", "CMD")
+
+                val zipFile = File(context.cacheDir, "kernel_package.zip")
+                runCatching { zipFile.delete() }
+                context.contentResolver.openInputStream(packageUri)?.use { input ->
+                    FileOutputStream(zipFile).use { output -> input.copyTo(output) }
+                } ?: run {
+                    tlog("[KFIX] ফাইল খোলা যায়নি", "ERR")
+                    return@launch
+                }
+
+                val work = File(context.cacheDir, "kfix")
+                work.deleteRecursively()
+                work.mkdirs()
+                val bootImg = File(work, "new-boot.img")
+                java.util.zip.ZipInputStream(zipFile.inputStream().buffered()).use { zis ->
+                    var entry = zis.nextEntry
+                    var found = false
+                    while (entry != null) {
+                        if (entry.name.substringAfterLast('/') == "new-boot.img") {
+                            FileOutputStream(bootImg).use { output -> zis.copyTo(output) }
+                            found = true
+                            break
+                        }
+                        entry = zis.nextEntry
+                    }
+                    if (!found) {
+                        tlog("[KFIX] প্যাকেজে new-boot.img নেই — এটা কি DriverForge-এর kernel_package zip?", "ERR")
+                        return@launch
+                    }
+                }
+                if (bootImg.length() < 1_000_000L || bootImg.length() > 90_000_000L) {
+                    tlog("[KFIX] boot image size অস্বাভাবিক (${bootImg.length()} bytes) — বাতিল", "ERR")
+                    return@launch
+                }
+                val header = ByteArray(8)
+                bootImg.inputStream().use { runCatching { it.read(header) } }
+                if (String(header, Charsets.US_ASCII) != "ANDROID!") {
+                    tlog("[KFIX] ANDROID! header নেই — valid boot image না", "ERR")
+                    return@launch
+                }
+                tlog("[KFIX] Package OK: ${bootImg.length() / (1024 * 1024)} MB", "OK")
+
+                val staged = "/data/local/tmp/kl_new_boot.img"
+                Shell.cmd(
+                    "cp \"${bootImg.absolutePath}\" $staged",
+                    "chmod 644 $staged"
+                ).exec()
+
+                val superkeyFile = File(context.cacheDir, "kl_key")
+                if (superkey.isNotBlank()) superkeyFile.writeText(superkey.trim())
+                tstep("Patching with KernelPatch...")
+                val kpScript = """
+                    KP=""
+                    for b in /data/adb/ap/bin/kpatch /data/adb/kpatch /data/adb/ap/kpatch; do
+                      [ -x "${'$'}b" ] && { KP="${'$'}b"; break; }
+                    done
+                    command -v kpatch >/dev/null 2>&1 && KP=${'$'}(command -v kpatch)
+                    [ -n "${'$'}KP" ] || { echo MARK_NO_KPATCH; exit 0; }
+                    KEY=${'$'}(cat /data/local/tmp/kl_key 2>/dev/null)
+                    [ -n "${'$'}KEY" ] || { echo MARK_NO_KEY; exit 0; }
+                    "${'$'}KP" patch "${'$'}staged" -k "${'$'}KEY" -o "${'$'}staged.kp" >/dev/null 2>&1 || "${'$'}KP" -p "${'$'}staged" -k "${'$'}KEY" -o "${'$'}staged.kp" >/dev/null 2>&1 || { echo MARK_KP_FAIL; exit 0; }
+                    [ -s "${'$'}staged.kp" ] && head -c 8 "${'$'}staged.kp" | grep -q ANDROID || { echo MARK_KP_FAIL; exit 0; }
+                    mv "${'$'}staged.kp" "${'$'}staged"
+                    echo MARK_KP_OK
+                """.trimIndent()
+                if (superkeyFile.exists()) Shell.cmd(
+                    "cp \"${superkeyFile.absolutePath}\" /data/local/tmp/kl_key",
+                    "chmod 600 /data/local/tmp/kl_key"
+                ).exec()
+                val kpRes = Shell.cmd(kpScript).exec()
+                val kpOut = (kpRes.out + kpRes.err).joinToString("\n").trim()
+                when {
+                    kpOut.contains("MARK_KP_OK") ->
+                        tlog("[KFIX] KernelPatch hook applied — root অক্ষত থাকবে", "OK")
+                    kpOut.contains("MARK_NO_KPATCH") || kpOut.contains("MARK_KP_FAIL") ->
+                        tlog("[KFIX] kpatch প্যাচ হয়নি — flash-এর পর root চলে যাবে, APatch manager-এ আবার প্যাচ করতে হবে", "WARN")
+                    kpOut.contains("MARK_NO_KEY") ->
+                        tlog("[KFIX] superkey দেওয়া হয়নি — flash-এর পর root চলে যাবে, APatch manager-এ আবার প্যাচ করতে হবে", "WARN")
+                }
+                runCatching { superkeyFile.delete() }
+                tstep("Backing up current boot...")
+                val backupDir = context.getExternalFilesDir(null) ?: context.cacheDir
+                val backupScript = """
+                    slot=${'$'}(getprop ro.boot.slot_suffix 2>/dev/null)
+                    [ -z "${'$'}slot" ] && slot=${'$'}(grep -o 'androidboot.slot_suffix=[^ ]*' /proc/cmdline 2>/dev/null | cut -d= -f2)
+                    BOOT=""
+                    for p in /dev/block/by-name/boot${'$'}slot \
+                             /dev/block/bootdevice/by-name/boot${'$'}slot \
+                             /dev/block/platform/*/by-name/boot${'$'}slot \
+                             /dev/block/platform/*/*/by-name/boot${'$'}slot \
+                             /dev/block/by-name/boot \
+                             /dev/block/bootdevice/by-name/boot; do
+                      [ -b "${'$'}p" ] && { BOOT="${'$'}p"; break; }
+                    done
+                    [ -n "${'$'}BOOT" ] || { echo MARK_NO_BOOT_DEV; exit 0; }
+                    echo "MARK_BOOT_DEV:${'$'}BOOT"
+                    BK=/data/local/tmp/kl_boot_backup.img
+                    dd if="${'$'}BOOT" of="${'$'}BK" bs=4096 2>/dev/null || { echo MARK_BACKUP_FAIL; exit 0; }
+                    echo "MARK_BACKUP_OK:${'$'}BK"
+                    dd if="${'$'}staged" of="${'$'}BOOT" bs=4096 conv=fsync 2>/dev/null || { echo MARK_FLASH_FAIL; dd if="${'$'}BK" of="${'$'}BOOT" bs=4096 2>/dev/null; exit 0; }
+                    ISZ=${'$'}(stat -c %s "${'$'}staged" 2>/dev/null || echo 0)
+                    RB=${'$'}(dd if="${'$'}BOOT" bs=4096 count=${'$'}(( (ISZ + 4095) / 4096 )) 2>/dev/null | sha256sum | cut -d' ' -f1)
+                    RS=${'$'}(sha256sum "${'$'}staged" | cut -d' ' -f1)
+                    [ "${'$'}RB" = "${'$'}RS" ] && echo MARK_FLASH_OK || { echo MARK_VERIFY_FAIL; dd if="${'$'}BK" of="${'$'}BOOT" bs=4096 2>/dev/null; }
+                """.trimIndent()
+                val res = Shell.cmd(backupScript).exec()
+                val out = (res.out + res.err).joinToString("\n").trim()
+
+                if (out.contains("MARK_NO_BOOT_DEV")) {
+                    tlog("[KFIX] boot partition খুঁজে পাওয়া যায়নি", "ERR")
+                    return@launch
+                }
+                if (out.contains("MARK_BACKUP_FAIL")) {
+                    tlog("[KFIX] পুরনো boot-এর backup নিতে ব্যর্থ — ঝুঁকি নিচ্ছি না, বাতিল", "ERR")
+                    return@launch
+                }
+                val backupPath = out.lineSequence().firstOrNull { it.startsWith("MARK_BACKUP_OK:") }?.substringAfter(':')
+                if (backupPath != null) {
+                    val keep = File(backupDir, "boot_backup_${System.currentTimeMillis()}.img")
+                    Shell.cmd("cp \"$backupPath\" \"${keep.absolutePath}\" 2>/dev/null").exec()
+                    tlog("[KFIX] পুরনো boot backup: ${keep.absolutePath}", "OK")
+                }
+                if (out.contains("MARK_FLASH_FAIL") || out.contains("MARK_VERIFY_FAIL")) {
+                    tlog("[KFIX] flash/verify ব্যর্থ — backup থেকে পুরনো boot ফেরত বসানো হয়েছে", "ERR")
+                    return@launch
+                }
+                if (!out.contains("MARK_FLASH_OK")) {
+                    tlog("[KFIX] flash অজানা কারণে ব্যর্থ: ${out.take(120)}", "ERR")
+                    return@launch
+                }
+
+                tlog("[KFIX] ✅ নতুন sig-off kernel flash সম্পন্ন — reboot দিলে কার্যকর হবে", "OK")
+                tlog("[KFIX] ⚠ reboot-এর পর root আবার কাজ করাতে APatch/KernelPatch manager-এ নতুন boot প্যাচ করতে হবে", "WARN")
+                triggerErrorDialog("Kernel Updated: restart phone once")
+                runCatching { Shell.cmd("rm -f $staged 2>/dev/null").exec() }
+            } catch (e: Exception) {
+                tlog("[KFIX] ERROR: ${e.message}", "ERR")
+            } finally {
+                isBusy.value = false
+                busyStep.value = ""
+            }
+        }
     }
 
     fun autoLoadUniversal(context: Context, preferOta: Boolean = true, variant: String = "") {
@@ -1084,7 +1268,6 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                 delay(450L)
                 tstep("Scanning drivers...")
                 tlog("Scanning driver database...", "INFO")
-                val manifest = remoteManifest.value ?: OtaDriverStore.fetchManifest()
 
                 delay(450L)
                 tstep("Matching driver...")
@@ -1538,4 +1721,56 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             Pair(false, e.message ?: "Exception")
         }
     }
+
+    fun patchKernelSignature(context: Context) {
+        if (isBusy.value) return
+        isBusy.value = true
+        busyStep.value = "Unlocking Kernel Signature..."
+        tlog("Starting Kernel Signature Bypass (SIG OFF)...", "CMD")
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                tstep("Checking root & boot partition...")
+                val ok = UniversalKernelLoader.autoUnlockSignatureStandalone(context, this@DriverViewModel)
+                withContext(Dispatchers.Main) {
+                    if (ok) {
+                        tlog("[AUTO-FIX] ✅ Kernel signature check successfully unlocked in boot partition!", "OK")
+                        tlog("[REBOOT REQUIRED] Please restart your phone once to apply the unlock.", "WARN")
+                        Toast.makeText(context, "Signature Bypassed! Restart Phone to apply.", Toast.LENGTH_LONG).show()
+                    } else {
+                        tlog("[ERR] Signature unlock failed. Ensure phone has root and boot partition access.", "ERR")
+                        Toast.makeText(context, "Signature bypass failed. Check terminal log.", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    tlog("[ERR] Signature bypass error: ${e.message}", "ERR")
+                }
+            } finally {
+                withContext(Dispatchers.Main) {
+                    isBusy.value = false
+                    busyStep.value = ""
+                    tstep("")
+                }
+            }
+        }
+    }
+
+    fun safeExitAndHide(context: Context) {
+        try {
+            tlog("[STEALTH] Performing zero-footprint clean exit...", "INFO")
+            Shell.cmd(
+                "dmesg -c >/dev/null 2>&1 || dmesg -C 2>/dev/null",
+                "rm -f /data/local/tmp/kloader_* /data/local/tmp/Driver.sh /data/local/tmp/*.ko /data/local/tmp/*.sh /data/local/tmp/ui.xml /data/local/tmp/sig* /data/local/tmp/magiskboot 2>/dev/null"
+            ).exec()
+            runCatching {
+                File(context.cacheDir, "kloader_auto.ko").delete()
+                File(context.cacheDir, "Driver.sh").delete()
+                File(context.cacheDir, "sigprobe.ko").delete()
+            }
+            (context as? android.app.Activity)?.finishAndRemoveTask()
+        } catch (_: Exception) {}
+        android.os.Process.killProcess(android.os.Process.myPid())
+        kotlin.system.exitProcess(0)
+    }
+
 }

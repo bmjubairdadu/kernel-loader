@@ -36,7 +36,7 @@ class MainActivity : ComponentActivity() {
             Shell.setDefaultBuilder(
                 Shell.Builder.create()
                     .setFlags(Shell.FLAG_REDIRECT_STDERR)
-                    .setTimeout(10)
+                    .setTimeout(60)
             )
         }
         try {
@@ -46,7 +46,7 @@ class MainActivity : ComponentActivity() {
         setContent {
 
             KernelLoderTheme(darkTheme = true, dynamicColor = false) {
-                val backStack = remember { NavBackStack<NavKey>(MainRoute) }
+                val backStack = remember { NavBackStack<NavKey>(WarningRoute) }
                 NavDisplay(
                     backStack = backStack,
                     onBack = { backStack.removeLastOrNull() },
@@ -55,7 +55,10 @@ class MainActivity : ComponentActivity() {
                             is WarningRoute -> NavEntry<NavKey>(key) {
                                 SafetyWarningDialog(
                                     onDismiss = { finish() },
-                                    onConfirm = { backStack.add(MainRoute) }
+                                    onConfirm = {
+                                        backStack.clear()
+                                        backStack.add(MainRoute)
+                                    }
                                 )
                             }
                             is MainRoute -> NavEntry<NavKey>(key) {

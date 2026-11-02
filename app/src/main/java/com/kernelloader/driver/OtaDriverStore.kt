@@ -92,7 +92,10 @@ object OtaDriverStore {
 
         if (cleanVerm.isNotBlank()) {
             if (eVer.equals(cleanVerm, ignoreCase = true)) return true
-            if (eVer.startsWith(cleanVerm, ignoreCase = true) || cleanVerm.startsWith(eVer, ignoreCase = true)) return true
+            val shorterSideIsFullVermagic = listOf(eVer, cleanVerm).minByOrNull { it.length }!!.contains(' ')
+            if (shorterSideIsFullVermagic &&
+                (eVer.startsWith(cleanVerm, ignoreCase = true) || cleanVerm.startsWith(eVer, ignoreCase = true))
+            ) return true
         }
 
         if (cleanRel.isNotBlank()) {
@@ -270,7 +273,12 @@ object OtaDriverStore {
                 out.delete()
             }
             val url = if (entry.file.startsWith("http")) entry.file
-                      else baseUrl.trimEnd('/') + "/" + entry.file.trimStart('/')
+                      else {
+                          val base = baseUrl.trimEnd('/')
+                          if (base.isBlank()) {
+                              manifestUrl.substringBeforeLast('/')
+                          } else base
+                      } + "/" + entry.file.trimStart('/')
             onLog("Downloading driver...", "INFO")
             val conn = com.kernelloader.security.SecurityShield.openSecureConnection(url).apply {
                 connectTimeout = 20000; readTimeout = 60000
@@ -282,10 +290,12 @@ object OtaDriverStore {
             }
             conn.connect()
             if (conn.responseCode !in 200..299) {
+                conn.disconnect()
                 onLog("Download failed (HTTP ${conn.responseCode})", "ERR")
                 return null
             }
-            out.outputStream().use { o ->
+            val tmp = File(out.absolutePath + ".part")
+            tmp.outputStream().use { o ->
                 conn.inputStream.use { i ->
                     val buf = ByteArray(32 * 1024)
                     while (true) {
@@ -296,10 +306,20 @@ object OtaDriverStore {
                 }
             }
             conn.disconnect()
-            if (!hashMatches(out, expected)) {
-                onLog("Downloaded driver failed sha256 - rejected", "ERR")
-                out.delete()
+            if (entry.size > 0 && tmp.length() != entry.size) {
+                onLog("Downloaded driver has wrong size (${tmp.length()} != ${entry.size}) - rejected", "ERR")
+                tmp.delete()
                 return null
+            }
+            if (!hashMatches(tmp, expected)) {
+                onLog("Downloaded driver failed sha256 - rejected", "ERR")
+                tmp.delete()
+                return null
+            }
+            if (out.exists()) out.delete()
+            if (!tmp.renameTo(out)) {
+                tmp.copyTo(out, overwrite = true)
+                tmp.delete()
             }
             onLog("Driver downloaded", "OK")
             out

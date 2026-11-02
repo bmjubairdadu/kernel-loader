@@ -117,7 +117,15 @@ object RootChecker {
     private fun readVermagicFast(file: java.io.File): String {
         return try {
             val buf = ByteArray(131072)
-            val n = java.io.FileInputStream(file).use { it.read(buf) }
+            val n = java.io.FileInputStream(file).use { input ->
+                var total = 0
+                while (total < buf.size) {
+                    val r = input.read(buf, total, buf.size - total)
+                    if (r <= 0) break
+                    total += r
+                }
+                total
+            }
             if (n <= 0) return ""
             val tag = "vermagic=".toByteArray(Charsets.US_ASCII)
             var idx = -1

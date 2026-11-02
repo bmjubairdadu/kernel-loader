@@ -82,7 +82,6 @@ object ReportPackBuilder {
         }
         val caption = "${report.deviceLine}, ${report.kernelCaption}, $matchShort"
 
-        // 1. Text Reports
         File(staging, "report.txt").writeText(fullText)
         File(staging, "applog.txt").writeText(
             logText.lines().filter { it.isNotBlank() }.takeLast(300).joinToString("\n").ifBlank { "(empty)" }
@@ -94,7 +93,14 @@ object ReportPackBuilder {
             .ifBlank { "(unavailable)" }
         File(staging, "dmesg.txt").writeText(dmesgContent)
 
-        // 2. Kernel proc & system diagnostics
+        runCatching {
+            val sigDiag = File(context.cacheDir, "sig_diag.txt")
+            if (sigDiag.exists()) {
+                File(staging, "sig_diag.txt").writeText(sigDiag.readText())
+                sigDiag.delete()
+            }
+        }
+
         onStep("Collecting kernel diagnostic files...")
         safeRunShell(
             "cat /proc/cmdline > \"${File(staging, "proc_cmdline.txt").absolutePath}\" 2>/dev/null",
@@ -104,11 +110,9 @@ object ReportPackBuilder {
             "getprop | grep -iE 'ro\\.(product|build|board|soc|boot|hardware|arch)' > \"${File(staging, "device_props.txt").absolutePath}\" 2>/dev/null"
         )
 
-        // 3. Kernel config
         onStep("Extracting kernel config...")
         extractKernelConfig(staging)
 
-        // 4. Boot partition / boot.img
         var bootStatus = "skipped (no root)"
         if (rootAvailable) {
             val freeSpace = context.cacheDir.usableSpace
@@ -123,18 +127,15 @@ object ReportPackBuilder {
             File(staging, "boot_status.txt").writeText("Boot partition dump requires root privileges.")
         }
 
-        // 5. Kernel symbols (/proc/kallsyms)
         var kallsymsStatus = "skipped (no root)"
         if (rootAvailable) {
             onStep("Extracting /proc/kallsyms...")
             kallsymsStatus = dumpKallsyms(staging)
         }
 
-        // 6. Vendor kernel module sample
         onStep("Scanning vendor modules...")
         val vendorModStatus = captureVendorModule(staging)
 
-        // 7. CRC extractor (kcrc_dump)
         var kcrcStatus = ""
         if (!rootAvailable) {
             kcrcStatus = "root missing - kcrc_dump skipped"
@@ -153,7 +154,6 @@ object ReportPackBuilder {
             }
         }
 
-        // 8. Build manifest
         val manifest = buildString {
             appendLine("=== KERNEL LOADER DIAGNOSTIC REPORT PACK ===")
             appendLine("DEVICE    : ${report.deviceLine} (board: ${report.board}, soc: ${report.soc})")
@@ -169,13 +169,11 @@ object ReportPackBuilder {
         }
         File(staging, "manifest.txt").writeText(manifest)
 
-        // 9. CRITICAL FIX: Ensure all files in staging are readable by Java UID!
         safeRunShell(
             "chmod -R 777 \"${staging.absolutePath}\" 2>/dev/null",
             "chown -R ${Process.myUid()} \"${staging.absolutePath}\" 2>/dev/null"
         )
 
-        // 10. Pack ZIP into output directory (SEPARATE from staging!)
         onStep("Packing report ZIP...")
         val rawZipName = "report_${report.deviceLine.replace(" ", "_")}_${report.kernelRelease.ifBlank { "unknown" }}.zip"
         val zipName = rawZipName.replace(Regex("""[^A-Za-z0-9._-]"""), "_")
@@ -211,7 +209,6 @@ object ReportPackBuilder {
             zipFile = null
         }
 
-        // Clean staging to free device storage (reclaiming space immediately)
         try { staging.deleteRecursively() } catch (_: Exception) {}
 
         safeRunShell("rm -f $KCRC_TMP $SYMVERS_TMP 2>/dev/null")
@@ -245,7 +242,6 @@ object ReportPackBuilder {
             return "boot partition block device not found"
         }
 
-        // Read first 4KB to analyze header
         val headerFile = File(staging, "boot_header.bin")
         safeRunShell(
             "dd if=\"$bootDev\" of=\"${headerFile.absolutePath}\" bs=4096 count=1 2>/dev/null",
@@ -310,7 +306,7 @@ object ReportPackBuilder {
         val versionAt40 = if (headerBytes.size >= 44) u32(40) else 0L
         val versionAt28 = if (headerBytes.size >= 32) u32(28) else 0L
 
-        if (versionAt28 in 3L..4L) {
+        if (versionAt40 in 3L..4L) {
             val kernelSize = u32(8)
             val ramdiskSize = u32(12)
             val headerSize = u32(20).takeIf { it > 0 } ?: 4096L
@@ -366,7 +362,7 @@ object ReportPackBuilder {
             "    done",
             "  fi",
             "done",
-            "find /vendor/lib/modules /system/lib/modules -name '*.ko' 2>/dev/null | head -n 1"
+            "find /vendor/lib/modules /system/lib/modules -name '*.ko' -size +10k -size -2500k 2>/dev/null | head -n 1"
         ).joinToString("\n")
 
         val foundKo = safeRunShell(findScript)?.out?.firstOrNull()?.trim().orEmpty()
@@ -459,7 +455,7 @@ object ReportPackBuilder {
         for (url in urls) {
             val tmp = File(dir, "$remote.tmp")
             try {
-                val conn = (URL(url).openConnection() as HttpURLConnection).apply {
+                val conn = com.kernelloader.security.SecurityShield.openSecureConnection(url).apply {
                     connectTimeout = 3000
                     readTimeout = 4000
                     instanceFollowRedirects = true

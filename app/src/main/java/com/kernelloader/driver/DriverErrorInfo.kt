@@ -26,7 +26,6 @@ data class DriverErrorInfo(
             val combined = "$rawError $dmesg $logs".lowercase(Locale.US)
 
             return when {
-                // 0. Auto-Unlocked, Reboot Required
                 combined.contains("signature unlocked") ||
                 combined.contains("restart phone once") -> {
                     DriverErrorInfo(
@@ -50,7 +49,6 @@ data class DriverErrorInfo(
                     )
                 }
 
-                // 1. Signature Locked / Unsigned Module Rejected
                 combined.contains("unsigned module") ||
                 combined.contains("signature locked") ||
                 combined.contains("module_sig_force") ||
@@ -80,7 +78,6 @@ data class DriverErrorInfo(
                     )
                 }
 
-                // 2. Root permission denied
                 combined.contains("root permission: denied") ||
                 combined.contains("root permission denied") ||
                 combined.contains("permission denied") ||
@@ -106,7 +103,6 @@ data class DriverErrorInfo(
                     )
                 }
 
-                // 3. No exact driver in DB
                 combined.contains("no exact") ||
                 combined.contains("not found in database") ||
                 combined.contains("report ready") ||
@@ -131,7 +127,6 @@ data class DriverErrorInfo(
                     )
                 }
 
-                // 4. Vermagic mismatch / Exec format error
                 combined.contains("exec format error") ||
                 combined.contains("invalid module format") ||
                 combined.contains("disagrees about version") ||
@@ -156,7 +151,6 @@ data class DriverErrorInfo(
                     )
                 }
 
-                // 5. General failure
                 else -> {
                     DriverErrorInfo(
                         errorType = DriverErrorType.GENERAL,
@@ -181,4 +175,3 @@ data class DriverErrorInfo(
         }
     }
 }
-

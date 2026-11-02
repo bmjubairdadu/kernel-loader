@@ -78,6 +78,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -172,32 +174,36 @@ fun HomeScreen(
     val hidden = viewModel.hiddenLoaded.value
     val loadedModule = viewModel.driverModule.value.ifBlank { viewModel.loadedModuleName.value }
 
-    LaunchedEffect(Unit) {
-        viewModel.initLogStore(context)
-
-        withContext(Dispatchers.IO) { ReportPackBuilder.wipeReportDir(context) }
-        viewModel.refreshManifest()
-        viewModel.checkForAppUpdate()
-
-        viewModel.refreshDriverState(context)
-    }
-
-    val deviceVermagic = remember {
-        RootChecker.getKernelVermagic()
-    }
-
-    val exact = remember(manifest, kernelRelease, deviceVermagic) {
-        manifest?.let {
-            OtaDriverStore.exactFor(it, kernelRelease, "", deviceVermagic)
+    if (!HomeScreenReportWipe.done) {
+        HomeScreenReportWipe.done = true
+        LaunchedEffect(Unit) {
+            withContext(Dispatchers.IO) { ReportPackBuilder.wipeReportDir(context) }
         }
     }
 
-    val supportedDrivers = remember(manifest, kernelRelease, deviceVermagic) {
+    val deviceVermagic = remember { mutableStateOf("") }
+
+    LaunchedEffect(Unit) {
+        viewModel.initLogStore(context)
+        viewModel.refreshManifest()
+        viewModel.checkForAppUpdate()
+        viewModel.refreshDriverState(context)
+        val v = withContext(Dispatchers.IO) { RootChecker.getKernelVermagic() }
+        if (v.isNotBlank()) deviceVermagic.value = v
+    }
+
+    val exact = remember(manifest, kernelRelease, deviceVermagic.value) {
+        manifest?.let {
+            OtaDriverStore.exactFor(it, kernelRelease, "", deviceVermagic.value)
+        }
+    }
+
+    val supportedDrivers = remember(manifest, kernelRelease, deviceVermagic.value) {
         manifest?.let {
             OtaDriverStore.supportedEntries(it, "")
         }?.let { list ->
             val (mine, others) = list.partition {
-                OtaDriverStore.isExactMatch(it, kernelRelease, deviceVermagic)
+                OtaDriverStore.isExactMatch(it, kernelRelease, deviceVermagic.value)
             }
             mine + others
         } ?: emptyList()
@@ -438,6 +444,9 @@ fun HomeScreen(
                         viewModel.driverLoaded.value = false
                         viewModel.hiddenLoaded.value = false
                         viewModel.autoLoadUniversal(context, preferOta = true, variant = "")
+                    },
+                    onSafeExit = {
+                        viewModel.safeExitAndHide(context)
                     }
                 )
             }
@@ -575,6 +584,84 @@ fun HomeScreen(
                             }
                         }
                     }
+
+                    val kernelFixPending = remember { mutableStateOf<android.net.Uri?>(null) }
+                    val superkeyInput = remember { mutableStateOf("") }
+                    val kernelFixLauncher = rememberLauncherForActivityResult(
+                        contract = ActivityResultContracts.OpenDocument(),
+                        onResult = { uri -> uri?.let { kernelFixPending.value = it } }
+                    )
+                    if (kernelFixPending.value != null) {
+                        androidx.compose.material3.AlertDialog(
+                            onDismissRequest = { kernelFixPending.value = null },
+                            title = { Text("KernelPatch Superkey") },
+                            text = {
+                                Column {
+                                    Text(
+                                        "Superkey দিন (APatch manager-এ যেটা সেট করা) — এতে নতুন boot-এ root hook বসবে, root অক্ষত থাকবে।",
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                    Spacer(Modifier.height(8.dp))
+                                    androidx.compose.material3.TextField(
+                                        value = superkeyInput.value,
+                                        onValueChange = { superkeyInput.value = it },
+                                        singleLine = true
+                                    )
+                                }
+                            },
+                            confirmButton = {
+                                androidx.compose.material3.TextButton(onClick = {
+                                    val uri = kernelFixPending.value
+                                    kernelFixPending.value = null
+                                    if (uri != null) viewModel.flashKernelUpdate(context, uri, superkeyInput.value)
+                                }) { Text("FLASH") }
+                            },
+                            dismissButton = {
+                                androidx.compose.material3.TextButton(onClick = { kernelFixPending.value = null }) { Text("CANCEL") }
+                            }
+                        )
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Button(
+                        onClick = { viewModel.patchKernelSignature(context) },
+                        enabled = !busy && rootAvailable,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = AccentAmber),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 9.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Bolt,
+                            contentDescription = null,
+                            tint = TextOnAccent,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            text = if (busy && busyStep.contains("Signature")) "PATCHING KERNEL SIGNATURE..." else "PATCH KERNEL SIGNATURE (SIG OFF)",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = TextOnAccent
+                        )
+                    }
+                    Spacer(Modifier.height(4.dp))
+                    OutlinedButton(
+                        onClick = { kernelFixLauncher.launch(arrayOf("application/zip", "application/octet-stream", "*/*")) },
+                        enabled = !busy && rootAvailable,
+                        modifier = Modifier.fillMaxWidth(),
+                        border = BorderStroke(1.dp, if (running) AccentBlue else BorderSubtle),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 7.dp)
+                    ) {
+                        Text(
+                            text = if (running) "KERNEL FIX — FLASHING..." else "FLASH CUSTOM KERNEL ZIP",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = if (running) AccentBlue else TextSecondary
+                        )
+                    }
+                    Text(
+                        text = "SIG_LOCK হলে DriverForge-এর kernel_package zip সিলেক্ট করো — অ্যাপ পুরনো boot ব্যাকআপ নিয়ে flash করবে",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextMuted
+                    )
                 }
             }
             Spacer(Modifier.height(8.dp))
@@ -671,7 +758,7 @@ fun HomeScreen(
                 entries = supportedDrivers,
                 status = manifestStatus,
                 kernelRelease = kernelRelease,
-                deviceVermagic = deviceVermagic
+                deviceVermagic = deviceVermagic.value
             )
 
             SupportCard(
@@ -1563,7 +1650,8 @@ private fun UnloadPanel(
     enabled: Boolean,
     busy: Boolean,
     onUnload: () -> Unit,
-    onReload: () -> Unit = {}
+    onReload: () -> Unit = {},
+    onSafeExit: () -> Unit = {}
 ) {
     if (visible <= 0.001f) return
 
@@ -1626,6 +1714,28 @@ private fun UnloadPanel(
                 fontWeight = FontWeight.Bold
             )
         }
+        Spacer(Modifier.height(6.dp))
+        Button(
+            onClick = onSafeExit,
+            colors = ButtonDefaults.buttonColors(containerColor = Surface2),
+            border = BorderStroke(1.dp, StatusOk.copy(alpha = 0.6f)),
+            shape = RoundedCornerShape(8.dp),
+            modifier = Modifier.padding(horizontal = 20.dp)
+        ) {
+            Icon(
+                Icons.Default.Close,
+                contentDescription = null,
+                tint = StatusOk,
+                modifier = Modifier.size(16.dp)
+            )
+            Spacer(Modifier.width(6.dp))
+            Text(
+                text = "EXIT & HIDE (SAFE FOR GAME)",
+                style = MonoSmall,
+                color = StatusOk,
+                fontWeight = FontWeight.Bold
+            )
+        }
     }
 }
 
@@ -1670,4 +1780,8 @@ private fun consoleLineColor(type: String): Color = when (type) {
     "FIX" -> LogFix
     "OUT" -> LogOut
     else -> LogInfo
+}
+
+private object HomeScreenReportWipe {
+    @Volatile var done: Boolean = false
 }
