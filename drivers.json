@@ -399,7 +399,7 @@
       "file": "4.9.337-DaisyForGaming.ko",
       "variant": "rt",
       "label": "4.9.337-DaisyForGaming",
-      "sha256": "484bc3ab5a7927a53fe0beb57e11d680f64325c710238286eee23c822c6da7d9",
+      "sha256": "ca4b27a35eff2fa721cf2066ec1731b9564841f2e8352015ca8373020168a0fc",
       "size": 15272,
       "buildDate": "2026-11-03T17:40:00Z",
       "source": "daisy-gaming-driver",
