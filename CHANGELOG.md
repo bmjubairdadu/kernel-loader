@@ -5,11 +5,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [2.9] — 2026-11-04 (tag `v2.9` / `versionCode 29`) RT Daisy Driver Support, 0x803 Handshake Hardening & Signature Bypass Polish
+## [2.9] — 2026-11-04 (tag `v2.9` / `versionCode 29`) Streamlined 0x803 Driver Probe, System Update Notifications & RT Daisy Compatibility
 
-> **Release v2.9:** Full compatibility with the new 15KB RT Daisy Gaming Driver (`4.9.337-DaisyForGaming`), enhanced 0x803 ioctl probe validation, refined dynamic character device recognition, zero-footprint signature bypass cleanup, and bundled `sigprobe.ko` diagnostic module.
+> **Release v2.9:** Streamlined driver verification to a direct, single-pass `Driver.sh` `0x803` ioctl probe, added Android status bar notification alerts for new OTA app updates and auto-downloads, full compatibility with the new 15KB RT Daisy Gaming Driver (`4.9.337-DaisyForGaming`), zero-footprint signature bypass cleanup, and bundled `sigprobe.ko` diagnostic module.
 
 ### Added
+* **Streamlined Driver Detection (`Driver.sh` 0x803 Probe):** Deprecated and removed legacy multi-step verification heuristics (character node snapshots, set diffs, major device scans, and regex pattern matching). Driver validation now directly relies on `Driver.sh` executing `ioctl 0x803` handshakes against candidate nodes, automatically assigning `chmod 666` and `chcon u:object_r:device:s0` to the responding device.
+* **Status Bar Update Notifications:** Integrated Android system notifications via `NotificationChannel("app_updates")` and `NotificationCompat`. Users are immediately alerted when a new version is available on GitHub and when the background auto-download completes ("Update Ready! Tap to install now"). Added Android 13+ (`POST_NOTIFICATIONS`) runtime permission flow.
 * **RT Daisy Driver Compatibility:** Fully verified and tested against the new ultra-lightweight 15KB RT driver with lock-free page table walking and 0% CPU idle footprint.
 * **0x803 Handshake Protection:** Hardened ioctl handshake detection against NULL module name queries, preventing `-EFAULT` false negatives during driver node validation.
 * **Bundled `sigprobe.ko` Diagnostic Asset:** Embedded the diagnostic signature probe module directly into APK assets for instant kernel signature enforcement profiling.
