@@ -264,11 +264,11 @@ object UniversalKernelLoader {
 
         vm.tstep("Loading module...")
 
-        val devNodesBefore = snapshotDevCharNodes()
+        val devNodesBefore = emptySet<String>()
 
-        val charMajorsBefore = snapshotCharMajors()
+        val charMajorsBefore = emptyMap<Int, String>()
 
-        vm.tlog("[SCAN] ${devNodesBefore.size} char nodes present in /dev before insmod", "INFO")
+        
 
 
 
@@ -670,59 +670,8 @@ object UniversalKernelLoader {
 
 
 
-    fun driverShProbe(context: Context?, vm: DriverViewModel?, preferredNode: String = ""): Boolean {
-
-        if (context == null) return false
-
-        val target = "/data/local/tmp/Driver.sh"
-
-        return try {
-
-            val local = File(context.cacheDir, "Driver.sh")
-
-            if (!local.exists() || local.length() == 0L) {
-
-                context.assets.open("Driver.sh").use { input ->
-
-                    FileOutputStream(local).use { output -> input.copyTo(output) }
-
-                }
-
-            }
-
-            Shell.cmd(
-
-                "cp \"${local.absolutePath}\" $target 2>/dev/null",
-
-                "chmod 755 $target 2>/dev/null"
-
-            ).exec()
-
-            val nodeArg = if (preferredNode.isNotBlank() &&
-
-                Shell.cmd("test -e /dev/$preferredNode 2>/dev/null").exec().isSuccess
-
-            ) " /dev/$preferredNode" else ""
-
-
-
-            Shell.cmd("$target$nodeArg 2>/dev/null").exec().isSuccess
-
-        } catch (_: Exception) {
-
-            false
-
-        } finally {
-
-            // Anti-Detection Critical Fix: Never leave Driver.sh on disk for anti-cheat scanners!
-
-            Shell.cmd("rm -f $target 2>/dev/null").exec()
-
-        }
-
-    }
-
-
+    fun driverShProbe(context: Context?, vm: DriverViewModel?, preferredNode: String = ""): Boolean =
+        probeDriverWithDriverSh(context, vm, preferredNode) != null
 
     private fun viewModelModule(vm: DriverViewModel): String =
 
@@ -772,471 +721,79 @@ object UniversalKernelLoader {
 
 
 
-    private fun snapshotDevCharNodes(): Set<String> =
-
-        Shell.cmd("for f in /dev/*; do [ -c \"\$f\" ] && echo \"\${f##*/}\"; done 2>/dev/null")
-
-            .exec().out.map { it.trim() }.filter { it.isNotEmpty() }.toSet()
-
-
-
-    private fun snapshotCharMajors(): Map<Int, String> {
-
-        var inChar = false
-
-        val majors = mutableMapOf<Int, String>()
-
-        for (raw in Shell.cmd("cat /proc/devices 2>/dev/null").exec().out) {
-
-            val line = raw.trim()
-
-            when {
-
-                line.startsWith("Character devices:") -> inChar = true
-
-                line.startsWith("Block devices:") -> inChar = false
-
-                inChar -> {
-
-                    val parts = line.split(Regex("\\s+"))
-
-                    if (parts.size >= 2) parts[0].toIntOrNull()?.let { majors[it] = parts[1] }
-
+    fun probeDriverWithDriverSh(context: Context?, vm: DriverViewModel?, preferredNode: String = ""): String? {
+        if (context == null) return null
+        val target = "/data/local/tmp/Driver.sh"
+        return try {
+            val local = File(context.cacheDir, "Driver.sh")
+            if (!local.exists() || local.length() == 0L) {
+                context.assets.open("Driver.sh").use { input ->
+                    FileOutputStream(local).use { output -> input.copyTo(output) }
                 }
+            }
+            Shell.cmd(
+                "cp \"${local.absolutePath}\" $target 2>/dev/null",
+                "chmod 755 $target 2>/dev/null"
+            ).exec()
 
+            var foundNode: String? = null
+            for (attempt in 1..5) {
+                val cleanPref = preferredNode.removePrefix("/dev/").trim()
+                if (cleanPref.isNotBlank() && Shell.cmd("test -e /dev/$cleanPref 2>/dev/null").exec().isSuccess) {
+                    val directRes = Shell.cmd("$target /dev/$cleanPref 2>&1").exec()
+                    val directOut = (directRes.out + directRes.err).joinToString("\n")
+                    if (directRes.isSuccess || directOut.contains("0x803")) {
+                        foundNode = cleanPref
+                        break
+                    }
+                }
+                val scanRes = Shell.cmd("$target 2>&1").exec()
+                val scanOut = (scanRes.out + scanRes.err).joinToString("\n")
+                if (scanRes.isSuccess || scanOut.contains("0x803")) {
+                    val match = Regex("""Device responding on\s+(/dev/[a-zA-Z0-9_-]+)""").find(scanOut)
+                        ?: Regex("""Device responding on\s+([^\s\n]+)""").find(scanOut)
+                    val parsed = match?.groupValues?.get(1)?.removePrefix("/dev/")?.trim()
+                    if (!parsed.isNullOrBlank()) {
+                        foundNode = parsed
+                        break
+                    } else if (cleanPref.isNotBlank()) {
+                        foundNode = cleanPref
+                        break
+                    }
+                }
+                try { Thread.sleep(150) } catch (_: InterruptedException) {}
             }
 
+            if (foundNode != null) {
+                Shell.cmd(
+                    "chmod 666 /dev/$foundNode 2>/dev/null",
+                    "chcon u:object_r:device:s0 /dev/$foundNode 2>/dev/null"
+                ).exec()
+                vm?.rememberDevNode(foundNode)
+                vm?.markHiddenLoaded()
+                vm?.tlog("[PROBE] Driver.sh 0x803 handshake OK on /dev/$foundNode — driver verified", "OK")
+            }
+            foundNode
+        } catch (e: Exception) {
+            vm?.tlog("[PROBE ERR] Driver.sh check error: ${e.message}", "ERR")
+            null
+        } finally {
+            Shell.cmd("rm -f $target 2>/dev/null").exec()
         }
-
-        return majors
-
     }
-
-
-
-    private fun pickFreshMajorNode(
-
-        vm: DriverViewModel,
-
-        moduleName: String,
-
-        before: Map<Int, String>
-
-    ): Pair<Int, String>? {
-
-        val after = snapshotCharMajors()
-
-        if (after.isEmpty()) return null
-
-        val fresh = if (before.isNotEmpty()) after.filter { (maj, name) -> before[maj] != name } else after
-
-        if (fresh.isEmpty()) return null
-
-        val knownNames = (vm.knownDriverModules() + moduleName).filter { it.isNotBlank() }
-
-        val knownHit = fresh.entries.firstOrNull { (_, name) ->
-
-            knownNames.any { kn -> name.contains(kn, ignoreCase = true) || kn.contains(name, ignoreCase = true) }
-
-        }
-
-        val picked = knownHit ?: if (before.isNotEmpty()) fresh.entries.firstOrNull() else null
-
-        if (picked == null) return null
-
-        val (maj, name) = picked
-
-        val clean = name.filter { it.isLetterOrDigit() || it == '_' || it == '-' }
-
-        return if (clean.isBlank()) null else maj to clean
-
-    }
-
-
 
     private fun verifyLoad(
-
         vm: DriverViewModel,
-
         expectedNode: String = "",
-
         moduleName: String = "",
-
         devNodesBefore: Set<String> = emptySet(),
-
         charMajorsBefore: Map<Int, String> = emptyMap(),
-
         context: Context? = null
-
     ): String {
-
-        vm.tstep("Verifying module...")
-
-
-
-        val candidates = listOfNotNull(
-
-            expectedNode.ifBlank { null }, "dmsync", "sysync", "kmem_337", "memacc"
-
-        )
-
-
-
-        var exactNode = false
-
-        var foundNodeName = ""
-
-
-
-        for (attempt in 1..10) {
-
-
-
-            val probed = probeOurDriverNode(context, vm)
-
-            if (probed != null && isCharNode(probed)) {
-
-                exactNode = true
-
-                foundNodeName = probed
-
-                if (probed != expectedNode) {
-
-                    vm.tlog("[PROBE] Verified /dev/$probed (RT/QX ABI)", "OK")
-
-                }
-
-                break
-
-            }
-
-            val devList = Shell.cmd("ls /dev 2>/dev/null").exec().out.map { it.trim() }
-
-            if (expectedNode.isNotEmpty() && devList.contains(expectedNode) && isCharNode(expectedNode)) {
-
-                exactNode = true
-
-                foundNodeName = expectedNode
-
-                break
-
-            }
-
-            if (devNodesBefore.isNotEmpty()) {
-
-                val fresh = (snapshotDevCharNodes() - devNodesBefore)
-
-                    .filter { !SafetyGuard.isSystemNode(it) }
-
-                    .sorted()
-
-                if (fresh.isNotEmpty()) {
-
-                    exactNode = true
-
-                    foundNodeName = fresh.first()
-
-                    vm.tlog("[SCAN] Detected fresh driver node: /dev/$foundNodeName", "OK")
-
-                    break
-
-                }
-
-            }
-
-            val poolHit = devList.firstOrNull {
-
-
-
-                (devNodesBefore.isEmpty() || it !in devNodesBefore) &&
-
-                !SafetyGuard.isSystemNode(it) &&
-
-                (it.matches(Regex("^[A-Za-z0-9]{6,8}$")) || it.matches(Regex("^[A-GNYB]{6,8}$"))) &&
-
-                isCharNode(it)
-
-            }
-
-            if (poolHit != null) {
-
-                exactNode = true
-
-                foundNodeName = poolHit
-
-                break
-
-            }
-
-            val hit = candidates.firstOrNull { it in devList && isCharNode(it) }
-
-            if (hit != null) {
-
-                exactNode = true
-
-                foundNodeName = hit
-
-                break
-
-            }
-
-            val mods = SafetyGuard.loadedModuleNames()
-
-            val modHit = devList.firstOrNull { d -> mods.any { m -> d.contains(m, ignoreCase = true) } && isCharNode(d) }
-
-            if (modHit != null) {
-
-                exactNode = true
-
-                foundNodeName = modHit
-
-                break
-
-            }
-
-            try { Thread.sleep(150) } catch (_: InterruptedException) {}
-
-        }
-
-
-
-        if (!exactNode) {
-
-            vm.tlog("[SYSFS] Scanning /sys/class for registered driver devices...", "INFO")
-
-            var sysDevs = Shell.cmd(
-
-                "for f in /sys/class/dmsync*/dev /sys/class/sysync*/dev /sys/class/uni*/dev /sys/class/dmsync*/*/dev /sys/class/kmem*/dev /sys/class/kmem*/*/dev /sys/class/memacc*/dev; do " +
-
-                        "if [ -f \"\$f\" ]; then echo \"\$(cat \"\$f\") \$f\"; break; fi; done 2>/dev/null"
-
-            ).exec().out.firstOrNull()?.trim()
-
-
-
-            if (sysDevs.isNullOrBlank()) {
-
-                val poolCls = Shell.cmd("ls /sys/class 2>/dev/null").exec().out
-
-                    .map { it.trim() }
-
-                    .firstOrNull { it.matches(Regex("^[A-GNYB]{6,8}$")) }
-
-                if (poolCls != null) {
-
-                    val mm = Shell.cmd("cat /sys/class/$poolCls/dev 2>/dev/null").exec().out.firstOrNull()?.trim()
-
-                    if (!mm.isNullOrBlank()) sysDevs = "$mm /sys/class/$poolCls/dev"
-
-                }
-
-            }
-
-
-
-            if (!sysDevs.isNullOrBlank()) {
-
-                val mm = sysDevs.substringBefore(' ').trim()
-
-                val parts = mm.split(':')
-
-                if (parts.size == 2 && parts[0].toIntOrNull() != null && parts[1].toIntOrNull() != null) {
-
-                    val maj = parts[0]
-
-                    val min = parts[1]
-
-                    val sysfsName = Regex("""/sys/class/(?:[^/]+/)*([^/]+)/dev$""")
-
-                        .find(sysDevs.substringAfter(' ', ""))?.groupValues?.get(1) ?: ""
-
-                    foundNodeName = when {
-
-                        sysfsName.isNotBlank() -> sysfsName
-
-                        expectedNode.isNotBlank() -> expectedNode
-
-                        else -> ""
-
-                    }
-
-                    if (foundNodeName.isNotEmpty()) {
-
-                        Shell.cmd("mknod -m 666 /dev/$foundNodeName c $maj $min 2>/dev/null").exec()
-
-                        exactNode = isCharNode(foundNodeName)
-
-                        if (exactNode) {
-
-                            vm.tlog("[SYSFS] Created /dev/$foundNodeName (major=$maj minor=$min)", "OK")
-
-                        }
-
-                    }
-
-                }
-
-            }
-
-        }
-
-
-
-        if (!exactNode) {
-
-            val picked = pickFreshMajorNode(vm, moduleName, charMajorsBefore)
-
-            if (picked != null) {
-
-                val (maj, nodeName) = picked
-
-                Shell.cmd("mknod -m 666 /dev/$nodeName c $maj 0 2>/dev/null").exec()
-
-                if (isCharNode(nodeName)) {
-
-                    foundNodeName = nodeName
-
-                    exactNode = true
-
-                    vm.tlog("[PROCDEV] Created /dev/$nodeName from /proc/devices (major=$maj, minor=0)", "OK")
-
-                }
-
-            }
-
-        }
-
-
-
-        if (exactNode && foundNodeName.isNotEmpty()) {
-
-            val targetPath = "/dev/$foundNodeName"
-
-            val setupCmds = mutableListOf(
-
-                "chmod 666 $targetPath 2>/dev/null",
-
-                "chcon u:object_r:device:s0 $targetPath 2>/dev/null",
-
-                "chmod 666 /dev/entryi 2>/dev/null",
-
-                "chcon u:object_r:device:s0 /dev/entryi 2>/dev/null"
-
-            )
-
-            Shell.cmd(*setupCmds.toTypedArray()).exec()
-
-
-
-            vm.rememberDevNode(foundNodeName)
-
-            vm.tlog("[DEVNODE] Active node: $targetPath (0666, device:s0 · Pure Stealth)", "OK")
-
-        }
-
-
-
-        val lsmod = Shell.cmd("lsmod").exec()
-
-        val allCandidates = (listOf(moduleName, vm.preferredDevNode()) + vm.knownDriverModules()).filter { it.isNotBlank() }.distinct()
-
-        val loadedLine = lsmod.out.drop(1).firstOrNull { line ->
-
-            val n = line.trim().split(Regex("\\s+")).firstOrNull() ?: ""
-
-            n.isNotBlank() && n != "Module" && n in allCandidates
-
-        }
-
-        val moduleLoaded = loadedLine != null
-
-        val loadedName = loadedLine?.trim()?.split(Regex("\\s+"))?.firstOrNull() ?: ""
-
-        if (loadedName.isNotBlank()) vm.setLoadedModule(loadedName)
-
-
-
-        val dmesg = Shell.cmd("dmesg | grep -i -E 'kmem|dmsync|kloader|memacc|vermagic|insmod' | tail -n 15").exec()
-
-
-
-        val nodeRwOk = foundNodeName.isNotBlank() &&
-
-                Shell.cmd("test -r /dev/$foundNodeName && test -w /dev/$foundNodeName").exec().isSuccess
-
-
-
-        if ((moduleLoaded || exactNode) && nodeRwOk) {
-
-            vm.tlog("[VERIFY] Node /dev/$foundNodeName R/W verified (0666, client-ready)", "OK")
-
-            vm.tlog("[IOCTL] Node ready for 0x801/0x802/0x803 dispatch", "OK")
-
-            if (!moduleLoaded) {
-
-                vm.markHiddenLoaded()
-
-                vm.tlog("[STEALTH] Module unlinked from lsmod (stealth mode active)", "OK")
-
-            } else {
-
-                vm.tlog("[MODULE] Driver registered in lsmod as $loadedName", "INFO")
-
-            }
-
-        } else if (exactNode) {
-
-            vm.markHiddenLoaded()
-
-            vm.tlog("[DEVNODE] /dev/$foundNodeName ready (0666, stealth)", "OK")
-
-            vm.tlog("[STEALTH] Hidden resident driver in memory", "OK")
-
-        } else if (moduleLoaded) {
-
-            vm.tlog("[MODULE] $loadedName loaded in kernel (validating device node...)", "WARN")
-
-        } else {
-
-            if (!moduleLoaded) vm.tlog("[ERR] Module missing from lsmod and /sys/class", "ERR")
-
-            if (!exactNode && expectedNode.isNotEmpty()) {
-
-                vm.tlog("[ERR] Device node /dev/$expectedNode missing", "ERR")
-
-            }
-
-            dmesg.out.filter { it.isNotBlank() }.distinct().takeLast(3)
-
-                .forEach { vm.tlog("[DMESG] $it", "INFO") }
-
-        }
-
-
-
-        vm.setVerification(
-
-            VerificationResult(
-
-                lsmod = lsmod.out,
-
-                deviceNodeFound = exactNode,
-
-                dmesgLogs = dmesg.out,
-
-                timestamp = vm.nowString()
-
-            )
-
-        )
-
-
-
-        return if (exactNode && foundNodeName.isNotBlank()) foundNodeName else ""
-
+        vm.tstep("Verifying driver with Driver.sh (0x803)...")
+        val activeNode = probeDriverWithDriverSh(context, vm, expectedNode)
+        return activeNode ?: ""
     }
-
-
 
     private fun finish(vm: DriverViewModel, ok: Boolean, msg: String, context: Context? = null) {
 

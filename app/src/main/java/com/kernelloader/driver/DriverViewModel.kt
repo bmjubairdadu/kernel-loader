@@ -1,5 +1,13 @@
 package com.kernelloader.driver
 
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import com.kernelloader.MainActivity
+import com.kernelloader.R
+import android.content.Intent
+import android.os.Build
+
 import android.app.Application
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -156,6 +164,72 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    fun showUpdateNotification(context: Context, info: AppUpdateChecker.UpdateInfo, isDownloaded: Boolean = false) {
+        try {
+            val channelId = "app_updates"
+            val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val channel = NotificationChannel(
+                    channelId,
+                    "App Updates",
+                    NotificationManager.IMPORTANCE_HIGH
+                ).apply {
+                    description = "Notifications for new Kernel Loader updates"
+                    enableLights(true)
+                    enableVibration(true)
+                }
+                notificationManager.createNotificationChannel(channel)
+            }
+
+            val cachedApk = AppUpdateChecker.getDownloadedApk(context, info)
+            val intent = if (isDownloaded && cachedApk != null && AppUpdateChecker.canInstall(context)) {
+                val uri = androidx.core.content.FileProvider.getUriForFile(
+                    context, "${context.packageName}.fileprovider", cachedApk
+                )
+                Intent(Intent.ACTION_VIEW).apply {
+                    setDataAndType(uri, "application/vnd.android.package-archive")
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+            } else {
+                Intent(context, MainActivity::class.java).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                }
+            }
+
+            val pendingIntent = PendingIntent.getActivity(
+                context,
+                0,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0)
+            )
+
+            val title = if (isDownloaded) {
+                "Kernel Loader Update Ready!"
+            } else {
+                "Kernel Loader v${info.versionName} Available"
+            }
+
+            val text = if (isDownloaded) {
+                "Version ${info.versionName} is downloaded. Tap to install now."
+            } else {
+                "A new version (${info.versionName}) is available. Tap to update."
+            }
+
+            val notification = androidx.core.app.NotificationCompat.Builder(context, channelId)
+                .setSmallIcon(R.drawable.app_logo)
+                .setContentTitle(title)
+                .setContentText(text)
+                .setStyle(androidx.core.app.NotificationCompat.BigTextStyle().bigText(text))
+                .setPriority(androidx.core.app.NotificationCompat.PRIORITY_HIGH)
+                .setAutoCancel(true)
+                .setContentIntent(pendingIntent)
+                .build()
+
+            androidx.core.app.NotificationManagerCompat.from(context).notify(9001, notification)
+        } catch (_: Exception) {}
+    }
+
     fun checkForAppUpdate(silent: Boolean = false) {
         if (updateStatus.value == "CHECKING" || updateStatus.value == "DOWNLOADING") return
         val wasReady = updateStatus.value == "READY_TO_INSTALL"
@@ -173,8 +247,10 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                             updateStatus.value = "READY_TO_INSTALL"
                             updateProgress.value = 100
                             tlog("Update v${result.info.versionName} ready to install", "OK")
+                            showUpdateNotification(app, result.info, isDownloaded = true)
                         } else {
                             tlog("New version v${result.info.versionName} found — auto-downloading in background...", "INFO")
+                            showUpdateNotification(app, result.info, isDownloaded = false)
                             startBackgroundDownload(result.info)
                         }
                     }
@@ -211,6 +287,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                         updateStatus.value = "READY_TO_INSTALL"
                         updateProgress.value = 100
                         tlog("Update v${info.versionName} downloaded (${apk.length() / 1024} KB) — ready to install", "OK")
+                        showUpdateNotification(app, info, isDownloaded = true)
                     },
                     onFailure = { err ->
                         updateStatus.value = "AVAILABLE"
@@ -685,108 +762,15 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     private suspend fun runDriverShVerification(context: Context): Pair<Boolean, String> {
-        tstep("Scanning /dev with Driver.sh...")
-        tlog("Running Driver.sh to verify driver node...", "CMD")
+        tstep("Scanning /dev with Driver.sh (0x803)...")
+        tlog("Running Driver.sh 0x803 handshake to detect driver node...", "CMD")
         return withContext(Dispatchers.IO) {
-            try {
-                val local = File(context.filesDir, "Driver.sh")
-                val assetStream = try {
-                    context.assets.open("Driver.sh")
-                } catch (_: Exception) {
-                    context.assets.open("bin/driver.sh")
-                }
-                assetStream.use { input ->
-                    local.outputStream().use { output -> input.copyTo(output) }
-                }
-                val targetPath = "/data/local/tmp/Driver.sh"
-                Shell.cmd(
-                    "cp \"${local.absolutePath}\" $targetPath",
-                    "chmod 755 $targetPath"
-                ).exec()
-
-                val preferred = preferredDevNode()
-                val targetCmd = if (preferred.isNotBlank() && Shell.cmd("test -e /dev/$preferred").exec().isSuccess) {
-                    "$targetPath /dev/$preferred 2>&1"
-                } else {
-                    "$targetPath 2>&1"
-                }
-                val res = Shell.cmd(targetCmd).exec()
-                val outStr = res.out.joinToString("\n").trim()
-                val errStr = res.err.joinToString("\n").trim()
-                val combined = listOf(outStr, errStr).filter { it.isNotBlank() }.joinToString(" ").trim()
-
-                if (res.isSuccess || outStr.contains("DRIVER STATUS : loaded", ignoreCase = true)) {
-                    res.out.forEach { line ->
-                        val trimmed = line.trim()
-                        if (trimmed.isNotBlank()) tlog(trimmed, "OK")
-                    }
-                    Pair(true, "Driver active & verified")
-                } else {
-                    val dmesgAll = Shell.cmd("dmesg 2>/dev/null | tail -n 25").exec().out.joinToString("\n")
-                    val chrdevMatch = Regex("""CHRDEV\s+"([^"]+)"\s+major\s+number\s+(\d+)""", RegexOption.IGNORE_CASE).find(dmesgAll)
-                    if (chrdevMatch != null) {
-                        val nodeName = chrdevMatch.groupValues[1]
-                        val major = chrdevMatch.groupValues[2]
-                        Shell.cmd(
-                            "mknod -m 666 /dev/$nodeName c $major 0 2>/dev/null",
-                            "chmod 666 /dev/$nodeName 2>/dev/null",
-                            "chcon u:object_r:device:s0 /dev/$nodeName 2>/dev/null"
-                        ).exec()
-                        rememberDevNode(nodeName)
-                        tlog("[KERNEL] Driver active on /dev/$nodeName (major $major)", "OK")
-                        tlog("[NOTICE] Driver.sh linker bypassed on legacy Android", "INFO")
-                        return@withContext Pair(true, "Driver active on /dev/$nodeName")
-                    }
-
-                    val procDevs = Shell.cmd("cat /proc/devices 2>/dev/null").exec().out
-                    val dynamicDev = procDevs.mapNotNull { line ->
-                        val parts = line.trim().split(Regex("""\s+"""))
-                        if (parts.size >= 2 && parts[0].toIntOrNull() != null) {
-                            val name = parts[1]
-                            val maj = parts[0]
-                            if (name.matches(Regex("^[A-Za-z0-9]{6,8}$")) && !SafetyGuard.isSystemNode(name)) {
-                                Pair(maj, name)
-                            } else null
-                        } else null
-                    }.lastOrNull()
-
-                    if (dynamicDev != null) {
-                        val (maj, nodeName) = dynamicDev
-                        Shell.cmd(
-                            "mknod -m 666 /dev/$nodeName c $maj 0 2>/dev/null",
-                            "chmod 666 /dev/$nodeName 2>/dev/null",
-                            "chcon u:object_r:device:s0 /dev/$nodeName 2>/dev/null"
-                        ).exec()
-                        rememberDevNode(nodeName)
-                        tlog("[PROCDEV] Driver node confirmed: /dev/$nodeName (major $maj)", "OK")
-                        tlog("[NOTICE] Driver.sh linker bypassed on legacy Android", "INFO")
-                        return@withContext Pair(true, "Driver active on /dev/$nodeName")
-                    }
-
-                    val dmesg = Shell.cmd("dmesg 2>/dev/null | tail -n 8").exec().out
-                        .map { it.trim() }
-                        .filter { it.isNotBlank() }
-                    val dmesgHint = dmesg.lastOrNull {
-                        it.contains("error", true) || it.contains("fail", true) || it.contains("denied", true) || it.contains("segfault", true)
-                    } ?: dmesg.lastOrNull() ?: ""
-
-                    val reason = when {
-                        combined.isNotBlank() -> combined
-                        dmesgHint.isNotBlank() -> "Kernel: $dmesgHint"
-                        res.code == 127 -> "Driver.sh not found or inaccessible (exit 127)"
-                        res.code == 126 -> "Driver.sh permission denied (exit 126)"
-                        else -> "No responding node found in /dev by Driver.sh (exit ${res.code})"
-                    }
-                    tlog("Driver.sh check failed: $reason", "ERR")
-                    if (dmesgHint.isNotBlank() && !reason.contains(dmesgHint)) {
-                        tlog("Kernel log hint: $dmesgHint", "WARN")
-                    }
-                    Pair(false, reason)
-                }
-            } catch (e: Exception) {
-                val msg = "Driver.sh execution error: ${e.message}"
-                tlog(msg, "ERR")
-                Pair(false, msg)
+            val node = UniversalKernelLoader.probeDriverWithDriverSh(context, this@DriverViewModel, preferredDevNode())
+            if (!node.isNullOrBlank()) {
+                rememberDevNode(node)
+                Pair(true, "Driver active on /dev/$node")
+            } else {
+                Pair(false, "No responding driver node found by Driver.sh (0x803)")
             }
         }
     }
@@ -979,88 +963,29 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                 return false
             }
 
-            tlog("Driver loaded successfully", "OK")
-            var nodeFound = false
-            val dmesgAll = Shell.cmd("dmesg 2>/dev/null | tail -n 25").exec().out.joinToString("\n")
-            val chrdevMatch = Regex("""CHRDEV\s+"([^"]+)"\s+major\s+number\s+(\d+)""", RegexOption.IGNORE_CASE).find(dmesgAll)
-            if (chrdevMatch != null) {
-                val nodeName = chrdevMatch.groupValues[1]
-                val major = chrdevMatch.groupValues[2]
-                Shell.cmd(
-                    "mknod -m 666 /dev/$nodeName c $major 0 2>/dev/null",
-                    "chmod 666 /dev/$nodeName 2>/dev/null",
-                    "chcon u:object_r:device:s0 /dev/$nodeName 2>/dev/null"
-                ).exec()
-                rememberDevNode(nodeName)
-                nodeFound = true
-                tlog("Driver node active: /dev/$nodeName", "OK")
-            } else {
-                val procDevs = Shell.cmd("cat /proc/devices 2>/dev/null").exec().out
-                val dynamicDev = procDevs.mapNotNull { line ->
-                    val parts = line.trim().split(Regex("""\s+"""))
-                    if (parts.size >= 2 && parts[0].toIntOrNull() != null) {
-                        val name = parts[1]
-                        val maj = parts[0]
-                        if (maj.toIntOrNull() !in procMajorsBefore &&
-                            name.matches(Regex("^[A-Za-z0-9]{6,8}$")) &&
-                            !SafetyGuard.isSystemNode(name)
-                        ) {
-                            Pair(maj, name)
-                        } else null
-                    } else null
-                }.lastOrNull()
-                if (dynamicDev != null) {
-                    val (maj, nodeName) = dynamicDev
-                    Shell.cmd(
-                        "mknod -m 666 /dev/$nodeName c $maj 0 2>/dev/null",
-                        "chmod 666 /dev/$nodeName 2>/dev/null",
-                        "chcon u:object_r:device:s0 /dev/$nodeName 2>/dev/null"
-                    ).exec()
-                    rememberDevNode(nodeName)
-                    nodeFound = true
-                    tlog("Driver node active: /dev/$nodeName", "OK")
-                }
-            }
-            val ours = SafetyGuard.newlyLoaded(baselineMods).firstOrNull()
-            if (ours != null) {
-                tlog("[MODULE] Registered in /proc/modules as $ours", "OK")
-            }
-            val isRtVariant = entry.variant.equals("rt", ignoreCase = true) || entry.file.contains("rt", true) || entry.label.contains("rt", true)
-            val probed = UniversalKernelLoader.driverShProbe(context, this@DriverViewModel, preferredDevNode())
-            if (probed) {
-                tlog("[PROBE] Driver.sh 0x803 handshake OK — driver verified", "OK")
-            } else if (isRtVariant && nodeFound) {
-                tlog("[STEALTH] RT Driver detected on /dev/${preferredDevNode()} — verified & ready", "OK")
-            } else if (ours != null) {
-                tlog("[PROBE] 0x803 handshake not answered — module present in lsmod; accepting with warning", "WARN")
-            } else if (nodeFound) {
-                val msg = "Adopted node did not answer the 0x803 driver handshake — load not verified"
-                lastLoadError.value = msg
-                otaFailReason = msg
-                tlog("[FAIL] $msg", "ERR")
-                return false
-            }
-            if (!nodeFound && ours == null) {
-                val msg = "insmod exited 0 but no driver node or module appeared — load not verified"
-                lastLoadError.value = msg
-                otaFailReason = msg
-                tlog("[FAIL] $msg", "ERR")
-                return false
-            }
-            withContext(Dispatchers.Main) {
-                if (ours != null) setLoadedModule(ours)
-                else markHiddenLoaded()
+            tstep("Verifying driver with Driver.sh (0x803)...")
+            tlog("Running Driver.sh 0x803 handshake to detect driver node...", "CMD")
+            val activeNode = UniversalKernelLoader.probeDriverWithDriverSh(context, this@DriverViewModel, preferredDevNode())
+            if (!activeNode.isNullOrBlank()) {
+                rememberDevNode(activeNode)
+                markHiddenLoaded()
                 driverLoaded.value = true
                 autoLoadOk.value = true
                 BootSessionTracker.recordLoaded(
                     context,
                     loadedModuleName.value,
-                    preferredDevNode(),
+                    activeNode,
                     hiddenLoaded.value
                 )
+                tlog("[STEALTH] Driver active on /dev/$activeNode. Clear app from recents before launching game!", "OK")
+                return true
+            } else {
+                val msg = "Driver did not answer 0x803 handshake via Driver.sh — load not verified"
+                lastLoadError.value = msg
+                otaFailReason = msg
+                tlog("[FAIL] $msg", "ERR")
+                return false
             }
-            tlog("[STEALTH] Driver ready. Clear app from recents before launching game!", "OK")
-            return true
             } finally {
                 Shell.cmd("rm -f ${staged.absolutePath} 2>/dev/null").exec()
             }
