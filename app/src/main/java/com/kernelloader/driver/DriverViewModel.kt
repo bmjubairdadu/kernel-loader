@@ -1008,14 +1008,14 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
         loadJob = viewModelScope.launch(Dispatchers.IO) {
             try {
                 tstep("Kernel update...")
-                tlog("[KFIX] Kernel fix package নেওয়া হচ্ছে...", "CMD")
+                tlog("[KFIX] Extracting kernel package...", "CMD")
 
                 val zipFile = File(context.cacheDir, "kernel_package.zip")
                 runCatching { zipFile.delete() }
                 context.contentResolver.openInputStream(packageUri)?.use { input ->
                     FileOutputStream(zipFile).use { output -> input.copyTo(output) }
                 } ?: run {
-                    tlog("[KFIX] ফাইল খোলা যায়নি", "ERR")
+                    tlog("[KFIX] Cannot open file", "ERR")
                     return@launch
                 }
 
@@ -1035,18 +1035,18 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                         entry = zis.nextEntry
                     }
                     if (!found) {
-                        tlog("[KFIX] প্যাকেজে new-boot.img নেই — এটা কি DriverForge-এর kernel_package zip?", "ERR")
+                        tlog("[KFIX] new-boot.img missing — invalid kernel_package zip", "ERR")
                         return@launch
                     }
                 }
                 if (bootImg.length() < 1_000_000L || bootImg.length() > 90_000_000L) {
-                    tlog("[KFIX] boot image size অস্বাভাবিক (${bootImg.length()} bytes) — বাতিল", "ERR")
+                    tlog("[KFIX] boot image size abnormal (${bootImg.length()} bytes) — aborted", "ERR")
                     return@launch
                 }
                 val header = ByteArray(8)
                 bootImg.inputStream().use { runCatching { it.read(header) } }
                 if (String(header, Charsets.US_ASCII) != "ANDROID!") {
-                    tlog("[KFIX] ANDROID! header নেই — valid boot image না", "ERR")
+                    tlog("[KFIX] Missing ANDROID! header — invalid boot image", "ERR")
                     return@launch
                 }
                 tlog("[KFIX] Package OK: ${bootImg.length() / (1024 * 1024)} MB", "OK")
@@ -1082,11 +1082,11 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                 val kpOut = (kpRes.out + kpRes.err).joinToString("\n").trim()
                 when {
                     kpOut.contains("MARK_KP_OK") ->
-                        tlog("[KFIX] KernelPatch hook applied — root অক্ষত থাকবে", "OK")
+                        tlog("[KFIX] KernelPatch hook applied — root preserved", "OK")
                     kpOut.contains("MARK_NO_KPATCH") || kpOut.contains("MARK_KP_FAIL") ->
-                        tlog("[KFIX] kpatch প্যাচ হয়নি — flash-এর পর root চলে যাবে, APatch manager-এ আবার প্যাচ করতে হবে", "WARN")
+                        tlog("[KFIX] kpatch not applied — re-patch in APatch manager after reboot if root is missing", "WARN")
                     kpOut.contains("MARK_NO_KEY") ->
-                        tlog("[KFIX] superkey দেওয়া হয়নি — flash-এর পর root চলে যাবে, APatch manager-এ আবার প্যাচ করতে হবে", "WARN")
+                        tlog("[KFIX] Superkey not provided — re-patch in APatch manager after reboot if root is missing", "WARN")
                 }
                 runCatching { superkeyFile.delete() }
                 tstep("Backing up current boot...")
@@ -1118,30 +1118,30 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                 val out = (res.out + res.err).joinToString("\n").trim()
 
                 if (out.contains("MARK_NO_BOOT_DEV")) {
-                    tlog("[KFIX] boot partition খুঁজে পাওয়া যায়নি", "ERR")
+                    tlog("[KFIX] Boot partition not found", "ERR")
                     return@launch
                 }
                 if (out.contains("MARK_BACKUP_FAIL")) {
-                    tlog("[KFIX] পুরনো boot-এর backup নিতে ব্যর্থ — ঝুঁকি নিচ্ছি না, বাতিল", "ERR")
+                    tlog("[KFIX] Failed to backup original boot — aborted for safety", "ERR")
                     return@launch
                 }
                 val backupPath = out.lineSequence().firstOrNull { it.startsWith("MARK_BACKUP_OK:") }?.substringAfter(':')
                 if (backupPath != null) {
                     val keep = File(backupDir, "boot_backup_${System.currentTimeMillis()}.img")
                     Shell.cmd("cp \"$backupPath\" \"${keep.absolutePath}\" 2>/dev/null").exec()
-                    tlog("[KFIX] পুরনো boot backup: ${keep.absolutePath}", "OK")
+                    tlog("[KFIX] Original boot backup saved: ${keep.absolutePath}", "OK")
                 }
                 if (out.contains("MARK_FLASH_FAIL") || out.contains("MARK_VERIFY_FAIL")) {
-                    tlog("[KFIX] flash/verify ব্যর্থ — backup থেকে পুরনো boot ফেরত বসানো হয়েছে", "ERR")
+                    tlog("[KFIX] Flash/verify failed — restored original boot from backup", "ERR")
                     return@launch
                 }
                 if (!out.contains("MARK_FLASH_OK")) {
-                    tlog("[KFIX] flash অজানা কারণে ব্যর্থ: ${out.take(120)}", "ERR")
+                    tlog("[KFIX] Flash failed: ${out.take(120)}", "ERR")
                     return@launch
                 }
 
-                tlog("[KFIX] ✅ নতুন sig-off kernel flash সম্পন্ন — reboot দিলে কার্যকর হবে", "OK")
-                tlog("[KFIX] ⚠ reboot-এর পর root আবার কাজ করাতে APatch/KernelPatch manager-এ নতুন boot প্যাচ করতে হবে", "WARN")
+                tlog("[KFIX] ✅ Kernel flash complete — reboot to apply", "OK")
+                tlog("[KFIX] ⚠ Re-patch boot in APatch/KernelPatch manager if root is lost after reboot", "WARN")
                 triggerErrorDialog("Kernel Updated: restart phone once")
                 runCatching { Shell.cmd("rm -f $staged 2>/dev/null").exec() }
             } catch (e: Exception) {

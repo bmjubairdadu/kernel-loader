@@ -22,7 +22,6 @@ import com.kernelloader.ui.CreditsRoute
 import com.kernelloader.ui.CreditsScreen
 import com.kernelloader.ui.HomeScreen
 import com.kernelloader.ui.MainRoute
-import com.kernelloader.ui.SafetyWarningDialog
 import com.kernelloader.ui.WarningRoute
 import com.kernelloader.ui.theme.KernelLoderTheme
 import com.topjohnwu.superuser.Shell
@@ -51,21 +50,12 @@ class MainActivity : ComponentActivity() {
         setContent {
 
             KernelLoderTheme(darkTheme = true, dynamicColor = false) {
-                val backStack = remember { NavBackStack<NavKey>(WarningRoute) }
+                val backStack = remember { NavBackStack<NavKey>(MainRoute) }
                 NavDisplay(
                     backStack = backStack,
                     onBack = { backStack.removeLastOrNull() },
                     entryProvider = { key ->
                         when (key) {
-                            is WarningRoute -> NavEntry<NavKey>(key) {
-                                SafetyWarningDialog(
-                                    onDismiss = { finish() },
-                                    onConfirm = {
-                                        backStack.clear()
-                                        backStack.add(MainRoute)
-                                    }
-                                )
-                            }
                             is MainRoute -> NavEntry<NavKey>(key) {
                                 MainScreen(
                                     onNavigateToCredits = { backStack.add(CreditsRoute) },

@@ -1384,7 +1384,7 @@ object UniversalKernelLoader {
 
                 buildString {
 
-                    appendLine("=== DRIVERFORGE SIGNATURE PROBE ===")
+                    appendLine("=== SIGNATURE PROBE ===")
 
                     appendLine("time   : ${vm.nowString()}")
 
