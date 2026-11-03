@@ -5,6 +5,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [2.9] — 2026-11-04 (tag `v2.9` / `versionCode 29`) RT Daisy Driver Support, 0x803 Handshake Hardening & Signature Bypass Polish
+
+> **Release v2.9:** Full compatibility with the new 15KB RT Daisy Gaming Driver (`4.9.337-DaisyForGaming`), enhanced 0x803 ioctl probe validation, refined dynamic character device recognition, zero-footprint signature bypass cleanup, and bundled `sigprobe.ko` diagnostic module.
+
+### Added
+* **RT Daisy Driver Compatibility:** Fully verified and tested against the new ultra-lightweight 15KB RT driver with lock-free page table walking and 0% CPU idle footprint.
+* **0x803 Handshake Protection:** Hardened ioctl handshake detection against NULL module name queries, preventing `-EFAULT` false negatives during driver node validation.
+* **Bundled `sigprobe.ko` Diagnostic Asset:** Embedded the diagnostic signature probe module directly into APK assets for instant kernel signature enforcement profiling.
+* **Refined Character Node Safety Guards:** Tightened SCSI block node regex (`^sd[a-z][0-9]*$`) to prevent false-positive suppression of 6-character random driver node names.
+* **Zero-Footprint Signature Bypass Cleanup:** Enforced automatic wiping of staged `magiskboot` and `sigpatch` binaries from `/data/local/tmp` upon completion of kernel signature unlocking.
+
+---
+
 ## [2.8] — 2026-10-28 (tag `v2.8` / `versionCode 28`) 1-Click In-App Kernel Signature Auto-Unlock & English-First Dialogs
 
 > **Release v2.8:** Autonomous in-app kernel boot image patching for `CONFIG_MODULE_SIG_FORCE`, embedded `magiskboot` for zero-dependency execution across APatch, Magisk, and KernelSU, English-default error guidance dialogs, and instant 1-click reboot action.

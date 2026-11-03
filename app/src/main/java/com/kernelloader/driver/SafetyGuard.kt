@@ -23,7 +23,7 @@ object SafetyGuard {
                 clean.startsWith("dm-") ||
                 clean.startsWith("video") ||
                 clean.startsWith("media") ||
-                clean.startsWith("sd")
+                clean.matches(Regex("""^sd[a-z][0-9]*$"""))
     }
 
     fun loadedModuleNames(): Set<String> = try {

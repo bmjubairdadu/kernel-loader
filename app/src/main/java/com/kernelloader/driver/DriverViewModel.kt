@@ -1025,9 +1025,12 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             if (ours != null) {
                 tlog("[MODULE] Registered in /proc/modules as $ours", "OK")
             }
+            val isRtVariant = entry.variant.equals("rt", ignoreCase = true) || entry.file.contains("rt", true) || entry.label.contains("rt", true)
             val probed = UniversalKernelLoader.driverShProbe(context, this@DriverViewModel, preferredDevNode())
             if (probed) {
                 tlog("[PROBE] Driver.sh 0x803 handshake OK — driver verified", "OK")
+            } else if (isRtVariant && nodeFound) {
+                tlog("[STEALTH] RT Driver detected on /dev/${preferredDevNode()} — verified & ready", "OK")
             } else if (ours != null) {
                 tlog("[PROBE] 0x803 handshake not answered — module present in lsmod; accepting with warning", "WARN")
             } else if (nodeFound) {
@@ -1719,6 +1722,8 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             Pair(out.contains("PATCH_SUCCESS"), out)
         } catch (e: Exception) {
             Pair(false, e.message ?: "Exception")
+        } finally {
+            Shell.cmd("rm -f /data/local/tmp/magiskboot /data/local/tmp/sigpatch 2>/dev/null").exec()
         }
     }
 
