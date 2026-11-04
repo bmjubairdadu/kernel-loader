@@ -9,11 +9,16 @@ object BootSessionTracker {
     private const val PREFS_NAME = "driver_boot_session_prefs"
     private const val KEY_DRIVER_LOADED = "driver_loaded"
     private const val KEY_BOOT_ID = "boot_id"
+    private const val KEY_BOOT_TIME = "boot_timestamp"
     private const val KEY_MODULE_NAME = "loaded_module_name"
     private const val KEY_DEV_NODE = "loaded_dev_node"
     private const val KEY_HIDDEN = "is_hidden"
     private const val KEY_LOAD_TIME = "load_timestamp"
     private const val KEY_LOAD_UPTIME = "load_uptime"
+
+    fun getBootTime(): Long {
+        return System.currentTimeMillis() - SystemClock.elapsedRealtime()
+    }
 
     fun getBootId(): String = try {
         val f = File("/proc/sys/kernel/random/boot_id")
@@ -32,11 +37,14 @@ object BootSessionTracker {
     fun recordLoaded(context: Context, moduleName: String, devNode: String, hidden: Boolean) {
         try {
             val cleanNode = devNode.removePrefix("/dev/").trim()
+            if (SafetyGuard.isSystemNode(cleanNode)) return
             val p = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             val bootId = getBootId()
+            val bootTime = getBootTime()
             p.edit()
                 .putBoolean(KEY_DRIVER_LOADED, true)
                 .putString(KEY_BOOT_ID, bootId)
+                .putLong(KEY_BOOT_TIME, bootTime)
                 .putString(KEY_MODULE_NAME, moduleName)
                 .putString(KEY_DEV_NODE, cleanNode)
                 .putBoolean(KEY_HIDDEN, hidden)
@@ -66,6 +74,13 @@ object BootSessionTracker {
             val isLoaded = p.getBoolean(KEY_DRIVER_LOADED, false)
             if (!isLoaded) return SessionState(false, "", "", false)
 
+            val devNode = p.getString(KEY_DEV_NODE, "") ?: ""
+            if (SafetyGuard.isSystemNode(devNode)) {
+                clear(context)
+                return SessionState(false, "", "", false)
+            }
+
+            // Check 1: Uptime reset check (uptime rolled back)
             val loadUptime = p.getLong(KEY_LOAD_UPTIME, 0L)
             val currentUptime = SystemClock.elapsedRealtime()
             if (loadUptime > 0L && currentUptime < loadUptime) {
@@ -73,6 +88,17 @@ object BootSessionTracker {
                 return SessionState(false, "", "", false)
             }
 
+            // Check 2: Boot timestamp difference check (accurate across hard/soft reboots)
+            val savedBootTime = p.getLong(KEY_BOOT_TIME, 0L)
+            if (savedBootTime > 0L) {
+                val currentBootTime = getBootTime()
+                if (Math.abs(currentBootTime - savedBootTime) > 30000L) {
+                    clear(context)
+                    return SessionState(false, "", "", false)
+                }
+            }
+
+            // Check 3: Kernel boot_id check
             val savedBootId = p.getString(KEY_BOOT_ID, "") ?: ""
             val currentBootId = getBootId()
             if (savedBootId.isNotBlank() && currentBootId.isNotBlank() && savedBootId != currentBootId) {
@@ -81,7 +107,6 @@ object BootSessionTracker {
             }
 
             val moduleName = p.getString(KEY_MODULE_NAME, "") ?: ""
-            val devNode = p.getString(KEY_DEV_NODE, "") ?: ""
             val isHidden = p.getBoolean(KEY_HIDDEN, false)
             return SessionState(true, moduleName, devNode, isHidden)
         } catch (_: Exception) {

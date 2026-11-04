@@ -312,6 +312,8 @@ fun HomeScreen(
 
                 resync()
 
+                viewModel.refreshDriverState(context)
+
             }
 
         }
