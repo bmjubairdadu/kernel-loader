@@ -14,7 +14,9 @@ object SafetyGuard {
         "cpu_dma_latency", "network_latency", "network_throughput", "memory_bandwidth",
         "msm_rng", "msm-rng", "msm_rotator", "msm_vidc", "msm_audio", "msm_ipc_router", "msm_subsys", "msm_sps",
         "qcom_rx_mclk", "hw_random", "ipa", "adsprpc-smd", "smd_cntl",
-        "avtimer", "fastrpc", "fastrng", "ssc", "subsys", "wwan_ioctl", "icesdcc"
+        "avtimer", "fastrpc", "fastrng", "ssc", "subsys", "wwan_ioctl", "icesdcc",
+        "rfkill", "btpower", "sensors", "frandom", "erandom", "dts_eagle", "uio0", "uio", "vsock", "vhost-vsock",
+        "devfreq", "extcon", "hidraw", "ramdump", "spidev", "usbrndis", "rotator", "smdpkt"
     )
 
     fun isSystemNode(name: String): Boolean {
@@ -34,6 +36,11 @@ object SafetyGuard {
                 clean.startsWith("avtimer") ||
                 clean.startsWith("fast") ||
                 clean.startsWith("subsys") ||
+                clean.startsWith("rfkill") ||
+                clean.startsWith("btpower") ||
+                clean.startsWith("sensor") ||
+                clean.startsWith("uio") ||
+                clean.startsWith("vsock") ||
                 clean.startsWith("tty") ||
                 clean.startsWith("loop") ||
                 clean.startsWith("ram") ||
@@ -61,7 +68,7 @@ object SafetyGuard {
             .map { it.trim() }
             .filter { cls ->
                 !isSystemNode(cls) &&
-                (cls.startsWith("dmsync") || cls.startsWith("sysync") || cls.matches(Regex("^[a-z0-9]{6,8}$", RegexOption.IGNORE_CASE)) || cls.matches(Regex("^[A-GNYB]{6,8}$")))
+                (cls.startsWith("dmsync") || cls.startsWith("sysync") || cls.matches(Regex("^[A-Z]{6,8}$")) || cls.matches(Regex("^[A-GNYB]{6,8}$")))
             }
         candidates.firstOrNull { cls ->
             val devFileExists = Shell.cmd("test -f /sys/class/$cls/dev || test -f /sys/class/$cls/$cls/dev").exec().isSuccess

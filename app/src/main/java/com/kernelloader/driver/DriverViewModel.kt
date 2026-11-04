@@ -369,19 +369,11 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
         try {
             val session = BootSessionTracker.checkSession(application)
             if (session.isLoaded) {
-                if (SafetyGuard.isSystemNode(session.devNode)) {
+                val cleanNode = session.devNode.removePrefix("/dev/").trim()
+                val isPatternValid = cleanNode.matches(Regex("^[A-Z]{6,8}$")) ||
+                        cleanNode.startsWith("dmsync") || cleanNode.startsWith("sysync")
+                if (SafetyGuard.isSystemNode(cleanNode) || !isPatternValid) {
                     BootSessionTracker.clear(application)
-                } else {
-                    driverLoaded.value = true
-                    hiddenLoaded.value = session.isHidden
-                    autoLoadOk.value = true
-                    if (session.moduleName.isNotBlank()) {
-                        loadedModuleName.value = session.moduleName
-                        driverModule.value = session.moduleName
-                    }
-                    if (session.devNode.isNotBlank() && session.devNode != DEFAULT_DEV_NODE) {
-                        devNodeOverride.value = session.devNode
-                    }
                 }
             }
         } catch (_: Exception) {}
@@ -1428,12 +1420,16 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch(Dispatchers.IO) {
             val session = BootSessionTracker.checkSession(context)
             if (session.isLoaded) {
+                val cleanSessionNode = session.devNode.removePrefix("/dev/").trim()
+                val isPatternValid = cleanSessionNode.matches(Regex("^[A-Z]{6,8}$")) ||
+                        cleanSessionNode.startsWith("dmsync") || cleanSessionNode.startsWith("sysync")
+                val isNodeSafe = cleanSessionNode.isNotBlank() && !SafetyGuard.isSystemNode(cleanSessionNode) && isPatternValid
+
                 val loadedMods = SafetyGuard.loadedModuleNames()
                 val isModAlive = session.moduleName.isNotBlank() && session.moduleName in loadedMods
-                val isNodeAlive = session.devNode.isNotBlank() &&
-                        !SafetyGuard.isSystemNode(session.devNode) &&
-                        (Shell.cmd("test -c /dev/${session.devNode} 2>/dev/null").exec().isSuccess ||
-                         Shell.cmd("test -d /sys/class/${session.devNode} 2>/dev/null").exec().isSuccess)
+                val isNodeAlive = isNodeSafe &&
+                        (Shell.cmd("test -c /dev/$cleanSessionNode 2>/dev/null").exec().isSuccess ||
+                         Shell.cmd("test -d /sys/class/$cleanSessionNode 2>/dev/null").exec().isSuccess)
 
                 if (isModAlive || isNodeAlive) {
                     withContext(Dispatchers.Main) {
@@ -1444,9 +1440,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                             loadedModuleName.value = session.moduleName
                             driverModule.value = session.moduleName
                         }
-                        if (session.devNode.isNotBlank() && session.devNode != DEFAULT_DEV_NODE && !SafetyGuard.isSystemNode(session.devNode)) {
-                            rememberDevNode(session.devNode)
-                        }
+                        rememberDevNode(cleanSessionNode)
                     }
                     return@launch
                 } else {
@@ -1490,8 +1484,11 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                 null
             }
 
+            val isProbedValid = probed != null && !SafetyGuard.isSystemNode(probed) &&
+                    (probed.matches(Regex("^[A-Z]{6,8}$")) || probed.startsWith("dmsync") || probed.startsWith("sysync"))
+
             withContext(Dispatchers.Main) {
-                if (probed != null && !SafetyGuard.isSystemNode(probed)) {
+                if (isProbedValid && probed != null) {
                     rememberDevNode(probed)
                     markHiddenLoaded()
                     autoLoadOk.value = true

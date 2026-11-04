@@ -75,7 +75,9 @@ object BootSessionTracker {
             if (!isLoaded) return SessionState(false, "", "", false)
 
             val devNode = p.getString(KEY_DEV_NODE, "") ?: ""
-            if (SafetyGuard.isSystemNode(devNode)) {
+            val isPatternValid = devNode.matches(Regex("^[A-Z]{6,8}$")) ||
+                    devNode.startsWith("dmsync") || devNode.startsWith("sysync")
+            if (SafetyGuard.isSystemNode(devNode) || !isPatternValid) {
                 clear(context)
                 return SessionState(false, "", "", false)
             }

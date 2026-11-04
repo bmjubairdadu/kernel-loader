@@ -679,19 +679,14 @@ object UniversalKernelLoader {
             val devNodes = Shell.cmd("ls /dev 2>/dev/null").exec().out.map { it.trim() }
 
             val preferred = vm.preferredDevNode().removePrefix("/dev/").trim()
-
-            if (preferred.isNotBlank() && !SafetyGuard.isSystemNode(preferred) && preferred in devNodes && isCharNode(preferred)) {
-
+            val isPatternValid = preferred.matches(Regex("^[A-Z]{6,8}$")) ||
+                    preferred.startsWith("dmsync") || preferred.startsWith("sysync")
+            if (preferred.isNotBlank() && !SafetyGuard.isSystemNode(preferred) && isPatternValid && preferred in devNodes && isCharNode(preferred)) {
                 return preferred
-
             }
-
             val sysfsClass = SafetyGuard.hiddenDriverClass()
-
             if (sysfsClass != null && sysfsClass in devNodes && isCharNode(sysfsClass)) {
-
                 return sysfsClass
-
             }
 
             null
