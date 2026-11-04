@@ -747,6 +747,10 @@ object UniversalKernelLoader {
             }
 
             if (!foundNode.isNullOrBlank() && !SafetyGuard.isSystemNode(foundNode)) {
+                Shell.cmd(
+                    "chmod 666 /dev/$foundNode 2>/dev/null",
+                    "chcon u:object_r:device:s0 /dev/$foundNode 2>/dev/null"
+                ).exec()
                 vm?.rememberDevNode(foundNode)
                 vm?.markHiddenLoaded()
                 vm?.tlog("[PROBE] Driver.sh verified on /dev/$foundNode (0x803 OK)", "OK")

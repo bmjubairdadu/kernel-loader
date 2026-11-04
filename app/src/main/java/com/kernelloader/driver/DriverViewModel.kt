@@ -959,6 +959,13 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             tlog("Running Driver.sh 0x803 handshake to detect driver node...", "CMD")
             val activeNode = UniversalKernelLoader.probeDriverWithDriverSh(context, this@DriverViewModel, preferredDevNode())
             if (!activeNode.isNullOrBlank()) {
+                Shell.cmd(
+                    "chmod 666 /dev/$activeNode 2>/dev/null",
+                    "chcon u:object_r:device:s0 /dev/$activeNode 2>/dev/null",
+                    "dmesg -c >/dev/null 2>&1 || dmesg -C 2>/dev/null",
+                    "logcat -c >/dev/null 2>&1",
+                    "rm -f /data/local/tmp/kloader_* /data/local/tmp/Driver.sh /data/local/tmp/*.ko /data/local/tmp/*.sh /data/local/tmp/ui.xml /data/local/tmp/sig* /data/local/tmp/magiskboot /data/local/tmp/test* 2>/dev/null"
+                ).exec()
                 rememberDevNode(activeNode)
                 markHiddenLoaded()
                 driverLoaded.value = true
@@ -969,7 +976,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                     activeNode,
                     hiddenLoaded.value
                 )
-                tlog("[STEALTH] Driver active on /dev/$activeNode. Clear app from recents before launching game!", "OK")
+                tlog("[STEALTH] Driver active on /dev/$activeNode. Tap 'EXIT & HIDE' before opening game!", "OK")
                 return true
             } else {
                 val msg = "Driver did not answer 0x803 handshake via Driver.sh — load not verified"
@@ -1711,12 +1718,16 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             tlog("[STEALTH] Performing zero-footprint clean exit...", "INFO")
             Shell.cmd(
                 "dmesg -c >/dev/null 2>&1 || dmesg -C 2>/dev/null",
-                "rm -f /data/local/tmp/kloader_* /data/local/tmp/Driver.sh /data/local/tmp/*.ko /data/local/tmp/*.sh /data/local/tmp/ui.xml /data/local/tmp/sig* /data/local/tmp/magiskboot 2>/dev/null"
+                "logcat -c >/dev/null 2>&1",
+                "rm -f /data/local/tmp/kloader_* /data/local/tmp/Driver.sh /data/local/tmp/*.ko /data/local/tmp/*.sh /data/local/tmp/ui.xml /data/local/tmp/sig* /data/local/tmp/magiskboot /data/local/tmp/test* 2>/dev/null"
             ).exec()
             runCatching {
                 File(context.cacheDir, "kloader_auto.ko").delete()
                 File(context.cacheDir, "Driver.sh").delete()
                 File(context.cacheDir, "sigprobe.ko").delete()
+            }
+            runCatching {
+                Shell.getCachedShell()?.close()
             }
             (context as? android.app.Activity)?.finishAndRemoveTask()
         } catch (_: Exception) {}
