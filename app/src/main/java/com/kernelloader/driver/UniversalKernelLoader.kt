@@ -782,19 +782,8 @@ object UniversalKernelLoader {
     }
 
     private fun finish(vm: DriverViewModel, ok: Boolean, msg: String, context: Context? = null) {
-
-        // Deep Cleanup of all staging/test traces in /data/local/tmp
-        Shell.cmd("rm -f $TMP_KO /data/local/tmp/Driver.sh /data/local/tmp/kloader_auto.ko /data/local/tmp/kloader_ota.ko /data/local/tmp/*.ko /data/local/tmp/*.sh /data/local/tmp/ui.xml /data/local/tmp/sig* /data/local/tmp/magiskboot 2>/dev/null").exec()
-        if (ok) {
-            Shell.cmd("dmesg -c >/dev/null 2>&1 || dmesg -C 2>/dev/null").exec()
-        }
-        if (context != null) {
-            runCatching {
-                File(context.cacheDir, "kloader_auto.ko").delete()
-                File(context.cacheDir, "Driver.sh").delete()
-                File(context.cacheDir, "sigprobe.ko").delete()
-            }
-        }
+        val targetCtx = context ?: vm.getApplication()
+        com.kernelloader.security.AntiCheatShield.deepCleanDevice(targetCtx)
 
         vm.autoLoadOk.value = ok
 

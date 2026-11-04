@@ -89,6 +89,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 
 import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.Warning
 
 import androidx.compose.material.icons.filled.BugReport
 
@@ -739,6 +740,18 @@ fun HomeScreen(
             Spacer(Modifier.height(14.dp))
 
 
+
+
+
+            val autoSec = viewModel.autoExitSeconds.value
+            if (loaded && autoSec != null) {
+                AutoExitBanner(
+                    seconds = autoSec,
+                    onExitNow = { viewModel.safeExitAndHide(context) },
+                    onCancel = { viewModel.cancelAutoExit() }
+                )
+                Spacer(Modifier.height(10.dp))
+            }
 
             val toUnload by animateFloatAsState(
 
@@ -3574,3 +3587,73 @@ private object HomeScreenReportWipe {
 
 }
 
+
+@Composable
+private fun AutoExitBanner(
+    seconds: Int,
+    onExitNow: () -> Unit,
+    onCancel: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+        colors = CardDefaults.cardColors(containerColor = androidx.compose.ui.graphics.Color(0xFF0C2B18)),
+        border = BorderStroke(1.5.dp, AccentGreen),
+        shape = RoundedCornerShape(10.dp)
+    ) {
+        Column(Modifier.fillMaxWidth().padding(14.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Default.CheckCircle,
+                    contentDescription = null,
+                    tint = AccentGreen,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = "DRIVER ACTIVE · AUTO-SAFE EXIT IN " + seconds + "s",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = AccentGreen,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = "Closing app and terminating root shell so anti-cheat cannot detect background tools. Safe for game!",
+                style = MonoTiny,
+                color = TextSecondary,
+                textAlign = TextAlign.Center
+            )
+            Spacer(Modifier.height(10.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Button(
+                    onClick = onExitNow,
+                    colors = ButtonDefaults.buttonColors(containerColor = AccentGreen),
+                    shape = RoundedCornerShape(6.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(
+                        text = "EXIT NOW",
+                        style = MonoSmall,
+                        color = androidx.compose.ui.graphics.Color.Black,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                OutlinedButton(
+                    onClick = onCancel,
+                    shape = RoundedCornerShape(6.dp),
+                    border = BorderStroke(1.dp, TextMuted),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(
+                        text = "CANCEL (DEBUG)",
+                        style = MonoSmall,
+                        color = TextPrimary
+                    )
+                }
+            }
+        }
+    }
+}

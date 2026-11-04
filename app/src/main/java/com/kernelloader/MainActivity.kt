@@ -7,6 +7,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.viewModels
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
@@ -27,6 +28,9 @@ import com.kernelloader.ui.theme.KernelLoderTheme
 import com.topjohnwu.superuser.Shell
 
 class MainActivity : ComponentActivity() {
+
+    private val viewModel: DriverViewModel by viewModels()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         com.kernelloader.security.SecurityShield.protect(this)
@@ -48,7 +52,6 @@ class MainActivity : ComponentActivity() {
         }
         enableEdgeToEdge()
         setContent {
-
             KernelLoderTheme(darkTheme = true, dynamicColor = false) {
                 val backStack = remember { NavBackStack<NavKey>(MainRoute) }
                 NavDisplay(
@@ -58,6 +61,7 @@ class MainActivity : ComponentActivity() {
                         when (key) {
                             is MainRoute -> NavEntry<NavKey>(key) {
                                 MainScreen(
+                                    viewModel = viewModel,
                                     onNavigateToCredits = { backStack.add(CreditsRoute) },
                                     onNavigateToConsole = { backStack.add(ConsoleRoute) }
                                 )
@@ -67,7 +71,7 @@ class MainActivity : ComponentActivity() {
                             }
                             is ConsoleRoute -> NavEntry<NavKey>(key) {
                                 ConsoleScreen(
-                                    viewModel = viewModel(),
+                                    viewModel = viewModel,
                                     onBack = { backStack.removeLastOrNull() }
                                 )
                             }
@@ -91,6 +95,13 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         com.kernelloader.security.SecurityShield.protect(this)
+    }
+
+    override fun onStop() {
+        super.onStop()
+        if (viewModel.driverLoaded.value && !isChangingConfigurations) {
+            viewModel.safeExitAndHide(this)
+        }
     }
 
     companion object {

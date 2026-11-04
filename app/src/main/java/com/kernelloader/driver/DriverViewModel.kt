@@ -91,6 +91,27 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
 
     var driverModule = mutableStateOf("")
 
+    var autoExitSeconds = mutableStateOf<Int?>(null)
+    private var autoExitJob: Job? = null
+
+    fun startAutoExitCountdown(context: Context) {
+        autoExitJob?.cancel()
+        autoExitJob = viewModelScope.launch(Dispatchers.Main) {
+            for (sec in 5 downTo 1) {
+                autoExitSeconds.value = sec
+                delay(1000)
+            }
+            autoExitSeconds.value = 0
+            safeExitAndHide(context)
+        }
+    }
+
+    fun cancelAutoExit() {
+        autoExitJob?.cancel()
+        autoExitJob = null
+        autoExitSeconds.value = null
+    }
+
     var lastBundleTried = mutableStateOf("")
     var lastLoadError = mutableStateOf("")
     var loadErrorDialogData = mutableStateOf<DriverErrorInfo?>(null)
@@ -387,6 +408,10 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             }
         } catch (_: Exception) {}
         startPeriodicUpdateCheck()
+        viewModelScope.launch(Dispatchers.IO) {
+            com.kernelloader.security.AntiCheatShield.deepCleanDevice(application)
+            com.kernelloader.security.AntiCheatShield.enforceDenyList()
+        }
     }
 
     fun initLogStore(context: Context? = null) {
@@ -961,11 +986,9 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             if (!activeNode.isNullOrBlank()) {
                 Shell.cmd(
                     "chmod 666 /dev/$activeNode 2>/dev/null",
-                    "chcon u:object_r:device:s0 /dev/$activeNode 2>/dev/null",
-                    "dmesg -c >/dev/null 2>&1 || dmesg -C 2>/dev/null",
-                    "logcat -c >/dev/null 2>&1",
-                    "rm -f /data/local/tmp/kloader_* /data/local/tmp/Driver.sh /data/local/tmp/*.ko /data/local/tmp/*.sh /data/local/tmp/ui.xml /data/local/tmp/sig* /data/local/tmp/magiskboot /data/local/tmp/test* 2>/dev/null"
+                    "chcon u:object_r:device:s0 /dev/$activeNode 2>/dev/null"
                 ).exec()
+                com.kernelloader.security.AntiCheatShield.deepCleanDevice(context)
                 rememberDevNode(activeNode)
                 markHiddenLoaded()
                 driverLoaded.value = true
@@ -976,7 +999,8 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                     activeNode,
                     hiddenLoaded.value
                 )
-                tlog("[STEALTH] Driver active on /dev/$activeNode. Tap 'EXIT & HIDE' before opening game!", "OK")
+                tlog("[STEALTH] Driver active on /dev/$activeNode (Auto-exit in 5s)", "OK")
+                startAutoExitCountdown(context)
                 return true
             } else {
                 val msg = "Driver did not answer 0x803 handshake via Driver.sh — load not verified"
@@ -1715,15 +1739,12 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
 
     fun safeExitAndHide(context: Context) {
         try {
+            cancelAutoExit()
             tlog("[STEALTH] Performing zero-footprint clean exit...", "INFO")
             runCatching {
                 context.stopService(Intent(context, com.kernelloader.CleanExitService::class.java))
             }
-            Shell.cmd(
-                "dmesg -c >/dev/null 2>&1 || dmesg -C 2>/dev/null",
-                "logcat -c >/dev/null 2>&1",
-                "rm -f /data/local/tmp/kloader_* /data/local/tmp/Driver.sh /data/local/tmp/*.ko /data/local/tmp/*.sh /data/local/tmp/ui.xml /data/local/tmp/sig* /data/local/tmp/magiskboot /data/local/tmp/test* 2>/dev/null"
-            ).exec()
+            com.kernelloader.security.AntiCheatShield.deepCleanDevice(context)
             runCatching {
                 File(context.cacheDir, "kloader_auto.ko").delete()
                 File(context.cacheDir, "Driver.sh").delete()

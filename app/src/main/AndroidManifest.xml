@@ -12,6 +12,10 @@
         tools:ignore="ProtectedPermissions" />
 
     <queries>
+        <package android:name="com.topjohnwu.magisk" />
+        <package android:name="io.github.a13e300.ksu" />
+        <package android:name="me.weishu.kernelsu" />
+        <package android:name="com.apatch" />
         <package android:name="com.whatsapp" />
         <package android:name="com.whatsapp.w4b" />
         <package android:name="org.telegram.messenger" />
