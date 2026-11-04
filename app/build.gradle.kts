@@ -15,8 +15,8 @@ android {
         applicationId = "com.kernelloader"
         minSdk = 28
         targetSdk = 34
-        versionCode = 33
-        versionName = "3.3"
+        versionCode = 34
+        versionName = "3.4"
 
         buildConfigField(
             "String",
@@ -63,7 +63,7 @@ androidComponents {
     }
     onVariants { variant ->
         variant.outputs.forEach { output ->
-            output.outputFileName.set("Kernel-Loader-v3.3.apk")
+            output.outputFileName.set("Kernel-Loader-v3.4.apk")
         }
     }
 }

@@ -99,7 +99,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onStop() {
         super.onStop()
-        if (viewModel.driverLoaded.value && !isChangingConfigurations) {
+        if (viewModel.driverLoaded.value && !viewModel.userCancelledAutoExit.value && !isChangingConfigurations) {
             viewModel.safeExitAndHide(this)
         }
     }

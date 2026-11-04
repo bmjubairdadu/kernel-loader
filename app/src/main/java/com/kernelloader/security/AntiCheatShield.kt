@@ -19,7 +19,7 @@ object AntiCheatShield {
         } catch (_: Exception) {}
     }
 
-    fun deepCleanDevice(context: Context) {
+    fun deepCleanDevice(context: Context, activeNode: String = "") {
         try {
             Log.d(TAG, "Performing deep device clean of staging & test files...")
             Shell.cmd(
@@ -33,6 +33,15 @@ object AntiCheatShield {
                 "dmesg -c >/dev/null 2>&1 || dmesg -C 2>/dev/null",
                 "logcat -c >/dev/null 2>&1"
             ).exec()
+
+            if (activeNode.isNotBlank()) {
+                val cleanNode = activeNode.removePrefix("/dev/").trim()
+                Shell.cmd(
+                    "for node in /dev/[A-Z][A-Z][A-Z][A-Z][A-Z][A-Z]; do " +
+                            "if [ \"\$node\" != \"/dev/$cleanNode\" ] && [ -c \"\$node\" ]; then " +
+                            "rm -f \"\$node\"; fi; done 2>/dev/null"
+                ).exec()
+            }
 
             runCatching {
                 context.cacheDir.listFiles()?.forEach { file ->

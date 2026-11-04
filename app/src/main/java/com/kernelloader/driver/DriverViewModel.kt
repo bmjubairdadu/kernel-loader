@@ -92,9 +92,11 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
     var driverModule = mutableStateOf("")
 
     var autoExitSeconds = mutableStateOf<Int?>(null)
+    var userCancelledAutoExit = mutableStateOf(false)
     private var autoExitJob: Job? = null
 
     fun startAutoExitCountdown(context: Context) {
+        userCancelledAutoExit.value = false
         autoExitJob?.cancel()
         autoExitJob = viewModelScope.launch(Dispatchers.Main) {
             for (sec in 5 downTo 1) {
@@ -107,6 +109,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun cancelAutoExit() {
+        userCancelledAutoExit.value = true
         autoExitJob?.cancel()
         autoExitJob = null
         autoExitSeconds.value = null
@@ -988,7 +991,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                     "chmod 666 /dev/$activeNode 2>/dev/null",
                     "chcon u:object_r:device:s0 /dev/$activeNode 2>/dev/null"
                 ).exec()
-                com.kernelloader.security.AntiCheatShield.deepCleanDevice(context)
+                com.kernelloader.security.AntiCheatShield.deepCleanDevice(context, activeNode)
                 rememberDevNode(activeNode)
                 markHiddenLoaded()
                 driverLoaded.value = true
@@ -1744,7 +1747,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             runCatching {
                 context.stopService(Intent(context, com.kernelloader.CleanExitService::class.java))
             }
-            com.kernelloader.security.AntiCheatShield.deepCleanDevice(context)
+            com.kernelloader.security.AntiCheatShield.deepCleanDevice(context, preferredDevNode())
             runCatching {
                 File(context.cacheDir, "kloader_auto.ko").delete()
                 File(context.cacheDir, "Driver.sh").delete()
