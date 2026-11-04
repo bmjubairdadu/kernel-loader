@@ -399,13 +399,13 @@
       "file": "4.9.337-DaisyForGaming.ko",
       "variant": "rt",
       "label": "4.9.337-DaisyForGaming",
-      "sha256": "2a38daedc1c50329e9596eabbd059ff3d46ca0e36499ae6b6db4df6702613c51",
-      "size": 25136,
+      "sha256": "a458d5ab98b8f8aa4a0390f6019d0332f0acd73223646321958888699c0c0ea5",
+      "size": 25936,
       "buildDate": "2026-11-03T17:40:00Z",
       "source": "daisy-gaming-driver",
       "verified": true,
       "frozen": false,
-      "sizeFormatted": "24.5 KB"
+      "sizeFormatted": "25.3 KB"
     }
   ],
   "frozenDrivers": [
