@@ -1716,6 +1716,9 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
     fun safeExitAndHide(context: Context) {
         try {
             tlog("[STEALTH] Performing zero-footprint clean exit...", "INFO")
+            runCatching {
+                context.stopService(Intent(context, com.kernelloader.CleanExitService::class.java))
+            }
             Shell.cmd(
                 "dmesg -c >/dev/null 2>&1 || dmesg -C 2>/dev/null",
                 "logcat -c >/dev/null 2>&1",
@@ -1729,10 +1732,24 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             runCatching {
                 Shell.getCachedShell()?.close()
             }
-            (context as? android.app.Activity)?.finishAndRemoveTask()
+            var act: android.app.Activity? = null
+            var ctx: Context? = context
+            while (ctx is android.content.ContextWrapper) {
+                if (ctx is android.app.Activity) {
+                    act = ctx
+                    break
+                }
+                ctx = ctx.baseContext
+            }
+            act?.moveTaskToBack(true)
+            act?.finishAffinity()
+            act?.finishAndRemoveTask()
         } catch (_: Exception) {}
-        android.os.Process.killProcess(android.os.Process.myPid())
-        kotlin.system.exitProcess(0)
+
+        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+            android.os.Process.killProcess(android.os.Process.myPid())
+            kotlin.system.exitProcess(0)
+        }, 300)
     }
 
 }
