@@ -723,85 +723,39 @@ object UniversalKernelLoader {
                 "chmod 755 $target 2>/dev/null"
             ).exec()
 
-            // 1. Run genuine V3 Driver.sh directly once (native C scan completes in ~0.15s)
+            // Pure V3 native C scan: Driver.sh scans /dev, runs 0x803 ioctl with PID 1
             val directRes = Shell.cmd("$target 2>&1").exec()
             val directOut = (directRes.out + directRes.err).joinToString("\n")
-            val isVerified = directOut.contains("Driver connected")
 
-            if (!isVerified) {
+            if (!directOut.contains("Driver connected")) {
                 return null
             }
 
-            // 2. Discover active character device node name instantly (< 10ms)
-            var foundNode: String? = null
-            val cleanPref = preferredNode.removePrefix("/dev/").trim()
-            if (cleanPref.isNotBlank() && !SafetyGuard.isSystemNode(cleanPref)) {
-                if (Shell.cmd("test -c /dev/$cleanPref 2>/dev/null").exec().isSuccess) {
+            // Extract exact responding node: "[+] Driver connected on /dev/<node>"
+            val nodeMatch = Regex("""\[\+\] Driver connected on (/dev/[A-Za-z0-9_-]+)""").find(directOut)
+            var foundNode = nodeMatch?.groupValues?.get(1)?.removePrefix("/dev/")?.trim()
+
+            if (foundNode.isNullOrBlank()) {
+                val cleanPref = preferredNode.removePrefix("/dev/").trim()
+                if (cleanPref.isNotBlank() && !SafetyGuard.isSystemNode(cleanPref) && Shell.cmd("test -c /dev/$cleanPref 2>/dev/null").exec().isSuccess) {
                     foundNode = cleanPref
                 }
             }
 
-            if (foundNode == null) {
-                // Check sysfs class created by driver
+            if (foundNode.isNullOrBlank()) {
                 foundNode = SafetyGuard.hiddenDriverClass()
             }
 
-            if (foundNode == null) {
-                // Parse /proc/devices character devices section for dynamically allocated non-system uppercase node
-                val procOut = Shell.cmd("cat /proc/devices 2>/dev/null").exec().out
-                var inCharDevs = false
-                for (line in procOut) {
-                    val trimmed = line.trim()
-                    if (trimmed.startsWith("Character devices:")) {
-                        inCharDevs = true
-                        continue
-                    }
-                    if (trimmed.startsWith("Block devices:")) {
-                        break
-                    }
-                    if (inCharDevs && trimmed.isNotBlank()) {
-                        val parts = trimmed.split(Regex("\\s+"))
-                        if (parts.size >= 2) {
-                            val candidate = parts[1].trim()
-                            if (candidate.isNotBlank() && !SafetyGuard.isSystemNode(candidate) &&
-                                (candidate.matches(Regex("^[A-Z0-9]{6,8}$")) || candidate.equals(cleanPref, ignoreCase = true))) {
-                                if (Shell.cmd("test -c /dev/$candidate 2>/dev/null").exec().isSuccess) {
-                                    foundNode = candidate
-                                    break
-                                }
-                            }
-                        }
-                    }
-                }
+            if (!foundNode.isNullOrBlank() && !SafetyGuard.isSystemNode(foundNode)) {
+                vm?.rememberDevNode(foundNode)
+                vm?.markHiddenLoaded()
+                vm?.tlog("[PROBE] Driver.sh verified on /dev/$foundNode (0x803 OK)", "OK")
+                foundNode
+            } else {
+                vm?.markHiddenLoaded()
+                vm?.tlog("[PROBE] Driver.sh 0x803 handshake OK — driver verified", "OK")
+                "driver"
             }
-
-            if (foundNode == null) {
-                // Fallback: fast scan /dev for uppercase random node matching V3 charset
-                val devList = Shell.cmd("ls /dev 2>/dev/null").exec().out
-                for (item in devList) {
-                    val name = item.trim()
-                    if (name.matches(Regex("^[A-Z0-9]{6,8}$")) && !SafetyGuard.isSystemNode(name)) {
-                        if (Shell.cmd("test -c /dev/$name 2>/dev/null").exec().isSuccess) {
-                            foundNode = name
-                            break
-                        }
-                    }
-                }
-            }
-
-            if (foundNode == null) {
-                return null
-            }
-
-            Shell.cmd(
-                "chmod 666 /dev/$foundNode 2>/dev/null",
-                "chcon u:object_r:device:s0 /dev/$foundNode 2>/dev/null"
-            ).exec()
-            vm?.rememberDevNode(foundNode)
-            vm?.markHiddenLoaded()
-            vm?.tlog("[PROBE] Driver.sh 0x803 handshake OK on /dev/$foundNode — driver verified", "OK")
-
-            foundNode
         } catch (e: Exception) {
             vm?.tlog("[PROBE ERR] Driver.sh check error: ${e.message}", "ERR")
             null
