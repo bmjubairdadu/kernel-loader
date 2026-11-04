@@ -623,18 +623,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             bin == "insmod" || Shell.cmd("test -x \"$bin\" 2>/dev/null || which \"$bin\" 2>/dev/null").exec().isSuccess
         }.ifEmpty { listOf("insmod") }
         val hideParam = if (supportsStealthHide()) "hide=1" else "hide=0"
-        val paramVariants = if (devNode.isNotBlank() && !SafetyGuard.isSystemNode(devNode)) {
-            listOf(
-                "devname=$devNode $hideParam",
-                "devicename=$devNode $hideParam",
-                "devname=$devNode",
-                "devicename=$devNode",
-                hideParam,
-                ""
-            )
-        } else {
-            listOf(hideParam, "")
-        }
+        val paramVariants = listOf(hideParam, "")
         var res = Shell.cmd("true").exec()
         var attempts = 0
         outer@ for (b in bins) {
@@ -1375,9 +1364,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
         if (safe.isNotBlank() && !SafetyGuard.isSystemNode(safe) && safe.matches(Regex("^[A-Za-z0-9]{6,8}$"))) {
             return safe
         }
-        val fresh = generateRandomDevNode()
-        devNodeOverride.value = fresh
-        return fresh
+        return ""
     }
 
     fun rememberDevNode(node: String) {

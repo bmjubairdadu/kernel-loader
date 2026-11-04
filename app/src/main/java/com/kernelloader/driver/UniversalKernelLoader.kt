@@ -725,37 +725,45 @@ object UniversalKernelLoader {
             var foundNode: String? = null
             val cleanPref = preferredNode.removePrefix("/dev/").trim()
             if (cleanPref.isNotBlank() && !SafetyGuard.isSystemNode(cleanPref)) {
-                // Priority 1: Expected node was provided - verify ONLY this exact node!
-                // NEVER fall back to blind scan when testing an expected driver node.
-                for (attempt in 1..5) {
-                    if (Shell.cmd("test -e /dev/$cleanPref 2>/dev/null").exec().isSuccess) {
-                        val directRes = Shell.cmd("$target /dev/$cleanPref 2>&1").exec()
-                        val directOut = (directRes.out + directRes.err).joinToString("\n")
-                        if (directRes.isSuccess || directOut.contains("0x803") || directOut.contains("Driver connected")) {
-                            foundNode = cleanPref
-                            break
-                        }
+                if (Shell.cmd("test -c /dev/$cleanPref 2>/dev/null").exec().isSuccess) {
+                    val directRes = Shell.cmd("$target /dev/$cleanPref 2>&1").exec()
+                    val directOut = (directRes.out + directRes.err).joinToString("\n")
+                    if (directRes.isSuccess || directOut.contains("0x803") || directOut.contains("Driver connected")) {
+                        foundNode = cleanPref
                     }
-                    try { Thread.sleep(150) } catch (_: InterruptedException) {}
                 }
-            } else {
-                // Priority 2: Blind scan ONLY if no preferredNode was provided.
-                // In blind scan, strictly reject any system node or lowercase non-pattern node.
-                for (attempt in 1..3) {
-                    val scanRes = Shell.cmd("$target 2>&1").exec()
-                    val scanOut = (scanRes.out + scanRes.err).joinToString("\n")
-                    if (scanRes.isSuccess || scanOut.contains("0x803") || scanOut.contains("Driver connected")) {
-                        val match = Regex("""Device responding on\s+(/dev/[a-zA-Z0-9_-]+)""").find(scanOut)
-                            ?: Regex("""Device responding on\s+([^\s\n]+)""").find(scanOut)
-                        val parsed = match?.groupValues?.get(1)?.removePrefix("/dev/")?.trim()
-                        if (!parsed.isNullOrBlank() && !SafetyGuard.isSystemNode(parsed) &&
-                            (parsed.matches(Regex("^[A-Z]{6,8}$")) || parsed.matches(Regex("^[A-GNYB]{6,8}$")) || parsed.startsWith("dmsync") || parsed.startsWith("sysync"))
-                        ) {
-                            foundNode = parsed
+            }
+
+            // V3 Architecture: Scan the whole /dev/ to find the responding driver node
+            if (foundNode == null) {
+                val scanScript = """
+                    for f in /dev/*; do
+                        [ -c "${'$'}f" ] || continue
+                        n="${'$'}{f#/dev/}"
+                        case "${'$'}n" in
+                            null|zero|full|ptmx|tty*|console|kmsg|random|urandom|loop*|fuse|ion|alarm*|rtc*|dm-*|uhid|uinput|tun|vhost*|port|mem|kmem|diag*|kgsl*|qsee*|block|input|snd*|thermal*|camera*|display*|video*|media*|msm_*|msm-*|qcom_*|hw_*|ipa*|adsprpc*|smd*|avtimer*|fast*|subsys*|rfkill*|bt*|sensor*|uio*|vsock*|ram*|gpio*|i2c*|spi*|pmsg*|usb*)
+                                continue ;;
+                        esac
+                        res=${'$'}($target "${'$'}f" 2>&1)
+                        if echo "${'$'}res" | grep -q "Driver connected"; then
+                            echo "FOUND_DRIVER_NODE:${'$'}n"
+                            exit 0
+                        fi
+                    done
+                    echo "NOT_FOUND"
+                """.trimIndent()
+
+                for (attempt in 1..4) {
+                    val scanRes = Shell.cmd(scanScript).exec()
+                    val match = Regex("""FOUND_DRIVER_NODE:([a-zA-Z0-9_-]+)""").find(scanRes.out.joinToString("\n"))
+                    if (match != null) {
+                        val candidate = match.groupValues[1].trim()
+                        if (candidate.isNotBlank() && !SafetyGuard.isSystemNode(candidate)) {
+                            foundNode = candidate
                             break
                         }
                     }
-                    try { Thread.sleep(150) } catch (_: InterruptedException) {}
+                    try { Thread.sleep(200) } catch (_: InterruptedException) {}
                 }
             }
 
