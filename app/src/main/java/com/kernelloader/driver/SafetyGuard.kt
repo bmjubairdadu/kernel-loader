@@ -11,12 +11,25 @@ object SafetyGuard {
         "device-mapper", "uhid", "uinput", "tun", "vhost-net", "port", "mem", "kmem",
         "diag", "kgsl-3d0", "qseecom", "socket", "block", "input", "snd", "graphics",
         "thermal", "camera", "display", "power_supply", "net", "sound", "misc", "video",
-        "cpu_dma_latency", "network_latency", "network_throughput", "memory_bandwidth"
+        "cpu_dma_latency", "network_latency", "network_throughput", "memory_bandwidth",
+        "msm_rng", "msm-rng", "msm_rotator", "msm_vidc", "msm_audio", "msm_ipc_router", "msm_subsys", "msm_sps",
+        "qcom_rx_mclk", "hw_random", "ipa", "adsprpc-smd", "smd_cntl"
     )
 
     fun isSystemNode(name: String): Boolean {
         val clean = name.removePrefix("/dev/").trim().lowercase()
-        return clean in SYSTEM_DEV_NODES ||
+        return clean.isBlank() ||
+                clean in SYSTEM_DEV_NODES ||
+                clean.startsWith("msm_") ||
+                clean.startsWith("msm-") ||
+                clean.startsWith("qcom_") ||
+                clean.startsWith("hw_") ||
+                clean.startsWith("diag") ||
+                clean.startsWith("kgsl") ||
+                clean.startsWith("qsee") ||
+                clean.startsWith("ipa") ||
+                clean.startsWith("adsprpc") ||
+                clean.startsWith("smd") ||
                 clean.startsWith("tty") ||
                 clean.startsWith("loop") ||
                 clean.startsWith("ram") ||
@@ -44,12 +57,12 @@ object SafetyGuard {
             .map { it.trim() }
             .filter { cls ->
                 !isSystemNode(cls) &&
-                (cls.startsWith("dmsync") || cls.startsWith("sysync") || cls.matches(Regex("^[A-Za-z0-9]{6,8}$")) || cls.matches(Regex("^[A-GNYB]{6,8}$")))
+                (cls.startsWith("dmsync") || cls.startsWith("sysync") || cls.matches(Regex("^[a-z0-9]{6,8}$", RegexOption.IGNORE_CASE)) || cls.matches(Regex("^[A-GNYB]{6,8}$")))
             }
         candidates.firstOrNull { cls ->
-            val devFileExists = Shell.cmd("test -f /sys/class/$cls/dev").exec().isSuccess
+            val devFileExists = Shell.cmd("test -f /sys/class/$cls/dev || test -f /sys/class/$cls/$cls/dev").exec().isSuccess
             val charNodeExists = Shell.cmd("test -c /dev/$cls").exec().isSuccess
-            devFileExists && charNodeExists
+            devFileExists || charNodeExists
         }
     } catch (e: Exception) {
         null

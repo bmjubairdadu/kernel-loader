@@ -627,10 +627,17 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             bin == "insmod" || Shell.cmd("test -x \"$bin\" 2>/dev/null || which \"$bin\" 2>/dev/null").exec().isSuccess
         }.ifEmpty { listOf("insmod") }
         val hideParam = if (supportsStealthHide()) "hide=1" else "hide=0"
-        val paramVariants = if (devNode.isNotBlank()) {
-            listOf("", "devname=$devNode $hideParam", "devicename=$devNode $hideParam", hideParam)
+        val paramVariants = if (devNode.isNotBlank() && !SafetyGuard.isSystemNode(devNode)) {
+            listOf(
+                "devname=$devNode $hideParam",
+                "devicename=$devNode $hideParam",
+                "devname=$devNode",
+                "devicename=$devNode",
+                hideParam,
+                ""
+            )
         } else {
-            listOf("", hideParam)
+            listOf(hideParam, "")
         }
         var res = Shell.cmd("true").exec()
         var attempts = 0
@@ -1356,17 +1363,30 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             driverModule.value.ifBlank { null }
         ).distinct()
 
+    fun generateRandomDevNode(): String {
+        val charset = "abcdefghijklmnopqrstuvwxyz"
+        val rnd = java.security.SecureRandom()
+        return (1..6).map { charset[rnd.nextInt(charset.length)] }.joinToString("")
+    }
+
     private fun sanitizeNode(node: String): String =
         node.filter { it.isLetterOrDigit() || it == '_' || it == '-' }.take(32)
 
     fun preferredDevNode(): String {
-        val safe = sanitizeNode(devNodeOverride.value)
-        return if (safe.isBlank()) DEFAULT_DEV_NODE else safe
+        val safe = sanitizeNode(devNodeOverride.value).lowercase()
+        if (safe.isNotBlank() && !SafetyGuard.isSystemNode(safe) && safe.matches(Regex("^[a-z]{6,8}$"))) {
+            return safe
+        }
+        val fresh = generateRandomDevNode()
+        devNodeOverride.value = fresh
+        return fresh
     }
 
     fun rememberDevNode(node: String) {
-        val safe = sanitizeNode(node)
-        if (safe.isNotBlank() && safe != DEFAULT_DEV_NODE) devNodeOverride.value = safe
+        val safe = sanitizeNode(node).lowercase()
+        if (safe.isNotBlank() && !SafetyGuard.isSystemNode(safe) && safe != DEFAULT_DEV_NODE) {
+            devNodeOverride.value = safe
+        }
     }
 
     fun rebootDevice(context: Context) {

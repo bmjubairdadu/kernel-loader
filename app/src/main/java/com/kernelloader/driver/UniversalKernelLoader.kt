@@ -320,26 +320,17 @@ object UniversalKernelLoader {
 
 
 
-            res = Shell.cmd("$insmodCmd $TMP_KO").exec()
-
+            val targetDevNode = if (devNode.isNotBlank() && !SafetyGuard.isSystemNode(devNode)) devNode else vm.preferredDevNode()
+            res = Shell.cmd("$insmodCmd $TMP_KO devname=$targetDevNode").exec()
             if (!res.isSuccess) {
-
-                res = Shell.cmd("$insmodCmd $TMP_KO devname=$devNode").exec()
-
+                res = Shell.cmd("$insmodCmd $TMP_KO devicename=$targetDevNode").exec()
             }
-
             if (!res.isSuccess) {
-
-                res = Shell.cmd("$insmodCmd $TMP_KO devicename=$devNode").exec()
-
+                res = Shell.cmd("$insmodCmd $TMP_KO").exec()
             }
-
             if (!res.isSuccess) {
-
                 vm.tlog("[KERNEL] Retrying with forced insmod (-f)...", "WARN")
-
-                res = Shell.cmd("$insmodCmd -f $TMP_KO 2>/dev/null || $insmodCmd -f $TMP_KO devname=$devNode 2>/dev/null").exec()
-
+                res = Shell.cmd("$insmodCmd -f $TMP_KO devname=$targetDevNode 2>/dev/null || $insmodCmd -f $TMP_KO 2>/dev/null").exec()
             }
 
         }
@@ -739,7 +730,7 @@ object UniversalKernelLoader {
             var foundNode: String? = null
             for (attempt in 1..5) {
                 val cleanPref = preferredNode.removePrefix("/dev/").trim()
-                if (cleanPref.isNotBlank() && Shell.cmd("test -e /dev/$cleanPref 2>/dev/null").exec().isSuccess) {
+                if (cleanPref.isNotBlank() && !SafetyGuard.isSystemNode(cleanPref) && Shell.cmd("test -e /dev/$cleanPref 2>/dev/null").exec().isSuccess) {
                     val directRes = Shell.cmd("$target /dev/$cleanPref 2>&1").exec()
                     val directOut = (directRes.out + directRes.err).joinToString("\n")
                     if (directRes.isSuccess || directOut.contains("0x803")) {
@@ -753,10 +744,10 @@ object UniversalKernelLoader {
                     val match = Regex("""Device responding on\s+(/dev/[a-zA-Z0-9_-]+)""").find(scanOut)
                         ?: Regex("""Device responding on\s+([^\s\n]+)""").find(scanOut)
                     val parsed = match?.groupValues?.get(1)?.removePrefix("/dev/")?.trim()
-                    if (!parsed.isNullOrBlank()) {
+                    if (!parsed.isNullOrBlank() && !SafetyGuard.isSystemNode(parsed)) {
                         foundNode = parsed
                         break
-                    } else if (cleanPref.isNotBlank()) {
+                    } else if (cleanPref.isNotBlank() && !SafetyGuard.isSystemNode(cleanPref)) {
                         foundNode = cleanPref
                         break
                     }
@@ -764,7 +755,7 @@ object UniversalKernelLoader {
                 try { Thread.sleep(150) } catch (_: InterruptedException) {}
             }
 
-            if (foundNode != null) {
+            if (foundNode != null && !SafetyGuard.isSystemNode(foundNode)) {
                 Shell.cmd(
                     "chmod 666 /dev/$foundNode 2>/dev/null",
                     "chcon u:object_r:device:s0 /dev/$foundNode 2>/dev/null"
@@ -772,6 +763,8 @@ object UniversalKernelLoader {
                 vm?.rememberDevNode(foundNode)
                 vm?.markHiddenLoaded()
                 vm?.tlog("[PROBE] Driver.sh 0x803 handshake OK on /dev/$foundNode — driver verified", "OK")
+            } else {
+                foundNode = null
             }
             foundNode
         } catch (e: Exception) {
