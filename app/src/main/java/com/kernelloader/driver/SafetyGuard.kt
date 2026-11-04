@@ -16,7 +16,9 @@ object SafetyGuard {
         "qcom_rx_mclk", "hw_random", "ipa", "adsprpc-smd", "smd_cntl",
         "avtimer", "fastrpc", "fastrng", "ssc", "subsys", "wwan_ioctl", "icesdcc",
         "rfkill", "btpower", "sensors", "frandom", "erandom", "dts_eagle", "uio0", "uio", "vsock", "vhost-vsock",
-        "devfreq", "extcon", "hidraw", "ramdump", "spidev", "usbrndis", "rotator", "smdpkt"
+        "devfreq", "extcon", "hidraw", "ramdump", "spidev", "usbrndis", "rotator", "smdpkt",
+        "ppp", "alsa", "sg", "ch", "i2c", "spi", "usb", "ptm", "pts", "gpiochip", "pmsg", "rtc", "DVB", "wwan_ioctl",
+        "dts_eagle_ioctl", "BaseRemoteCtl", "goodix_fp_spi", "rmnet_ctrl", "ttyGS", "usbmon", "wcnss_wlan", "wcnss_ctrl"
     )
 
     fun isSystemNode(name: String): Boolean {

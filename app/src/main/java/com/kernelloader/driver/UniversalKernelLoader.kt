@@ -723,7 +723,7 @@ object UniversalKernelLoader {
             // 1. Run genuine V3 Driver.sh directly once (native C scan completes in ~0.15s)
             val directRes = Shell.cmd("$target 2>&1").exec()
             val directOut = (directRes.out + directRes.err).joinToString("\n")
-            val isVerified = directOut.contains("Driver connected") || directOut.contains("0x803")
+            val isVerified = directOut.contains("Driver connected")
 
             if (!isVerified) {
                 return null
@@ -739,7 +739,12 @@ object UniversalKernelLoader {
             }
 
             if (foundNode == null) {
-                // Parse /proc/devices character devices section for dynamically allocated non-system node
+                // Check sysfs class created by driver
+                foundNode = SafetyGuard.hiddenDriverClass()
+            }
+
+            if (foundNode == null) {
+                // Parse /proc/devices character devices section for dynamically allocated non-system uppercase node
                 val procOut = Shell.cmd("cat /proc/devices 2>/dev/null").exec().out
                 var inCharDevs = false
                 for (line in procOut) {
@@ -755,7 +760,8 @@ object UniversalKernelLoader {
                         val parts = trimmed.split(Regex("\\s+"))
                         if (parts.size >= 2) {
                             val candidate = parts[1].trim()
-                            if (candidate.isNotBlank() && !SafetyGuard.isSystemNode(candidate)) {
+                            if (candidate.isNotBlank() && !SafetyGuard.isSystemNode(candidate) &&
+                                (candidate.matches(Regex("^[A-Z0-9]{6,8}$")) || candidate.equals(cleanPref, ignoreCase = true))) {
                                 if (Shell.cmd("test -c /dev/$candidate 2>/dev/null").exec().isSuccess) {
                                     foundNode = candidate
                                     break
@@ -781,7 +787,7 @@ object UniversalKernelLoader {
             }
 
             if (foundNode == null) {
-                foundNode = "driver"
+                return null
             }
 
             Shell.cmd(
