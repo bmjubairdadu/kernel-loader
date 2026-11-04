@@ -731,7 +731,7 @@ object UniversalKernelLoader {
                     if (Shell.cmd("test -e /dev/$cleanPref 2>/dev/null").exec().isSuccess) {
                         val directRes = Shell.cmd("$target /dev/$cleanPref 2>&1").exec()
                         val directOut = (directRes.out + directRes.err).joinToString("\n")
-                        if (directRes.isSuccess || directOut.contains("0x803")) {
+                        if (directRes.isSuccess || directOut.contains("0x803") || directOut.contains("Driver connected")) {
                             foundNode = cleanPref
                             break
                         }
@@ -744,12 +744,12 @@ object UniversalKernelLoader {
                 for (attempt in 1..3) {
                     val scanRes = Shell.cmd("$target 2>&1").exec()
                     val scanOut = (scanRes.out + scanRes.err).joinToString("\n")
-                    if (scanRes.isSuccess || scanOut.contains("0x803")) {
+                    if (scanRes.isSuccess || scanOut.contains("0x803") || scanOut.contains("Driver connected")) {
                         val match = Regex("""Device responding on\s+(/dev/[a-zA-Z0-9_-]+)""").find(scanOut)
                             ?: Regex("""Device responding on\s+([^\s\n]+)""").find(scanOut)
                         val parsed = match?.groupValues?.get(1)?.removePrefix("/dev/")?.trim()
                         if (!parsed.isNullOrBlank() && !SafetyGuard.isSystemNode(parsed) &&
-                            (parsed.matches(Regex("^[A-Z]{6,8}$")) || parsed.startsWith("dmsync") || parsed.startsWith("sysync"))
+                            (parsed.matches(Regex("^[A-Z]{6,8}$")) || parsed.matches(Regex("^[A-GNYB]{6,8}$")) || parsed.startsWith("dmsync") || parsed.startsWith("sysync"))
                         ) {
                             foundNode = parsed
                             break
