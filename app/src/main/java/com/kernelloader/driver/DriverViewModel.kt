@@ -1368,7 +1368,9 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
         ).distinct()
 
     fun generateRandomDevNode(): String {
-        val charset = "abcdefghijklmnopqrstuvwxyz"
+        // Uppercase 6-letter string [A-Z]{6} (e.g. KMTXQV).
+        // Zero chance of collision with Android/Linux system nodes (which are strictly lowercase).
+        val charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
         val rnd = java.security.SecureRandom()
         return (1..6).map { charset[rnd.nextInt(charset.length)] }.joinToString("")
     }
@@ -1377,8 +1379,8 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
         node.filter { it.isLetterOrDigit() || it == '_' || it == '-' }.take(32)
 
     fun preferredDevNode(): String {
-        val safe = sanitizeNode(devNodeOverride.value).lowercase()
-        if (safe.isNotBlank() && !SafetyGuard.isSystemNode(safe) && safe.matches(Regex("^[a-z]{6,8}$"))) {
+        val safe = sanitizeNode(devNodeOverride.value)
+        if (safe.isNotBlank() && !SafetyGuard.isSystemNode(safe) && safe.matches(Regex("^[A-Za-z0-9]{6,8}$"))) {
             return safe
         }
         val fresh = generateRandomDevNode()
@@ -1387,7 +1389,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun rememberDevNode(node: String) {
-        val safe = sanitizeNode(node).lowercase()
+        val safe = sanitizeNode(node)
         if (safe.isNotBlank() && !SafetyGuard.isSystemNode(safe) && safe != DEFAULT_DEV_NODE) {
             devNodeOverride.value = safe
         }

@@ -13,7 +13,8 @@ object SafetyGuard {
         "thermal", "camera", "display", "power_supply", "net", "sound", "misc", "video",
         "cpu_dma_latency", "network_latency", "network_throughput", "memory_bandwidth",
         "msm_rng", "msm-rng", "msm_rotator", "msm_vidc", "msm_audio", "msm_ipc_router", "msm_subsys", "msm_sps",
-        "qcom_rx_mclk", "hw_random", "ipa", "adsprpc-smd", "smd_cntl"
+        "qcom_rx_mclk", "hw_random", "ipa", "adsprpc-smd", "smd_cntl",
+        "avtimer", "fastrpc", "fastrng", "ssc", "subsys", "wwan_ioctl", "icesdcc"
     )
 
     fun isSystemNode(name: String): Boolean {
@@ -30,6 +31,9 @@ object SafetyGuard {
                 clean.startsWith("ipa") ||
                 clean.startsWith("adsprpc") ||
                 clean.startsWith("smd") ||
+                clean.startsWith("avtimer") ||
+                clean.startsWith("fast") ||
+                clean.startsWith("subsys") ||
                 clean.startsWith("tty") ||
                 clean.startsWith("loop") ||
                 clean.startsWith("ram") ||

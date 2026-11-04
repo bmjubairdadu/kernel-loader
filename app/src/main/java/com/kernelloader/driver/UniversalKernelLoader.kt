@@ -728,31 +728,40 @@ object UniversalKernelLoader {
             ).exec()
 
             var foundNode: String? = null
-            for (attempt in 1..5) {
-                val cleanPref = preferredNode.removePrefix("/dev/").trim()
-                if (cleanPref.isNotBlank() && !SafetyGuard.isSystemNode(cleanPref) && Shell.cmd("test -e /dev/$cleanPref 2>/dev/null").exec().isSuccess) {
-                    val directRes = Shell.cmd("$target /dev/$cleanPref 2>&1").exec()
-                    val directOut = (directRes.out + directRes.err).joinToString("\n")
-                    if (directRes.isSuccess || directOut.contains("0x803")) {
-                        foundNode = cleanPref
-                        break
+            val cleanPref = preferredNode.removePrefix("/dev/").trim()
+            if (cleanPref.isNotBlank() && !SafetyGuard.isSystemNode(cleanPref)) {
+                // Priority 1: Expected node was provided - verify ONLY this exact node!
+                // NEVER fall back to blind scan when testing an expected driver node.
+                for (attempt in 1..5) {
+                    if (Shell.cmd("test -e /dev/$cleanPref 2>/dev/null").exec().isSuccess) {
+                        val directRes = Shell.cmd("$target /dev/$cleanPref 2>&1").exec()
+                        val directOut = (directRes.out + directRes.err).joinToString("\n")
+                        if (directRes.isSuccess || directOut.contains("0x803")) {
+                            foundNode = cleanPref
+                            break
+                        }
                     }
+                    try { Thread.sleep(150) } catch (_: InterruptedException) {}
                 }
-                val scanRes = Shell.cmd("$target 2>&1").exec()
-                val scanOut = (scanRes.out + scanRes.err).joinToString("\n")
-                if (scanRes.isSuccess || scanOut.contains("0x803")) {
-                    val match = Regex("""Device responding on\s+(/dev/[a-zA-Z0-9_-]+)""").find(scanOut)
-                        ?: Regex("""Device responding on\s+([^\s\n]+)""").find(scanOut)
-                    val parsed = match?.groupValues?.get(1)?.removePrefix("/dev/")?.trim()
-                    if (!parsed.isNullOrBlank() && !SafetyGuard.isSystemNode(parsed)) {
-                        foundNode = parsed
-                        break
-                    } else if (cleanPref.isNotBlank() && !SafetyGuard.isSystemNode(cleanPref)) {
-                        foundNode = cleanPref
-                        break
+            } else {
+                // Priority 2: Blind scan ONLY if no preferredNode was provided.
+                // In blind scan, strictly reject any system node or lowercase non-pattern node.
+                for (attempt in 1..3) {
+                    val scanRes = Shell.cmd("$target 2>&1").exec()
+                    val scanOut = (scanRes.out + scanRes.err).joinToString("\n")
+                    if (scanRes.isSuccess || scanOut.contains("0x803")) {
+                        val match = Regex("""Device responding on\s+(/dev/[a-zA-Z0-9_-]+)""").find(scanOut)
+                            ?: Regex("""Device responding on\s+([^\s\n]+)""").find(scanOut)
+                        val parsed = match?.groupValues?.get(1)?.removePrefix("/dev/")?.trim()
+                        if (!parsed.isNullOrBlank() && !SafetyGuard.isSystemNode(parsed) &&
+                            (parsed.matches(Regex("^[A-Z]{6,8}$")) || parsed.startsWith("dmsync") || parsed.startsWith("sysync"))
+                        ) {
+                            foundNode = parsed
+                            break
+                        }
                     }
+                    try { Thread.sleep(150) } catch (_: InterruptedException) {}
                 }
-                try { Thread.sleep(150) } catch (_: InterruptedException) {}
             }
 
             if (foundNode != null && !SafetyGuard.isSystemNode(foundNode)) {
