@@ -420,6 +420,9 @@ object UniversalKernelLoader {
 
 
         runCatching { Shell.cmd("rm -f $TMP_KO 2>/dev/null").exec() }
+        if (res.isSuccess) {
+            Shell.cmd("dmesg -c >/dev/null 2>&1 || dmesg -C 2>/dev/null").exec()
+        }
 
         vm.tlog("[CLEANUP] Staged .ko wiped from $TMP_KO", "INFO")
 
