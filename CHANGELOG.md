@@ -5,6 +5,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [3.0] — 2026-11-04 (tag `v3.0` / `versionCode 30`) Anti-Ban Hardware Protection & Pure V3 RT Driver Support
+
+> **Release v3.0:** Major security and anti-ban overhaul: hard-blacklists Snapdragon hardware security nodes (`msm_rng`, `avtimer`) to prevent false-positive adoption, incorporates full signature recognition for genuine V3 RT driver nodes (`[A-GNYB]{6,8}` / `[A-Z]{6,8}`), eliminates blind scan hijackings, and pairs 1:1 with pure zero-lag, zero-heat RT drivers.
+
+### Fixed & Security
+* **Hardware Device Blacklisting (Ban Prevention):** Added strict rejection in `SafetyGuard` for Snapdragon crypto and hardware nodes (`msm_rng`, `msm-rng`, `avtimer`, `qce`, `qseecom`, `ipa`, `adsprpc-smd`). Prevents memory scanners and game cheats from attaching to critical SoC crypto units.
+* **Driver.sh V3 Signature Recognition:** Updated `UniversalKernelLoader` to detect V3 verification signatures (`"Driver connected"`, `"0x803"`) and validate uppercase RT random node charsets (`"BYNBBYNBBYNBBYNBABCDEFG"`).
+* **Guarded Node Adoption:** Probing now strictly validates the designated driver node and rejects any system or non-pattern fallback nodes.
+* **Zero-QX Driver Alignment:** Fully compatible with pure RT drivers featuring direct 3-level page table walking (`__va(pa)`), zero `mmap_sem` locking, zero thread jitter, and zero device overheating.
+
+---
+
 ## [2.9] — 2026-11-04 (tag `v2.9` / `versionCode 29`) Streamlined 0x803 Driver Probe, System Update Notifications & RT Daisy Compatibility
 
 > **Release v2.9:** Streamlined driver verification to a direct, single-pass `Driver.sh` `0x803` ioctl probe, added Android status bar notification alerts for new OTA app updates and auto-downloads, full compatibility with the new 15KB RT Daisy Gaming Driver (`4.9.337-DaisyForGaming`), zero-footprint signature bypass cleanup, and bundled `sigprobe.ko` diagnostic module.
