@@ -1,7 +1,7 @@
 {
   "baseUrl": "https://raw.githubusercontent.com/bmjubairdadu/kernel-loader/drivers",
   "branch": "drivers",
-  "updated": "2026-11-05T10:42:40Z",
+  "updated": "2026-11-05T13:44:31Z",
   "count": 38,
   "drivers": [
     {
@@ -275,7 +275,7 @@
       "source": "Samsung_SM_A235F_4.19.157",
       "verified": true,
       "frozen": false,
-      "sizeFormatted": "281.3 KB"
+      "sizeFormatted": "253.8 KB"
     },
     {
       "version": "5.4.210-android12-9-g6b8e8e96f0d6-ab395 SMP preempt mod_unload modversions aarch64",
