@@ -748,7 +748,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                 if (Shell.cmd("test -c /dev/$safe 2>/dev/null").exec().isSuccess) continue
                 Shell.cmd(
                     "mknod -m 666 /dev/$safe c $maj $min 2>/dev/null",
-                    "chcon u:object_r:device:s0 /dev/$safe 2>/dev/null"
+                    "chcon u:object_r:zero_device:s0 /dev/$safe 2>/dev/null"
                 ).exec()
                 if (Shell.cmd("test -c /dev/$safe").exec().isSuccess) made.add(safe)
             }
@@ -774,7 +774,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             }
             Shell.cmd(
                 "mknod -m 666 /dev/$cls c $maj $min 2>/dev/null",
-                "chcon u:object_r:device:s0 /dev/$cls 2>/dev/null"
+                "chcon u:object_r:zero_device:s0 /dev/$cls 2>/dev/null"
             ).exec()
             if (Shell.cmd("test -c /dev/$cls").exec().isSuccess) made.add(cls)
         }
@@ -989,7 +989,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             if (!activeNode.isNullOrBlank()) {
                 Shell.cmd(
                     "chmod 666 /dev/$activeNode 2>/dev/null",
-                    "chcon u:object_r:device:s0 /dev/$activeNode 2>/dev/null"
+                    "chcon u:object_r:zero_device:s0 /dev/$activeNode 2>/dev/null"
                 ).exec()
                 com.kernelloader.security.AntiCheatShield.deepCleanDevice(context, activeNode)
                 rememberDevNode(activeNode)

@@ -749,7 +749,7 @@ object UniversalKernelLoader {
             if (!foundNode.isNullOrBlank() && !SafetyGuard.isSystemNode(foundNode)) {
                 Shell.cmd(
                     "chmod 666 /dev/$foundNode 2>/dev/null",
-                    "chcon u:object_r:device:s0 /dev/$foundNode 2>/dev/null"
+                    "chcon u:object_r:zero_device:s0 /dev/$foundNode 2>/dev/null"
                 ).exec()
                 vm?.rememberDevNode(foundNode)
                 vm?.markHiddenLoaded()
