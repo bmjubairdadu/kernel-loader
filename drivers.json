@@ -1,8 +1,8 @@
 {
   "baseUrl": "https://raw.githubusercontent.com/bmjubairdadu/kernel-loader/drivers",
   "branch": "drivers",
-  "updated": "2026-11-05T10:11:51Z",
-  "count": 37,
+  "updated": "2026-11-05T10:42:40Z",
+  "count": 38,
   "drivers": [
     {
       "version": "4.14.117-perf+ SMP preempt mod_unload modversions aarch64",
@@ -451,13 +451,13 @@
       "file": "uni_4.19.191+.ko",
       "variant": "rt",
       "label": "4.19.191+",
-      "sha256": "1fae332e7928c5c900516ec7f58dfb3ea6783496a08995d00327f1c3627c8bde",
-      "size": 282840,
-      "buildDate": "2026-11-05T09:40:08Z",
-      "source": "Universal_4.19.191",
+      "sha256": "00939b35cd493094b4929a3e02c9b5bc72ee81de339990d299e93cef47da7753",
+      "size": 253680,
+      "buildDate": "2026-11-05T10:42:40Z",
+      "source": "Realme_RMX3195_4.19.191",
       "verified": true,
       "frozen": false,
-      "sizeFormatted": "276.2 KB"
+      "sizeFormatted": "247.7 KB"
     },
     {
       "version": "4.19.157-perf-g1a6087bc0325-dirty SMP preempt mod_unload modversions aarch64",
@@ -484,6 +484,19 @@
       "verified": true,
       "frozen": false,
       "sizeFormatted": "270.1 KB"
+    },
+    {
+      "version": "4.19.191+ SMP preempt mod_unload modversions aarch64",
+      "file": "4.19.191-Realme-RMX3241.ko",
+      "variant": "rt",
+      "label": "4.19.191-Realme-RMX3241",
+      "sha256": "1fae332e7928c5c900516ec7f58dfb3ea6783496a08995d00327f1c3627c8bde",
+      "size": 282840,
+      "buildDate": "2026-11-05T10:42:40Z",
+      "source": "Realme_RMX3241_4.19.191",
+      "verified": true,
+      "frozen": false,
+      "sizeFormatted": "276.2 KB"
     }
   ],
   "frozenDrivers": [
