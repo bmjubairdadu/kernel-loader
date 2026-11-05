@@ -1,7 +1,7 @@
 {
   "baseUrl": "https://raw.githubusercontent.com/bmjubairdadu/kernel-loader/drivers",
   "branch": "drivers",
-  "updated": "2026-11-05T13:36:00Z",
+  "updated": "2026-11-05T08:10:58Z",
   "count": 31,
   "drivers": [
     {
@@ -399,13 +399,13 @@
       "file": "4.9.337-DaisyForGaming.ko",
       "variant": "rt",
       "label": "4.9.337-DaisyForGaming",
-      "sha256": "ba55bc1de310dcba4983486e25964197effe8992fd664f5d8a2f477d21338239",
-      "size": 16328,
-      "buildDate": "2026-11-05T13:35:00Z",
+      "sha256": "3f93f7dee4a1f1c663436da040baa19c6d8f8523ecc6f07dd0fe11f2dfbd7492",
+      "size": 15208,
+      "buildDate": "2026-11-05T08:10:58Z",
       "source": "daisy-gaming-driver",
       "verified": true,
       "frozen": false,
-      "sizeFormatted": "15.9 KB"
+      "sizeFormatted": "14.9 KB"
     }
   ],
   "frozenDrivers": [
