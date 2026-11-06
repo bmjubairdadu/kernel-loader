@@ -356,6 +356,12 @@ object OtaDriverStore {
     fun cacheDir(context: Context): File =
         File(context.filesDir, "ota_drivers").apply { mkdirs() }
 
+    fun clearCache(context: Context) {
+        try {
+            cacheDir(context).listFiles()?.forEach { it.delete() }
+        } catch (_: Exception) {}
+    }
+
     fun cachedFile(context: Context, entry: DriverEntry): File =
         File(cacheDir(context), entry.file.substringAfterLast('/'))
 
@@ -368,15 +374,15 @@ object OtaDriverStore {
         return try {
             val out = cachedFile(context, entry)
             val expected = entry.sha256.trim().lowercase()
-            if (expected.isNotBlank() && out.exists() && out.length() > 0 &&
-                (entry.size <= 0 || out.length() == entry.size)
-            ) {
-                if (hashMatches(out, expected)) {
-                    onLog("Driver cached", "OK")
+            if (out.exists()) {
+                val matches = expected.isNotBlank() &&
+                    (entry.size <= 0 || out.length() == entry.size) &&
+                    hashMatches(out, expected)
+                if (matches) {
+                    onLog("Driver cached (verified)", "OK")
                     return out
                 }
-
-                onLog("Cached driver failed sha256 - redownloading", "WARN")
+                onLog("Deleting stale cached driver (${out.length()} bytes)...", "WARN")
                 out.delete()
             }
             val primaryUrl = if (entry.file.startsWith("http")) entry.file
@@ -387,7 +393,8 @@ object OtaDriverStore {
                           } else base
                       } + "/" + entry.file.trimStart('/')
             val cdnFallback = "https://cdn.jsdelivr.net/gh/bmjubairdadu/kernel-loader@drivers/" + entry.file.trimStart('/')
-            val candidateUrls = listOf(primaryUrl, cdnFallback).distinct()
+            val releaseFallback = "https://github.com/bmjubairdadu/kernel-loader/releases/latest/download/" + entry.file.substringAfterLast('/')
+            val candidateUrls = listOf(primaryUrl, cdnFallback, releaseFallback).distinct()
 
             val tmp = File(out.absolutePath + ".part")
             var downloadedOk = false

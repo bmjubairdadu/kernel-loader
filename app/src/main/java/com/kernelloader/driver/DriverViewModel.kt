@@ -892,6 +892,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
 
             val devNode = preferredDevNode()
             Shell.cmd(
+                "rm -f /data/local/tmp/kloader_*.ko 2>/dev/null",
                 "cp \"${downloaded.absolutePath}\" ${staged.absolutePath}",
                 "chmod 644 ${staged.absolutePath}",
                 "chown root:root ${staged.absolutePath} 2>/dev/null",
@@ -1278,6 +1279,8 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                     UniversalKernelLoader.autoLoad(context, this@DriverViewModel, "")
                 } else {
                     activePipelineVariant.value = ""
+                    OtaDriverStore.clearCache(context)
+                    Shell.cmd("rm -f /data/local/tmp/kloader_*.ko 2>/dev/null").exec()
                     tlog("Loading driver...", "CMD")
                     tstep("Loading driver from database...")
                     val handled = runOtaLoad(context, "")
