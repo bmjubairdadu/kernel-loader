@@ -104,6 +104,14 @@ object OtaDriverStore {
         val eVer = entry.version.trim()
         val eRel = eVer.substringBefore(" ").trim()
 
+        if (cleanRel.isNotBlank()) {
+            val pDev = verParts(cleanRel)
+            val pEntry = verParts(eRel)
+            if (pDev != null && pEntry != null && pDev != pEntry) {
+                return false
+            }
+        }
+
         if (cleanVerm.isNotBlank()) {
             if (eVer.equals(cleanVerm, ignoreCase = true)) return true
             val shorterSideIsFullVermagic = listOf(eVer, cleanVerm).minByOrNull { it.length }!!.contains(' ')

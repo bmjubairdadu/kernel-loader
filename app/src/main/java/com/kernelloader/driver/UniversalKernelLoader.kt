@@ -303,20 +303,16 @@ object UniversalKernelLoader {
             vm.tlog("Inserting module...", "CMD")
 
             val insmodCmd = listOf(
-
-                "insmod",
-
                 "/data/adb/ap/bin/busybox insmod",
-
                 "/data/adb/ksu/bin/busybox insmod",
-
                 "/data/adb/magisk/busybox insmod",
-
-                "/system/bin/insmod",
-
-                "busybox insmod"
-
-            ).firstOrNull { Shell.cmd("test -x \"$it\" 2>/dev/null || which \"$it\" 2>/dev/null").exec().isSuccess } ?: "insmod"
+                "busybox insmod",
+                "insmod",
+                "/system/bin/insmod"
+            ).firstOrNull { 
+                val bin = it.substringBefore(" ")
+                bin == "insmod" || bin == "busybox" || Shell.cmd("test -x \"$bin\" 2>/dev/null || which \"$bin\" 2>/dev/null").exec().isSuccess 
+            } ?: "insmod"
 
 
 
@@ -384,20 +380,16 @@ object UniversalKernelLoader {
                 ).exec()
 
                 val insmodRetry = listOf(
-
-                    "insmod",
-
                     "/data/adb/ap/bin/busybox insmod",
-
                     "/data/adb/ksu/bin/busybox insmod",
-
                     "/data/adb/magisk/busybox insmod",
-
-                    "/system/bin/insmod",
-
-                    "busybox insmod"
-
-                ).firstOrNull { Shell.cmd("test -x \"$it\" 2>/dev/null || which \"$it\" 2>/dev/null").exec().isSuccess } ?: "insmod"
+                    "busybox insmod",
+                    "insmod",
+                    "/system/bin/insmod"
+                ).firstOrNull { 
+                    val bin = it.substringBefore(" ")
+                    bin == "insmod" || bin == "busybox" || Shell.cmd("test -x \"$bin\" 2>/dev/null || which \"$bin\" 2>/dev/null").exec().isSuccess 
+                } ?: "insmod"
 
                 res = Shell.cmd("$insmodRetry $TMP_KO devname=$devNode 2>&1 || $insmodRetry $TMP_KO 2>&1").exec()
 

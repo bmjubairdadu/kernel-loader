@@ -18,7 +18,9 @@ object SafetyGuard {
         "rfkill", "btpower", "sensors", "frandom", "erandom", "dts_eagle", "uio0", "uio", "vsock", "vhost-vsock",
         "devfreq", "extcon", "hidraw", "ramdump", "spidev", "usbrndis", "rotator", "smdpkt",
         "ppp", "alsa", "sg", "ch", "i2c", "spi", "usb", "ptm", "pts", "gpiochip", "pmsg", "rtc", "DVB", "wwan_ioctl",
-        "dts_eagle_ioctl", "BaseRemoteCtl", "goodix_fp_spi", "rmnet_ctrl", "ttyGS", "usbmon", "wcnss_wlan", "wcnss_ctrl"
+        "dts_eagle_ioctl", "BaseRemoteCtl", "goodix_fp_spi", "rmnet_ctrl", "ttyGS", "usbmon", "wcnss_wlan", "wcnss_ctrl",
+        "vcodec", "vcodec2", "mainaf", "cam_cal_drv", "scp", "sspm", "nanohub", "boringssl", "bfqio", "cpuctl", "cpuset", "stune",
+        "kd_camera_hw", "kd_camera_hw_bus2", "m4u", "mtk_cmdq", "mtk_disp", "mtk_m4u", "sw_sync", "pvr_sync"
     )
 
     fun isSystemNode(name: String): Boolean {
@@ -29,6 +31,13 @@ object SafetyGuard {
                 clean.startsWith("msm-") ||
                 clean.startsWith("qcom_") ||
                 clean.startsWith("hw_") ||
+                clean.startsWith("mtk") ||
+                clean.startsWith("mt_") ||
+                clean.startsWith("ccci") ||
+                clean.startsWith("teei") ||
+                clean.startsWith("m_") ||
+                clean.startsWith("kd_") ||
+                clean.startsWith("vcodec") ||
                 clean.startsWith("diag") ||
                 clean.startsWith("kgsl") ||
                 clean.startsWith("qsee") ||

@@ -639,16 +639,16 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
         }
 
         val bins = listOf(
-            "insmod",
             "/data/adb/ap/bin/busybox insmod",
             "/data/adb/ksu/bin/busybox insmod",
             "/data/adb/magisk/busybox insmod",
+            "busybox insmod",
+            "insmod",
             "/system/bin/insmod",
-            "/vendor/bin/insmod",
-            "busybox insmod"
+            "/vendor/bin/insmod"
         ).filter { b ->
             val bin = b.substringBefore(" ")
-            bin == "insmod" || Shell.cmd("test -x \"$bin\" 2>/dev/null || which \"$bin\" 2>/dev/null").exec().isSuccess
+            bin == "insmod" || bin == "busybox" || Shell.cmd("test -x \"$bin\" 2>/dev/null || which \"$bin\" 2>/dev/null").exec().isSuccess
         }.ifEmpty { listOf("insmod") }
         val hideParam = if (supportsStealthHide()) "hide=1" else "hide=0"
         val paramVariants = listOf(hideParam, "")
@@ -1491,9 +1491,11 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
 
                 val loadedMods = SafetyGuard.loadedModuleNames()
                 val isModAlive = session.moduleName.isNotBlank() && session.moduleName in loadedMods
-                val isNodeAlive = isNodeSafe &&
-                        (Shell.cmd("test -c /dev/$cleanSessionNode 2>/dev/null").exec().isSuccess ||
-                         Shell.cmd("test -d /sys/class/$cleanSessionNode 2>/dev/null").exec().isSuccess)
+                val isNodeAlive = isNodeSafe && (
+                    (isModAlive && (Shell.cmd("test -c /dev/$cleanSessionNode 2>/dev/null").exec().isSuccess ||
+                                   Shell.cmd("test -d /sys/class/$cleanSessionNode 2>/dev/null").exec().isSuccess)) ||
+                    UniversalKernelLoader.driverShProbe(context, this@DriverViewModel, cleanSessionNode)
+                )
 
                 if (isModAlive || isNodeAlive) {
                     withContext(Dispatchers.Main) {
