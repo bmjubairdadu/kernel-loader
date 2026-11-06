@@ -550,13 +550,13 @@
       "file": "6.12.69-Realme-RMX5070.ko",
       "variant": "rt",
       "label": "6.12.69-Realme-RMX5070",
-      "sha256": "f887e49e3deff2caf2d35edeb40b7665b7c559d881c77efbe62635d3a044fec7",
-      "size": 40176,
-      "buildDate": "2026-11-05T16:13:52Z",
+      "sha256": "8c8af2b9d8b5e820e76be78a2e718c2ab105d38001b9c4bade3775417e544e4e",
+      "size": 42112,
+      "buildDate": "2026-11-06T18:26:25Z",
       "source": "Realme_RMX5070_6.12.69",
       "verified": true,
       "frozen": false,
-      "sizeFormatted": "39.2 KB"
+      "sizeFormatted": "41.1 KB"
     },
     {
       "version": "4.19.191-g216400aba14e-dirty SMP preempt mod_unload modversions aarch64",
