@@ -696,9 +696,30 @@ object UniversalKernelLoader {
                 "chmod 755 $target 2>/dev/null"
             ).exec()
 
-            // Pure V3 native C scan: Driver.sh scans /dev, runs 0x803 ioctl with PID 1
-            val directRes = Shell.cmd("$target 2>&1").exec()
-            val directOut = (directRes.out + directRes.err).joinToString("\n")
+            // Pure V3 native C scan: Driver.sh direct probe on target node or /dev candidates
+            val pref = preferredNode.removePrefix("/dev/").trim()
+            val candidate = if (pref.isNotBlank()) "/dev/$pref" else ""
+            var directOut = ""
+            if (candidate.isNotBlank() && Shell.cmd("test -c $candidate 2>/dev/null").exec().isSuccess) {
+                val r = Shell.cmd("timeout 2 $target $candidate 2>&1 || $target $candidate 2>&1").exec()
+                directOut = (r.out + r.err).joinToString("\n")
+            }
+            if (!directOut.contains("Driver connected")) {
+                val newNodes = Shell.cmd("ls -1 /dev/[A-Z][A-Z][A-Z][A-Z][A-Z][A-Z] 2>/dev/null").exec().out
+                    .filter { it.isNotBlank() }
+                for (nn in newNodes) {
+                    val r = Shell.cmd("timeout 2 $target $nn 2>&1 || $target $nn 2>&1").exec()
+                    val outCandidate = (r.out + r.err).joinToString("\n")
+                    if (outCandidate.contains("Driver connected")) {
+                        directOut = outCandidate
+                        break
+                    }
+                }
+            }
+            if (!directOut.contains("Driver connected")) {
+                val r = Shell.cmd("timeout 3 $target 2>&1").exec()
+                directOut = (r.out + r.err).joinToString("\n")
+            }
 
             if (!directOut.contains("Driver connected")) {
                 return null
