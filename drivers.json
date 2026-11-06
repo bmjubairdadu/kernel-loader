@@ -1,8 +1,8 @@
 {
   "baseUrl": "https://raw.githubusercontent.com/bmjubairdadu/kernel-loader/drivers",
   "branch": "drivers",
-  "updated": "2026-11-05T13:54:08Z",
-  "count": 38,
+  "updated": "2026-11-05T16:50:45Z",
+  "count": 37,
   "drivers": [
     {
       "version": "4.14.117-perf+ SMP preempt mod_unload modversions aarch64",
@@ -421,19 +421,6 @@
       "sizeFormatted": "171.2 KB"
     },
     {
-      "version": "4.19.275-niigo-enanan-yoka-ks32386 SMP preempt mod_unload modversions aarch64",
-      "file": "uni_4.19.275-niigo-enanan-yoka-ks32386.ko",
-      "variant": "rt",
-      "label": "4.19.275-niigo-enanan-yoka-ks32386",
-      "sha256": "43f4b3e455ad4c46bc5637334c82ef7756337d47fb33048ac2e81e1570a31273",
-      "size": 288064,
-      "buildDate": "2026-11-05T09:40:08Z",
-      "source": "Samsung_A235F/4.19.157",
-      "verified": true,
-      "frozen": false,
-      "sizeFormatted": "281.3 KB"
-    },
-    {
       "version": "5.4.254-android12-9-g3bdf085cac44-ab1209 SMP preempt mod_unload modversions aarch64",
       "file": "uni_5.4.254-android12-9-g3bdf085cac44-ab1209.ko",
       "variant": "rt",
@@ -445,19 +432,6 @@
       "verified": true,
       "frozen": false,
       "sizeFormatted": "397.7 KB"
-    },
-    {
-      "version": "4.19.191+ SMP preempt mod_unload modversions aarch64",
-      "file": "uni_4.19.191+.ko",
-      "variant": "rt",
-      "label": "4.19.191+",
-      "sha256": "02ea9cddfa56116421a5c9aad7f202b2d1fd56f8f094a60f1aa5e38ff9780569",
-      "size": 253680,
-      "buildDate": "2026-11-05T10:42:40Z",
-      "source": "Realme_RMX3195_4.19.191",
-      "verified": true,
-      "frozen": false,
-      "sizeFormatted": "247.7 KB"
     },
     {
       "version": "4.19.157-perf-g1a6087bc0325-dirty SMP preempt mod_unload modversions aarch64",
@@ -497,6 +471,19 @@
       "verified": true,
       "frozen": false,
       "sizeFormatted": "276.2 KB"
+    },
+    {
+      "version": "6.12.69-android16-6-g014ca48a80ee-ab15889839-4k SMP preempt mod_unload modversions aarch64",
+      "file": "6.12.69-Realme-RMX5070.ko",
+      "variant": "rt",
+      "label": "6.12.69-Realme-RMX5070",
+      "sha256": "f887e49e3deff2caf2d35edeb40b7665b7c559d881c77efbe62635d3a044fec7",
+      "size": 40176,
+      "buildDate": "2026-11-05T16:13:52Z",
+      "source": "Realme_RMX5070_6.12.69",
+      "verified": true,
+      "frozen": false,
+      "sizeFormatted": "39.2 KB"
     }
   ],
   "frozenDrivers": [
