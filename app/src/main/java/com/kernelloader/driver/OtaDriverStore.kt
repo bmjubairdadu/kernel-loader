@@ -20,6 +20,15 @@ object OtaDriverStore {
     const val RT = "rt"
     const val QX = "qx"
 
+    data class DeviceInfo(
+        val model: String = "",
+        val device: String = "",
+        val product: String = "",
+        val androidVersion: String = "",
+        val buildId: String = "",
+        val displayId: String = ""
+    )
+
     data class DriverEntry(
         val version: String,
         val file: String,
@@ -27,7 +36,12 @@ object OtaDriverStore {
         val size: Long = 0L,
         val buildDate: String = "",
         val variant: String = "",
-        val label: String = ""
+        val label: String = "",
+        val model: String = "",
+        val device: String = "",
+        val androidVersion: String = "",
+        val buildId: String = "",
+        val supportedDevices: List<String> = emptyList()
     )
 
     fun variantLabel(variant: String): String = when (variant.lowercase()) {
@@ -119,15 +133,94 @@ object OtaDriverStore {
         return false
     }
 
-    fun resolve(manifest: Manifest, kernelRelease: String, variant: String = "", deviceVermagic: String = ""): ResolveResult {
+    fun matchesDevice(entry: DriverEntry, info: DeviceInfo): Boolean {
+        val hasDeviceConstraint = entry.device.isNotBlank() || entry.model.isNotBlank() || entry.supportedDevices.isNotEmpty()
+        if (!hasDeviceConstraint) return true
+
+        val cleanDev = info.device.trim().lowercase()
+        val cleanProd = info.product.trim().lowercase()
+        val cleanModel = info.model.trim().lowercase()
+
+        if (entry.device.isNotBlank()) {
+            val ed = entry.device.trim().lowercase()
+            if (ed == cleanDev || ed == cleanProd || cleanProd.contains(ed)) return true
+        }
+
+        if (entry.model.isNotBlank()) {
+            val em = entry.model.trim().lowercase()
+            if (em == cleanModel || cleanModel.contains(em) || em.contains(cleanModel)) return true
+        }
+
+        for (target in entry.supportedDevices) {
+            val t = target.trim().lowercase()
+            if (t.isNotBlank() && (t == cleanDev || t == cleanProd || t == cleanModel || cleanModel.contains(t) || cleanProd.contains(t))) {
+                return true
+            }
+        }
+
+        return false
+    }
+
+    fun isDeviceConflict(entry: DriverEntry, info: DeviceInfo): Boolean {
+        if (info.model.isBlank() && info.device.isBlank() && info.product.isBlank()) return false
+        val hasDeviceConstraint = entry.device.isNotBlank() || entry.model.isNotBlank() || entry.supportedDevices.isNotEmpty()
+        if (!hasDeviceConstraint) return false
+        return !matchesDevice(entry, info)
+    }
+
+    fun resolve(
+        manifest: Manifest,
+        kernelRelease: String,
+        variant: String = "",
+        deviceVermagic: String = "",
+        deviceInfo: DeviceInfo = DeviceInfo()
+    ): ResolveResult {
         val pool = variantsFor(manifest, variant)
         if (pool.isEmpty()) return ResolveResult.None
 
-        pool.firstOrNull { isExactMatch(it, kernelRelease, deviceVermagic) }?.let {
-            return ResolveResult.Exact(it)
+        // 1. Exclude drivers that specify a different device (avoid mismatching across devices with same vermagic)
+        val nonConflicting = pool.filter { !isDeviceConflict(it, deviceInfo) }
+        val exactKernelMatches = nonConflicting.filter { isExactMatch(it, kernelRelease, deviceVermagic) }
+
+        if (exactKernelMatches.isNotEmpty()) {
+            // Rank candidates by device model, Android version, and build ID precision
+            val ranked = exactKernelMatches.sortedWith(
+                compareByDescending<DriverEntry> { entry ->
+                    var score = 100
+                    val cleanDev = deviceInfo.device.trim().lowercase()
+                    val cleanModel = deviceInfo.model.trim().lowercase()
+                    val cleanAnd = deviceInfo.androidVersion.trim()
+
+                    // Exact device codename match (+50)
+                    if (entry.device.isNotBlank() && (entry.device.equals(cleanDev, true) || deviceInfo.product.contains(entry.device, true))) {
+                        score += 50
+                    }
+                    // Exact model match (+30)
+                    if (entry.model.isNotBlank() && (entry.model.equals(cleanModel, true) || cleanModel.contains(entry.model, true))) {
+                        score += 30
+                    }
+                    // Supported devices token match (+25)
+                    if (entry.supportedDevices.any { cleanDev.contains(it, true) || cleanModel.contains(it, true) }) {
+                        score += 25
+                    }
+                    // Android version match (+20)
+                    if (entry.androidVersion.isNotBlank() && cleanAnd.isNotBlank() &&
+                        (entry.androidVersion == cleanAnd || cleanAnd.startsWith(entry.androidVersion))
+                    ) {
+                        score += 20
+                    }
+                    // Build ID match (+15)
+                    if (entry.buildId.isNotBlank() &&
+                        (deviceInfo.buildId.contains(entry.buildId, true) || deviceInfo.displayId.contains(entry.buildId, true))
+                    ) {
+                        score += 15
+                    }
+                    score
+                }.thenByDescending { it.buildDate }
+            )
+            return ResolveResult.Exact(ranked.first())
         }
 
-        // Stop auto-forcing nearest-match drivers to prevent vermagic mismatch crashes on unmatched kernels
         return ResolveResult.None
     }
 
@@ -212,6 +305,18 @@ object OtaDriverStore {
                 val file = d.optString("file", "")
                 if (version.isEmpty() || file.isEmpty()) continue
                 val label = d.optString("label", "").ifBlank { version.substringBefore(" ") }
+                val model = d.optString("model", "")
+                val device = d.optString("device", "")
+                val androidVersion = d.optString("androidVersion", "").ifBlank { d.optString("android", "") }
+                val buildId = d.optString("buildId", "").ifBlank { d.optString("displayId", "") }
+                val supportedArr = d.optJSONArray("supportedDevices")
+                val supportedDevices = mutableListOf<String>()
+                if (supportedArr != null) {
+                    for (j in 0 until supportedArr.length()) {
+                        val s = supportedArr.optString(j, "").trim()
+                        if (s.isNotBlank()) supportedDevices.add(s)
+                    }
+                }
                 drivers.add(
                     DriverEntry(
                         version = version,
@@ -220,7 +325,12 @@ object OtaDriverStore {
                         size = d.optLong("size", 0L),
                         buildDate = d.optString("buildDate", ""),
                         variant = d.optString("variant", "").trim().lowercase(),
-                        label = label
+                        label = label,
+                        model = model,
+                        device = device,
+                        androidVersion = androidVersion,
+                        buildId = buildId,
+                        supportedDevices = supportedDevices
                     )
                 )
             }

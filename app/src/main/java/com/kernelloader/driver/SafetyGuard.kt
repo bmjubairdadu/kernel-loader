@@ -70,7 +70,7 @@ object SafetyGuard {
             .map { it.trim() }
             .filter { cls ->
                 !isSystemNode(cls) &&
-                (cls.startsWith("dmsync") || cls.startsWith("sysync") || cls.matches(Regex("^[A-Za-z0-9]{6,8}$")))
+                (cls.startsWith("dmsync") || cls.startsWith("sysync"))
             }
         candidates.firstOrNull { cls ->
             val devFileExists = Shell.cmd("test -f /sys/class/$cls/dev || test -f /sys/class/$cls/$cls/dev").exec().isSuccess

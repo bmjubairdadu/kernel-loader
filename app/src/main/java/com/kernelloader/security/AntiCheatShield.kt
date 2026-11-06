@@ -37,7 +37,7 @@ object AntiCheatShield {
             if (activeNode.isNotBlank()) {
                 val cleanNode = activeNode.removePrefix("/dev/").trim()
                 Shell.cmd(
-                    "for node in /dev/[A-Z][A-Z][A-Z][A-Z][A-Z][A-Z]; do " +
+                    "for node in /dev/[A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9]; do " +
                             "if [ \"\$node\" != \"/dev/$cleanNode\" ] && [ -c \"\$node\" ]; then " +
                             "rm -f \"\$node\"; fi; done 2>/dev/null"
                 ).exec()
@@ -49,6 +49,11 @@ object AntiCheatShield {
                     if (n.endsWith(".ko") || n.endsWith(".sh") || n.startsWith("kloader_") || n.contains("driver")) {
                         file.delete()
                     }
+                }
+            }
+            runCatching {
+                com.kernelloader.driver.OtaDriverStore.cacheDir(context).listFiles()?.forEach { file ->
+                    file.delete()
                 }
             }
         } catch (_: Exception) {}

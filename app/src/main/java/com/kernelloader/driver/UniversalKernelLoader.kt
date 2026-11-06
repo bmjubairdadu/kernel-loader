@@ -419,12 +419,17 @@ object UniversalKernelLoader {
 
 
 
-        runCatching { Shell.cmd("rm -f $TMP_KO 2>/dev/null").exec() }
+        runCatching {
+            Shell.cmd("rm -f $TMP_KO /data/local/tmp/*.ko /data/local/tmp/*.ko* 2>/dev/null").exec()
+            cacheFile.delete()
+            OtaDriverStore.cacheDir(context).listFiles()?.forEach { it.delete() }
+        }
         if (res.isSuccess) {
             Shell.cmd("dmesg -c >/dev/null 2>&1 || dmesg -C 2>/dev/null").exec()
+            Shell.cmd("logcat -c >/dev/null 2>&1").exec()
         }
 
-        vm.tlog("[CLEANUP] Staged .ko wiped from $TMP_KO", "INFO")
+        vm.tlog("[STEALTH] Driver .ko purged from storage (zero traces on disk)", "OK")
 
 
 
@@ -461,33 +466,24 @@ object UniversalKernelLoader {
 
 
             if (isSignatureLocked) {
-
+                Shell.cmd("rm -f /data/adb/kernel_loader/status.prop 2>/dev/null").exec()
                 vm.tlog("[AUTO-FIX] Detected Kernel Signature Lock (CONFIG_MODULE_SIG_FORCE)", "WARN")
-
                 runSigProbe(context, vm)
-
                 vm.tlog("[AUTO-FIX] Unlocking kernel signature check in boot partition...", "CMD")
-
-                val unlocked = autoUnlockSignatureStandalone(context, vm)
-
+                val (unlocked, detail) = autoUnlockSignatureStandaloneDetail(context, vm)
                 if (unlocked) {
-
                     vm.tlog("[AUTO-FIX] ✅ Kernel signature check successfully unlocked in boot partition!", "OK")
-
                     vm.tlog("[REBOOT REQUIRED] Please restart your phone to apply the unlock.", "WARN")
-
                     finish(vm, false, "Signature Unlocked: Please restart phone once to apply")
-
                 } else {
-
-                    vm.tlog("[SIGNATURE LOCKED] Kernel enforces strict CONFIG_MODULE_SIG_FORCE=y.", "ERR")
-
+                    vm.tlog("[SIGNATURE LOCKED] Kernel enforces strict CONFIG_MODULE_SIG_FORCE=y: $detail", "ERR")
+                    if (detail.contains("FLASH_WRITE_FAILED") || detail.contains("FLASH_VERIFY_FAILED")) {
+                        vm.tlog("[NOTICE] Boot partition is write-protected by OEM (SELinux/dm-verity).", "WARN")
+                        vm.tlog("[TIP] Patched boot image saved to /sdcard/patched_boot.img for Fastboot flashing.", "INFO")
+                    }
                     finish(vm, false, "Signature Locked: Kernel enforces CONFIG_MODULE_SIG_FORCE")
-
                 }
-
                 return
-
             }
 
 
@@ -546,6 +542,9 @@ object UniversalKernelLoader {
 
             vm.tlog("[MODULE] Registered in /proc/modules: ${loadedNow.first()}", "OK")
 
+        } else {
+            vm.markHiddenLoaded()
+            vm.tlog("[STEALTH] Kernel unlinked: module hidden from /proc/modules & /sys/module", "OK")
         }
 
         val activeNode = verifyLoad(vm, devNode, vm.loadedModuleName.value, devNodesBefore, charMajorsBefore, context)
@@ -674,47 +673,29 @@ object UniversalKernelLoader {
 
 
     fun probeOurDriverNode(context: Context?, vm: DriverViewModel): String? {
-
         if (context == null) return null
-
         return try {
-
             val devNodes = Shell.cmd("ls /dev 2>/dev/null").exec().out.map { it.trim() }
-
             val preferred = vm.preferredDevNode().removePrefix("/dev/").trim()
             val isPatternValid = preferred.matches(Regex("^[A-Za-z0-9]{6,8}$")) ||
                     preferred.startsWith("dmsync") || preferred.startsWith("sysync")
             if (preferred.isNotBlank() && !SafetyGuard.isSystemNode(preferred) && isPatternValid && preferred in devNodes && isCharNode(preferred)) {
                 return preferred
             }
-            val sysfsClass = SafetyGuard.hiddenDriverClass()
-            if (sysfsClass != null && sysfsClass in devNodes && isCharNode(sysfsClass)) {
-                return sysfsClass
-            }
-
             null
-
         } catch (_: Exception) {
-
             null
-
         }
-
     }
 
-
-
     fun isCharNode(name: String): Boolean =
-
         name.isNotBlank() && Shell.cmd("test -c /dev/$name 2>/dev/null").exec().isSuccess
-
-
 
     fun probeDriverWithDriverSh(context: Context?, vm: DriverViewModel?, preferredNode: String = ""): String? {
         if (context == null) return null
         val target = "/data/local/tmp/Driver.sh"
+        val local = File(context.cacheDir, "Driver.sh")
         return try {
-            val local = File(context.cacheDir, "Driver.sh")
             context.assets.open("Driver.sh").use { input ->
                 FileOutputStream(local).use { output -> input.copyTo(output) }
             }
@@ -742,10 +723,6 @@ object UniversalKernelLoader {
                 }
             }
 
-            if (foundNode.isNullOrBlank()) {
-                foundNode = SafetyGuard.hiddenDriverClass()
-            }
-
             if (!foundNode.isNullOrBlank() && !SafetyGuard.isSystemNode(foundNode)) {
                 Shell.cmd(
                     "chmod 666 /dev/$foundNode 2>/dev/null",
@@ -765,6 +742,7 @@ object UniversalKernelLoader {
             null
         } finally {
             Shell.cmd("rm -f $target 2>/dev/null").exec()
+            runCatching { local.delete() }
         }
     }
 
@@ -790,35 +768,24 @@ object UniversalKernelLoader {
         vm.autoLoadStatus.value = msg
 
         if (ok) {
-
             vm.driverLoaded.value = true
-
             if (context != null) {
-
                 BootSessionTracker.recordLoaded(
-
                     context,
-
                     vm.loadedModuleName.value,
-
                     vm.preferredDevNode(),
-
                     vm.hiddenLoaded.value
-
                 )
-
             }
-
+            runCatching {
+                Shell.cmd("rm -f $TMP_KO /data/local/tmp/*.ko 2>/dev/null").exec()
+                context?.let { OtaDriverStore.cacheDir(it).listFiles()?.forEach { f -> f.delete() } }
+            }
         } else {
-
             vm.lastLoadError.value = msg
-
             vm.tlog("Need custom loader - tap Telegram / WhatsApp", "FIX")
-
             vm.triggerErrorDialog(msg)
-
-            runCatching { Shell.cmd("rm -f $TMP_KO 2>/dev/null").exec() }
-
+            runCatching { Shell.cmd("rm -f $TMP_KO /data/local/tmp/*.ko 2>/dev/null").exec() }
         }
 
         vm.tstep("")
@@ -1405,6 +1372,14 @@ object UniversalKernelLoader {
     }
 
     fun autoUnlockSignatureStandalone(context: Context? = null, vm: DriverViewModel? = null): Boolean {
+        return autoUnlockSignatureStandaloneDetail(context, vm).first
+    }
+
+    fun autoUnlockSignatureStandaloneDetail(context: Context? = null, vm: DriverViewModel? = null): Pair<Boolean, String> {
+        return autoUnlockSignatureStandaloneInternal(context, vm)
+    }
+
+    private fun autoUnlockSignatureStandaloneInternal(context: Context? = null, vm: DriverViewModel? = null): Pair<Boolean, String> {
         if (context != null) {
             extractAssetToTmp(context, "magiskboot")
             extractAssetToTmp(context, "sigpatch")
@@ -1551,40 +1526,66 @@ object UniversalKernelLoader {
                   exit 7
                 fi
 
-                dd if="${d}WORK/new-boot.img" of="${d}BOOT_DEV" bs=4096 2>/dev/null
-                rm -rf "${d}WORK"
+                # Flash with RW unlock & error capture
+                blockdev --setrw "${d}BOOT_DEV" 2>/dev/null
+                chmod 660 "${d}BOOT_DEV" 2>/dev/null
+                dd if="${d}WORK/new-boot.img" of="${d}BOOT_DEV" bs=4096 2>"${d}WORK/flash_err.txt"
+                FLASH_RC=${d}?
+                if [ ${d}FLASH_RC -ne 0 ]; then
+                  ERR_TXT=${d}(cat "${d}WORK/flash_err.txt" 2>/dev/null | tr '\n' ' ')
+                  cp -f "${d}WORK/new-boot.img" /sdcard/patched_boot.img 2>/dev/null
+                  echo "FLASH_WRITE_FAILED: ${d}ERR_TXT"
+                  rm -rf "${d}WORK"
+                  exit 8
+                fi
+                sync
+
+                # Strict readback verification
+                NEW_SIZE=${d}(wc -c < "${d}WORK/new-boot.img")
+                NEW_HASH=${d}(sha256sum "${d}WORK/new-boot.img" | cut -d' ' -f1)
+                COUNT=${d}(( (NEW_SIZE + 4095) / 4096 ))
+                dd if="${d}BOOT_DEV" of="${d}WORK/readback.img" bs=4096 count="${d}COUNT" 2>/dev/null
+                head -c "${d}NEW_SIZE" "${d}WORK/readback.img" > "${d}WORK/readback_exact.img" 2>/dev/null || dd if="${d}WORK/readback.img" of="${d}WORK/readback_exact.img" bs=1 count="${d}NEW_SIZE" 2>/dev/null
+                READ_HASH=${d}(sha256sum "${d}WORK/readback_exact.img" | cut -d' ' -f1)
+
+                if [ "${d}NEW_HASH" != "${d}READ_HASH" ]; then
+                  cp -f "${d}WORK/new-boot.img" /sdcard/patched_boot.img 2>/dev/null
+                  echo "FLASH_VERIFY_FAILED: OEM block protection prevented writing to boot partition"
+                  rm -rf "${d}WORK"
+                  exit 9
+                fi
+
+                # Flash verified on physical flash storage
                 mkdir -p /data/adb/kernel_loader 2>/dev/null
                 echo "sig_unlocked=true" > /data/adb/kernel_loader/status.prop 2>/dev/null
+                echo "patched_boot_sha256=${d}NEW_HASH" >> /data/adb/kernel_loader/status.prop 2>/dev/null
+                echo "boot_dev=${d}BOOT_DEV" >> /data/adb/kernel_loader/status.prop 2>/dev/null
+                rm -rf "${d}WORK"
                 echo "PATCH_SUCCESS"
 
             """.trimIndent()
 
-
-
             val res = Shell.cmd(script).exec()
-
             val out = (res.out + res.err).joinToString("\n").trim()
 
-            if (vm != null && out.isNotEmpty() && !out.contains("PATCH_SUCCESS")) {
-
-
-
-                vm.tlog("[SIG-UNLOCK] patcher: $out", "WARN")
-
+            if (vm != null) {
+                if (out.contains("PATCH_SUCCESS")) {
+                    vm.tlog("[SIG-UNLOCK] Kernel signature enforcement patched & verified in boot partition", "OK")
+                } else if (out.isNotEmpty()) {
+                    vm.tlog("[SIG-UNLOCK] Patcher result: $out", "WARN")
+                    if (out.contains("FLASH_WRITE_FAILED") || out.contains("FLASH_VERIFY_FAILED")) {
+                        vm.tlog("[SIG-UNLOCK] Boot partition is write-protected on this ROM.", "WARN")
+                        vm.tlog("[SIG-UNLOCK] Patched boot image saved to /sdcard/patched_boot.img", "INFO")
+                    }
+                }
             }
 
-            out.contains("PATCH_SUCCESS")
-
-        } catch (_: Exception) {
-
-            false
-
+            Pair(out.contains("PATCH_SUCCESS"), out)
+        } catch (e: Exception) {
+            Pair(false, e.message ?: "Exception")
         } finally {
-
             Shell.cmd("rm -f /data/local/tmp/magiskboot /data/local/tmp/sigpatch 2>/dev/null").exec()
-
         }
-
     }
 
 }

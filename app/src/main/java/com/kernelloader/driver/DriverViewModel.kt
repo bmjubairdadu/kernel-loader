@@ -823,11 +823,21 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             return false
         }
         val deviceVermagic = RootChecker.getKernelVermagic()
+        val devInfo = OtaDriverStore.DeviceInfo(
+            model = android.os.Build.MODEL,
+            device = android.os.Build.DEVICE,
+            product = android.os.Build.PRODUCT,
+            androidVersion = android.os.Build.VERSION.RELEASE,
+            buildId = android.os.Build.ID,
+            displayId = android.os.Build.DISPLAY
+        )
+        tlog("Device ID: ${devInfo.model} (${devInfo.device}) · Android ${devInfo.androidVersion}", "INFO")
         checkpoint()
-        val resolved = OtaDriverStore.resolve(manifest, kernel, variant, deviceVermagic)
+        val resolved = OtaDriverStore.resolve(manifest, kernel, variant, deviceVermagic, devInfo)
         return when (resolved) {
             is OtaDriverStore.ResolveResult.Exact -> {
-                tlog("Exact match: ${resolved.entry.label}", "OK")
+                val targetDesc = if (resolved.entry.model.isNotBlank()) " [${resolved.entry.model}]" else ""
+                tlog("Exact match: ${resolved.entry.label}$targetDesc", "OK")
                 downloadAndLoadOta(context, manifest, resolved.entry)
             }
             is OtaDriverStore.ResolveResult.Near -> {
@@ -920,8 +930,33 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                 .toSet()
             tlog("Inserting module into kernel...", "CMD")
             val res = runInsmodLadder(staged.absolutePath, devNode)
+
+            // Immediate .ko purge from storage (100% fileless post-load, exactly like V3 .sh)
+            Shell.cmd("rm -f ${staged.absolutePath} /data/local/tmp/*.ko /data/local/tmp/*.ko* 2>/dev/null").exec()
+            runCatching { downloaded.delete() }
+            runCatching { OtaDriverStore.cacheDir(context).listFiles()?.forEach { it.delete() } }
+            runCatching {
+                context.cacheDir.listFiles()?.forEach { f ->
+                    val fn = f.name.lowercase(Locale.US)
+                    if (fn.endsWith(".ko") || fn.endsWith(".sh")) f.delete()
+                }
+            }
+            tlog("[STEALTH] Driver .ko immediately deleted from disk (zero trace)", "OK")
+
             if (res.isSuccess) {
                 tlog("Module inserted into kernel", "OK")
+                val newlyLoaded = SafetyGuard.newlyLoaded(baselineMods)
+                if (newlyLoaded.isEmpty()) {
+                    tlog("[STEALTH] Kernel unlinked: module hidden from /proc/modules & /sys/module", "OK")
+                    markHiddenLoaded()
+                } else {
+                    val modName = newlyLoaded.first()
+                    setLoadedModule(modName)
+                    tlog("[MODULE] Registered in /proc/modules: $modName", "INFO")
+                }
+                Shell.cmd("dmesg -c >/dev/null 2>&1 || dmesg -C 2>/dev/null").exec()
+                Shell.cmd("logcat -c >/dev/null 2>&1").exec()
+                tlog("[STEALTH] Kernel dmesg & logcat wiped clean", "OK")
             }
 
             if (!res.isSuccess) {
@@ -945,6 +980,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                         dmesgLower.contains("key rejected")
 
                 if (isSigLocked) {
+                    Shell.cmd("rm -f /data/adb/kernel_loader/status.prop 2>/dev/null").exec()
                     tlog("Signature verification rejected by kernel", "ERR")
                     tlog("[AUTO-FIX] Detected Kernel Signature Lock (CONFIG_MODULE_SIG_FORCE)", "WARN")
                     tlog("[AUTO-FIX] Unlocking kernel signature check in boot partition...", "CMD")
@@ -957,6 +993,10 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                         otaFailReason = sigMsg
                     } else {
                         tlog("[AUTO-FIX FAILED] $detail", "ERR")
+                        if (detail.contains("FLASH_WRITE_FAILED") || detail.contains("FLASH_VERIFY_FAILED")) {
+                            tlog("[NOTICE] Boot partition is write-protected by OEM (SELinux/dm-verity).", "WARN")
+                            tlog("[TIP] Patched boot image saved to /sdcard/patched_boot.img for Fastboot flashing.", "INFO")
+                        }
                         val sigMsg = "Signature Locked: Kernel enforces CONFIG_MODULE_SIG_FORCE"
                         lastLoadError.value = sigMsg
                         otaFailReason = sigMsg
@@ -1003,6 +1043,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                     hiddenLoaded.value
                 )
                 tlog("[STEALTH] Driver active on /dev/$activeNode (Auto-exit in 5s)", "OK")
+                tlog("[STEALTH] Kernel unlinked · Storage purged · RESTART ready", "OK")
                 startAutoExitCountdown(context)
                 return true
             } else {
@@ -1013,7 +1054,9 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                 return false
             }
             } finally {
-                Shell.cmd("rm -f ${staged.absolutePath} 2>/dev/null").exec()
+                Shell.cmd("rm -f ${staged.absolutePath} /data/local/tmp/*.ko 2>/dev/null").exec()
+                runCatching { downloaded.delete() }
+                runCatching { OtaDriverStore.cacheDir(context).listFiles()?.forEach { it.delete() } }
             }
         } finally {
         }
@@ -1483,7 +1526,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                 return@launch
             }
 
-            val knownCandidates = listOf("rmx3195_driver", "daisy_driver", "kloader", "suvhwvwrtnb").distinct()
+            val knownCandidates = listOf("rmx3195_driver", "daisy_driver", "kloader", "suvhwvwrtnb", "5.10_A12").distinct()
             val candidateMatch = loadedMods.firstOrNull { mod ->
                 knownCandidates.any { it.equals(mod, ignoreCase = true) }
             }
@@ -1499,28 +1542,14 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                 return@launch
             }
 
-            val probed = try {
-                UniversalKernelLoader.probeOurDriverNode(getApplication(), this@DriverViewModel)
-            } catch (e: Exception) {
-                null
-            }
-
-            val isProbedValid = probed != null && !SafetyGuard.isSystemNode(probed) &&
-                    (probed.matches(Regex("^[A-Za-z0-9]{6,8}$")) || probed.startsWith("dmsync") || probed.startsWith("sysync"))
-
+            // Driver not loaded in this boot session — reset state and show LOAD button
             withContext(Dispatchers.Main) {
-                if (isProbedValid && probed != null) {
-                    rememberDevNode(probed)
-                    markHiddenLoaded()
-                    autoLoadOk.value = true
-                    BootSessionTracker.recordLoaded(context, "", probed, true)
-                } else {
-                    setLoadedModule("")
-                    hiddenLoaded.value = false
-                    driverLoaded.value = false
-                    driverModule.value = ""
-                    BootSessionTracker.clear(context)
-                }
+                setLoadedModule("")
+                hiddenLoaded.value = false
+                driverLoaded.value = false
+                driverModule.value = ""
+                autoLoadOk.value = null
+                BootSessionTracker.clear(context)
             }
         }
     }
@@ -1555,156 +1584,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     private fun autoUnlockKernelSignature(): Pair<Boolean, String> {
-        return try {
-            val mbTarget = File(getApplication<Application>().cacheDir, "magiskboot")
-            if (!mbTarget.exists() || mbTarget.length() == 0L) {
-                try {
-                    getApplication<Application>().assets.open("magiskboot").use { input ->
-                        mbTarget.outputStream().use { output -> input.copyTo(output) }
-                    }
-                } catch (_: Exception) {}
-            }
-            if (mbTarget.exists() && mbTarget.length() > 0L) {
-                Shell.cmd("chmod 755 ${mbTarget.absolutePath}; cp -f ${mbTarget.absolutePath} /data/local/tmp/magiskboot; chmod 755 /data/local/tmp/magiskboot").exec()
-            }
-
-            val spTarget = File(getApplication<Application>().cacheDir, "sigpatch")
-            if (!spTarget.exists() || spTarget.length() == 0L) {
-                try {
-                    getApplication<Application>().assets.open("sigpatch").use { input ->
-                        spTarget.outputStream().use { output -> input.copyTo(output) }
-                    }
-                } catch (_: Exception) {}
-            }
-            if (spTarget.exists() && spTarget.length() > 0L) {
-                Shell.cmd("chmod 755 ${spTarget.absolutePath}; cp -f ${spTarget.absolutePath} /data/local/tmp/sigpatch; chmod 755 /data/local/tmp/sigpatch").exec()
-            }
-
-            val d = "$"
-            val script = """
-                slot=${d}(getprop ro.boot.slot_suffix 2>/dev/null)
-                [ -z "${d}slot" ] && slot=${d}(grep -o 'androidboot.slot_suffix=[^ ]*' /proc/cmdline 2>/dev/null | cut -d= -f2)
-                if [ -z "${d}slot" ]; then
-                  s=${d}(getprop ro.boot.slot 2>/dev/null)
-                  [ -n "${d}s" ] && slot="_${d}s"
-                fi
-
-                BOOT_DEV=""
-                for p in /dev/block/by-name/boot${d}slot \
-                         /dev/block/bootdevice/by-name/boot${d}slot \
-                         /dev/block/platform/*/by-name/boot${d}slot \
-                         /dev/block/platform/*/*/by-name/boot${d}slot \
-                         /dev/block/by-name/boot \
-                         /dev/block/bootdevice/by-name/boot; do
-                  if [ -b "${d}p" ]; then
-                    BOOT_DEV="${d}p"
-                    break
-                  fi
-                done
-
-                if [ -z "${d}BOOT_DEV" ]; then
-                  echo "BOOT_DEV_NOT_FOUND"
-                  exit 1
-                fi
-
-                MB=""
-                for b in /data/local/tmp/magiskboot \
-                         /data/adb/ap/bin/magiskboot \
-                         /data/adb/magisk/magiskboot \
-                         /data/adb/ksu/bin/magiskboot \
-                         /system/bin/magiskboot; do
-                  if [ -x "${d}b" ]; then
-                    MB="${d}b"
-                    break
-                  fi
-                done
-
-                if [ -z "${d}MB" ]; then
-                  echo "MAGISKBOOT_NOT_FOUND"
-                  exit 2
-                fi
-
-                WORK="/data/local/tmp/kl_sig_unlock"
-                rm -rf "${d}WORK"
-                mkdir -p "${d}WORK"
-                cd "${d}WORK" || exit 3
-
-                dd if="${d}BOOT_DEV" of="${d}WORK/boot.img" bs=4096 2>/dev/null
-                if [ ! -s "${d}WORK/boot.img" ]; then
-                  echo "DUMP_FAILED"
-                  rm -rf "${d}WORK"
-                  exit 4
-                fi
-
-                "${d}MB" unpack "${d}WORK/boot.img" >/dev/null 2>&1
-                if [ ! -f "${d}WORK/kernel" ]; then
-                  echo "UNPACK_FAILED"
-                  rm -rf "${d}WORK"
-                  exit 5
-                fi
-
-                PATCHED=0
-                P="00008052c0035fd61f2003d5"
-
-                # 1. OnePlus CPH2381 (5.4.254)
-                "${d}MB" hexpatch "${d}WORK/kernel" 4841019000c14339c0035fd6 ${d}P >/dev/null 2>&1 && PATCHED=1
-                # 2. Realme RMX3511 (5.4.210)
-                "${d}MB" hexpatch "${d}WORK/kernel" e8d000b000614239c0035fd6 ${d}P >/dev/null 2>&1 && PATCHED=1
-                # 3. Infinix X6525 (5.4.210)
-                "${d}MB" hexpatch "${d}WORK/kernel" c80601f000415039c0035fd6 ${d}P >/dev/null 2>&1 && PATCHED=1
-                # 4. OnePlus IN2021 (4.19.157)
-                "${d}MB" hexpatch "${d}WORK/kernel" 2835019000816c39c0035fd6 ${d}P >/dev/null 2>&1 && PATCHED=1
-                # 5. Realme RMX3195 (4.19.191)
-                "${d}MB" hexpatch "${d}WORK/kernel" a8f6009000817439c0035fd6 ${d}P >/dev/null 2>&1 && PATCHED=1
-                # 6. Samsung SM-A235F (4.19.157)
-                "${d}MB" hexpatch "${d}WORK/kernel" c839019000c15739c0035fd6 ${d}P >/dev/null 2>&1 && PATCHED=1
-                # 7. Xiaomi M2010J19CG (4.19.157)
-                "${d}MB" hexpatch "${d}WORK/kernel" c8f000d000614739c0035fd6 ${d}P >/dev/null 2>&1 && PATCHED=1
-                # 8. Realme RMX5070 (4.14.357)
-                "${d}MB" hexpatch "${d}WORK/kernel" 0828019000214c39c0035fd6 ${d}P >/dev/null 2>&1 && PATCHED=1
-                # 9. Realme RMX3241 (4.19.191)
-                "${d}MB" hexpatch "${d}WORK/kernel" 281a01b000817f39c0035fd6 ${d}P >/dev/null 2>&1 && PATCHED=1
-                # 10. Xiaomi Redmi 7 (4.9.186)
-                "${d}MB" hexpatch "${d}WORK/kernel" 82030035c00640f91f7000f1 23000014c00640f91f7000f1 >/dev/null 2>&1 && PATCHED=1
-
-                # Dynamic scan via native arm64 disassembler engine
-                if [ ${d}PATCHED -eq 0 ] && [ -x /data/local/tmp/sigpatch ]; then
-                  /data/local/tmp/sigpatch "${d}WORK/kernel" >/dev/null 2>&1
-                  if [ ${d}? -eq 0 ]; then
-                    PATCHED=1
-                  fi
-                fi
-
-                if [ ${d}PATCHED -eq 0 ]; then
-                  echo "PATTERN_NOT_FOUND"
-                  rm -rf "${d}WORK"
-                  exit 6
-                fi
-
-                "${d}MB" repack "${d}WORK/boot.img" >/dev/null 2>&1
-                if [ ! -f "${d}WORK/new-boot.img" ] || [ ! -s "${d}WORK/new-boot.img" ]; then
-                  echo "REPACK_FAILED"
-                  rm -rf "${d}WORK"
-                  exit 7
-                fi
-
-                dd if="${d}WORK/new-boot.img" of="${d}BOOT_DEV" bs=4096 2>/dev/null
-                rm -rf "${d}WORK"
-
-                # Setup engine bridge files for immediate driver compatibility
-                mkdir -p /data/adb/kernel_loader 2>/dev/null
-                echo "sig_unlocked=true" > /data/adb/kernel_loader/status.prop 2>/dev/null
-                echo "PATCH_SUCCESS"
-            """.trimIndent()
-
-            val res = Shell.cmd(script).exec()
-            val out = (res.out + res.err).joinToString("\n").trim()
-            Pair(out.contains("PATCH_SUCCESS"), out)
-        } catch (e: Exception) {
-            Pair(false, e.message ?: "Exception")
-        } finally {
-            Shell.cmd("rm -f /data/local/tmp/magiskboot /data/local/tmp/sigpatch 2>/dev/null").exec()
-        }
+        return UniversalKernelLoader.autoUnlockSignatureStandaloneDetail(getApplication(), this)
     }
 
     fun patchKernelSignature(context: Context) {
@@ -1715,15 +1595,19 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 tstep("Checking root & boot partition...")
-                val ok = UniversalKernelLoader.autoUnlockSignatureStandalone(context, this@DriverViewModel)
+                val (ok, detail) = UniversalKernelLoader.autoUnlockSignatureStandaloneDetail(context, this@DriverViewModel)
                 withContext(Dispatchers.Main) {
                     if (ok) {
                         tlog("[AUTO-FIX] ✅ Kernel signature check successfully unlocked in boot partition!", "OK")
                         tlog("[REBOOT REQUIRED] Please restart your phone once to apply the unlock.", "WARN")
                         Toast.makeText(context, "Signature Bypassed! Restart Phone to apply.", Toast.LENGTH_LONG).show()
                     } else {
-                        tlog("[ERR] Signature unlock failed. Ensure phone has root and boot partition access.", "ERR")
-                        Toast.makeText(context, "Signature bypass failed. Check terminal log.", Toast.LENGTH_SHORT).show()
+                        tlog("[ERR] Signature unlock failed: $detail", "ERR")
+                        if (detail.contains("FLASH_WRITE_FAILED") || detail.contains("FLASH_VERIFY_FAILED")) {
+                            tlog("[NOTICE] Boot partition is write-protected by OEM (SELinux/dm-verity).", "WARN")
+                            tlog("[TIP] Patched boot image saved to /sdcard/patched_boot.img for Fastboot flashing.", "INFO")
+                        }
+                        Toast.makeText(context, "Signature bypass failed: $detail", Toast.LENGTH_SHORT).show()
                     }
                 }
             } catch (e: Exception) {

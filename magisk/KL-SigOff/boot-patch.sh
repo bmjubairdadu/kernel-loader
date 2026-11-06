@@ -101,17 +101,10 @@ if [ ! -s boot.img ]; then log "ERR DUMP_FAILED ($BOOT_DEV)"; echo "DUMP_FAILED"
 
 CUR_HASH=$(sha256sum boot.img | cut -d' ' -f1)
 
-# already-patched guards: same image we flashed before, or the app's unlock marker
+# already-patched guards: same image we flashed before
 if grep -q "patched_boot_sha256=$CUR_HASH" "$STATE" 2>/dev/null; then
   log "SKIP already patched (state hash match)"
   echo "- Kernel already patched (hash match)."
-  echo "ALREADY_PATCHED"
-  exit 0
-fi
-if grep -q "sig_unlocked=true" /data/adb/kernel_loader/status.prop 2>/dev/null; then
-  log "SKIP app already unlocked signature"
-  echo "patched_boot_sha256=$CUR_HASH" >> "$STATE"
-  echo "- App already unlocked signature."
   echo "ALREADY_PATCHED"
   exit 0
 fi
@@ -146,7 +139,7 @@ fi
 
 # Fallback: known per-build patterns via magiskboot hexpatch
 if [ "$PATCHED" = "0" ]; then
-  P=00008052c0035fd6
+  P="00008052c0035fd61f2003d5"
 
   try_pattern() {
     "$MB" hexpatch kernel "$2" "$3" >/dev/null 2>&1
@@ -195,14 +188,46 @@ if [ -n "$part_sectors" ] && [ "$part_sectors" -gt 0 ] 2>/dev/null; then
 fi
 
 echo "- Flashing patched boot image to $BOOT_DEV..."
-dd if=new-boot.img of="$BOOT_DEV" bs=4096 2>/dev/null
+blockdev --setrw "$BOOT_DEV" 2>/dev/null
+chmod 660 "$BOOT_DEV" 2>/dev/null
+dd if=new-boot.img of="$BOOT_DEV" bs=4096 2>"$WORK/flash_err.txt"
+FLASH_RC=$?
+if [ $FLASH_RC -ne 0 ]; then
+  ERR_TXT=$(cat "$WORK/flash_err.txt" 2>/dev/null | tr '\n' ' ')
+  log "ERR FLASH_WRITE_FAILED: $ERR_TXT"
+  echo "FLASH_WRITE_FAILED: $ERR_TXT"
+  cp -f new-boot.img /sdcard/patched_boot.img 2>/dev/null
+  echo "- Saved fallback to /sdcard/patched_boot.img"
+  exit 8
+fi
 sync
+
+# Strict readback verification
+NEW_SIZE=$(wc -c < new-boot.img)
 NEW_HASH=$(sha256sum new-boot.img | cut -d' ' -f1)
+
+COUNT=$(( (NEW_SIZE + 4095) / 4096 ))
+dd if="$BOOT_DEV" of="$WORK/readback.img" bs=4096 count="$COUNT" 2>/dev/null
+head -c "$NEW_SIZE" "$WORK/readback.img" > "$WORK/readback_exact.img" 2>/dev/null || dd if="$WORK/readback.img" of="$WORK/readback_exact.img" bs=1 count="$NEW_SIZE" 2>/dev/null
+
+READ_HASH=$(sha256sum "$WORK/readback_exact.img" | cut -d' ' -f1)
+
+if [ "$NEW_HASH" != "$READ_HASH" ]; then
+  log "ERR FLASH_VERIFY_FAILED: new=$NEW_HASH read=$READ_HASH (OEM block write protection)"
+  echo "FLASH_VERIFY_FAILED: boot block device write-protected"
+  cp -f new-boot.img /sdcard/patched_boot.img 2>/dev/null
+  echo "- Saved fallback to /sdcard/patched_boot.img"
+  exit 9
+fi
+
 {
   echo "patched_boot_sha256=$NEW_HASH"
   echo "boot_dev=$BOOT_DEV"
   echo "patched_at=$(date '+%Y-%m-%d %H:%M:%S')"
 } >> "$STATE"
+mkdir -p /data/adb/kernel_loader 2>/dev/null
+echo "sig_unlocked=true" > /data/adb/kernel_loader/status.prop 2>/dev/null
+echo "patched_boot_sha256=$NEW_HASH" >> /data/adb/kernel_loader/status.prop 2>/dev/null
 log "OK flashed patched boot to $BOOT_DEV sha=$NEW_HASH"
 echo "PATCH_SUCCESS"
 
