@@ -34,14 +34,20 @@ object AntiCheatShield {
                 "logcat -c >/dev/null 2>&1"
             ).exec()
 
-            if (activeNode.isNotBlank()) {
-                val cleanNode = activeNode.removePrefix("/dev/").trim()
-                Shell.cmd(
-                    "for node in /dev/[A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9]; do " +
-                            "if [ \"\$node\" != \"/dev/$cleanNode\" ] && [ -c \"\$node\" ]; then " +
-                            "rm -f \"\$node\"; fi; done 2>/dev/null"
-                ).exec()
-            }
+            // Auto-heal critical system nodes in case a previous buggy run or tool wiped them
+            Shell.cmd(
+                "if [ ! -c /dev/binder ]; then " +
+                        "BM=\$(grep -w binder /proc/misc 2>/dev/null | awk '{print \$1}'); " +
+                        "[ -n \"\$BM\" ] && mknod -m 666 /dev/binder c 10 \$BM 2>/dev/null; " +
+                        "restorecon -F /dev/binder 2>/dev/null; fi",
+                "if [ ! -c /dev/ashmem ]; then " +
+                        "AM=\$(grep -w ashmem /proc/misc 2>/dev/null | awk '{print \$1}'); " +
+                        "[ -n \"\$AM\" ] && mknod -m 666 /dev/ashmem c 10 \$AM 2>/dev/null; " +
+                        "restorecon -F /dev/ashmem 2>/dev/null; fi",
+                "if [ ! -c /dev/random ]; then " +
+                        "mknod -m 666 /dev/random c 1 8 2>/dev/null; " +
+                        "restorecon -F /dev/random 2>/dev/null; fi"
+            ).exec()
 
             runCatching {
                 context.cacheDir.listFiles()?.forEach { file ->
