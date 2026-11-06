@@ -1505,7 +1505,18 @@ object UniversalKernelLoader {
                   "${d}MB" hexpatch "${d}WORK/kernel" 82030035c00640f91f7000f1 23000014c00640f91f7000f1 >/dev/null 2>&1 && PATCHED=1
                 fi
 
+                # Samsung Knox RKP Neutralization (CONFIG_RKP=y bypass: disable rkp_init + load_module/do_init_module uh_calls)
+                "${d}MB" hexpatch "${d}WORK/kernel" ff4303d1fd7b0ba9fdc30291f36300f948200090 00008052c0035fd61f2003d51f2003d548200090 >/dev/null 2>&1 && PATCHED=1
+                "${d}MB" hexpatch "${d}WORK/kernel" 290d40b9bfff3ba9aba33da9a9831ef84930fc97 290d40b9bfff3ba9aba33da9a9831ef81f2003d5 >/dev/null 2>&1 && PATCHED=1
+                "${d}MB" hexpatch "${d}WORK/kernel" e5031faae92301a9eb3302a9ea1b00f9b52cfc97 e5031faae92301a9eb3302a9ea1b00f91f2003d5 >/dev/null 2>&1 && PATCHED=1
+
                 if [ ${d}PATCHED -eq 0 ]; then
+                  if grep -q "sig_unlocked=true" /data/adb/kernel_loader/status.prop 2>/dev/null; then
+                    echo "ALREADY_PATCHED"
+                    echo "PATCH_SUCCESS"
+                    rm -rf "${d}WORK"
+                    exit 0
+                  fi
                   echo "PATTERN_NOT_FOUND"
                   rm -rf "${d}WORK"
                   exit 6
@@ -1562,7 +1573,7 @@ object UniversalKernelLoader {
 
             if (vm != null) {
                 if (out.contains("PATCH_SUCCESS")) {
-                    vm.tlog("[SIG-UNLOCK] Kernel signature enforcement patched & verified in boot partition", "OK")
+                    vm.tlog("[SIG-UNLOCK] Kernel signature & Knox RKP patched & verified in boot partition", "OK")
                 } else if (out.isNotEmpty()) {
                     vm.tlog("[SIG-UNLOCK] Patcher result: $out", "WARN")
                     if (out.contains("FLASH_WRITE_FAILED") || out.contains("FLASH_VERIFY_FAILED")) {

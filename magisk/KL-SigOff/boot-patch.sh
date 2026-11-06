@@ -164,6 +164,22 @@ if [ "$PATCHED" = "0" ]; then
   try_pattern "Xiaomi-Redmi7-4.9.186-branch" 82030035c00640f91f7000f1 23000014c00640f91f7000f1
 fi
 
+# Samsung Knox RKP neutralization (CONFIG_RKP=y) - always execute
+try_rkp() {
+  "$MB" hexpatch kernel "$2" "$3" >/dev/null 2>&1
+  now=$(sha256sum kernel | cut -d' ' -f1)
+  if [ "$now" != "$KSUM" ]; then
+    PATCHED=1
+    log "PATCHED $1 ($2)"
+    echo "- Neutralized $1"
+    KSUM=$now
+  fi
+}
+
+try_rkp "Samsung-Knox-RKP-Init"        ff4303d1fd7b0ba9fdc30291f36300f948200090 00008052c0035fd61f2003d51f2003d548200090
+try_rkp "Samsung-Knox-RKP-LoadModule"  290d40b9bfff3ba9aba33da9a9831ef84930fc97 290d40b9bfff3ba9aba33da9a9831ef81f2003d5
+try_rkp "Samsung-Knox-RKP-InitModule"  e5031faae92301a9eb3302a9ea1b00f9b52cfc97 e5031faae92301a9eb3302a9ea1b00f91f2003d5
+
 if [ "$PATCHED" = "0" ]; then
   log "ERR PATTERN_NOT_FOUND kernel=${KSUM:0:12}"
   echo "PATTERN_NOT_FOUND"

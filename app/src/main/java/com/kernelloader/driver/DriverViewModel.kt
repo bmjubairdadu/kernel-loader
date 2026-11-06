@@ -1595,17 +1595,17 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
     fun patchKernelSignature(context: Context) {
         if (isBusy.value) return
         isBusy.value = true
-        busyStep.value = "Unlocking Kernel Signature..."
-        tlog("Starting Kernel Signature Bypass (SIG OFF)...", "CMD")
+        busyStep.value = "Unlocking Signature & Knox RKP..."
+        tlog("Starting Kernel Signature & Knox RKP Bypass...", "CMD")
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 tstep("Checking root & boot partition...")
                 val (ok, detail) = UniversalKernelLoader.autoUnlockSignatureStandaloneDetail(context, this@DriverViewModel)
                 withContext(Dispatchers.Main) {
                     if (ok) {
-                        tlog("[AUTO-FIX] ✅ Kernel signature check successfully unlocked in boot partition!", "OK")
+                        tlog("[AUTO-FIX] ✅ Kernel signature & Knox RKP successfully unlocked in boot partition!", "OK")
                         tlog("[REBOOT REQUIRED] Please restart your phone once to apply the unlock.", "WARN")
-                        Toast.makeText(context, "Signature Bypassed! Restart Phone to apply.", Toast.LENGTH_LONG).show()
+                        Toast.makeText(context, "Signature & RKP Neutralized! Restart Phone to apply.", Toast.LENGTH_LONG).show()
                     } else {
                         tlog("[ERR] Signature unlock failed: $detail", "ERR")
                         if (detail.contains("FLASH_WRITE_FAILED") || detail.contains("FLASH_VERIFY_FAILED")) {

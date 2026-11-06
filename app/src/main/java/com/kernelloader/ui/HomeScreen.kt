@@ -1291,7 +1291,7 @@ fun HomeScreen(
 
                         Text(
 
-                            text = if (busy && busyStep.contains("Signature")) "PATCHING KERNEL SIGNATURE..." else "PATCH KERNEL SIGNATURE (SIG OFF)",
+                            text = if (busy && (busyStep.contains("Signature") || busyStep.contains("RKP"))) "PATCHING SIG & KNOX RKP..." else "PATCH KERNEL SIGNATURE (SIG & RKP OFF)",
 
                             style = MaterialTheme.typography.labelMedium,
 
