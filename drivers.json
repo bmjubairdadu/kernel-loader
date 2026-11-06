@@ -360,7 +360,7 @@
       "file": "4.9.337-DaisyForGaming.ko",
       "variant": "rt",
       "label": "4.9.337-DaisyForGaming",
-      "sha256": "73ed9e162b751e28d02915f70f77c72c7a0e52bde62effe5a70216c388526def",
+      "sha256": "9429bfe6b07cbb43fd6d5844f08dd034c40d3b07b853f088bce9943ba8083964",
       "size": 27432,
       "buildDate": "2026-11-06T13:25:00Z",
       "source": "DaisyForGaming/build_rt",
