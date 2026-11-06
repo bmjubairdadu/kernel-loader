@@ -1497,7 +1497,9 @@ object UniversalKernelLoader {
                   "${d}MB" hexpatch "${d}WORK/kernel" c839019000c15739c0035fd6 ${d}P >/dev/null 2>&1 && PATCHED=1
                   # 7. Xiaomi M2010J19CG (4.19.157)
                   "${d}MB" hexpatch "${d}WORK/kernel" c8f000d000614739c0035fd6 ${d}P >/dev/null 2>&1 && PATCHED=1
-                  # 8. Realme RMX5070 (4.14.357)
+                  # 8. Realme RMX5070 / Samsung SM-A525F (4.14.357-openela direct signature bypass)
+                  "${d}MB" hexpatch "${d}WORK/kernel" c2030035f50300aaa90e41f83f7500f143030054080440f9 f40301aaf30300aa390000141f2003d51f2003d51f2003d5 >/dev/null 2>&1 && PATCHED=1
+                  # 8b. Legacy getter pattern (if present)
                   "${d}MB" hexpatch "${d}WORK/kernel" 0828019000214c39c0035fd6 ${d}P >/dev/null 2>&1 && PATCHED=1
                   # 9. Realme RMX3241 (4.19.191)
                   "${d}MB" hexpatch "${d}WORK/kernel" 281a01b000817f39c0035fd6 ${d}P >/dev/null 2>&1 && PATCHED=1
@@ -1511,7 +1513,8 @@ object UniversalKernelLoader {
                 "${d}MB" hexpatch "${d}WORK/kernel" e5031faae92301a9eb3302a9ea1b00f9b52cfc97 e5031faae92301a9eb3302a9ea1b00f91f2003d5 >/dev/null 2>&1 && PATCHED=1
 
                 if [ ${d}PATCHED -eq 0 ]; then
-                  if grep -q "sig_unlocked=true" /data/adb/kernel_loader/status.prop 2>/dev/null; then
+                  CUR_BOOT_HASH=${d}(sha256sum "${d}WORK/boot.img" | cut -d' ' -f1)
+                  if grep -q "patched_boot_sha256=${d}CUR_BOOT_HASH" /data/adb/kernel_loader/status.prop 2>/dev/null; then
                     echo "ALREADY_PATCHED"
                     echo "PATCH_SUCCESS"
                     rm -rf "${d}WORK"

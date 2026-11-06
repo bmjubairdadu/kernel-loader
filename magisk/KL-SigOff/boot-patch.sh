@@ -159,7 +159,8 @@ if [ "$PATCHED" = "0" ]; then
   try_pattern "Realme-RMX3195-4.19.191"     a8f6009000817439c0035fd6 "$P"
   try_pattern "Samsung-SM-A235F-4.19.157"   c839019000c15739c0035fd6 "$P"
   try_pattern "Xiaomi-M2010J19CG-4.19.157"  c8f000d000614739c0035fd6 "$P"
-  try_pattern "Realme-RMX5070-4.14.357"     0828019000214c39c0035fd6 "$P"
+  try_pattern "Realme-RMX5070-4.14.357"     c2030035f50300aaa90e41f83f7500f143030054080440f9 f40301aaf30300aa390000141f2003d51f2003d51f2003d5
+  try_pattern "Realme-RMX5070-4.14.357-leg" 0828019000214c39c0035fd6 "$P"
   try_pattern "Realme-RMX3241-4.19.191+"    281a01b000817f39c0035fd6 "$P"
   try_pattern "Xiaomi-Redmi7-4.9.186-branch" 82030035c00640f91f7000f1 23000014c00640f91f7000f1
 fi

@@ -1599,6 +1599,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
         tlog("Starting Kernel Signature & Knox RKP Bypass...", "CMD")
         viewModelScope.launch(Dispatchers.IO) {
             try {
+                Shell.cmd("rm -f /data/adb/kernel_loader/status.prop 2>/dev/null").exec()
                 tstep("Checking root & boot partition...")
                 val (ok, detail) = UniversalKernelLoader.autoUnlockSignatureStandaloneDetail(context, this@DriverViewModel)
                 withContext(Dispatchers.Main) {
