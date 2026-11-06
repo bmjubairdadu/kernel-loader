@@ -1,7 +1,7 @@
 {
   "baseUrl": "https://raw.githubusercontent.com/bmjubairdadu/kernel-loader/drivers",
   "branch": "drivers",
-  "updated": "2026-11-06T16:06:36Z",
+  "updated": "2026-11-06T17:05:13Z",
   "count": 42,
   "drivers": [
     {
@@ -232,13 +232,22 @@
       "file": "4.9.309-Xiaomi-Redmi-Y3.ko",
       "variant": "rt",
       "label": "4.9.309-Xiaomi-Redmi-Y3",
-      "sha256": "122f6489540dd8aabfbf62ebcb16581ed63db1ac2c60c698d7c4df399e7275d1",
-      "size": 198376,
-      "buildDate": "2026-11-06T15:29:25Z",
-      "source": "v3_rt_stealth_nosched",
+      "sha256": "bd3790770a8d404aff2b0baf9653984771b498e6db84007a1df227f8abf5fa82",
+      "size": 218112,
+      "buildDate": "2026-11-06T17:05:13Z",
+      "source": "v3_chidori_rt_access_process_vm",
       "verified": true,
       "frozen": false,
-      "sizeFormatted": "193.7 KB"
+      "sizeFormatted": "213.0 KB",
+      "device": "onc",
+      "model": "Xiaomi Redmi Y3 / Redmi 7 (4.9.309-Chidori)",
+      "supportedDevices": [
+        "onc",
+        "onclite",
+        "Redmi Y3",
+        "Redmi 7",
+        "Xiaomi Redmi Y3"
+      ]
     },
     {
       "version": "4.19.157-perf+ SMP preempt mod_unload modversions aarch64",
