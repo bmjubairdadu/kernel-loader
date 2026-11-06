@@ -1,7 +1,7 @@
 {
   "baseUrl": "https://raw.githubusercontent.com/bmjubairdadu/kernel-loader/drivers",
   "branch": "drivers",
-  "updated": "2026-11-06T07:14:48Z",
+  "updated": "2026-11-06T07:29:11Z",
   "count": 40,
   "drivers": [
     {
@@ -360,13 +360,13 @@
       "file": "4.9.337-DaisyForGaming.ko",
       "variant": "rt",
       "label": "4.9.337-DaisyForGaming",
-      "sha256": "3f93f7dee4a1f1c663436da040baa19c6d8f8523ecc6f07dd0fe11f2dfbd7492",
-      "size": 15208,
-      "buildDate": "2026-11-05T08:10:58Z",
-      "source": "daisy-gaming-driver",
+      "sha256": "73ed9e162b751e28d02915f70f77c72c7a0e52bde62effe5a70216c388526def",
+      "size": 27432,
+      "buildDate": "2026-11-06T13:25:00Z",
+      "source": "DaisyForGaming/build_rt",
       "verified": true,
       "frozen": false,
-      "sizeFormatted": "14.9 KB"
+      "sizeFormatted": "26.8 KB"
     },
     {
       "version": "4.9.186-KernelSU+ SMP preempt mod_unload modversions aarch64",
