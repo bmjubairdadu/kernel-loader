@@ -1,7 +1,7 @@
 {
   "baseUrl": "https://raw.githubusercontent.com/bmjubairdadu/kernel-loader/drivers",
   "branch": "drivers",
-  "updated": "2026-11-06T19:15:00Z",
+  "updated": "2026-11-06T19:42:00Z",
   "count": 41,
   "drivers": [
     {
@@ -290,13 +290,13 @@
       "file": "4.19.157-Samsung-SM-A235F-v2.ko",
       "variant": "rt",
       "label": "4.19.157-Samsung-SM-A235F",
-      "sha256": "8ea0537d7b006b0825f2cf072fbcfcb4c7ced7e0d0c56847aa02034a9f22821b",
-      "size": 259896,
-      "buildDate": "2026-11-06T19:15:00Z",
+      "sha256": "2c336d785e87bfe481a6e579b0449b1a561994a91b8b172d8339ebce3e58ac0e",
+      "size": 259960,
+      "buildDate": "2026-11-06T19:42:00Z",
       "source": "Samsung_SM_A235F_4.19.157",
       "verified": true,
       "frozen": false,
-      "sizeFormatted": "253.8 KB",
+      "sizeFormatted": "253.9 KB",
       "device": "a23",
       "model": "SM-A235F",
       "androidVersion": "14",
