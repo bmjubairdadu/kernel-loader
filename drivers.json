@@ -1,8 +1,8 @@
 {
   "baseUrl": "https://raw.githubusercontent.com/bmjubairdadu/kernel-loader/drivers",
   "branch": "drivers",
-  "updated": "2026-11-06T15:29:25Z",
-  "count": 41,
+  "updated": "2026-11-06T15:42:37Z",
+  "count": 42,
   "drivers": [
     {
       "version": "4.14.117-perf+ SMP preempt mod_unload modversions aarch64",
@@ -516,7 +516,14 @@
       "source": "Realme_RMX3241_4.19.191",
       "verified": true,
       "frozen": false,
-      "sizeFormatted": "276.2 KB"
+      "sizeFormatted": "276.2 KB",
+      "device": "RMX3241",
+      "model": "Realme 8 5G (RMX3241)",
+      "supportedDevices": [
+        "RMX3241",
+        "Realme RMX3241",
+        "rmx3241"
+      ]
     },
     {
       "version": "6.12.69-android16-6-g014ca48a80ee-ab15889839-4k SMP preempt mod_unload modversions aarch64",
@@ -603,6 +610,31 @@
         "220233L2G",
         "angelica",
         "cattail"
+      ]
+    },
+    {
+      "version": "4.19.191+ SMP preempt mod_unload modversions aarch64",
+      "file": "4.19.191-Realme-RMX3195.ko",
+      "variant": "rt",
+      "label": "4.19.191-Realme-RMX3195",
+      "sha256": "4f30b5c5f07cfb9bb45d02a6b47519904ce71ad9bfbe74124ffaf8bd00276683",
+      "size": 253680,
+      "buildDate": "2026-11-06T15:42:37Z",
+      "source": "v3_rt_stealth_nosched",
+      "verified": true,
+      "frozen": false,
+      "sizeFormatted": "247.7 KB",
+      "device": "RMX3195",
+      "model": "Realme RMX3195",
+      "androidVersion": "13",
+      "supportedDevices": [
+        "RMX3195",
+        "Realme RMX3195",
+        "rmx3195",
+        "rm6769",
+        "RM6769",
+        "Realme C25s",
+        "c25s"
       ]
     }
   ],
