@@ -360,13 +360,13 @@
       "file": "4.9.337-DaisyForGaming.ko",
       "variant": "rt",
       "label": "4.9.337-DaisyForGaming",
-      "sha256": "9429bfe6b07cbb43fd6d5844f08dd034c40d3b07b853f088bce9943ba8083964",
-      "size": 27432,
+      "sha256": "af19e66e48ff17199da4a6b874ef83e5efdf87902ac2d6dfc1565742a033a262",
+      "size": 27304,
       "buildDate": "2026-11-06T13:25:00Z",
       "source": "DaisyForGaming/build_rt",
       "verified": true,
       "frozen": false,
-      "sizeFormatted": "26.8 KB"
+      "sizeFormatted": "26.7 KB"
     },
     {
       "version": "4.9.186-KernelSU+ SMP preempt mod_unload modversions aarch64",
