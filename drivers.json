@@ -1,7 +1,7 @@
 {
   "baseUrl": "https://raw.githubusercontent.com/bmjubairdadu/kernel-loader/drivers",
   "branch": "drivers",
-  "updated": "2026-11-06T19:42:00Z",
+  "updated": "2026-11-06T15:29:25Z",
   "count": 41,
   "drivers": [
     {
@@ -232,10 +232,10 @@
       "file": "4.9.309-Xiaomi-Redmi-Y3.ko",
       "variant": "rt",
       "label": "4.9.309-Xiaomi-Redmi-Y3",
-      "sha256": "8f4745d97167de26118396682ef9c4e0a90a8ac04db0eaa3c8067b3705bbfe9b",
+      "sha256": "122f6489540dd8aabfbf62ebcb16581ed63db1ac2c60c698d7c4df399e7275d1",
       "size": 198376,
-      "buildDate": "2026-10-27T15:41:15Z",
-      "source": "CraftRom/Chidori-Kernel_onclite",
+      "buildDate": "2026-11-06T15:29:25Z",
+      "source": "v3_rt_stealth_nosched",
       "verified": true,
       "frozen": false,
       "sizeFormatted": "193.7 KB"
