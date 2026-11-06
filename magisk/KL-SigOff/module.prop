@@ -1,0 +1,6 @@
+id=kl_sigoff
+name=KL SigOff — Kernel Module Signature Off
+version=v1.0.0
+versionCode=10000
+author=bmjubairdadu
+description=Boot-time kernel module-signature disable. Dumps boot partition, hexpatches the sig-enforce check in the kernel image (10 known builds + dynamic engine), repacks and flashes back. Unsigned .ko drivers then insmod cleanly. Needs one reboot after patching.

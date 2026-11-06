@@ -73,6 +73,8 @@ Thumbs.db
 /driver/publish_lf.sh
 /build_log.txt
 # ===== agent scan scratch at repo root =====
+/BUGFIX_REPORT_*.md
+/COMPARISON_*.md
 /auc.txt
 /loglist.txt
 /reboot_scan.txt
@@ -87,3 +89,4 @@ driver/*.v17bak
 # anchored so it can never swallow app/src/main/java/com/kernelloader/driver/
 /driver/
 /kernel-modules/
+/RE/

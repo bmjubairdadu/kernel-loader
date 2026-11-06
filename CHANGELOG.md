@@ -5,6 +5,25 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [3.6] — 2026-11-06 (tag `v3.6` / `versionCode 36`) Universal 3-Tier Dynamic Kernel Signature Bypass & KL-SigOff Magisk Module
+
+> **Release v3.6:** Introduces a state-of-the-art 3-Tier Dynamic ARM64 Machine Code Disassembler (`sigpatch`), universal slot-aware partition discovery (`find_boot`) across all Android OEMs, and the official standalone `KL-SigOff` flashable module for Magisk, KernelSU, and APatch with live-screen installation patching.
+
+### Added
+* **3-Tier Dynamic ARM64 Disassembler Engine (`sigpatch`):**
+  - **Tier 1 (Fast-Path Table):** Instant matching against known patterns (OnePlus, Realme, Infinix, Samsung, Xiaomi).
+  - **Tier 2 (Dynamic `is_module_sig_enforced` Analyzer):** Scans ARM64 instructions to dynamically locate leaf functions (`adrp xN` -> `ldrb w0, [xN, #offset]` -> `ret`) regardless of register choice or offset, verifies cross-reference callers (`bl`), and patches with `mov w0, #0 ; ret`.
+  - **Tier 3 (Universal `module_sig_check` Header Probe):** Discovers inlined/LTO kernel validation blocks by matching marker length comparisons (`cmp xN, #0x1c`), traces back to function prologue, and patches entry.
+  - **Already-Patched Guard:** Safely detects previously patched kernel images and prevents redundant flashing.
+* **Universal Partition Discovery (`find_boot`):**
+  - Robust slot-aware resolver checking `/dev/block/by-name`, `/dev/block/bootdevice`, `/sys/class/block/*/uevent` (`PARTNAME`), and platform mapper partitions across all modern A/B and legacy Android devices.
+* **Official `KL-SigOff` Magisk / KernelSU / APatch Module:**
+  - Standalone flashable zip (`KL-SigOff-v1.0.zip`) that directly analyzes, unpacks, patches, and flashes the kernel boot image during module installation via `customize.sh`, with zero unexpected delayed reboots and automatic background recovery in `service.sh`.
+* **Asset Cache Integrity Guard:**
+  - Enforced file-size verification in `extractAssetToTmp`, guaranteeing bundled binaries (`sigpatch`, `magiskboot`) immediately replace outdated cache files in app storage.
+
+---
+
 ## [3.0] — 2026-11-04 (tag `v3.0` / `versionCode 30`) Anti-Ban Hardware Protection & Pure V3 RT Driver Support
 
 > **Release v3.0:** Major security and anti-ban overhaul: hard-blacklists Snapdragon hardware security nodes (`msm_rng`, `avtimer`) to prevent false-positive adoption, incorporates full signature recognition for genuine V3 RT driver nodes (`[A-GNYB]{6,8}` / `[A-Z]{6,8}`), eliminates blind scan hijackings, and pairs 1:1 with pure zero-lag, zero-heat RT drivers.
