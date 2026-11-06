@@ -93,7 +93,14 @@
       "source": "v3_drivers/RT/4.19.191-ColorOS.sh",
       "verified": true,
       "frozen": false,
-      "sizeFormatted": "192.4 KB"
+      "sizeFormatted": "192.4 KB",
+      "model": "ColorOS / Realme",
+      "supportedDevices": [
+        "oppo",
+        "realme",
+        "oneplus",
+        "coloros"
+      ]
     },
     {
       "version": "4.19.191-g914ba8403bb3-dirty SMP preempt mod_unload modversions aarch64",
@@ -106,7 +113,15 @@
       "source": "v3_drivers/RT/4.19.191-note12pro.sh",
       "verified": true,
       "frozen": false,
-      "sizeFormatted": "182.7 KB"
+      "sizeFormatted": "182.7 KB",
+      "device": "ruby",
+      "model": "Redmi Note 12 Pro",
+      "supportedDevices": [
+        "ruby",
+        "rubyp",
+        "note12pro",
+        "redmi note 12 pro"
+      ]
     },
     {
       "version": "4.19.81-perf-g236f9eb09-dirty SMP preempt mod_unload modversions aarch64",
@@ -262,7 +277,13 @@
       "source": "Infinix_X688B_4.19.127",
       "verified": true,
       "frozen": false,
-      "sizeFormatted": "216.5 KB"
+      "sizeFormatted": "216.5 KB",
+      "device": "X688B",
+      "model": "Infinix Hot 10 Play (X688B)",
+      "supportedDevices": [
+        "X688B",
+        "Infinix X688B"
+      ]
     },
     {
       "version": "4.19.157-perf-27940246-abA235FXXS4DXA5 SMP preempt mod_unload modversions aarch64",
@@ -314,7 +335,13 @@
       "source": "Infinix_X6525_5.4.210",
       "verified": true,
       "frozen": false,
-      "sizeFormatted": "397.7 KB"
+      "sizeFormatted": "397.7 KB",
+      "device": "X6525",
+      "model": "Infinix Smart 8 (X6525)",
+      "supportedDevices": [
+        "X6525",
+        "Infinix X6525"
+      ]
     },
     {
       "version": "6.6.30-android15-8-g6b55ce738535-4k SMP preempt mod_unload modversions aarch64",
@@ -366,7 +393,16 @@
       "source": "DaisyForGaming/build_rt",
       "verified": true,
       "frozen": false,
-      "sizeFormatted": "26.7 KB"
+      "sizeFormatted": "26.7 KB",
+      "device": "daisy",
+      "model": "Mi A2 Lite",
+      "androidVersion": "12",
+      "supportedDevices": [
+        "daisy",
+        "Mi A2 Lite",
+        "mi_a2_lite",
+        "lineage_daisy"
+      ]
     },
     {
       "version": "4.9.186-KernelSU+ SMP preempt mod_unload modversions aarch64",
@@ -509,7 +545,13 @@
       "source": "v3_rt_stealth",
       "verified": true,
       "frozen": false,
-      "sizeFormatted": "34.8 KB"
+      "sizeFormatted": "34.8 KB",
+      "device": "X6887",
+      "model": "Infinix Note 40 Pro (X6887)",
+      "supportedDevices": [
+        "X6887",
+        "Infinix X6887"
+      ]
     },
     {
       "version": "6.12.58-android16-6-g32fc8147b5dc-4k SMP preempt mod_unload modversions aarch64",
@@ -522,7 +564,13 @@
       "source": "v3_rt_stealth",
       "verified": true,
       "frozen": false,
-      "sizeFormatted": "34.8 KB"
+      "sizeFormatted": "34.8 KB",
+      "device": "X6887",
+      "model": "Infinix Note 40 Pro (X6887)",
+      "supportedDevices": [
+        "X6887",
+        "Infinix X6887"
+      ]
     }
   ],
   "frozenDrivers": [
