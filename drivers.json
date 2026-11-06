@@ -1,8 +1,8 @@
 {
   "baseUrl": "https://raw.githubusercontent.com/bmjubairdadu/kernel-loader/drivers",
   "branch": "drivers",
-  "updated": "2026-11-05T16:50:45Z",
-  "count": 37,
+  "updated": "2026-11-06T07:14:48Z",
+  "count": 40,
   "drivers": [
     {
       "version": "4.14.117-perf+ SMP preempt mod_unload modversions aarch64",
@@ -318,13 +318,13 @@
     },
     {
       "version": "6.6.30-android15-8-g6b55ce738535-4k SMP preempt mod_unload modversions aarch64",
-      "file": "6.6.30-Xiaomi-2310FPCA4I.ko",
+      "file": "6.6.30-Xiaomi-23106RN0DA.ko",
       "variant": "rt",
-      "label": "6.6.30-Xiaomi-2310FPCA4I",
+      "label": "6.6.30-Xiaomi-23106RN0DA",
       "sha256": "6b686de5d6be6330d2fdd5925bc1d204c15379f05bcee6d04a7add0f17cd33f9",
       "size": 559008,
-      "buildDate": "2026-10-28T09:22:23Z",
-      "source": "Xiaomi_2310FPCA4I_6.6.30",
+      "buildDate": "2026-11-06T13:10:00Z",
+      "source": "v3_rt_stealth",
       "verified": true,
       "frozen": false,
       "sizeFormatted": "545.9 KB"
@@ -484,6 +484,45 @@
       "verified": true,
       "frozen": false,
       "sizeFormatted": "39.2 KB"
+    },
+    {
+      "version": "4.19.191-g216400aba14e-dirty SMP preempt mod_unload modversions aarch64",
+      "file": "4.19.191-Realme-RMX5070.ko",
+      "variant": "rt",
+      "label": "4.19.191-Realme-RMX5070",
+      "sha256": "4ead3707c8d9285e209f7784865d464688475f4d56d2aa6a15c8caa073d58a2c",
+      "size": 18600,
+      "buildDate": "2026-11-06T13:01:00Z",
+      "source": "v3_rt_stealth",
+      "verified": true,
+      "frozen": false,
+      "sizeFormatted": "18.2 KB"
+    },
+    {
+      "version": "6.12.58-android16-6-g59d87130986d-ab15472332-4k SMP preempt mod_unload modversions aarch64",
+      "file": "6.12.58-Infinix-X6887.ko",
+      "variant": "rt",
+      "label": "6.12.58-Infinix-X6887",
+      "sha256": "d209aa8c5e008ec75cf52435162e62fb3dc1c5c4224f219526ec9fdb227263e0",
+      "size": 35672,
+      "buildDate": "2026-11-06T13:10:00Z",
+      "source": "v3_rt_stealth",
+      "verified": true,
+      "frozen": false,
+      "sizeFormatted": "34.8 KB"
+    },
+    {
+      "version": "6.12.58-android16-6-g32fc8147b5dc-4k SMP preempt mod_unload modversions aarch64",
+      "file": "6.12.58-Infinix-X6887.ko",
+      "variant": "rt",
+      "label": "6.12.58-Infinix-X6887-vendor",
+      "sha256": "d209aa8c5e008ec75cf52435162e62fb3dc1c5c4224f219526ec9fdb227263e0",
+      "size": 35672,
+      "buildDate": "2026-11-06T13:10:00Z",
+      "source": "v3_rt_stealth",
+      "verified": true,
+      "frozen": false,
+      "sizeFormatted": "34.8 KB"
     }
   ],
   "frozenDrivers": [
