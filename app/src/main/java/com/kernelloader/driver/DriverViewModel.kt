@@ -394,7 +394,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             val session = BootSessionTracker.checkSession(application)
             if (session.isLoaded) {
                 val cleanNode = session.devNode.removePrefix("/dev/").trim()
-                val isPatternValid = cleanNode.matches(Regex("^[A-Z]{6,8}$")) ||
+                val isPatternValid = cleanNode.matches(Regex("^[A-Za-z0-9]{6,8}$")) ||
                         cleanNode.startsWith("dmsync") || cleanNode.startsWith("sysync")
                 if (SafetyGuard.isSystemNode(cleanNode) || !isPatternValid) {
                     BootSessionTracker.clear(application)
@@ -760,9 +760,9 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
     private fun mknodPatternSysClasses(): List<String> {
         val made = mutableListOf<String>()
         val classes = Shell.cmd("ls /sys/class 2>/dev/null").exec().out
-            .map { it.trim() }.filter { it.matches(Regex("^[A-GNYB]{6,8}$")) }
+            .map { it.trim() }.filter { it.matches(Regex("^[A-Za-z0-9]{6,8}$")) }
         for (cls in classes) {
-            if (!cls.all { it in "ABCDEFGNYB" }) continue
+            if (SafetyGuard.isSystemNode(cls)) continue
             val dev = Shell.cmd("cat /sys/class/$cls/dev 2>/dev/null").exec().out
                 .firstOrNull()?.trim() ?: continue
             val mm = dev.split(":")
@@ -1442,7 +1442,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             val session = BootSessionTracker.checkSession(context)
             if (session.isLoaded) {
                 val cleanSessionNode = session.devNode.removePrefix("/dev/").trim()
-                val isPatternValid = cleanSessionNode.matches(Regex("^[A-Z]{6,8}$")) ||
+                val isPatternValid = cleanSessionNode.matches(Regex("^[A-Za-z0-9]{6,8}$")) ||
                         cleanSessionNode.startsWith("dmsync") || cleanSessionNode.startsWith("sysync")
                 val isNodeSafe = cleanSessionNode.isNotBlank() && !SafetyGuard.isSystemNode(cleanSessionNode) && isPatternValid
 
@@ -1506,7 +1506,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             }
 
             val isProbedValid = probed != null && !SafetyGuard.isSystemNode(probed) &&
-                    (probed.matches(Regex("^[A-Z]{6,8}$")) || probed.startsWith("dmsync") || probed.startsWith("sysync"))
+                    (probed.matches(Regex("^[A-Za-z0-9]{6,8}$")) || probed.startsWith("dmsync") || probed.startsWith("sysync"))
 
             withContext(Dispatchers.Main) {
                 if (isProbedValid && probed != null) {

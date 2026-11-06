@@ -682,7 +682,7 @@ object UniversalKernelLoader {
             val devNodes = Shell.cmd("ls /dev 2>/dev/null").exec().out.map { it.trim() }
 
             val preferred = vm.preferredDevNode().removePrefix("/dev/").trim()
-            val isPatternValid = preferred.matches(Regex("^[A-Z]{6,8}$")) ||
+            val isPatternValid = preferred.matches(Regex("^[A-Za-z0-9]{6,8}$")) ||
                     preferred.startsWith("dmsync") || preferred.startsWith("sysync")
             if (preferred.isNotBlank() && !SafetyGuard.isSystemNode(preferred) && isPatternValid && preferred in devNodes && isCharNode(preferred)) {
                 return preferred

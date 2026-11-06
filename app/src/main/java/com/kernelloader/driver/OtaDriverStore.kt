@@ -127,19 +127,8 @@ object OtaDriverStore {
             return ResolveResult.Exact(it)
         }
 
-        val short = RootChecker.kernelShortVersion(kernelRelease)
-        var best: DriverEntry? = null
-        var bestD = Int.MAX_VALUE
-        for (e in pool) {
-            val d = distance(short, RootChecker.kernelShortVersion(e.version))
-            if (d < bestD) { bestD = d; best = e }
-        }
-        val b = best ?: return ResolveResult.None
-        val pk = verParts(short) ?: return ResolveResult.None
-        val pb = verParts(RootChecker.kernelShortVersion(b.version))
-            ?: return ResolveResult.None
-        if (pk.first != pb.first) return ResolveResult.None
-        return ResolveResult.Near(b, bestD)
+        // Stop auto-forcing nearest-match drivers to prevent vermagic mismatch crashes on unmatched kernels
+        return ResolveResult.None
     }
 
     fun supportedVersions(manifest: Manifest, variant: String = ""): List<String> =
@@ -272,47 +261,67 @@ object OtaDriverStore {
                 onLog("Cached driver failed sha256 - redownloading", "WARN")
                 out.delete()
             }
-            val url = if (entry.file.startsWith("http")) entry.file
+            val primaryUrl = if (entry.file.startsWith("http")) entry.file
                       else {
                           val base = baseUrl.trimEnd('/')
                           if (base.isBlank()) {
                               manifestUrl.substringBeforeLast('/')
                           } else base
                       } + "/" + entry.file.trimStart('/')
-            onLog("Downloading driver...", "INFO")
-            val conn = com.kernelloader.security.SecurityShield.openSecureConnection(url).apply {
-                connectTimeout = 20000; readTimeout = 60000
-                instanceFollowRedirects = true
-                useCaches = false
-                setRequestProperty("User-Agent", "KernelLoder-OTA/1.0")
-                setRequestProperty("Cache-Control", "no-cache")
-                setRequestProperty("Pragma", "no-cache")
-            }
-            conn.connect()
-            if (conn.responseCode !in 200..299) {
-                conn.disconnect()
-                onLog("Download failed (HTTP ${conn.responseCode})", "ERR")
-                return null
-            }
+            val cdnFallback = "https://cdn.jsdelivr.net/gh/bmjubairdadu/kernel-loader@drivers/" + entry.file.trimStart('/')
+            val candidateUrls = listOf(primaryUrl, cdnFallback).distinct()
+
             val tmp = File(out.absolutePath + ".part")
-            tmp.outputStream().use { o ->
-                conn.inputStream.use { i ->
-                    val buf = ByteArray(32 * 1024)
-                    while (true) {
-                        val n = i.read(buf)
-                        if (n <= 0) break
-                        o.write(buf, 0, n)
+            var downloadedOk = false
+
+            for (url in candidateUrls) {
+                try {
+                    onLog("Downloading driver...", "INFO")
+                    val conn = com.kernelloader.security.SecurityShield.openSecureConnection(url).apply {
+                        connectTimeout = 20000; readTimeout = 60000
+                        instanceFollowRedirects = true
+                        useCaches = false
+                        setRequestProperty("User-Agent", "KernelLoder-OTA/1.0")
+                        setRequestProperty("Cache-Control", "no-cache")
+                        setRequestProperty("Pragma", "no-cache")
                     }
+                    conn.connect()
+                    if (conn.responseCode !in 200..299) {
+                        conn.disconnect()
+                        onLog("Mirror failed (HTTP ${conn.responseCode}) - trying CDN fallback", "WARN")
+                        continue
+                    }
+                    tmp.outputStream().use { o ->
+                        conn.inputStream.use { i ->
+                            val buf = ByteArray(32 * 1024)
+                            while (true) {
+                                val n = i.read(buf)
+                                if (n <= 0) break
+                                o.write(buf, 0, n)
+                            }
+                        }
+                    }
+                    conn.disconnect()
+                    if (entry.size > 0 && tmp.length() != entry.size) {
+                        onLog("Wrong size (${tmp.length()} != ${entry.size}) - retrying mirror", "WARN")
+                        tmp.delete()
+                        continue
+                    }
+                    if (!hashMatches(tmp, expected)) {
+                        onLog("Downloaded file failed sha256 - retrying mirror", "WARN")
+                        tmp.delete()
+                        continue
+                    }
+                    downloadedOk = true
+                    break
+                } catch (e: Exception) {
+                    onLog("Connection error: ${e.message} - trying mirror", "WARN")
+                    tmp.delete()
                 }
             }
-            conn.disconnect()
-            if (entry.size > 0 && tmp.length() != entry.size) {
-                onLog("Downloaded driver has wrong size (${tmp.length()} != ${entry.size}) - rejected", "ERR")
-                tmp.delete()
-                return null
-            }
-            if (!hashMatches(tmp, expected)) {
-                onLog("Downloaded driver failed sha256 - rejected", "ERR")
+
+            if (!downloadedOk || !tmp.exists() || tmp.length() == 0L) {
+                onLog("All mirrors failed to download driver", "ERR")
                 tmp.delete()
                 return null
             }
