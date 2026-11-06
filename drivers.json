@@ -1,8 +1,8 @@
 {
   "baseUrl": "https://raw.githubusercontent.com/bmjubairdadu/kernel-loader/drivers",
   "branch": "drivers",
-  "updated": "2026-11-06T07:32:18Z",
-  "count": 40,
+  "updated": "2026-11-06T18:25:00Z",
+  "count": 41,
   "drivers": [
     {
       "version": "4.14.117-perf+ SMP preempt mod_unload modversions aarch64",
@@ -570,6 +570,29 @@
       "supportedDevices": [
         "X6887",
         "Infinix X6887"
+      ]
+    },
+    {
+      "version": "4.19.275-niigo-enanan-yoka-ks32386 SMP preempt mod_unload modversions aarch64",
+      "file": "4.19.275-niigo-enanan-yoka-ks32386.ko",
+      "variant": "rt",
+      "label": "4.19.275-niigo-enanan-yoka-ks32386",
+      "sha256": "ccedf00a4c34a927483770e9fac935c2084dd1af2be8dd706d616d1589c7e8dd",
+      "size": 175328,
+      "buildDate": "2026-11-06T18:25:00Z",
+      "source": "DriverForge/4.19.275",
+      "verified": true,
+      "frozen": false,
+      "sizeFormatted": "171.2 KB",
+      "model": "220233L2G",
+      "device": "dandelion",
+      "androidVersion": "11",
+      "supportedDevices": [
+        "dandelion",
+        "dandelion_global2",
+        "220233L2G",
+        "angelica",
+        "cattail"
       ]
     }
   ],
