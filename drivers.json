@@ -1,7 +1,7 @@
 {
   "baseUrl": "https://raw.githubusercontent.com/bmjubairdadu/kernel-loader/drivers",
   "branch": "drivers",
-  "updated": "2026-11-07T09:42:28Z",
+  "updated": "2026-11-07T10:36:18Z",
   "count": 43,
   "drivers": [
     {
@@ -668,9 +668,9 @@
       "file": "4.19.191-Tecno-BF7.ko",
       "variant": "rt",
       "label": "4.19.191-Tecno-BF7",
-      "sha256": "74bbe39f04a72ac1f99a63691709b762be62bc7d6217030575b47d080876c920",
+      "sha256": "13752e4ee44ae92db0f66fa76f3af673ced86d355ae26fefb03882aafef1edc8",
       "size": 187096,
-      "buildDate": "2026-11-07T09:42:28Z",
+      "buildDate": "2026-11-07T10:36:18Z",
       "source": "v3_drivers/RT/4.19.191.sh",
       "verified": true,
       "frozen": false,
