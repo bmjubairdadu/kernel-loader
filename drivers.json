@@ -1,8 +1,8 @@
 {
   "baseUrl": "https://raw.githubusercontent.com/bmjubairdadu/kernel-loader/drivers",
   "branch": "drivers",
-  "updated": "2026-11-06T18:11:39Z",
-  "count": 42,
+  "updated": "2026-11-07T08:57:15Z",
+  "count": 43,
   "drivers": [
     {
       "version": "4.14.117-perf+ SMP preempt mod_unload modversions aarch64",
@@ -569,7 +569,13 @@
       "source": "v3_rt_stealth",
       "verified": true,
       "frozen": false,
-      "sizeFormatted": "18.2 KB"
+      "sizeFormatted": "18.2 KB",
+      "device": "RMX5070",
+      "model": "Realme RMX5070",
+      "supportedDevices": [
+        "RMX5070",
+        "rmx5070"
+      ]
     },
     {
       "version": "6.12.58-android16-6-g59d87130986d-ab15472332-4k SMP preempt mod_unload modversions aarch64",
@@ -655,6 +661,30 @@
         "RM6769",
         "Realme C25s",
         "c25s"
+      ]
+    },
+    {
+      "version": "4.19.191-g216400aba14e-dirty SMP preempt mod_unload modversions aarch64",
+      "file": "4.19.191-Tecno-BF7.ko",
+      "variant": "rt",
+      "label": "4.19.191-Tecno-BF7",
+      "sha256": "4f8f422a848eb630daf2951e319f593541c359a9ff2be998843c6a06734d5230",
+      "size": 187096,
+      "buildDate": "2026-11-07T14:50:00Z",
+      "source": "v3_drivers/RT/4.19.191.sh",
+      "verified": true,
+      "frozen": false,
+      "sizeFormatted": "182.7 KB",
+      "device": "BF7",
+      "model": "Tecno Spark Go 2023 / Pop 7 Pro (BF7)",
+      "androidVersion": "12",
+      "supportedDevices": [
+        "TECNO BF7",
+        "BF7",
+        "BF7-GL",
+        "TECNO-BF7",
+        "mt6761",
+        "MT6761"
       ]
     }
   ],
