@@ -1,8 +1,8 @@
 {
   "baseUrl": "https://raw.githubusercontent.com/bmjubairdadu/kernel-loader/drivers",
   "branch": "drivers",
-  "updated": "2026-11-07T17:52:22Z",
-  "count": 43,
+  "updated": "2026-11-07T18:30:52Z",
+  "count": 44,
   "drivers": [
     {
       "version": "4.14.117-perf+ SMP preempt mod_unload modversions aarch64",
@@ -459,6 +459,30 @@
       "verified": true,
       "frozen": false,
       "sizeFormatted": "15.5 KB"
+    },
+    {
+      "version": "4.19.87 SMP preempt mod_unload modversions aarch64",
+      "file": "4.19.87-Samsung-SM-A516U1.ko",
+      "variant": "rt",
+      "label": "4.19.87-Samsung-SM-A516U1",
+      "sha256": "2d960aa8a99c5202bffde8288c35cf1c30b417d194a433d3dc6728b8630c8374",
+      "size": 15712,
+      "buildDate": "2026-11-08T00:29:05Z",
+      "source": "Samsung_SM_A516U1_4.19.87",
+      "verified": true,
+      "frozen": false,
+      "sizeFormatted": "15.3 KB",
+      "device": "a51x",
+      "model": "SM-A516U1",
+      "androidVersion": "11",
+      "supportedDevices": [
+        "a51x",
+        "a51xue",
+        "SM-A516U1",
+        "SM-A516U",
+        "exynos980",
+        "universal980"
+      ]
     },
     {
       "version": "4.19.87 SMP preempt mod_unload modversions aarch64",
