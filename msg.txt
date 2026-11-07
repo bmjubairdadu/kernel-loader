@@ -1,1 +1,0 @@
-ota: purge wanbai signature, enforce pure random stealth node
