@@ -1,7 +1,7 @@
 {
   "baseUrl": "https://raw.githubusercontent.com/bmjubairdadu/kernel-loader/drivers",
   "branch": "drivers",
-  "updated": "2026-11-07T16:49:28Z",
+  "updated": "2026-11-07T17:52:22Z",
   "count": 43,
   "drivers": [
     {
@@ -367,13 +367,13 @@
       "file": "6.6.30-Xiaomi-23106RN0DA.ko",
       "variant": "rt",
       "label": "6.6.30-Xiaomi-23106RN0DA",
-      "sha256": "e85a9bb753edbd59100ac2e1d5b599732f5616d162a8689867d64431caa58582",
-      "size": 38488,
-      "buildDate": "2026-11-07T16:49:28Z",
+      "sha256": "60c63dec3ceb57f948e90996fe895692e372a1212da0881f866342f6433a7a6c",
+      "size": 25352,
+      "buildDate": "2026-11-07T17:52:22Z",
       "source": "Xiaomi_23106RN0DA_6.6.30",
       "verified": true,
       "frozen": false,
-      "sizeFormatted": "37.6 KB",
+      "sizeFormatted": "24.8 KB",
       "device": "gale",
       "model": "Redmi 13C / Poco C65 (23106RN0DA)",
       "androidVersion": "15",
