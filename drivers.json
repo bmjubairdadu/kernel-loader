@@ -1,9 +1,29 @@
 {
   "baseUrl": "https://raw.githubusercontent.com/bmjubairdadu/kernel-loader/drivers",
   "branch": "drivers",
-  "updated": "2026-11-08T14:25:17Z",
-  "count": 26,
+  "updated": "2026-11-08T14:59:39Z",
+  "count": 27,
   "drivers": [
+    {
+      "version": "6.12.69-android16-6-g37a7d8c11197-4k SMP preempt mod_unload modversions aarch64",
+      "file": "6.12.69-android16-6-g014ca48a80ee-ab15889839-4k-spinel.ko",
+      "variant": "rt",
+      "label": "6.12.69-android16-6-g014ca48a80ee-ab15889839-4k-spinel",
+      "sha256": "d62ffbac659155dc20187061a0f8e085669f29aaba1902410e2521e25bffd9cf",
+      "size": 41288,
+      "buildDate": "2026-11-08T14:59:39Z",
+      "source": "AutoMaker/6.12.69-android16-6-g014ca48a80ee-ab15889839-4k",
+      "verified": true,
+      "frozen": false,
+      "sizeFormatted": "40.3 KB",
+      "device": "spinel",
+      "model": "2510DRA23G",
+      "androidVersion": "11",
+      "supportedDevices": [
+        "spinel",
+        "2510DRA23G"
+      ]
+    },
     {
       "version": "4.9.309-Chidori-Kernel SMP preempt mod_unload modversions aarch64",
       "file": "4.9.309-Chidori-Kernel-onc.ko",
