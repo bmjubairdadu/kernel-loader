@@ -1,9 +1,29 @@
 {
   "baseUrl": "https://raw.githubusercontent.com/bmjubairdadu/kernel-loader/drivers",
   "branch": "drivers",
-  "updated": "2026-11-08T08:01:37Z",
-  "count": 25,
+  "updated": "2026-11-08T08:07:24Z",
+  "count": 26,
   "drivers": [
+    {
+      "version": "4.9.337-DaisyForGaming SMP preempt mod_unload modversions aarch64",
+      "file": "4.9.337-DaisyForGaming-daisy.ko",
+      "variant": "rt",
+      "label": "4.9.337-DaisyForGaming-daisy",
+      "sha256": "bcd45e1de70ec65a3a0814e868b9e70ca3f0e277a10a10ef74f9cdd1f9a3b1cb",
+      "size": 27688,
+      "buildDate": "2026-11-08T08:07:24Z",
+      "source": "AutoMaker/4.9.337-DaisyForGaming",
+      "verified": true,
+      "frozen": false,
+      "sizeFormatted": "27.0 KB",
+      "device": "daisy",
+      "model": "Mi A2 Lite",
+      "androidVersion": "11",
+      "supportedDevices": [
+        "daisy",
+        "Mi A2 Lite"
+      ]
+    },
     {
       "version": "4.9.309-Chidori-Kernel SMP preempt mod_unload modversions aarch64",
       "file": "4.9.309-Chidori-Kernel-onc.ko",
