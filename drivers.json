@@ -1,9 +1,29 @@
 {
   "baseUrl": "https://raw.githubusercontent.com/bmjubairdadu/kernel-loader/drivers",
   "branch": "drivers",
-  "updated": "2026-11-08T17:31:02Z",
+  "updated": "2026-11-08T17:46:09Z",
   "count": 28,
   "drivers": [
+    {
+      "version": "6.12.69-android16-6-g37a7d8c11197-4k SMP preempt mod_unload modversions aarch64",
+      "file": "6.12.69-android16-6-g014ca48a80ee-ab15889839-4k-spinel.ko",
+      "variant": "rt",
+      "label": "6.12.69-android16-6-g014ca48a80ee-ab15889839-4k-spinel",
+      "sha256": "3121a1917b2de806aa434e16e8f8cf4e40869389109fa1d3a648aabd90cc89bf",
+      "size": 44048,
+      "buildDate": "2026-11-08T17:46:09Z",
+      "source": "AutoMaker/6.12.69-android16-6-g014ca48a80ee-ab15889839-4k",
+      "verified": true,
+      "frozen": false,
+      "sizeFormatted": "43.0 KB",
+      "device": "spinel",
+      "model": "2510DRA23G",
+      "androidVersion": "11",
+      "supportedDevices": [
+        "spinel",
+        "2510DRA23G"
+      ]
+    },
     {
       "version": "6.6.30-android15-8-g6b55ce738535-4k SMP preempt mod_unload modversions aarch64",
       "file": "6.6.30-android15-8-g6b55ce738535-4k-gale.ko",
@@ -22,26 +42,6 @@
       "supportedDevices": [
         "gale",
         "23106RN0DA"
-      ]
-    },
-    {
-      "version": "6.12.69-android16-6-g37a7d8c11197-4k SMP preempt mod_unload modversions aarch64",
-      "file": "6.12.69-android16-6-g014ca48a80ee-ab15889839-4k-spinel.ko",
-      "variant": "rt",
-      "label": "6.12.69-android16-6-g014ca48a80ee-ab15889839-4k-spinel",
-      "sha256": "7d2a6ed03bb37b217a4dcef976c37238cdc9ab00a919ab0648e87733e566587c",
-      "size": 43536,
-      "buildDate": "2026-11-08T16:41:00Z",
-      "source": "AutoMaker/6.12.69-android16-6-g014ca48a80ee-ab15889839-4k",
-      "verified": true,
-      "frozen": false,
-      "sizeFormatted": "42.5 KB",
-      "device": "spinel",
-      "model": "2510DRA23G",
-      "androidVersion": "11",
-      "supportedDevices": [
-        "spinel",
-        "2510DRA23G"
       ]
     },
     {
