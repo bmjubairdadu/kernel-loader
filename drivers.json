@@ -18,10 +18,15 @@
       "sizeFormatted": "40.3 KB",
       "device": "spinel",
       "model": "2510DRA23G",
-      "androidVersion": "11",
+      "androidVersion": "16",
       "supportedDevices": [
         "spinel",
-        "2510DRA23G"
+        "2510DRA23G",
+        "Xiaomi 2510DRA23G"
+      ],
+      "supportedKernels": [
+        "6.12.69-android16-6-g014ca48a80ee-ab15889839-4k",
+        "6.12.69-android16-6-g37a7d8c11197-4k"
       ]
     },
     {
