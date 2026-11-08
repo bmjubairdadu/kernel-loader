@@ -1,9 +1,29 @@
 {
   "baseUrl": "https://raw.githubusercontent.com/bmjubairdadu/kernel-loader/drivers",
   "branch": "drivers",
-  "updated": "2026-11-08T16:41:00Z",
-  "count": 27,
+  "updated": "2026-11-08T17:31:02Z",
+  "count": 28,
   "drivers": [
+    {
+      "version": "6.6.30-android15-8-g6b55ce738535-4k SMP preempt mod_unload modversions aarch64",
+      "file": "6.6.30-android15-8-g6b55ce738535-4k-gale.ko",
+      "variant": "rt",
+      "label": "6.6.30-android15-8-g6b55ce738535-4k-gale",
+      "sha256": "fd6f7a1411dcc1e50757be6713723bcb11937ca14de3e99f1d522863de0ef9a6",
+      "size": 41808,
+      "buildDate": "2026-11-08T17:31:02Z",
+      "source": "AutoMaker/6.6.30-android15-8-g6b55ce738535-4k",
+      "verified": true,
+      "frozen": false,
+      "sizeFormatted": "40.8 KB",
+      "device": "gale",
+      "model": "23106RN0DA",
+      "androidVersion": "11",
+      "supportedDevices": [
+        "gale",
+        "23106RN0DA"
+      ]
+    },
     {
       "version": "6.12.69-android16-6-g37a7d8c11197-4k SMP preempt mod_unload modversions aarch64",
       "file": "6.12.69-android16-6-g014ca48a80ee-ab15889839-4k-spinel.ko",
