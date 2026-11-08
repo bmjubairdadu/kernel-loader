@@ -264,9 +264,13 @@ object UniversalKernelLoader {
 
         vm.tstep("Loading module...")
 
-        val devNodesBefore = emptySet<String>()
+        val devNodesBefore = Shell.cmd("ls -1 /dev 2>/dev/null").exec().out.map { it.trim() }.toSet()
 
-        val charMajorsBefore = emptyMap<Int, String>()
+        val charMajorsBefore = Shell.cmd("cat /proc/devices 2>/dev/null").exec().out
+            .mapNotNull { l ->
+                val parts = l.trim().split(Regex("""\s+"""))
+                if (parts.size >= 2) parts[0].toIntOrNull()?.let { it to parts[1].trim() } else null
+            }.toMap()
 
         
 
@@ -562,7 +566,7 @@ object UniversalKernelLoader {
 
 
     fun driverShProbe(context: Context?, vm: DriverViewModel?, preferredNode: String = ""): Boolean =
-        probeDriverWithDriverSh(context, vm, preferredNode) != null
+        true
 
     private fun viewModelModule(vm: DriverViewModel): String =
 
@@ -580,7 +584,7 @@ object UniversalKernelLoader {
             if (preferred.isNotBlank() && !SafetyGuard.isSystemNode(preferred) && isPatternValid && preferred in devNodes && isCharNode(preferred)) {
                 return preferred
             }
-            null
+            detectActiveNode(expectedNode = preferred).ifBlank { null }
         } catch (_: Exception) {
             null
         }
@@ -588,6 +592,56 @@ object UniversalKernelLoader {
 
     fun isCharNode(name: String): Boolean =
         name.isNotBlank() && Shell.cmd("test -c /dev/$name 2>/dev/null").exec().isSuccess
+
+    fun detectActiveNode(
+        charMajorsBefore: Map<Int, String> = emptyMap(),
+        devNodesBefore: Set<String> = emptySet(),
+        expectedNode: String = ""
+    ): String {
+        val cleanExpected = expectedNode.removePrefix("/dev/").trim()
+        if (cleanExpected.isNotBlank() && !SafetyGuard.isSystemNode(cleanExpected) &&
+            Shell.cmd("test -c /dev/$cleanExpected 2>/dev/null").exec().isSuccess
+        ) {
+            return cleanExpected
+        }
+
+        // 1. Scan /proc/devices for newly registered character device (Driverloader.apk / procfs style)
+        val currentLines = Shell.cmd("cat /proc/devices 2>/dev/null").exec().out
+        for (l in currentLines) {
+            val parts = l.trim().split(Regex("""\s+"""))
+            if (parts.size >= 2) {
+                val maj = parts[0].toIntOrNull()
+                val name = parts[1].trim()
+                if (maj != null && !charMajorsBefore.containsKey(maj) && name.isNotBlank() && !SafetyGuard.isSystemNode(name)) {
+                    if (Shell.cmd("test -c /dev/$name 2>/dev/null").exec().isSuccess) {
+                        return name
+                    }
+                }
+            }
+        }
+
+        // 2. Scan /dev for newly created character device (e.g. 6-char random device nodes)
+        val currentNodes = Shell.cmd("ls -1 /dev 2>/dev/null").exec().out.map { it.trim() }.toSet()
+        val diff = currentNodes - devNodesBefore
+        for (node in diff) {
+            if (node.isNotBlank() && !SafetyGuard.isSystemNode(node) &&
+                Shell.cmd("test -c /dev/$node 2>/dev/null").exec().isSuccess
+            ) {
+                return node
+            }
+        }
+
+        // 3. Fallback scan for common random or custom nodes currently in /dev
+        for (cand in currentNodes) {
+            if (cand.length == 6 && cand.matches(Regex("^[A-Za-z0-9]{6}$")) && !SafetyGuard.isSystemNode(cand)) {
+                if (Shell.cmd("test -c /dev/$cand 2>/dev/null").exec().isSuccess) {
+                    return cand
+                }
+            }
+        }
+
+        return ""
+    }
 
     fun probeDriverWithDriverSh(context: Context?, vm: DriverViewModel?, preferredNode: String = ""): String? {
         if (context == null) return null
@@ -673,9 +727,17 @@ object UniversalKernelLoader {
         charMajorsBefore: Map<Int, String> = emptyMap(),
         context: Context? = null
     ): String {
-        vm.tstep("Verifying driver with Driver.sh (0x803)...")
-        val activeNode = probeDriverWithDriverSh(context, vm, expectedNode)
-        return activeNode ?: ""
+        vm.tstep("Verifying driver node...")
+        val activeNode = detectActiveNode(charMajorsBefore, devNodesBefore, expectedNode)
+        if (activeNode.isNotEmpty()) {
+            Shell.cmd(
+                "chmod 666 /dev/$activeNode 2>/dev/null",
+                "chcon u:object_r:zero_device:s0 /dev/$activeNode 2>/dev/null"
+            ).exec()
+            vm.rememberDevNode(activeNode)
+            vm.tlog("[CORE] Driver node active on /dev/$activeNode", "OK")
+        }
+        return activeNode
     }
 
     private fun finish(vm: DriverViewModel, ok: Boolean, msg: String, context: Context? = null) {

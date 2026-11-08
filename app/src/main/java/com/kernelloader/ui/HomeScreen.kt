@@ -1437,7 +1437,7 @@ fun HomeScreen(
 
                         Text(
 
-                            text = "safe handshake check (0x803)",
+                            text = "native node activity check",
 
                             style = MaterialTheme.typography.bodySmall,
 
