@@ -1,7 +1,7 @@
 {
   "baseUrl": "https://raw.githubusercontent.com/bmjubairdadu/kernel-loader/drivers",
   "branch": "drivers",
-  "updated": "2026-11-08T08:55:08Z",
+  "updated": "2026-11-08T09:29:06Z",
   "count": 26,
   "drivers": [
     {
@@ -9,13 +9,13 @@
       "file": "4.9.337-DaisyForGaming-daisy.ko",
       "variant": "rt",
       "label": "4.9.337-DaisyForGaming-daisy",
-      "sha256": "42fe8971df1f636da26906a9100e830a31b72455cc695b47695d43228a9368f4",
-      "size": 27472,
-      "buildDate": "2026-11-08T08:55:08Z",
+      "sha256": "a0e2fabea87767a4b07ca2fa9d0f6508a20308bbdd3d42d7022536989f7a31a1",
+      "size": 35688,
+      "buildDate": "2026-11-08T09:29:06Z",
       "source": "AutoMaker/4.9.337-DaisyForGaming",
       "verified": true,
       "frozen": false,
-      "sizeFormatted": "26.8 KB",
+      "sizeFormatted": "34.9 KB",
       "device": "daisy",
       "model": "Mi A2 Lite",
       "androidVersion": "11",
