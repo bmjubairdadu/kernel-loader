@@ -1,9 +1,29 @@
 {
   "baseUrl": "https://raw.githubusercontent.com/bmjubairdadu/kernel-loader/drivers",
   "branch": "drivers",
-  "updated": "2026-11-08T09:29:06Z",
+  "updated": "2026-11-08T11:10:33Z",
   "count": 26,
   "drivers": [
+    {
+      "version": "4.9.309-Chidori-Kernel SMP preempt mod_unload modversions aarch64",
+      "file": "4.9.309-Chidori-Kernel-onc.ko",
+      "variant": "rt",
+      "label": "4.9.309-Chidori-Kernel-onc",
+      "sha256": "3bb05328047dc2f45e65aa722a28c755dc83416bda0e0e868dd9a6e0d58aca04",
+      "size": 29928,
+      "buildDate": "2026-11-08T11:10:33Z",
+      "source": "AutoMaker/4.9.309-Chidori-Kernel",
+      "verified": true,
+      "frozen": false,
+      "sizeFormatted": "29.2 KB",
+      "device": "onc",
+      "model": "Redmi Y3",
+      "androidVersion": "11",
+      "supportedDevices": [
+        "onc",
+        "Redmi Y3"
+      ]
+    },
     {
       "version": "4.9.337-DaisyForGaming SMP preempt mod_unload modversions aarch64",
       "file": "4.9.337-DaisyForGaming-daisy.ko",
@@ -22,26 +42,6 @@
       "supportedDevices": [
         "daisy",
         "Mi A2 Lite"
-      ]
-    },
-    {
-      "version": "4.9.309-Chidori-Kernel SMP preempt mod_unload modversions aarch64",
-      "file": "4.9.309-Chidori-Kernel-onc.ko",
-      "variant": "rt",
-      "label": "4.9.309-Chidori-Kernel-onc",
-      "sha256": "ffca529869781ad2762d0edefe8787b4afab13e90a31010ea47cc1dbca18e817",
-      "size": 27688,
-      "buildDate": "2026-11-08T08:01:37Z",
-      "source": "AutoMaker/4.9.309-Chidori-Kernel",
-      "verified": true,
-      "frozen": false,
-      "sizeFormatted": "27.0 KB",
-      "device": "onc",
-      "model": "Redmi Y3",
-      "androidVersion": "11",
-      "supportedDevices": [
-        "onc",
-        "Redmi Y3"
       ]
     },
     {
