@@ -1,7 +1,7 @@
 {
   "baseUrl": "https://raw.githubusercontent.com/bmjubairdadu/kernel-loader/drivers",
   "branch": "drivers",
-  "updated": "2026-11-08T13:41:48Z",
+  "updated": "2026-11-08T14:24:03Z",
   "count": 26,
   "drivers": [
     {
@@ -11,7 +11,7 @@
       "label": "4.9.309-Chidori-Kernel-onc",
       "sha256": "43fa45ac821b5c5656455977abcb4a7051081feb1e0eb1c6416a570f0a6a85d4",
       "size": 30976,
-      "buildDate": "2026-11-08T13:41:48Z",
+      "buildDate": "2026-11-08T14:24:03Z",
       "source": "AutoMaker/4.9.309-Chidori-Kernel",
       "verified": true,
       "frozen": false,
