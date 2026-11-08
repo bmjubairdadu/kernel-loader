@@ -516,7 +516,7 @@ object UniversalKernelLoader {
 
         vm.tlog("[KERNEL] Module inserted into kernel successfully", "OK")
 
-        val dmesgInsert = Shell.cmd("dmesg 2>/dev/null | grep -iE 'kmem|dmsync|kloader|memacc' | tail -n 3").exec().out
+        val dmesgInsert = Shell.cmd("dmesg 2>/dev/null | grep -iE 'rv|KHACK_DEBUG|hw_bp|kmem|dmsync|kloader|memacc' | tail -n 5").exec().out
 
         dmesgInsert.filter { it.isNotBlank() }.distinct().forEach {
 
