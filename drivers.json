@@ -1,7 +1,7 @@
 {
   "baseUrl": "https://raw.githubusercontent.com/bmjubairdadu/kernel-loader/drivers",
   "branch": "drivers",
-  "updated": "2026-11-08T05:51:56Z",
+  "updated": "2026-11-08T06:43:40Z",
   "count": 45,
   "drivers": [
     {
@@ -9,13 +9,13 @@
       "file": "4.19.87-a51x.ko",
       "variant": "rt",
       "label": "4.19.87-a51x",
-      "sha256": "d690623470c6dac7dbe70c1d9198567493a973909d2c5b57e1ac101ebd45977e",
-      "size": 25704,
-      "buildDate": "2026-11-08T05:51:56Z",
+      "sha256": "e1ab21c5ec18e276ecab8ecd474e7ada0fcaae749fd531978847b129fb0546b2",
+      "size": 27688,
+      "buildDate": "2026-11-08T06:43:40Z",
       "source": "AutoMaker/4.19.87",
       "verified": true,
       "frozen": false,
-      "sizeFormatted": "25.1 KB",
+      "sizeFormatted": "27.0 KB",
       "device": "a51x",
       "model": "SM-A516U1",
       "androidVersion": "11",
