@@ -1,7 +1,7 @@
 {
   "baseUrl": "https://raw.githubusercontent.com/bmjubairdadu/kernel-loader/drivers",
   "branch": "drivers",
-  "updated": "2026-11-08T17:46:09Z",
+  "updated": "2026-11-08T17:47:50Z",
   "count": 28,
   "drivers": [
     {
@@ -9,9 +9,9 @@
       "file": "6.12.69-android16-6-g014ca48a80ee-ab15889839-4k-spinel.ko",
       "variant": "rt",
       "label": "6.12.69-android16-6-g014ca48a80ee-ab15889839-4k-spinel",
-      "sha256": "3121a1917b2de806aa434e16e8f8cf4e40869389109fa1d3a648aabd90cc89bf",
+      "sha256": "91ccf302bb53b3d245e6c57ba66929ac13c68e7a9f01ec279c1d85d7c16f8eb9",
       "size": 44048,
-      "buildDate": "2026-11-08T17:46:09Z",
+      "buildDate": "2026-11-08T17:47:50Z",
       "source": "AutoMaker/6.12.69-android16-6-g014ca48a80ee-ab15889839-4k",
       "verified": true,
       "frozen": false,
