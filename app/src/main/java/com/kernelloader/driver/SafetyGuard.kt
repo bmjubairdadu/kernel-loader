@@ -20,13 +20,15 @@ object SafetyGuard {
         "ppp", "alsa", "sg", "ch", "i2c", "spi", "usb", "ptm", "pts", "gpiochip", "pmsg", "rtc", "DVB", "wwan_ioctl",
         "dts_eagle_ioctl", "BaseRemoteCtl", "goodix_fp_spi", "rmnet_ctrl", "ttyGS", "usbmon", "wcnss_wlan", "wcnss_ctrl",
         "vcodec", "vcodec2", "mainaf", "cam_cal_drv", "scp", "sspm", "nanohub", "boringssl", "bfqio", "cpuctl", "cpuset", "stune",
-        "kd_camera_hw", "kd_camera_hw_bus2", "m4u", "mtk_cmdq", "mtk_disp", "mtk_m4u", "sw_sync", "pvr_sync"
+        "kd_camera_hw", "kd_camera_hw_bus2", "m4u", "mtk_cmdq", "mtk_disp", "mtk_m4u", "sw_sync", "pvr_sync",
+        "sec", "sec_dev", "mtk_sec", "mtk_sec_heap"
     )
 
     fun isSystemNode(name: String): Boolean {
         val clean = name.removePrefix("/dev/").trim().lowercase()
         return clean.isBlank() ||
                 clean in SYSTEM_DEV_NODES ||
+                clean == "sec" || clean.startsWith("sec") ||
                 clean.startsWith("msm_") ||
                 clean.startsWith("msm-") ||
                 clean.startsWith("qcom_") ||

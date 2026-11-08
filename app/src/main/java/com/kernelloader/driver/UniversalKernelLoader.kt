@@ -584,7 +584,7 @@ object UniversalKernelLoader {
             if (preferred.isNotBlank() && !SafetyGuard.isSystemNode(preferred) && isPatternValid && preferred in devNodes && isCharNode(preferred)) {
                 return preferred
             }
-            detectActiveNode(expectedNode = preferred).ifBlank { null }
+            null
         } catch (_: Exception) {
             null
         }
