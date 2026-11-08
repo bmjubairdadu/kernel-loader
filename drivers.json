@@ -1,7 +1,7 @@
 {
   "baseUrl": "https://raw.githubusercontent.com/bmjubairdadu/kernel-loader/drivers",
   "branch": "drivers",
-  "updated": "2026-11-08T15:41:05Z",
+  "updated": "2026-11-08T16:41:00Z",
   "count": 27,
   "drivers": [
     {
@@ -9,13 +9,13 @@
       "file": "6.12.69-android16-6-g014ca48a80ee-ab15889839-4k-spinel.ko",
       "variant": "rt",
       "label": "6.12.69-android16-6-g014ca48a80ee-ab15889839-4k-spinel",
-      "sha256": "65992a74147fa2fd8afdb2fb9fe650e865a31fcb0d6d065d1869752fd41aeafe",
-      "size": 43664,
-      "buildDate": "2026-11-08T15:41:05Z",
+      "sha256": "7d2a6ed03bb37b217a4dcef976c37238cdc9ab00a919ab0648e87733e566587c",
+      "size": 43536,
+      "buildDate": "2026-11-08T16:41:00Z",
       "source": "AutoMaker/6.12.69-android16-6-g014ca48a80ee-ab15889839-4k",
       "verified": true,
       "frozen": false,
-      "sizeFormatted": "42.6 KB",
+      "sizeFormatted": "42.5 KB",
       "device": "spinel",
       "model": "2510DRA23G",
       "androidVersion": "11",
