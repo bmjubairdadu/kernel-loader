@@ -1,7 +1,7 @@
 {
   "baseUrl": "https://raw.githubusercontent.com/bmjubairdadu/kernel-loader/drivers",
   "branch": "drivers",
-  "updated": "2026-11-08T14:59:39Z",
+  "updated": "2026-11-08T15:41:05Z",
   "count": 27,
   "drivers": [
     {
@@ -9,24 +9,19 @@
       "file": "6.12.69-android16-6-g014ca48a80ee-ab15889839-4k-spinel.ko",
       "variant": "rt",
       "label": "6.12.69-android16-6-g014ca48a80ee-ab15889839-4k-spinel",
-      "sha256": "d62ffbac659155dc20187061a0f8e085669f29aaba1902410e2521e25bffd9cf",
-      "size": 41288,
-      "buildDate": "2026-11-08T14:59:39Z",
+      "sha256": "65992a74147fa2fd8afdb2fb9fe650e865a31fcb0d6d065d1869752fd41aeafe",
+      "size": 43664,
+      "buildDate": "2026-11-08T15:41:05Z",
       "source": "AutoMaker/6.12.69-android16-6-g014ca48a80ee-ab15889839-4k",
       "verified": true,
       "frozen": false,
-      "sizeFormatted": "40.3 KB",
+      "sizeFormatted": "42.6 KB",
       "device": "spinel",
       "model": "2510DRA23G",
-      "androidVersion": "16",
+      "androidVersion": "11",
       "supportedDevices": [
         "spinel",
-        "2510DRA23G",
-        "Xiaomi 2510DRA23G"
-      ],
-      "supportedKernels": [
-        "6.12.69-android16-6-g014ca48a80ee-ab15889839-4k",
-        "6.12.69-android16-6-g37a7d8c11197-4k"
+        "2510DRA23G"
       ]
     },
     {
