@@ -1,7 +1,7 @@
 {
   "baseUrl": "https://raw.githubusercontent.com/bmjubairdadu/kernel-loader/drivers",
   "branch": "drivers",
-  "updated": "2026-11-08T12:45:52Z",
+  "updated": "2026-11-08T12:54:36Z",
   "count": 26,
   "drivers": [
     {
@@ -9,13 +9,13 @@
       "file": "4.9.309-Chidori-Kernel-onc.ko",
       "variant": "rt",
       "label": "4.9.309-Chidori-Kernel-onc",
-      "sha256": "ee392294e69c4bd4b035129019d99622aa7fd15ed7849d774a791c693e8ffe43",
-      "size": 28968,
-      "buildDate": "2026-11-08T12:45:52Z",
+      "sha256": "94c3a8506d4b78ed4c313367fcd5cb46dd1147f747a1e2f0697b02aac4865262",
+      "size": 27912,
+      "buildDate": "2026-11-08T12:54:36Z",
       "source": "AutoMaker/4.9.309-Chidori-Kernel",
       "verified": true,
       "frozen": false,
-      "sizeFormatted": "28.3 KB",
+      "sizeFormatted": "27.3 KB",
       "device": "onc",
       "model": "Redmi Y3",
       "androidVersion": "11",
