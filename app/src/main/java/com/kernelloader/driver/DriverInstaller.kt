@@ -127,6 +127,28 @@ class DriverInstaller(private val ctx: Context) {
         return su(cmd, onLine)
     }
 
+    fun verifyLoad(module: String = MODULE, onLine: (String) -> Unit = {}): Pair<Boolean, String?> {
+        val work = File(ctx.cacheDir, "ftl").apply { mkdirs() }
+        val script = copyAsset("sh/verify_load.sh", File(work, "verify_load.sh"))
+        var passed = false
+        var foundNode: String? = null
+        val cmd = "mkdir -p $REMOTE && cp -f '${script.absolutePath}' $REMOTE/verify_load.sh && " +
+            "chmod 755 $REMOTE/verify_load.sh && " +
+            "$REMOTE/verify_load.sh $module"
+        val rc = su(cmd) { line ->
+            val trimmed = line.trim()
+            if (trimmed.isNotBlank()) {
+                if (trimmed.startsWith("RESULT: PASS")) passed = true
+                if (trimmed.startsWith("NODE=")) {
+                    foundNode = trimmed.substringAfter("NODE=").trim()
+                }
+                onLine(trimmed)
+            }
+        }
+        if (rc == 0) passed = true
+        return Pair(passed, foundNode)
+    }
+
     private fun copyAsset(assetPath: String, dst: File): File {
         ctx.assets.open(assetPath).use { ins ->
             dst.outputStream().use { outs -> ins.copyTo(outs) }

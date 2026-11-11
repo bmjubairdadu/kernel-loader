@@ -670,40 +670,32 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             isBusy.value = true
             verifyStatus.value = "CHECKING"
             verifyDetail.value = ""
-            busyStep.value = "Verifying script & driver..."
+            busyStep.value = "Running verify_load.sh..."
             var passed = false
             var summaryDetail = ""
             withContext(Dispatchers.IO) {
                 try {
                     val app = getApplication<Application>()
                     val installer = DriverInstaller(app)
-                    val mainLoaded = installer.isLoaded(DriverInstaller.MODULE)
-                    val altLoaded = if (!mainLoaded) installer.isLoaded(DriverInstaller.ALT_MODULE) else false
-                    val isModuleLoaded = mainLoaded || altLoaded
-                    val modName = if (altLoaded) DriverInstaller.ALT_MODULE else DriverInstaller.MODULE
-                    val node = installer.findNode()
-                    var pingOk = false
-                    if (!node.isNullOrBlank()) {
-                        val pingRc = installer.client(node, "ping") { line -> }
-                        pingOk = pingRc == 0
-                    }
-                    passed = isModuleLoaded || !node.isNullOrBlank()
-                    if (passed) {
-                        val activeMod = if (isModuleLoaded) modName else "Active stealth driver"
-                        val nodeStr = node ?: "dynamic"
-                        summaryDetail = "$activeMod · $nodeStr"
-                        tlog("DRIVER ACTIVE & LOADED", "OK")
-                        tlog("Kernel Module : $activeMod (Loaded)", "OK")
-                        tlog("Device Node   : $nodeStr (Active)", "OK")
-                        if (pingOk) {
-                            tlog("Stealth Comms : IOCTL ping OK", "OK")
+                    val release = (RootChecker.getKernelRelease() ?: System.getProperty("os.version") ?: "").trim()
+                    val targetMod = if (release.startsWith("6.12")) DriverInstaller.ALT_MODULE else DriverInstaller.MODULE
+                    val (ok, node) = installer.verifyLoad(targetMod) { line ->
+                        if (line != "---" && !line.startsWith("===")) {
+                            val type = when {
+                                line.startsWith("PASS") || line.contains("RESULT: PASS") || line.startsWith("NODE=") -> "OK"
+                                line.startsWith("FAIL") || line.contains("RESULT: FAIL") -> "ERR"
+                                else -> "INFO"
+                            }
+                            tlog(line, type)
                         }
+                    }
+                    passed = ok
+                    if (passed) {
+                        val activeNode = node ?: installer.findNode() ?: "dynamic"
+                        summaryDetail = "$targetMod · $activeNode"
                         tlog("Status: Driver & script are working properly", "OK")
                     } else {
                         summaryDetail = "NOT LOADED"
-                        tlog("DRIVER NOT LOADED", "ERR")
-                        tlog("Kernel Module : Not found in kernel memory", "ERR")
-                        tlog("Device Node   : Not found in /dev", "ERR")
                         tlog("Status: Driver or Script is NOT loaded", "WARN")
                         tlog("Hint: Tap LOAD above to install driver", "INFO")
                     }

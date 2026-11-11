@@ -3,6 +3,47 @@
   "generated_at": "2026-04-18T00:00:00Z",
   "drivers": [
     {
+      "version": "4.9.337-DaisyForGaming SMP preempt mod_unload modversions aarch64",
+      "file": "4.9.337.sh",
+      "variant": "rt",
+      "label": "4.9.337",
+      "sha256": "9ed57f63cc3afec7af63766c973d537146bc3ebaf2d29ffaf5d7f8f11bd719eb",
+      "size": 615138,
+      "buildDate": "2026-11-11T23:06:52Z",
+      "source": "AutoMaker/4.9.337-DaisyForGaming / source-build",
+      "verified": true,
+      "frozen": false,
+      "sizeFormatted": "600.7 KB",
+      "device": "daisy",
+      "model": "Mi A2 Lite",
+      "brand": "Xiaomi",
+      "product": "lineage_daisy",
+      "androidVersion": "11",
+      "buildId": "RQ3A.211001.001",
+      "displayId": "RQ3A.211001.001 release-keys",
+      "cpuAbi": "arm64-v8a",
+      "soc": "msm8953",
+      "supportedDevices": [
+        "daisy",
+        "lineage_daisy",
+        "Mi A2 Lite",
+        "Xiaomi Mi A2 Lite",
+        "msm8953"
+      ],
+      "aliases": [
+        "4.9.337-DaisyForGaming",
+        "4.9.337-DaisyForGaming-daisy",
+        "4.9.337-daisy",
+        "4.9.337-lineage_daisy",
+        "4.9.337"
+      ],
+      "asset": "drivers/4.9.337.sh",
+      "cfi": "none",
+      "crcCount": 50,
+      "moduleLayoutCrc": "0x69d16fd5",
+      "modversions": true
+    },
+    {
       "kernel": "4.14.117-perf+",
       "vermagic": "4.14.117-perf+ SMP preempt mod_unload modversions aarch64",
       "variant": "a",
@@ -165,8 +206,8 @@
       "size": 777834
     },
     {
-      "kernel": "5.10.226LZ\u79bb@gnmtl-00002-g7d7b7d0205d2-dirty",
-      "vermagic": "5.10.226LZ\u79bb@gnmtl-00002-g7d7b7d0205d2-dirty SMP preempt mod_unload modversions aarch64",
+      "kernel": "5.10.226LZ离@gnmtl-00002-g7d7b7d0205d2-dirty",
+      "vermagic": "5.10.226LZ离@gnmtl-00002-g7d7b7d0205d2-dirty SMP preempt mod_unload modversions aarch64",
       "variant": "a",
       "label": "5.10",
       "file": "RT/5.10.sh",
@@ -174,8 +215,8 @@
       "size": 899946
     },
     {
-      "kernel": "5.15.167tg@gnmtl\u79bb-00023-g952e16e5fc48-dirty",
-      "vermagic": "5.15.167tg@gnmtl\u79bb-00023-g952e16e5fc48-dirty SMP preempt mod_unload modversions aarch64",
+      "kernel": "5.15.167tg@gnmtl离-00023-g952e16e5fc48-dirty",
+      "vermagic": "5.15.167tg@gnmtl离-00023-g952e16e5fc48-dirty SMP preempt mod_unload modversions aarch64",
       "variant": "a",
       "label": "5.15",
       "file": "RT/5.15.sh",
@@ -209,5 +250,7 @@
       "sha256": "a2d1200f628ce27cff58007924541bb8c9a58c144b4b97e2df27ebe106024e1c",
       "size": 702290
     }
-  ]
+  ],
+  "count": 24,
+  "updated": "2026-11-11T23:06:52Z"
 }
