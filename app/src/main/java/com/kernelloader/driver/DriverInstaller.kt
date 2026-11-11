@@ -17,12 +17,17 @@ class DriverInstaller(private val ctx: Context) {
         val rawLog: String = ""
     )
 
-    fun availableScripts(): List<String> =
-        ctx.assets.list("drivers/RT")
+    fun availableScripts(): List<String> {
+        val rtList = ctx.assets.list("drivers/RT")
             ?.filter { it.endsWith(".sh") }
             ?.map { it.removeSuffix(".sh") }
-            ?.sorted()
             ?: emptyList()
+        val rootList = ctx.assets.list("drivers")
+            ?.filter { it.endsWith(".sh") }
+            ?.map { it.removeSuffix(".sh") }
+            ?: emptyList()
+        return (rtList + rootList).distinct().sorted()
+    }
 
     fun candidates(release: String): List<String> {
         val v = release.substringBefore('-').trim()
@@ -51,7 +56,12 @@ class DriverInstaller(private val ctx: Context) {
 
     fun install(assetStem: String, onLine: (String) -> Unit = {}): Result {
         val work = File(ctx.cacheDir, "ftl").apply { mkdirs() }
-        val script = copyAsset("drivers/RT/$assetStem.sh", File(work, "$assetStem.sh"))
+        val scriptPath = if (ctx.assets.list("drivers/RT")?.contains("$assetStem.sh") == true) {
+            "drivers/RT/$assetStem.sh"
+        } else {
+            "drivers/$assetStem.sh"
+        }
+        val script = copyAsset(scriptPath, File(work, "$assetStem.sh"))
         val wrapper = copyAsset("sh/driver_load.sh", File(work, "driver_load.sh"))
         return runWrapper(script, wrapper, onLine)
     }

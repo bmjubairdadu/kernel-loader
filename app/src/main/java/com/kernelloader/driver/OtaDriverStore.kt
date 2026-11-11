@@ -130,11 +130,14 @@ object OtaDriverStore {
         for (i in 0 until arr.length()) {
             val o = arr.getJSONObject(i)
             val file = o.optString("file", "")
+            val vm = o.optString("vermagic", "").ifBlank { o.optString("version", "") }
             val k = o.optString("kernel", "")
-            val vm = o.optString("vermagic", "")
+                .ifBlank { o.optString("short_vermagic", "") }
+                .ifBlank { vm.split(' ').firstOrNull().orEmpty() }
+                .ifBlank { o.optString("label", "") }
             if (file.isBlank() || (k.isBlank() && vm.isBlank())) continue
             out += DriverEntry(
-                kernel = k.ifBlank { vm.split(' ').firstOrNull().orEmpty() },
+                kernel = k,
                 vermagic = vm,
                 variant = o.optString("variant", "a"),
                 label = o.optString("label", ""),

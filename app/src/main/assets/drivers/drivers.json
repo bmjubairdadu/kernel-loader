@@ -3,13 +3,15 @@
   "generated_at": "2026-04-18T00:00:00Z",
   "drivers": [
     {
+      "kernel": "4.9.337-DaisyForGaming",
+      "vermagic": "4.9.337-DaisyForGaming SMP preempt mod_unload modversions aarch64",
       "version": "4.9.337-DaisyForGaming SMP preempt mod_unload modversions aarch64",
-      "file": "4.9.337.sh",
       "variant": "rt",
       "label": "4.9.337",
+      "file": "RT/4.9.337.sh",
       "sha256": "9ed57f63cc3afec7af63766c973d537146bc3ebaf2d29ffaf5d7f8f11bd719eb",
       "size": 615138,
-      "buildDate": "2026-11-11T23:06:52Z",
+      "buildDate": "2026-11-11T23:24:21Z",
       "source": "AutoMaker/4.9.337-DaisyForGaming / source-build",
       "verified": true,
       "frozen": false,
@@ -37,7 +39,7 @@
         "4.9.337-lineage_daisy",
         "4.9.337"
       ],
-      "asset": "drivers/4.9.337.sh",
+      "asset": "drivers/RT/4.9.337.sh",
       "cfi": "none",
       "crcCount": 50,
       "moduleLayoutCrc": "0x69d16fd5",
@@ -252,5 +254,5 @@
     }
   ],
   "count": 24,
-  "updated": "2026-11-11T23:06:52Z"
+  "updated": "2026-11-11T23:24:21Z"
 }
