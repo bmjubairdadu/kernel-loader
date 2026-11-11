@@ -1,7 +1,7 @@
 {
   "baseUrl": "https://raw.githubusercontent.com/bmjubairdadu/kernel-loader/drivers",
   "branch": "drivers",
-  "updated": "2026-11-11T11:04:23Z",
+  "updated": "2026-11-11T11:19:51Z",
   "count": 29,
   "drivers": [
     {
@@ -9,13 +9,13 @@
       "file": "4.9.337.sh",
       "variant": "rt",
       "label": "4.9.337",
-      "sha256": "503dddb53f4b2964b5e5ae3a1a14d4c84d92b24ffffc8799516529cdf13cf687",
-      "size": 43402,
-      "buildDate": "2026-11-11T11:04:23Z",
-      "source": "AutoMaker/4.9.337-DaisyForGaming",
+      "sha256": "51317b1ca781068d7e004230817beda1c3ba586d1bbff6d04d7c566021d75e1b",
+      "size": 503690,
+      "buildDate": "2026-11-11T11:19:51Z",
+      "source": "AutoMaker/4.9.337-DaisyForGaming / source-build",
       "verified": true,
       "frozen": false,
-      "sizeFormatted": "42.4 KB",
+      "sizeFormatted": "491.9 KB",
       "device": "daisy",
       "model": "Mi A2 Lite",
       "brand": "Xiaomi",
