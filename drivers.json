@@ -1,9 +1,30 @@
 {
   "baseUrl": "https://raw.githubusercontent.com/bmjubairdadu/kernel-loader/drivers",
   "branch": "drivers",
-  "updated": "2026-11-08T18:49:27Z",
-  "count": 28,
+  "updated": "2026-11-11T10:54:11Z",
+  "count": 29,
   "drivers": [
+    {
+      "version": "4.9.337-DaisyForGaming SMP preempt mod_unload modversions aarch64",
+      "file": "4.9.337-DaisyForGaming-daisy.sh",
+      "variant": "rt",
+      "label": "4.9.337-DaisyForGaming-daisy",
+      "sha256": "503dddb53f4b2964b5e5ae3a1a14d4c84d92b24ffffc8799516529cdf13cf687",
+      "size": 43402,
+      "buildDate": "2026-11-11T10:54:11Z",
+      "source": "AutoMaker/4.9.337-DaisyForGaming",
+      "verified": true,
+      "frozen": false,
+      "sizeFormatted": "42.4 KB",
+      "device": "daisy",
+      "model": "Mi A2 Lite",
+      "androidVersion": "11",
+      "supportedDevices": [
+        "daisy",
+        "Mi A2 Lite",
+        "Xiaomi Mi A2 Lite"
+      ]
+    },
     {
       "version": "6.12.69-android16-6-g37a7d8c11197-4k SMP preempt mod_unload modversions aarch64",
       "file": "6.12.69-android16-6-g014ca48a80ee-ab15889839-4k-spinel.ko",
