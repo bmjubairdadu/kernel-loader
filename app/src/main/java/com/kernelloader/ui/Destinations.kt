@@ -7,9 +7,6 @@ import androidx.navigation3.runtime.NavKey
 data object MainRoute : NavKey
 
 @Serializable
-data object WarningRoute : NavKey
-
-@Serializable
 data object CreditsRoute : NavKey
 
 @Serializable

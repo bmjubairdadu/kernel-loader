@@ -21,6 +21,9 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import com.kernelloader.R
 import com.kernelloader.ui.theme.GridLine
+import com.kernelloader.ui.theme.LogoMagenta
+import com.kernelloader.ui.theme.LogoPink
+import com.kernelloader.ui.theme.LogoPurple
 import com.kernelloader.ui.theme.Surface0
 import com.kernelloader.ui.theme.Surface1
 import com.kernelloader.ui.theme.Surface2
@@ -34,7 +37,7 @@ val BrandAccent = TopGlow
 
 @Composable
 fun AppBackground(
-    watermarkAlpha: Float = 0.035f,
+    watermarkAlpha: Float = 0.045f,
     content: @Composable BoxScope.() -> Unit
 ) {
     Box(
@@ -44,25 +47,47 @@ fun AppBackground(
             .background(
                 Brush.verticalGradient(
                     0.0f to Surface0,
-                    0.5f to Surface1.copy(alpha = 0.55f),
-                    1.0f to Surface0
+                    0.45f to Surface1.copy(alpha = 0.72f),
+                    1.0f to SurfaceDeep
                 )
             )
     ) {
+
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(260.dp)
+                .height(320.dp)
                 .background(
                     Brush.verticalGradient(
-                        0.0f to TopGlow.copy(alpha = 0.10f),
+                        0.0f to LogoPink.copy(alpha = 0.16f),
+                        0.45f to LogoMagenta.copy(alpha = 0.09f),
                         1.0f to Color.Transparent
                     )
                 )
         )
 
         Canvas(Modifier.fillMaxSize()) {
-            val step = 30.dp.toPx()
+
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(LogoPink.copy(alpha = 0.12f), Color.Transparent),
+                    center = Offset(size.width * 0.15f, size.height * 0.08f),
+                    radius = size.width * 0.65f
+                ),
+                center = Offset(size.width * 0.15f, size.height * 0.08f),
+                radius = size.width * 0.65f
+            )
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(LogoPurple.copy(alpha = 0.12f), Color.Transparent),
+                    center = Offset(size.width * 0.88f, size.height * 0.32f),
+                    radius = size.width * 0.65f
+                ),
+                center = Offset(size.width * 0.88f, size.height * 0.32f),
+                radius = size.width * 0.65f
+            )
+
+            val step = 32.dp.toPx()
             var x = 0f
             while (x < size.width) {
                 drawLine(GridLine, Offset(x, 0f), Offset(x, size.height), strokeWidth = 1f)

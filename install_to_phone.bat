@@ -27,7 +27,7 @@ echo [1/3] কানেক্টেড ডিভাইস চেক করা �
 "%ADB_BIN%" devices
 echo.
 
-set "APK_FILE=%~dp0app\build\outputs\apk\release\app-release.apk"
+set "APK_FILE=%~dp0app\build\outputs\apk\release\Kernel-Loader-v5.0.apk"
 if not exist "%APK_FILE%" (
     set "APK_FILE=%~dp0app\build\outputs\apk\debug\app-debug.apk"
 )

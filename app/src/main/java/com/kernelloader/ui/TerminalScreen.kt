@@ -125,18 +125,18 @@ fun ConsoleScreen(
     }
 
     val listState = rememberLazyListState(
-        initialFirstVisibleItemIndex = (shown.size - 1).coerceAtLeast(0)
+        initialFirstVisibleItemIndex = shown.size.coerceAtLeast(0)
     )
 
     LaunchedEffect(shown.size, shown.lastOrNull(), filter) {
         if (shown.isNotEmpty()) {
-            listState.scrollToItem(shown.size - 1)
+            listState.scrollToItem(shown.size)
         }
     }
 
     LaunchedEffect(Unit) {
         if (shown.isNotEmpty()) {
-            listState.scrollToItem(shown.size - 1)
+            listState.scrollToItem(shown.size)
         }
     }
 
@@ -274,6 +274,9 @@ fun ConsoleScreen(
                     ) {
                         items(shown) { line ->
                             TerminalLineRow(line)
+                        }
+                        item {
+                            Spacer(Modifier.height(2.dp))
                         }
                     }
                 }
@@ -448,36 +451,28 @@ private fun TerminalLineRow(line: TerminalLine) {
             .padding(vertical = 2.dp),
         verticalAlignment = Alignment.Top
     ) {
-        Box(
-            modifier = Modifier
-                .padding(top = 4.dp)
-                .width(3.dp)
-                .height(12.dp)
-                .background(typeColor, RoundedCornerShape(2.dp))
-        )
-        Spacer(modifier = Modifier.width(8.dp))
         Text(
-            text = line.time,
-            color = LogTimestamp,
-            style = MaterialTheme.typography.bodySmall.copy(
-                fontFamily = FontFamily.Monospace,
-                fontSize = 11.sp
-            ),
-            modifier = Modifier.padding(top = 1.dp, end = 8.dp)
-        )
-        Text(
-            text = "- ${line.text}",
+            text = "- [${line.type}]",
             color = typeColor,
             style = MaterialTheme.typography.bodySmall.copy(
                 fontFamily = FontFamily.Monospace,
-                fontSize = 12.5.sp,
-                fontWeight = if (line.type == "OK" || line.type == "ERR")
-                    FontWeight.SemiBold
-                else FontWeight.Normal
+                fontSize = 11.5.sp,
+                fontWeight = FontWeight.Bold
             ),
-            modifier = Modifier.weight(1f),
-            maxLines = 1,
-            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+            modifier = Modifier.padding(end = 6.dp, top = 0.5.dp)
+        )
+        Text(
+            text = line.text,
+            color = if (line.type == "OK" || line.type == "ERR" || line.type == "WARN" || line.type == "CMD") {
+                typeColor
+            } else {
+                TextPrimary
+            },
+            style = MaterialTheme.typography.bodySmall.copy(
+                fontFamily = FontFamily.Monospace,
+                fontSize = 12.sp
+            ),
+            modifier = Modifier.weight(1f)
         )
     }
 }

@@ -16,20 +16,24 @@
 
 ---
 
-**Kernel Loader** is a root-powered Android application designed to resolve, download, insert, and verify kernel modules (`.ko`) across Linux kernels 4.9 through 6.12. It matches the exact running kernel against a live OTA driver catalog, verifies real-time physical memory read/write access via an integrated verification binary (`Driver.sh`), and packages complete hardware diagnostic dumps for custom driver compilation.
+**Kernel Loader** is a root-powered Android application designed to resolve, insert, and verify kernel modules (`.ko`) across Linux kernels 4.9 through 6.12. It matches the running kernel against an embedded driver database shipped inside the APK, verifies real-time physical memory read/write access via an integrated verification binary (`Driver.sh`), and packages complete hardware diagnostic dumps for custom driver compilation.
 
 ---
 
 ## Key Features
 
-- **Unified Load Pipeline**: Automatically matches the exact kernel version, downloads the compatible driver from the live OTA repository, and loads it into kernel space.
-- **In-App R/W Verification**: Direct execution of the `Driver.sh` memory engine within the terminal screen to verify physical memory read and write operations.
+- **Unified Load Pipeline**: Automatically matches the running kernel against the embedded driver database, extracts the matching module from APK assets, verifies its SHA-256, and loads it into kernel space through a single `insmod` call.
+- **Single Signature Path**: The only load method is kernel signature enforcement bypass (sysctl first, boot-image patch + reboot when `CONFIG_MODULE_SIG_FORCE` is active). Custom `.ko` picking, KernelSU/Engine Bridge loaders, `insmod -f`, hide parameters, and custom kernel ZIP flashing were removed.
+- **In-App R/W Verification**: Direct execution of the `Driver.sh` memory engine to verify physical memory read and write operations on the driver's `/dev/<node>`.
 - **Detailed Error Reporting**: When a module load fails, the loader extracts and displays the root cause directly from kernel ring buffers (`dmesg`), avoiding generic verification errors.
 - **Diagnostic Report Pack**: Generates a self-contained ZIP archive containing:
   - Exact `boot.img` partition dump (detected via active A/B slot and block device mapping).
   - Full kernel symbol table (`/proc/kallsyms`).
   - Sample OEM vendor module (`.ko`) with extracted compiler vermagic and configuration.
   - Decompressed kernel configuration (`/proc/config.gz` or `/proc/config`).
+  - Embedded driver audit: `.ko` file, SHA-256, vermagic, MODVERSIONS CRCs, undefined symbols, CFI flavour, build ID.
+  - Driver source files (`driver_src_*`), `database.json`, and an agent-oriented `README_AGENT.md` build guide.
+  - Target BTF (`/sys/kernel/btf/vmlinux`) when readable.
   - Kernel ring buffer logs (`dmesg`) and live application logs.
 - **One-Tap Sharing**: Direct integration with WhatsApp and Telegram with full FileProvider permission handling and clip-data propagation.
 - **Security and Hardening**:
@@ -54,7 +58,7 @@
 | Root Provider | Magisk, KernelSU, or APatch (Superuser access required) |
 | Architecture | ARM64 (aarch64) |
 | Android Version | Android 9.0 (API level 28) or higher |
-| Connectivity | Internet connection for OTA driver catalog and updates |
+| Connectivity | Not required for driver loading (database and drivers are embedded); only the app update checker and optional `kcrc_dump` fetch use the network |
 
 ---
 
@@ -65,11 +69,11 @@ Tap LOAD
    │
    ├─► Pre-flight validation (Root check, Kernel release, Architecture)
    │
-   ├─► OTA catalog resolution (Exact kernel match from repository)
+   ├─► Embedded database resolution (exact kernel match from APK assets)
    │
-   ├─► Download and integrity verification
+   ├─► Extract asset + SHA-256/size verification
    │
-   ├─► Staged insmod execution via root shell
+   ├─► Signature bypass + single insmod execution via root shell
    │
    └─► Device node verification and live dmesg validation
 ```
@@ -88,6 +92,15 @@ report_<device>_<kernel>.zip
 ├─ sample_vendor_module.ko   Real OEM module from /vendor/lib/modules
 ├─ vendor_modinfo.txt        Compiler version, vermagic, and module info
 ├─ config.txt                Kernel configuration options (IKCONFIG)
+├─ embedded_driver.ko        Embedded module selected for this kernel
+├─ embedded_driver_info.txt  SHA-256, vermagic, CFI, build ID, MODVERSIONS
+├─ driver_requirements.txt   Undefined symbols + expected __versions CRCs
+├─ Module.symvers.embedded.txt  CRCs the embedded module was linked against
+├─ Module.symvers.txt        Target CRC table from kcrc_dump (when available)
+├─ vmlinux.btf               Target BTF (when readable)
+├─ database.json             Full embedded driver manifest
+├─ driver_src_*              Driver source, Kbuild, Makefile
+├─ README_AGENT.md           Source-less rebuild instructions for an agent
 ├─ dmesg.txt                 Kernel ring buffer tail and insmod error details
 ├─ applog.txt                Application execution console log
 ├─ proc_cmdline.txt          Kernel boot arguments
@@ -108,7 +121,7 @@ cd kernel-loader
 ```
 
 The release APK will be generated at:
-`app/build/outputs/apk/release/Kernel-Loader-v2.2.apk`
+`app/build/outputs/apk/release/Kernel-Loader-v5.0.apk`
 
 - Language: Kotlin
 - UI Framework: Jetpack Compose

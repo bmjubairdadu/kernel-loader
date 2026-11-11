@@ -183,7 +183,7 @@ fun CreditsScreen(onBack: () -> Unit) {
                         )
                         Spacer(Modifier.width(8.dp))
                         Text(
-                            text = "universal kernel module loader",
+                            text = "embedded kernel module loader",
                             style = MonoTiny,
                             color = TextMuted
                         )

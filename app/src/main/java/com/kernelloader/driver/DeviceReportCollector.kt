@@ -47,7 +47,8 @@ object DeviceReportCollector {
         val bootPartition: String = "",
         val slotSuffix: String = "",
         val cmdline: String = "",
-        val selinuxMode: String = ""
+        val selinuxMode: String = "",
+        val btfInfo: String = ""
     ) {
         private val kernelShort: String =
             Regex("""\d+\.\d+\.\d+""").find(kernelRelease)?.value ?: "unknown"
@@ -79,6 +80,7 @@ object DeviceReportCollector {
             if (selinuxMode.isNotBlank()) {
                 appendLine("SELINUX   : $selinuxMode")
             }
+            appendLine("BTF       : ${btfInfo.ifBlank { "unavailable" }}")
             if (bootPartition.isNotBlank()) {
                 appendLine("BOOT DEV  : $bootPartition (slot: ${slotSuffix.ifBlank { "none" }})")
             }
@@ -130,14 +132,20 @@ object DeviceReportCollector {
 
         val configFlags = cmdOut(
             "zcat /proc/config.gz 2>/dev/null | " +
-                "grep -E '^CONFIG_(SMP|PREEMPT|PREEMPT_DYNAMIC|MODVERSIONS|MODULE_UNLOAD|MODULE_SIG|MODULE_COMPRESS_XZ|LOCALVERSION|LOCALVERSION_AUTO|TRIM_UNUSED_KSYMS)=' || " +
-                "grep -E '^CONFIG_(SMP|PREEMPT|PREEMPT_DYNAMIC|MODVERSIONS|MODULE_UNLOAD|MODULE_SIG|LOCALVERSION|LOCALVERSION_AUTO|TRIM_UNUSED_KSYMS)=' /proc/config 2>/dev/null"
+                "grep -E '^CONFIG_(SMP|PREEMPT|PREEMPT_DYNAMIC|MODVERSIONS|MODULE_UNLOAD|MODULE_FORCE_UNLOAD|MODULE_SIG|MODULE_SIG_ALL|MODULE_SIG_FORCE|MODULE_COMPRESS|MODULE_COMPRESS_XZ|LOCALVERSION|LOCALVERSION_AUTO|TRIM_UNUSED_KSYMS|CFI|CFI_CLANG|CFI_PERMISSIVE|LTO|LTO_CLANG|LTO_CLANG_THIN|LTO_CLANG_FULL|DEBUG_INFO_BTF|KALLSYMS|KALLSYMS_ALL|RANDSTRUCT|STACKPROTECTOR|STACKPROTECTOR_STRONG|ARM64_PTR_AUTH|SHADOW_CALL_STACK|RANDOMIZE_BASE|STRICT_KERNEL_RWX|STRICT_MODULE_RWX|HARDENED_USERCOPY|RKP|KNOX|SECURITY|MODULE_FORCE_LOAD|MODULE_SIG_KEY|MODULE_SIG_HASH|MODULE_SIG_SHA256|MODULE_SIG_SHA512)=' || " +
+                "grep -E '^CONFIG_(SMP|PREEMPT|PREEMPT_DYNAMIC|MODVERSIONS|MODULE_UNLOAD|MODULE_FORCE_UNLOAD|MODULE_SIG|MODULE_SIG_ALL|MODULE_SIG_FORCE|MODULE_COMPRESS|MODULE_COMPRESS_XZ|LOCALVERSION|LOCALVERSION_AUTO|TRIM_UNUSED_KSYMS|CFI|CFI_CLANG|CFI_PERMISSIVE|LTO|LTO_CLANG|LTO_CLANG_THIN|LTO_CLANG_FULL|DEBUG_INFO_BTF|KALLSYMS|KALLSYMS_ALL|RANDSTRUCT|STACKPROTECTOR|STACKPROTECTOR_STRONG|ARM64_PTR_AUTH|SHADOW_CALL_STACK|RANDOMIZE_BASE|STRICT_KERNEL_RWX|STRICT_MODULE_RWX|HARDENED_USERCOPY|RKP|KNOX|SECURITY|MODULE_FORCE_LOAD|MODULE_SIG_KEY|MODULE_SIG_HASH|MODULE_SIG_SHA256|MODULE_SIG_SHA512)=' /proc/config 2>/dev/null"
         )
             .lines()
             .map { it.trim() }
             .filter { it.startsWith("CONFIG_") }
             .distinct()
-            .take(14)
+            .take(60)
+
+        val btfInfo = run {
+            val p = "/sys/kernel/btf/vmlinux"
+            val size = cmdOut("stat -c %s $p 2>/dev/null")
+            if (size.isNotBlank() && size.trim() != "0") "$p (${size.trim()} bytes)" else "unavailable"
+        }
 
         var vermagic = ""
         var vermagicSource = ""
@@ -201,7 +209,8 @@ object DeviceReportCollector {
             bootPartition = bootPartition,
             slotSuffix = slotSuffix,
             cmdline = cmdline,
-            selinuxMode = selinuxMode
+            selinuxMode = selinuxMode,
+            btfInfo = btfInfo
         )
     }
 

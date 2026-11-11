@@ -55,10 +55,9 @@ data class DriverErrorInfo(
                         rawError = if (rawError.isNotBlank()) rawError else "CONFIG_MODULE_SIG_FORCE active (Unsigned module rejected)",
                         descriptionEn = "Your device's kernel enforces strict module signature verification (CONFIG_MODULE_SIG_FORCE=y) and rejects unsigned drivers.",
                         solutionStepsEn = listOf(
-                            "Open APatch, FolkPatch, or Magisk app on your phone.",
-                            "Go to 'Modules' tab (NOT KPM tab) ➔ Tap 'Install a module' (or 'Install from storage').",
-                            "Select and flash 'KernelLoader-Engine.zip' (or 'Universal_Kernel_Sig_Bypass.zip').",
-                            "Reboot your phone once, open Kernel Loader, and tap LOAD — it will connect via Engine Bridge and load instantly!"
+                            "Tap LOAD again - the app writes the signature sysctl and retries the insmod automatically.",
+                            "If the kernel still rejects the module, the app patches the boot image signature check and asks for one reboot.",
+                            "Reboot your phone once, open Kernel Loader, and tap LOAD - the embedded driver will load cleanly."
                         )
                     )
                 }
@@ -93,7 +92,7 @@ data class DriverErrorInfo(
                         solutionStepsEn = listOf(
                             "An automated device report pack has been saved to your device storage.",
                             "Send the report pack ZIP or text to the driver builder to build a Pure RT driver for your kernel.",
-                            "Once the driver is compiled and added to the database, tap LOAD to automatically download and load it."
+                            "Once the driver is compiled and embedded in an app build, tap LOAD to extract and load it automatically."
                         )
                     )
                 }

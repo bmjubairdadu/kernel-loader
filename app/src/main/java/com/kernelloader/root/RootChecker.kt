@@ -1,17 +1,15 @@
 package com.kernelloader.root
 
 import com.topjohnwu.superuser.Shell
-import java.io.BufferedReader
-import java.io.InputStreamReader
+import java.io.File
+import java.io.FileInputStream
 
 object RootChecker {
-
-    private val KERNEL_RE = Regex("""(\d+)\.(\d+)\.(\d+)""")
 
     fun isRootAvailable(): Boolean {
         return try {
             Shell.getShell().isRoot
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             false
         }
     }
@@ -21,7 +19,7 @@ object RootChecker {
             val process = Runtime.getRuntime().exec("uname -r")
             val version = process.inputStream.bufferedReader().use { it.readLine() }
             process.destroy()
-            version ?: "Unknown"
+            version?.trim() ?: "Unknown"
         } catch (e: Exception) {
             "Error: ${e.message}"
         }
@@ -32,7 +30,7 @@ object RootChecker {
             val res = Shell.cmd("uname -r").exec()
             if (res.isSuccess && res.out.isNotEmpty()) res.out[0].trim()
             else getKernelVersion()
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             getKernelVersion()
         }
     }
@@ -41,37 +39,18 @@ object RootChecker {
         return try {
             getKernelVersionRoot()
                 .takeIf { it.isNotBlank() && !it.startsWith("Error") }
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             null
         }
     }
 
-    fun kernelShortVersion(kernelRelease: String = getKernelVersion()): String {
-        val m = KERNEL_RE.find(kernelRelease) ?: return kernelRelease.trim()
-        return "${m.groupValues[1]}.${m.groupValues[2]}.${m.groupValues[3]}"
-    }
-
-    fun kernelMajorMinor(kernelRelease: String = getKernelVersion()): String {
-        val m = KERNEL_RE.find(kernelRelease) ?: return ""
-        return "${m.groupValues[1]}.${m.groupValues[2]}"
-    }
-
-    fun isKernelCompatible(): Boolean = getKernelVersion().isNotBlank()
-
-    fun getCompatibilityMessage(driverCount: Int = -1, exactMatch: Boolean? = null): String {
-        val v = getKernelVersion()
-        val short = kernelShortVersion(v)
-        return when {
-            exactMatch == true -> "OK: $v - exact driver available ($short) - ready to load"
-            exactMatch == false -> "UNIVERSAL: $v - no exact driver, best match + vermagic auto-patch + force-load"
-            driverCount > 0 -> "UNIVERSAL: $v - $driverCount driver(s) bundled - auto-selects best match"
-            else -> "UNIVERSAL: $v - pick any .ko (any device / any model / old & new kernels)"
-        }
-    }
-
-    fun hasExactDriver(driverVersions: List<String>, kernelRelease: String = getKernelVersion()): Boolean {
-        val short = kernelShortVersion(kernelRelease)
-        return driverVersions.any { kernelShortVersion(it) == short }
+    fun getShortVermagic(vermagic: String = "", kernelRelease: String = ""): String {
+        val fromVm = vermagic.trim().substringBefore(' ').trim()
+        if (fromVm.isNotBlank() && !fromVm.startsWith("Error")) return fromVm
+        val fromRel = kernelRelease.trim().substringBefore(' ').trim()
+        if (fromRel.isNotBlank() && !fromRel.startsWith("Error")) return fromRel
+        val fallback = (getKernelRelease() ?: getKernelVersion()).trim().substringBefore(' ').trim()
+        return fallback.ifBlank { "Unknown" }
     }
 
     @Volatile
@@ -81,43 +60,56 @@ object RootChecker {
         cachedVermagic?.let { return it }
         val v = detectKernelVermagic()
         if (v.isNotBlank()) cachedVermagic = v
-        return v
+        return v.ifBlank { getKernelRelease().orEmpty() }
     }
 
     private fun detectKernelVermagic(): String {
         val candidateDirs = listOf(
-            java.io.File("/vendor/lib/modules"),
-            java.io.File("/odm/lib/modules"),
-            java.io.File("/system/lib/modules")
+            File("/vendor/lib/modules"),
+            File("/vendor_dlkm/lib/modules"),
+            File("/odm/lib/modules"),
+            File("/system/lib/modules"),
+            File("/system_dlkm/lib/modules")
         )
         for (dir in candidateDirs) {
             if (!dir.isDirectory) continue
             val names = dir.list { _, name -> name.endsWith(".ko") } ?: continue
             for (name in names) {
-                val vm = readVermagicFast(java.io.File(dir, name))
+                val vm = readVermagicFast(File(dir, name))
                 if (vm.isNotBlank()) return vm
             }
         }
-        for (candidate in listOf("/vendor/lib/modules/*.ko", "/odm/lib/modules/*.ko", "/system/lib/modules/*.ko")) {
+        val globs = listOf(
+            "/vendor/lib/modules/*.ko",
+            "/vendor_dlkm/lib/modules/*.ko",
+            "/odm/lib/modules/*.ko",
+            "/system/lib/modules/*.ko",
+            "/system_dlkm/lib/modules/*.ko"
+        )
+        for (candidate in globs) {
             val file = try {
                 val res = Shell.cmd("ls $candidate 2>/dev/null | head -n 1").exec()
                 if (res.isSuccess && res.out.isNotEmpty()) res.out[0].trim() else ""
-            } catch (e: Exception) { "" }
+            } catch (_: Exception) {
+                ""
+            }
             if (file.isNotBlank()) {
                 val raw = try {
                     val res = Shell.cmd("cat \"$file\" 2>/dev/null | tr '\\0' '\\n' | grep -m1 '^vermagic='").exec()
                     if (res.isSuccess && res.out.isNotEmpty()) res.out[0].substringAfter("vermagic=").trim() else ""
-                } catch (e: Exception) { "" }
+                } catch (_: Exception) {
+                    ""
+                }
                 if (raw.isNotBlank()) return raw
             }
         }
-        return ""
+        return getKernelRelease().orEmpty()
     }
 
-    private fun readVermagicFast(file: java.io.File): String {
+    private fun readVermagicFast(file: File): String {
         return try {
             val buf = ByteArray(131072)
-            val n = java.io.FileInputStream(file).use { input ->
+            val n = FileInputStream(file).use { input ->
                 var total = 0
                 while (total < buf.size) {
                     val r = input.read(buf, total, buf.size - total)
@@ -140,7 +132,7 @@ object RootChecker {
             var end = idx + tag.size
             while (end < n && buf[end] != 0.toByte()) end++
             String(buf, idx + tag.size, end - (idx + tag.size), Charsets.US_ASCII).trim()
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             ""
         }
     }

@@ -2,15 +2,10 @@ package com.kernelloader.update
 
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
-import android.os.Build
-import android.provider.Settings
 import androidx.core.content.FileProvider
 import org.json.JSONObject
 import java.io.File
 import java.io.FileOutputStream
-import java.net.HttpURLConnection
-import java.net.URL
 
 object AppUpdateChecker {
 
@@ -73,22 +68,15 @@ object AppUpdateChecker {
         currentVersionName: String
     ): Boolean {
         if (isSemverNewer(tag, currentVersionName)) return true
-
         val code = extractVersionCode(tag, text)
-        if (code != null && code > currentVersionCode) {
-            return true
-        }
-
-        return false
+        return code != null && code > currentVersionCode
     }
 
     private fun resolveVersionName(tag: String, text: String): String {
         val tagSem = Regex("""^v?(\d+\.\d+(?:\.\d+)*)""").find(tag.trim())
         if (tagSem != null) return tagSem.groupValues[1]
-
         val textSem = Regex("""(?:Kernel-Loader-|Kernel\s+Loader\s+)?v?(\d+\.\d+(?:\.\d+)*)""", RegexOption.IGNORE_CASE).find(text)
         if (textSem != null) return textSem.groupValues[1]
-
         return tag.removePrefix("v").ifBlank { tag }
     }
 
@@ -111,7 +99,6 @@ object AppUpdateChecker {
         currentVersionName: String
     ): UpdateCheck? {
         val page = pageUrl.trimEnd('/')
-
         val (_, finalUrl) = fetch("$page/latest") ?: return null
         val tag = latestTagFromUrl(finalUrl) ?: return null
         val assetsBody = fetch("$page/expanded_assets/$tag")?.first ?: ""
@@ -163,7 +150,7 @@ object AppUpdateChecker {
         val finalUrl = conn.url.toString()
         conn.disconnect()
         body?.let { it to finalUrl }
-    } catch (e: Exception) {
+    } catch (_: Exception) {
         null
     }
 
@@ -180,7 +167,7 @@ object AppUpdateChecker {
         } else null
         conn.disconnect()
         len
-    } catch (e: Exception) {
+    } catch (_: Exception) {
         null
     }
 
@@ -202,7 +189,7 @@ object AppUpdateChecker {
             val body = if (ok) conn.inputStream.bufferedReader().readText() else null
             conn.disconnect()
             body ?: return UpdateCheck.Offline
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             return UpdateCheck.Offline
         }
 
@@ -247,7 +234,7 @@ object AppUpdateChecker {
                     publishedAt = rel.optString("published_at", "")
                 )
             )
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             UpdateCheck.Offline
         }
     }
@@ -334,19 +321,6 @@ object AppUpdateChecker {
         finalFile
     }
 
-    fun downloadAndInstall(context: Context, info: UpdateInfo, onProgress: (Int) -> Unit = {}): String {
-        val result = downloadApk(context, info, onProgress)
-        return result.fold(
-            onSuccess = { out ->
-                installApk(context, out)
-                "UPDATE: APK downloaded (${out.length() / 1024} KB) - installer opened"
-            },
-            onFailure = { e ->
-                "UPDATE: download error - ${e.message}"
-            }
-        )
-    }
-
     fun installApk(context: Context, apk: File) {
         val uri = FileProvider.getUriForFile(
             context, "${context.packageName}.fileprovider", apk
@@ -356,20 +330,5 @@ object AppUpdateChecker {
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
         }
         context.startActivity(intent)
-    }
-
-    fun canInstall(context: Context): Boolean =
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
-            context.packageManager.canRequestPackageInstalls()
-        else true
-
-    fun requestInstallPermission(context: Context) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            context.startActivity(
-                Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES)
-                    .setData(Uri.parse("package:${context.packageName}"))
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            )
-        }
     }
 }

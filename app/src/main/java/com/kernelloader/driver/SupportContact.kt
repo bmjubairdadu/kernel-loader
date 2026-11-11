@@ -3,8 +3,6 @@ package com.kernelloader.driver
 import android.content.ClipData
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
-import android.os.Build
 import androidx.core.content.FileProvider
 import java.io.File
 import java.net.URLEncoder
@@ -12,84 +10,14 @@ import java.net.URLEncoder
 object SupportContact {
 
     const val APP_NAME = "Kernel Loader"
-
     const val WHATSAPP_NUMBER = "8801785917145"
-
     const val WHATSAPP_DISPLAY = "+880 1785-917145"
-
-    const val TELEGRAM_USERNAME = "Jubairdadubm"
-
     const val TELEGRAM_HANDLE = "@Jubairdadubm"
-
     const val TELEGRAM_URL = "https://t.me/Jubairdadubm"
-
-    fun defaultMessage(kernelRelease: String?): String {
-        val model = (Build.MANUFACTURER.replaceFirstChar { it.uppercase() } + " " + Build.MODEL).trim()
-        val k = kernelRelease?.takeIf { it.isNotBlank() } ?: "unknown"
-        val android = Build.VERSION.RELEASE ?: "?"
-        val sdk = Build.VERSION.SDK_INT
-        return buildString {
-            appendLine("╔══════════════════════════╗")
-            appendLine("   ⚡  KERNEL LOADER SUPPORT  ⚡")
-            appendLine("╚══════════════════════════╝")
-            appendLine()
-            appendLine("📱 Device  : $model")
-            appendLine("🐧 Kernel  : $k")
-            appendLine("🤖 Android : $android (API $sdk)")
-            appendLine("📦 App     : $APP_NAME")
-            appendLine()
-            appendLine("❗ No matching loader for this kernel version in the database.")
-            appendLine("🛠️ Please build a custom loader (.ko) for this kernel.")
-            appendLine()
-            append("➖➖➖➖➖➖➖➖➖➖➖➖")
-        }
-    }
-
-    fun messageWithCustom(kernelRelease: String?, custom: String): String {
-        val base = defaultMessage(kernelRelease)
-        val extra = custom.trim()
-        return if (extra.isEmpty()) base
-        else base + "\n\n📝 My note:\n" + extra + "\n\n➖➖➖➖➖➖➖➖➖➖➖➖"
-    }
-
-    fun failureReport(
-        kernelRelease: String?,
-        appVersion: String,
-        result: String,
-        logText: String,
-        maxLogChars: Int = 2200
-    ): String {
-        val model = (Build.MANUFACTURER.replaceFirstChar { it.uppercase() } + " " + Build.MODEL).trim()
-        val k = kernelRelease?.takeIf { it.isNotBlank() } ?: "unknown"
-        val android = Build.VERSION.RELEASE ?: "?"
-        val tail = logText.lines()
-            .filter { it.isNotBlank() }
-            .takeLast(30)
-            .joinToString("\n")
-            .takeLast(maxLogChars)
-        return buildString {
-            appendLine("╔══════════════════════════╗")
-            appendLine("   ⚡ KERNEL LOADER REPORT ⚡")
-            appendLine("╚══════════════════════════╝")
-            appendLine()
-            appendLine("📱 Device  : $model")
-            appendLine("🐧 Kernel  : $k")
-            appendLine("🤖 Android : $android (API ${Build.VERSION.SDK_INT})")
-            appendLine("📦 App     : $APP_NAME $appVersion")
-            appendLine("📊 Result  : ${result.take(120)}")
-            appendLine()
-            appendLine("📝 LOG:")
-            append(tail.ifBlank { "(empty)" })
-        }
-    }
-
-    fun waLinkFull(kernelRelease: String?, appVersion: String, result: String, logText: String): String =
-        "https://wa.me/$WHATSAPP_NUMBER?text=" +
-                URLEncoder.encode(failureReport(kernelRelease, appVersion, result, logText), "UTF-8")
 
     fun waLinkReport(reportText: String): String =
         "https://wa.me/$WHATSAPP_NUMBER?text=" +
-                URLEncoder.encode(reportText, "UTF-8")
+            URLEncoder.encode(reportText, "UTF-8")
 
     fun sendZipViaWhatsApp(context: Context, zip: File, caption: String): Boolean {
         val uri = FileProvider.getUriForFile(
@@ -99,18 +27,16 @@ object SupportContact {
         for (pkg in targets) {
             try {
                 context.grantUriPermission(pkg, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            } catch (_: Exception) {}
+            } catch (_: Exception) {
+            }
         }
         fun newIntent(): Intent = Intent(Intent.ACTION_SEND).apply {
             type = "application/zip"
             putExtra(Intent.EXTRA_STREAM, uri)
-            clipData = ClipData.newRawUri("report.zip", uri)
+            clipData = ClipData.newRawUri(zip.name, uri)
             putExtra(Intent.EXTRA_TEXT, caption)
             putExtra("jid", "$WHATSAPP_NUMBER@s.whatsapp.net")
-            addFlags(
-                Intent.FLAG_GRANT_READ_URI_PERMISSION or
-                        Intent.FLAG_ACTIVITY_NEW_TASK
-            )
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
         }
         for (pkg in targets) {
             val intent = newIntent().apply { setPackage(pkg) }
@@ -154,17 +80,15 @@ object SupportContact {
         for (pkg in targets) {
             try {
                 context.grantUriPermission(pkg, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            } catch (_: Exception) {}
+            } catch (_: Exception) {
+            }
         }
         fun newIntent(): Intent = Intent(Intent.ACTION_SEND).apply {
             type = "application/zip"
             putExtra(Intent.EXTRA_STREAM, uri)
-            clipData = ClipData.newRawUri("report.zip", uri)
+            clipData = ClipData.newRawUri(zip.name, uri)
             putExtra(Intent.EXTRA_TEXT, "$caption\nTelegram: $TELEGRAM_HANDLE")
-            addFlags(
-                Intent.FLAG_GRANT_READ_URI_PERMISSION or
-                        Intent.FLAG_ACTIVITY_NEW_TASK
-            )
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
         }
         for (pkg in targets) {
             val intent = newIntent().apply { setPackage(pkg) }
@@ -195,9 +119,4 @@ object SupportContact {
     }
 
     fun telegramDirectUrl(): String = TELEGRAM_URL
-
-    fun telegramShareUrl(reportText: String): String =
-        "https://t.me/share/url?url=" +
-                URLEncoder.encode(TELEGRAM_URL, "UTF-8") + "&text=" +
-                URLEncoder.encode(reportText, "UTF-8")
 }

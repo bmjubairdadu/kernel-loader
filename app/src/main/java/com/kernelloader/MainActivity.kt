@@ -1,7 +1,9 @@
 package com.kernelloader
 
+import android.app.Service
 import android.content.Intent
 import android.os.Bundle
+import android.os.IBinder
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -23,9 +25,20 @@ import com.kernelloader.ui.CreditsRoute
 import com.kernelloader.ui.CreditsScreen
 import com.kernelloader.ui.HomeScreen
 import com.kernelloader.ui.MainRoute
-import com.kernelloader.ui.WarningRoute
 import com.kernelloader.ui.theme.KernelLoderTheme
 import com.topjohnwu.superuser.Shell
+
+class TaskClearService : Service() {
+    override fun onBind(intent: Intent?): IBinder? = null
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int = START_NOT_STICKY
+
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        super.onTaskRemoved(rootIntent)
+        DriverViewModel.performStealthCleanupAndExit(applicationContext)
+        stopSelf()
+    }
+}
 
 class MainActivity : ComponentActivity() {
 
@@ -34,6 +47,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         com.kernelloader.security.SecurityShield.protect(this)
+        runCatching { startService(Intent(this, TaskClearService::class.java)) }
         if (!shellConfigured) {
             shellConfigured = true
             Shell.setDefaultBuilder(
@@ -42,9 +56,6 @@ class MainActivity : ComponentActivity() {
                     .setTimeout(60)
             )
         }
-        try {
-            startService(Intent(this, CleanExitService::class.java))
-        } catch (_: Exception) {}
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
             if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
                 requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 101)
@@ -83,24 +94,15 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    override fun onDestroy() {
-        super.onDestroy()
-        if (!isChangingConfigurations) {
-            try {
-                stopService(Intent(this, CleanExitService::class.java))
-            } catch (_: Exception) {}
-        }
-    }
-
     override fun onResume() {
         super.onResume()
         com.kernelloader.security.SecurityShield.protect(this)
     }
 
-    override fun onStop() {
-        super.onStop()
-        if (viewModel.driverLoaded.value && !viewModel.userCancelledAutoExit.value && !isChangingConfigurations) {
-            viewModel.safeExitAndHide(this)
+    override fun onDestroy() {
+        super.onDestroy()
+        if (!isChangingConfigurations) {
+            viewModel.autoCleanupAndExit(this)
         }
     }
 
