@@ -126,6 +126,7 @@ class DriverInstaller(private val ctx: Context) {
                 kv[line.substring(0, eq)] = line.substring(eq + 1).trim()
             }
         }
+        su("rm -f $REMOTE/$scriptName $REMOTE/driver_load.sh $REMOTE/.* 2>/dev/null") {}
 
         val ok = kv["FTL_OK"] == "1" && !kv["FTL_NODE"].isNullOrEmpty()
         return Result(
@@ -162,7 +163,9 @@ class DriverInstaller(private val ctx: Context) {
         copyAssetToRemote("bin/khack_client_arm64", "khack_client_arm64")
         val escaped = args.joinToString(" ") { "'${it.replace("'", "'\\''")}'" }
         val cmd = "$REMOTE/khack_client_arm64 '$node' $escaped"
-        return su(cmd, onLine)
+        val rc = su(cmd, onLine)
+        su("rm -f $REMOTE/khack_client_arm64 2>/dev/null") {}
+        return rc
     }
 
     fun verifyLoad(module: String = MODULE, onLine: (String) -> Unit = {}): Pair<Boolean, String?> {
@@ -180,6 +183,7 @@ class DriverInstaller(private val ctx: Context) {
                 onLine(trimmed)
             }
         }
+        su("rm -f $REMOTE/verify_load.sh 2>/dev/null") {}
         if (rc == 0) passed = true
         return Pair(passed, foundNode)
     }
