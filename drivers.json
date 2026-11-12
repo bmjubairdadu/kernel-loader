@@ -5,45 +5,13 @@
   "count": 1,
   "drivers": [
     {
-      "version": "4.9.337-DaisyForGaming SMP preempt mod_unload modversions aarch64",
-      "file": "4.9.337.sh",
+      "kernel": "4.9.337",
+      "vermagic": "4.9.337-DaisyForGaming SMP preempt mod_unload modversions aarch64",
       "variant": "rt",
       "label": "4.9.337",
+      "file": "4.9.337.sh",
       "sha256": "9ed57f63cc3afec7af63766c973d537146bc3ebaf2d29ffaf5d7f8f11bd719eb",
-      "size": 615138,
-      "buildDate": "2026-11-11T23:06:52Z",
-      "source": "AutoMaker/4.9.337-DaisyForGaming / source-build",
-      "verified": true,
-      "frozen": false,
-      "sizeFormatted": "600.7 KB",
-      "device": "daisy",
-      "model": "Mi A2 Lite",
-      "brand": "Xiaomi",
-      "product": "lineage_daisy",
-      "androidVersion": "11",
-      "buildId": "RQ3A.211001.001",
-      "displayId": "RQ3A.211001.001 release-keys",
-      "cpuAbi": "arm64-v8a",
-      "soc": "msm8953",
-      "supportedDevices": [
-        "daisy",
-        "lineage_daisy",
-        "Mi A2 Lite",
-        "Xiaomi Mi A2 Lite",
-        "msm8953"
-      ],
-      "aliases": [
-        "4.9.337-DaisyForGaming",
-        "4.9.337-DaisyForGaming-daisy",
-        "4.9.337-daisy",
-        "4.9.337-lineage_daisy",
-        "4.9.337"
-      ],
-      "asset": "drivers/4.9.337.sh",
-      "cfi": "none",
-      "crcCount": 50,
-      "moduleLayoutCrc": "0x69d16fd5",
-      "modversions": true
+      "size": 615138
     }
   ]
 }
