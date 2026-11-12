@@ -80,7 +80,7 @@ if [ -z "$NODE" ]; then
     for d in /sys/class/*/; do
         cls=$(basename "$d")
         case "$cls" in
-            android_usb|avtimer|backlight|bdi|block|bluetooth|bt*|char|devfreq|diag|dma|dual_role_usb|dvb|extcon|fastrng|fastrpc|firmware|goodix*|gpio|graphics|hidraw|hwmon|i2c*|icesdcc|ieee*|input|iommu|ipa*|jpeg*|kgsl|lcd*|leds|lirc|mdio*|mem|misc|mmc*|msm*|net|phy|pmsg|power*|ppp|pwm|qseecom|ramdump|rc|regulator|rfkill|rmnet*|rotator|rtc|scsi*|smd*|sound|spmi*|ssc|subsys*|switch|thermal|tty*|uio|vc|video*|virtio*|vtconsole|wakeup|wcnss*|wwan*|BaseRemoteCtl|sensors)
+            android_usb|avtimer|backlight|battery*|bdi|block|bluetooth|bt*|char|charger*|devfreq|diag|dma|dual_role_usb|dvb|extcon|fastrng|fastrpc|firmware|goodix*|gpio|graphics|hidraw|hwmon|i2c*|icesdcc|ieee*|input|iommu|ipa*|jpeg*|kgsl|lcd*|leds|lirc|mdio*|mem|misc|mmc*|msm*|net|phy|pmsg|power*|ppp|pwm|qg*|qseecom|ramdump|rc|regulator|rfkill|rmnet*|rotator|rtc|scsi*|smb*|smd*|soc*|sound|spmi*|ssc|subsys*|switch|thermal|tty*|uio|vc|video*|virtio*|vtconsole|wakeup|wcnss*|wwan*|BaseRemoteCtl|sensors)
                 continue
                 ;;
         esac
@@ -113,7 +113,7 @@ if [ -z "$NODE" ] && [ "$RC" -eq 0 ]; then
         for d in /sys/class/*/; do
             cls=$(basename "$d")
             case "$cls" in
-                android_usb|avtimer|backlight|bdi|block|bluetooth|bt*|char|devfreq|diag|dma|dual_role_usb|dvb|extcon|fastrng|fastrpc|firmware|goodix*|gpio|graphics|hidraw|hwmon|i2c*|icesdcc|ieee*|input|iommu|ipa*|jpeg*|kgsl|lcd*|leds|lirc|mdio*|mem|misc|mmc*|msm*|net|phy|pmsg|power*|ppp|pwm|qseecom|ramdump|rc|regulator|rfkill|rmnet*|rotator|rtc|scsi*|smd*|sound|spmi*|ssc|subsys*|switch|thermal|tty*|uio|vc|video*|virtio*|vtconsole|wakeup|wcnss*|wwan*|BaseRemoteCtl|sensors)
+                android_usb|avtimer|backlight|battery*|bdi|block|bluetooth|bt*|char|charger*|devfreq|diag|dma|dual_role_usb|dvb|extcon|fastrng|fastrpc|firmware|goodix*|gpio|graphics|hidraw|hwmon|i2c*|icesdcc|ieee*|input|iommu|ipa*|jpeg*|kgsl|lcd*|leds|lirc|mdio*|mem|misc|mmc*|msm*|net|phy|pmsg|power*|ppp|pwm|qg*|qseecom|ramdump|rc|regulator|rfkill|rmnet*|rotator|rtc|scsi*|smb*|smd*|soc*|sound|spmi*|ssc|subsys*|switch|thermal|tty*|uio|vc|video*|virtio*|vtconsole|wakeup|wcnss*|wwan*|BaseRemoteCtl|sensors)
                     continue
                     ;;
             esac

@@ -492,6 +492,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             hiddenLoaded.value = isStealth
             loadedModuleName.value = mod
             driverModule.value = if (node.isNotBlank()) "$mod ($node)" else mod
+            DriverSessionManager.markLoaded(getApplication(), node, mod, isStealth)
             autoLoadOk.value = true
             autoLoadStatus.value = "Loaded: ${driverModule.value}"
             verifyStatus.value = "PASS"
@@ -645,6 +646,8 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
         if (rebooting.value) return
         rebooting.value = true
         tlog("Rebooting device...", "WARN")
+        val appCtx = context ?: getApplication()
+        DriverSessionManager.clearSession(appCtx)
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 delay(400)
@@ -664,30 +667,15 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
     fun refreshDriverState(context: Context? = null) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                if (!RootChecker.isRootAvailable()) {
-                    withContext(Dispatchers.Main) {
-                        driverLoaded.value = false
-                        hiddenLoaded.value = false
-                        driverModule.value = ""
-                        loadedModuleName.value = ""
-                    }
-                    return@launch
-                }
-                val installer = DriverInstaller(context ?: getApplication())
-                val mainLoaded = installer.isLoaded(DriverInstaller.MODULE)
-                val altLoaded = if (!mainLoaded) installer.isLoaded(DriverInstaller.ALT_MODULE) else false
-                val node = installer.findNode()
+                val appCtx = context ?: getApplication()
+                val (active, info) = DriverSessionManager.isSessionActive(appCtx)
                 withContext(Dispatchers.Main) {
-                    if (mainLoaded || altLoaded || !node.isNullOrBlank()) {
-                        val mod = when {
-                            mainLoaded -> DriverInstaller.MODULE
-                            altLoaded -> DriverInstaller.ALT_MODULE
-                            else -> DriverInstaller.MODULE
-                        }
+                    if (active) {
+                        val (node, mod, stealth) = info
                         driverLoaded.value = true
-                        hiddenLoaded.value = !mainLoaded && !altLoaded && !node.isNullOrBlank()
+                        hiddenLoaded.value = stealth
                         loadedModuleName.value = mod
-                        driverModule.value = if (!node.isNullOrBlank()) "$mod ($node)" else mod
+                        driverModule.value = if (node.isNotBlank()) "$mod ($node)" else mod
                     } else {
                         driverLoaded.value = false
                         hiddenLoaded.value = false
@@ -707,27 +695,18 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             tlog("Checking driver status...", "CMD")
             withContext(Dispatchers.IO) {
                 val appCtx = context ?: getApplication()
-                val installer = DriverInstaller(appCtx)
-                val mainLoaded = installer.isLoaded(DriverInstaller.MODULE)
-                val altLoaded = if (!mainLoaded) installer.isLoaded(DriverInstaller.ALT_MODULE) else false
-                val node = installer.findNode()
-                if (!node.isNullOrBlank()) {
-                    tlog("Active node found: $node", "OK")
-                    installer.client(node, "ping") { line ->
-                        tlog(line, classifyLine(line))
-                    }
-                } else {
-                    tlog("No active 6-char device node in /dev", "WARN")
-                }
+                val (active, info) = DriverSessionManager.isSessionActive(appCtx)
                 withContext(Dispatchers.Main) {
-                    if (mainLoaded || altLoaded || !node.isNullOrBlank()) {
-                        val mod = if (altLoaded) DriverInstaller.ALT_MODULE else DriverInstaller.MODULE
+                    if (active) {
+                        val (node, mod, stealth) = info
                         driverLoaded.value = true
+                        hiddenLoaded.value = stealth
                         loadedModuleName.value = mod
-                        driverModule.value = if (!node.isNullOrBlank()) "$mod ($node)" else mod
+                        driverModule.value = if (node.isNotBlank()) "$mod ($node)" else mod
                         tlog("Driver status: ACTIVE (${driverModule.value})", "OK")
                     } else {
                         driverLoaded.value = false
+                        hiddenLoaded.value = false
                         loadedModuleName.value = ""
                         driverModule.value = ""
                         tlog("Driver status: NOT LOADED", "ERR")
@@ -768,9 +747,11 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                     if (passed) {
                         val activeNode = node ?: installer.findNode() ?: "dynamic"
                         summaryDetail = "$targetMod · $activeNode"
+                        DriverSessionManager.markLoaded(app, activeNode, targetMod, true)
                         tlog("Status: Driver & script are working properly", "OK")
                     } else {
                         summaryDetail = "NOT LOADED"
+                        DriverSessionManager.clearSession(app)
                         tlog("Status: Driver or Script is NOT loaded", "WARN")
                         tlog("Hint: Tap LOAD above to install driver", "INFO")
                     }
