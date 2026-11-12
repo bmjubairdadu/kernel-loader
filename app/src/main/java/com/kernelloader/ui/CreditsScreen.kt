@@ -10,10 +10,12 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -204,16 +206,25 @@ fun CreditsScreen(onBack: () -> Unit) {
                 onClick = onBack,
                 shape = RoundedCornerShape(14.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = AccentGreen.copy(alpha = 0.16f),
-                    contentColor = AccentGreen
+                    containerColor = Color.Transparent,
+                    contentColor = Color.White
                 ),
-                border = BorderStroke(1.dp, AccentGreen.copy(alpha = 0.5f)),
-                modifier = Modifier.fillMaxWidth(0.6f)
+                border = BorderStroke(1.1.dp, Color(0xFF34D399).copy(alpha = 0.65f)),
+                contentPadding = PaddingValues(0.dp),
+                modifier = Modifier
+                    .fillMaxWidth(0.6f)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(
+                        Brush.horizontalGradient(
+                            listOf(Color(0xFF0B5345), Color(0xFF0E6655))
+                        )
+                    )
             ) {
                 Text(
                     text = stringResource(R.string.close),
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(vertical = 2.dp)
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Color.White,
+                    modifier = Modifier.padding(vertical = 10.dp)
                 )
             }
             Spacer(modifier = Modifier.height(10.dp))

@@ -49,6 +49,7 @@ import com.kernelloader.ui.theme.AccentRed
 import com.kernelloader.ui.theme.BorderStrong
 import com.kernelloader.ui.theme.BorderSubtle
 import com.kernelloader.ui.theme.FamilyRt
+import com.kernelloader.ui.theme.LogoPurple
 import com.kernelloader.ui.theme.Surface0
 import com.kernelloader.ui.theme.Surface1
 import com.kernelloader.ui.theme.Surface2
@@ -220,10 +221,10 @@ fun DriverErrorDialog(
                             .height(44.dp),
                         shape = RoundedCornerShape(14.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Surface3,
-                            contentColor = TextPrimary
+                            containerColor = Color(0xFF3F1D73),
+                            contentColor = Color.White
                         ),
-                        border = BorderStroke(1.dp, BorderStrong)
+                        border = BorderStroke(1.dp, LogoPurple.copy(alpha = 0.7f))
                     ) {
                         Text(
                             text = "📋 Copy Log",

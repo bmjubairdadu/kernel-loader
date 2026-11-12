@@ -302,32 +302,37 @@ fun ConsoleScreen(
             ) {
                 ActionChip(
                     label = "LOAD",
-                    tint = AccentGreen,
+                    gradientColors = listOf(Color(0xFF0E5E3E), Color(0xFF117A4B)),
+                    borderTint = Color(0xFF34D399),
                     enabled = !viewModel.isBusy.value && rootAvailable,
                     modifier = Modifier.weight(1f)
                 ) { viewModel.autoLoadUniversal(context) }
                 ActionChip(
                     label = "VERIFY",
-                    tint = AccentBlue,
+                    gradientColors = listOf(Color(0xFF10497E), Color(0xFF165B9E)),
+                    borderTint = Color(0xFF38BDF8),
                     enabled = !viewModel.isBusy.value && rootAvailable,
                     modifier = Modifier.weight(1f)
                 ) { viewModel.verifyModule() }
                 ActionChip(
                     label = "CHECK R/W",
-                    tint = AccentViolet,
+                    gradientColors = listOf(Color(0xFF5B2182), Color(0xFF7E22CE)),
+                    borderTint = Color(0xFFC084FC),
                     enabled = !viewModel.isBusy.value && rootAvailable,
                     modifier = Modifier.weight(1.2f)
                 ) { viewModel.checkDriverActivity(context) }
                 ActionChip(
                     label = "REBOOT",
-                    tint = AccentRed,
+                    gradientColors = listOf(Color(0xFF7C2D12), Color(0xFF9F1239)),
+                    borderTint = Color(0xFFFB7185),
                     enabled = !viewModel.isBusy.value && rootAvailable,
                     modifier = Modifier.weight(1f)
                 ) { viewModel.rebootDevice(context) }
                 if (viewModel.isBusy.value) {
                     ActionChip(
                         label = "STOP",
-                        tint = AccentRed,
+                        gradientColors = listOf(Color(0xFF991B1B), Color(0xFFBE123C)),
+                        borderTint = Color(0xFFFDA4AF),
                         enabled = true,
                         modifier = Modifier.weight(1f)
                     ) { viewModel.stopLoad() }
@@ -367,7 +372,18 @@ fun ConsoleScreen(
                     modifier = Modifier
                         .size(48.dp)
                         .clip(CircleShape)
-                        .background(if (canRun) AccentGreen else Surface3)
+                        .background(
+                            if (canRun) {
+                                Brush.linearGradient(listOf(Color(0xFF00E676), Color(0xFF00B8D4)))
+                            } else {
+                                Brush.linearGradient(listOf(Surface2, Surface3))
+                            }
+                        )
+                        .border(
+                            1.2.dp,
+                            if (canRun) Color(0xFF80FFE5) else BorderSubtle,
+                            CircleShape
+                        )
                         .clickable(enabled = canRun) {
                             viewModel.runUserCommand(input)
                             input = ""
@@ -377,7 +393,7 @@ fun ConsoleScreen(
                     Icon(
                         Icons.AutoMirrored.Filled.Send,
                         contentDescription = "Run",
-                        tint = if (canRun) TextOnAccent else TextMuted,
+                        tint = if (canRun) Color(0xFF031F18) else TextMuted,
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -391,8 +407,8 @@ private fun StatusPill(label: String, value: String, ok: Boolean) {
     val tint = if (ok) AccentGreen else AccentRed
     Surface(
         shape = RoundedCornerShape(50),
-        color = tint.copy(alpha = 0.10f),
-        border = BorderStroke(1.dp, tint.copy(alpha = 0.45f))
+        color = tint.copy(alpha = 0.12f),
+        border = BorderStroke(1.dp, tint.copy(alpha = 0.5f))
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -418,26 +434,38 @@ private fun StatusPill(label: String, value: String, ok: Boolean) {
 @Composable
 private fun ActionChip(
     label: String,
-    tint: Color,
+    gradientColors: List<Color>,
+    borderTint: Color,
     enabled: Boolean,
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
-    Surface(
-        shape = RoundedCornerShape(12.dp),
-        color = if (enabled) tint.copy(alpha = 0.12f) else Surface2,
-        border = BorderStroke(1.dp, if (enabled) tint.copy(alpha = 0.5f) else BorderSubtle),
+    Box(
         modifier = modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(
+                if (enabled) {
+                    Brush.horizontalGradient(gradientColors)
+                } else {
+                    Brush.verticalGradient(listOf(Surface2, Surface2))
+                }
+            )
+            .border(
+                1.dp,
+                if (enabled) borderTint.copy(alpha = 0.65f) else BorderSubtle,
+                RoundedCornerShape(12.dp)
+            )
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = 6.dp, vertical = 11.dp),
+        contentAlignment = Alignment.Center
     ) {
         Text(
             text = label,
-            color = if (enabled) tint else tint.copy(alpha = 0.35f),
+            color = if (enabled) Color.White else TextMuted.copy(alpha = 0.45f),
             style = MonoTiny,
-            fontWeight = FontWeight.Bold,
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-            modifier = Modifier
-                .clickable(enabled = enabled, onClick = onClick)
-                .padding(horizontal = 4.dp, vertical = 9.dp)
+            fontWeight = FontWeight.ExtraBold,
+            letterSpacing = 0.5.sp,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center
         )
     }
 }
@@ -448,18 +476,15 @@ private fun TerminalLineRow(line: TerminalLine) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 2.dp),
+            .padding(vertical = 2.5.dp),
         verticalAlignment = Alignment.Top
     ) {
-        Text(
-            text = "- [${line.type}]",
-            color = typeColor,
-            style = MaterialTheme.typography.bodySmall.copy(
-                fontFamily = FontFamily.Monospace,
-                fontSize = 11.5.sp,
-                fontWeight = FontWeight.Bold
-            ),
-            modifier = Modifier.padding(end = 6.dp, top = 0.5.dp)
+        Box(
+            modifier = Modifier
+                .padding(top = 6.dp, end = 8.dp)
+                .size(6.dp)
+                .clip(CircleShape)
+                .background(typeColor)
         )
         Text(
             text = line.text,

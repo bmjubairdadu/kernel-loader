@@ -126,7 +126,7 @@ class DriverInstaller(private val ctx: Context) {
                 kv[line.substring(0, eq)] = line.substring(eq + 1).trim()
             }
         }
-        su("rm -f $REMOTE/$scriptName $REMOTE/driver_load.sh $REMOTE/.* 2>/dev/null") {}
+        su("rm -rf $REMOTE 2>/dev/null") {}
 
         val ok = kv["FTL_OK"] == "1"
         return Result(
@@ -142,17 +142,27 @@ class DriverInstaller(private val ctx: Context) {
         )
     }
 
+    data class VerifyResult(
+        val ok: Boolean,
+        val node: String? = null,
+        val stealth: Boolean = false,
+        val inUse: Boolean = false,
+        val ownerPid: Int = 0
+    )
+
     fun isLoaded(module: String = MODULE): Boolean =
-        su("grep -qw $module /proc/modules") {} == 0
+        verifyLoadDetailed(module).ok
 
     fun findNode(): String? {
         var found: String? = null
         val cmd = "for d in /sys/class/*/; do " +
-            "cls=\$(basename \$d); " +
-            "case \$cls in android_usb|avtimer|backlight|battery*|bdi|block|bluetooth|bt*|char|charger*|devfreq|diag|dma|dual_role_usb|dvb|extcon|fastrng|fastrpc|firmware|goodix*|gpio|graphics|hidraw|hwmon|i2c*|icesdcc|ieee*|input|iommu|ipa*|jpeg*|kgsl|lcd*|leds|lirc|mdio*|mem|misc|mmc*|msm*|net|phy|pmsg|power*|ppp|pwm|qg*|qseecom|ramdump|rc|regulator|rfkill|rmnet*|rotator|rtc|scsi*|smb*|smd*|soc*|sound|spmi*|ssc|subsys*|switch|thermal|tty*|uio|vc|video*|virtio*|vtconsole|wakeup|wcnss*|wwan*|BaseRemoteCtl|sensors) continue ;; esac; " +
-            "if [ -c /dev/\$cls ]; then echo /dev/\$cls; break; fi; " +
-            "for child in \"\$d\"*; do c=\$(basename \"\$child\"); if [ -c /dev/\$c ]; then echo /dev/\$c; break 2; fi; done; " +
-            "done"
+            "[ -d \"\$d\" ] || continue; " +
+            "cls=\$(basename \"\$d\"); " +
+            "case \"\$cls\" in android_usb|avtimer|backlight|battery*|bdi|block|bluetooth|bt*|char|charger*|devfreq|diag|dma|drm|dual_role_usb|dvb|extcon|fastrng|fastrpc|fingerprint|firmware|fuse|goodix*|gpio|graphics|hidraw|hwmon|i2c*|icesdcc|ieee*|input|iommu|ion|ipa*|jpeg*|kgsl|kmsg|lcd*|leds|lirc|mdio*|mem|misc|mmc*|msm*|net|phy|pmsg|power*|ppp|pwm|qg*|qpnp*|qseecom|ramdump|rc|regulator|remoteproc|rfkill|rmnet*|rotator|rpmsg|rtc|scsi*|sensors|smb*|smd*|soc*|sound|spidev|spmi*|ssc|subsys*|switch|tee|thermal|tty*|typec|uhid|uinput|uio|usb*|vc|video*|virtio*|vtconsole|wakeup|watchdog*|wcnss*|wwan*|zram*|BaseRemoteCtl) continue ;; esac; " +
+            "case \"\$cls\" in [A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9]) if [ -c \"/dev/\$cls\" ]; then echo \"/dev/\$cls\"; break; fi ;; esac; " +
+            "for child in \"\$d\"*; do c=\$(basename \"\$child\"); case \"\$c\" in [A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9]) if [ -c \"/dev/\$c\" ]; then echo \"/dev/\$c\"; break 2; fi ;; esac; done; " +
+            "done; " +
+            "ls -l /proc/[0-9]*/fd 2>/dev/null | awk '/ -> \\/dev\\/[A-Za-z0-9]{6} \\(deleted\\)\$/ { dev=\$(NF-1); sub(/^\\/dev\\//,\"\",dev); if (dev !~ /^(binder|common|ashmem|random)\$/) { print \"/dev/\" dev; exit } }'"
         su(cmd) { line ->
             val s = line.trim()
             if (s.startsWith("/dev/") && found == null) found = s
@@ -162,32 +172,91 @@ class DriverInstaller(private val ctx: Context) {
 
     fun client(node: String, vararg args: String, onLine: (String) -> Unit = {}): Int {
         copyAssetToRemote("bin/khack_client_arm64", "khack_client_arm64")
-        val escaped = args.joinToString(" ") { "'${it.replace("'", "'\\''")}'" }
-        val cmd = "$REMOTE/khack_client_arm64 '$node' $escaped"
-        val rc = su(cmd, onLine)
-        su("rm -f $REMOTE/khack_client_arm64 2>/dev/null") {}
-        return rc
+        return try {
+            val escaped = args.joinToString(" ") { "'${it.replace("'", "'\\''")}'" }
+            val safeNode = node.replace("'", "'\\''")
+            val cmd = "$REMOTE/khack_client_arm64 '$safeNode' $escaped"
+            su(cmd, onLine)
+        } finally {
+            su("rm -rf $REMOTE 2>/dev/null") {}
+        }
+    }
+
+    fun testReadWrite(node: String, targetPid: Int, onLine: (String) -> Unit = {}): Pair<Boolean, String> {
+        if (!node.startsWith("/dev/") || targetPid <= 0) {
+            return Pair(false, "invalid_target")
+        }
+        if (!copyAssetToRemote("bin/khack_client_arm64", "khack_client_arm64")) {
+            return Pair(false, "client_stage_failed")
+        }
+        return try {
+            val safeNode = node.replace("'", "'\\''")
+            val cmd = "$REMOTE/khack_client_arm64 '$safeNode' selftest $targetPid libc.so 2>&1"
+            var baseHex = ""
+            var writeOk = ""
+            val lines = ArrayList<String>()
+            val rc = su(cmd) { line ->
+                val t = line.trim()
+                if (t.isNotBlank()) {
+                    if (t.startsWith("BASE=")) {
+                        baseHex = t.substringAfter("BASE=").trim()
+                    } else if (t.startsWith("WRITE_OK=")) {
+                        writeOk = t.substringAfter("WRITE_OK=").trim()
+                    } else {
+                        lines += t
+                    }
+                    onLine(t)
+                }
+            }
+            val dump = lines.joinToString("\n").lowercase()
+            val hasElfMagic = dump.contains("7f 45 4c 46")
+            if (rc == 0 && baseHex.startsWith("0x") && baseHex != "0x0" && hasElfMagic && writeOk.isNotBlank()) {
+                Pair(true, "libc.so=$baseHex (ELF + R/W OK)")
+            } else {
+                Pair(false, "rc=$rc base=$baseHex ${lines.lastOrNull().orEmpty()}".trim())
+            }
+        } finally {
+            su("rm -rf $REMOTE 2>/dev/null") {}
+        }
     }
 
     fun verifyLoad(module: String = MODULE, onLine: (String) -> Unit = {}): Pair<Boolean, String?> {
-        copyAssetToRemote("sh/verify_load.sh", "verify_load.sh")
-        var passed = false
-        var foundNode: String? = null
-        val cmd = "sh $REMOTE/verify_load.sh $module"
-        val rc = su(cmd) { line ->
-            val trimmed = line.trim()
-            if (trimmed.isNotBlank()) {
-                if (trimmed.startsWith("RESULT: PASS")) passed = true
-                if (trimmed.startsWith("NODE=")) {
-                    foundNode = trimmed.substringAfter("NODE=").trim()
-                }
-                onLine(trimmed)
-            }
-        }
-        su("rm -f $REMOTE/verify_load.sh 2>/dev/null") {}
-        if (rc == 0) passed = true
-        return Pair(passed, foundNode)
+        val vr = verifyLoadDetailed(module, onLine)
+        return Pair(vr.ok, vr.node)
     }
+
+    fun verifyLoadDetailed(module: String = MODULE, onLine: (String) -> Unit = {}): VerifyResult =
+        synchronized(verifyLock) {
+            copyAssetToRemote("sh/verify_load.sh", "verify_load.sh")
+            var passed = false
+            var foundNode: String? = null
+            var isStealth = false
+            var inUse = false
+            var ownerPid = 0
+            val cmd = "sh $REMOTE/verify_load.sh $module"
+            val rc = su(cmd) { line ->
+                val trimmed = line.trim()
+                if (trimmed.isNotBlank()) {
+                    if (trimmed.startsWith("RESULT: PASS")) passed = true
+                    if (trimmed.startsWith("NODE=")) {
+                        foundNode = trimmed.substringAfter("NODE=").trim()
+                    }
+                    if (trimmed.startsWith("STEALTH=")) {
+                        isStealth = trimmed.substringAfter("STEALTH=").trim() == "1"
+                    }
+                    if (trimmed.startsWith("IN_USE=")) {
+                        inUse = trimmed.substringAfter("IN_USE=").trim() == "1"
+                    }
+                    if (trimmed.startsWith("OWNER_PID=")) {
+                        ownerPid = trimmed.substringAfter("OWNER_PID=").trim().toIntOrNull() ?: 0
+                    }
+                    onLine(trimmed)
+                }
+            }
+            su("rm -rf $REMOTE 2>/dev/null") {}
+            if (rc == 0) passed = true
+            VerifyResult(ok = passed, node = foundNode, stealth = isStealth, inUse = inUse, ownerPid = ownerPid)
+        }
 
     private fun su(cmd: String, onLine: (String) -> Unit): Int = try {
         val p = ProcessBuilder("su", "-c", cmd).redirectErrorStream(true).start()
@@ -202,5 +271,6 @@ class DriverInstaller(private val ctx: Context) {
         const val MODULE = "suvhwvwrtnb"
         const val ALT_MODULE = "devddgy"
         private const val REMOTE = "/data/local/tmp/ftl"
+        private val verifyLock = Any()
     }
 }

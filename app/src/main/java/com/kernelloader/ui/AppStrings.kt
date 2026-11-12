@@ -82,11 +82,15 @@ object IpLanguageManager {
     private const val PREFS_NAME = "kl_lang_prefs"
     private const val KEY_DETECTED_LANG = "detected_lang"
     private const val KEY_DETECTED_COUNTRY = "detected_country"
+    private const val KEY_USER_LANG = "user_lang"
+
+    @Volatile
+    private var ipCheckedThisSession = false
 
     var manualOverrideLang by mutableStateOf<String?>(null)
         private set
 
-    var detectedLangCode by mutableStateOf("bn")
+    var detectedLangCode by mutableStateOf("en")
         private set
 
     var detectedCountryCode by mutableStateOf("BD")
@@ -107,23 +111,40 @@ object IpLanguageManager {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val savedDetected = prefs.getString(KEY_DETECTED_LANG, null)
         val savedCountry = prefs.getString(KEY_DETECTED_COUNTRY, null)
+        val savedUserLang = prefs.getString(KEY_USER_LANG, null)
         if (!savedDetected.isNullOrBlank()) detectedLangCode = savedDetected
         if (!savedCountry.isNullOrBlank()) detectedCountryCode = savedCountry
+        if (!savedUserLang.isNullOrBlank()) manualOverrideLang = savedUserLang
     }
 
-    fun selectCountryLanguage() {
+    fun selectCountryLanguage(context: Context? = null) {
         val cc = detectedCountryCode.trim().uppercase(Locale.US)
         val targetLang = countryToLanguage(cc).takeIf { it != "en" } ?: "bn"
         detectedLangCode = targetLang
-        manualOverrideLang = null
+        manualOverrideLang = targetLang
+        context?.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            ?.edit()
+            ?.putString(KEY_USER_LANG, targetLang)
+            ?.apply()
     }
 
-    fun selectEnglish() {
+    fun selectEnglish(context: Context? = null) {
         manualOverrideLang = "en"
+        context?.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            ?.edit()
+            ?.putString(KEY_USER_LANG, "en")
+            ?.apply()
     }
 
     suspend fun detectIpAndLanguage(context: Context) {
         init(context)
+        if (ipCheckedThisSession) return
+        ipCheckedThisSession = true
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val hasUserChoice = !prefs.getString(KEY_USER_LANG, null).isNullOrBlank()
+        val hasSavedDetected = !prefs.getString(KEY_DETECTED_LANG, null).isNullOrBlank()
+        if (hasUserChoice && hasSavedDetected) return
+
         withContext(Dispatchers.IO) {
             try {
                 val countryCode = fetchCountryCodeOnly()
@@ -132,20 +153,23 @@ object IpLanguageManager {
                     val lang = countryToLanguage(cc)
                     withContext(Dispatchers.Main) {
                         detectedCountryCode = cc
-                        detectedLangCode = lang
+                        if (!hasUserChoice) {
+                            detectedLangCode = lang
+                        }
                     }
-                    context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                        .edit()
+                    prefs.edit()
                         .putString(KEY_DETECTED_COUNTRY, cc)
                         .putString(KEY_DETECTED_LANG, lang)
                         .apply()
-                } else {
+                } else if (!hasSavedDetected) {
                     val fallbackCountry = Locale.getDefault().country.uppercase(Locale.US)
-                    if (detectedCountryCode.isBlank() && fallbackCountry.isNotBlank()) {
+                    if (fallbackCountry.isNotBlank()) {
                         val lang = countryToLanguage(fallbackCountry)
                         withContext(Dispatchers.Main) {
                             detectedCountryCode = fallbackCountry
-                            detectedLangCode = lang
+                            if (!hasUserChoice) {
+                                detectedLangCode = lang
+                            }
                         }
                     }
                 }
@@ -283,7 +307,7 @@ object IpLanguageManager {
         statusTerminalHint = "Ready — application, script (.sh) & module (.ko) status will appear here",
         supportedKernelTerminalTitle = "SUPPORTED KERNEL TERMINAL",
         supportedKernelTerminalSub = "Uploaded scripts (.sh) & drivers (.ko) in database",
-        thisDeviceBadge = "SUPPORTED · THIS DEVICE",
+        thisDeviceBadge = "THIS DEVICE",
         scriptBadge = "SCRIPT .sh",
         driverBadge = "DRIVER .ko",
         reportSectionTitle = "SEND KERNEL BUILD REPORT",
@@ -348,7 +372,7 @@ object IpLanguageManager {
         statusTerminalHint = "প্রস্তুত — অ্যাপ্লিকেশন, স্ক্রিপ্ট (.sh) এবং মডিউল (.ko)-এর সব স্ট্যাটাস এখানে দেখাবে",
         supportedKernelTerminalTitle = "সাপোর্টেড কার্নেল টার্মিনাল (SUPPORTED KERNEL TERMINAL)",
         supportedKernelTerminalSub = "ডাটাবেসে আপলোড করা সকল স্ক্রিপ্ট (.sh) ও ড্রাইভার (.ko) তালিকা",
-        thisDeviceBadge = "সাপোর্টেড · এই ডিভাইস",
+        thisDeviceBadge = "THIS DEVICE",
         scriptBadge = "SCRIPT .sh",
         driverBadge = "DRIVER .ko",
         reportSectionTitle = "রিপোর্ট পাঠান (SEND REPORT)",
@@ -413,7 +437,7 @@ object IpLanguageManager {
         statusTerminalHint = "तैयार — एप्लिकेशन, स्क्रिप्ट (.sh) और मॉड्यूल (.ko) का स्टेटस यहाँ दिखेगा",
         supportedKernelTerminalTitle = "सपोर्टेड कर्नेल टर्मिनल (SUPPORTED KERNEL TERMINAL)",
         supportedKernelTerminalSub = "डेटाबेस में अपलोड किए गए सभी स्क्रिप्ट (.sh) और ड्राइवर (.ko)",
-        thisDeviceBadge = "सपोर्टेड · यह डिवाइस",
+        thisDeviceBadge = "THIS DEVICE",
         scriptBadge = "SCRIPT .sh",
         driverBadge = "DRIVER .ko",
         reportSectionTitle = "कर्नेल रिपोर्ट भेजें (SEND REPORT)",
@@ -478,7 +502,7 @@ object IpLanguageManager {
         statusTerminalHint = "تیار — ایپلیکیشن، اسکرپٹ اور ماڈیول کا تمام اسٹیٹس یہاں نظر آئے گا",
         supportedKernelTerminalTitle = "سپورٹڈ کرنل ٹرمینل (SUPPORTED KERNEL TERMINAL)",
         supportedKernelTerminalSub = "ڈیٹا بیس میں موجود تمام اسکرپٹس (.sh) اور ڈرائیورز (.ko)",
-        thisDeviceBadge = "سپورٹڈ · یہ ڈیوائس",
+        thisDeviceBadge = "THIS DEVICE",
         scriptBadge = "SCRIPT .sh",
         driverBadge = "DRIVER .ko",
         reportSectionTitle = "رپورٹ بھیجیں (SEND REPORT)",

@@ -53,8 +53,10 @@ object OtaDriverStore {
 
     @Volatile private var cachedManifest: Manifest? = null
 
-    suspend fun loadManifest(context: Context): Manifest? = withContext(Dispatchers.IO) {
-        cachedManifest?.let { return@withContext it }
+    suspend fun loadManifest(context: Context, forceRefresh: Boolean = false): Manifest? = withContext(Dispatchers.IO) {
+        if (!forceRefresh) {
+            cachedManifest?.let { return@withContext it }
+        }
         val manifestFile = File(context.filesDir, "drivers_manifest.json")
         val remoteText = runCatching {
             val url = URL(REMOTE_MANIFEST_URL)

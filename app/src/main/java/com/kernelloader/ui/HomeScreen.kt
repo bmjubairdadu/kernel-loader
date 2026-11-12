@@ -165,7 +165,6 @@ fun HomeScreen(
                         if (kRel.isNotBlank()) kernelRelease = kRel
                         if (kVm.isNotBlank()) deviceVermagic.value = kVm
                     }
-                    viewModel.refreshDriverState(context)
                 }
             }
         }
@@ -209,10 +208,7 @@ fun HomeScreen(
                 if (kRel.isNotBlank()) kernelRelease = kRel
                 if (kVm.isNotBlank()) deviceVermagic.value = kVm
             }
-            viewModel.refreshManifest()
-            viewModel.checkForAppUpdate()
-            viewModel.refreshDriverState(context)
-            IpLanguageManager.detectIpAndLanguage(context)
+            viewModel.runStartupChecksOnce(context)
         }
     }
 
@@ -276,8 +272,8 @@ fun HomeScreen(
                     strings = s,
                     version = "v${BuildConfig.VERSION_NAME}",
                     busy = busy,
-                    onSelectCountryLang = { IpLanguageManager.selectCountryLanguage() },
-                    onSelectEnglish = { IpLanguageManager.selectEnglish() }
+                    onSelectCountryLang = { IpLanguageManager.selectCountryLanguage(context) },
+                    onSelectEnglish = { IpLanguageManager.selectEnglish(context) }
                 )
 
                 UpdateBannerSection(
@@ -300,8 +296,8 @@ fun HomeScreen(
                         Toast.makeText(context, "Vermagic copied: $shortVermagic", Toast.LENGTH_SHORT).show()
                     },
                     onRefreshDb = {
-                        viewModel.refreshManifest()
-                        viewModel.checkForAppUpdate()
+                        viewModel.refreshManifest(forceRefresh = true)
+                        viewModel.checkForAppUpdate(manual = true)
                     },
                     onConsole = onNavigateToConsole,
                     onCredits = onNavigateToCredits
@@ -341,7 +337,7 @@ fun HomeScreen(
                             if (running) {
                                 CircularProgressIndicator(
                                     modifier = Modifier.size(30.dp),
-                                    color = GradientAmberStart,
+                                    color = Color.White,
                                     strokeWidth = 2.8.dp
                                 )
                             } else {
@@ -358,7 +354,7 @@ fun HomeScreen(
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.ExtraBold,
                                 letterSpacing = 1.4.sp,
-                                color = if (loadsTapable && !busy && rootAvailable) Color.White else TextDisabled
+                                color = if (running || (loadsTapable && !busy && rootAvailable)) Color.White else TextDisabled
                             )
                         }
                         if (running) {
@@ -992,10 +988,14 @@ private fun StatusBoxesSection(
                     trailingAction = {
                         Box(
                             modifier = Modifier
-                                .size(24.dp)
-                                .clip(RoundedCornerShape(7.dp))
-                                .background(Surface2)
-                                .border(0.8.dp, BorderSubtle, RoundedCornerShape(7.dp))
+                                .size(26.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(
+                                    Brush.linearGradient(
+                                        listOf(Color(0xFF4C1D7A), Color(0xFF331559))
+                                    )
+                                )
+                                .border(1.dp, LogoPink.copy(alpha = 0.55f), RoundedCornerShape(8.dp))
                                 .clickable(onClick = onRefreshDb),
                             contentAlignment = Alignment.Center
                         ) {
@@ -1085,21 +1085,27 @@ private fun StatusBoxesSection(
                 MiniAction(
                     icon = Icons.Default.ContentCopy,
                     description = "Copy Vermagic",
-                    tint = LogoSoftPink,
+                    tint = Color(0xFFC4B5FD),
+                    gradientColors = listOf(Color(0xFF3B1F6E), Color(0xFF28154D)),
+                    borderTint = Color(0xFF8B5CF6),
                     onClick = onCopyVermagic
                 )
                 Spacer(Modifier.width(5.dp))
                 MiniAction(
                     icon = Icons.Default.Terminal,
                     description = "Open Console",
-                    tint = LogoPink,
+                    tint = LogoSoftPink,
+                    gradientColors = listOf(Color(0xFF4A1B66), Color(0xFF2E124A)),
+                    borderTint = LogoPink,
                     onClick = onConsole
                 )
                 Spacer(Modifier.width(5.dp))
                 MiniAction(
                     icon = Icons.Default.Info,
                     description = "Credits",
-                    tint = LogoSoftPink,
+                    tint = Color(0xFF67E8F9),
+                    gradientColors = listOf(Color(0xFF213163), Color(0xFF1A2049)),
+                    borderTint = Color(0xFF38BDF8),
                     onClick = onCredits
                 )
             }
@@ -1211,6 +1217,75 @@ private fun InfoStatusBox(
 }
 
 @Composable
+private fun PremiumActionButton(
+    text: String,
+    icon: ImageVector,
+    enabled: Boolean,
+    loading: Boolean = false,
+    gradientColors: List<Color>,
+    borderColors: List<Color>,
+    iconTint: Color = Color.White,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(13.dp))
+            .background(
+                if (enabled) Brush.horizontalGradient(gradientColors)
+                else Brush.horizontalGradient(listOf(Surface2, Surface3.copy(alpha = 0.65f)))
+            )
+            .border(
+                1.1.dp,
+                if (enabled) Brush.horizontalGradient(borderColors)
+                else Brush.horizontalGradient(listOf(BorderSubtle, BorderSubtle)),
+                RoundedCornerShape(13.dp)
+            )
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(vertical = 11.dp, horizontal = 14.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .size(28.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(if (enabled) Color.Black.copy(alpha = 0.24f) else Surface3.copy(alpha = 0.45f))
+                    .border(
+                        1.dp,
+                        if (enabled) iconTint.copy(alpha = 0.42f) else BorderSubtle,
+                        RoundedCornerShape(8.dp)
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                if (loading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(14.dp),
+                        color = iconTint,
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    Icon(
+                        icon,
+                        contentDescription = null,
+                        tint = if (enabled) iconTint else TextDisabled,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+            Spacer(Modifier.width(10.dp))
+            Text(
+                text = text,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.ExtraBold,
+                color = if (enabled) Color.White else TextDisabled,
+                letterSpacing = 0.7.sp
+            )
+        }
+    }
+}
+
+@Composable
 private fun DriverStatusSummaryCard(
     strings: UiStrings,
     loaded: Boolean,
@@ -1222,7 +1297,8 @@ private fun DriverStatusSummaryCard(
     verifyDetail: String,
     onVerify: () -> Unit
 ) {
-    val stateColor = if (loaded) StatusOk else AccentRed
+    val activeDisplay = loaded || verifyStatus == "PASS"
+    val stateColor = if (activeDisplay) StatusOk else AccentRed
     val isChecking = verifyStatus == "CHECKING"
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -1230,7 +1306,7 @@ private fun DriverStatusSummaryCard(
         colors = CardDefaults.cardColors(containerColor = Surface1),
         border = BorderStroke(
             1.2.dp,
-            if (loaded) Brush.horizontalGradient(listOf(StatusOk, LogoPink))
+            if (activeDisplay) Brush.horizontalGradient(listOf(StatusOk, Color(0xFF00E5FF)))
             else Brush.horizontalGradient(listOf(AccentRed.copy(alpha = 0.65f), LogoPurple.copy(alpha = 0.55f)))
         )
     ) {
@@ -1244,20 +1320,20 @@ private fun DriverStatusSummaryCard(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                StatusDot(loaded = loaded)
+                StatusDot(loaded = activeDisplay)
                 Spacer(Modifier.width(9.dp))
                 Column(Modifier.weight(1f)) {
                     Text(
-                        text = if (loaded) {
+                        text = if (activeDisplay) {
                             if (hidden) strings.driverStatusHidden
                             else "${strings.driverStatusLoaded} · $loadedModule"
                         } else strings.driverStatusNotLoaded,
                         style = MonoSmall,
                         fontWeight = FontWeight.ExtraBold,
-                        color = if (loaded) StatusOk else AccentRed
+                        color = if (activeDisplay) StatusOk else AccentRed
                     )
                     Text(
-                        text = if (loaded) strings.driverStatusLoadedHint else strings.driverStatusNotLoadedHint,
+                        text = if (activeDisplay) strings.driverStatusLoadedHint else strings.driverStatusNotLoadedHint,
                         style = MaterialTheme.typography.bodySmall,
                         fontSize = 11.sp,
                         color = TextSecondary,
@@ -1265,7 +1341,7 @@ private fun DriverStatusSummaryCard(
                         overflow = TextOverflow.Ellipsis
                     )
                 }
-                if (loaded) {
+                if (activeDisplay) {
                     Icon(
                         Icons.Default.CheckCircle,
                         contentDescription = null,
@@ -1314,63 +1390,18 @@ private fun DriverStatusSummaryCard(
                 }
             }
 
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(9.dp))
 
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(11.dp))
-                    .background(
-                        if (!busy && rootAvailable) {
-                            Brush.horizontalGradient(
-                                listOf(
-                                    Color(0xFF2B1045),
-                                    Color(0xFF45145E),
-                                    Color(0xFF261042)
-                                )
-                            )
-                        } else {
-                            Brush.horizontalGradient(listOf(Surface2, Surface2))
-                        }
-                    )
-                    .border(
-                        1.4.dp,
-                        if (!busy && rootAvailable) {
-                            Brush.horizontalGradient(listOf(LogoPink, LogoMagenta, LogoPurple))
-                        } else {
-                            Brush.horizontalGradient(listOf(BorderSubtle, BorderSubtle))
-                        },
-                        RoundedCornerShape(11.dp)
-                    )
-                    .clickable(enabled = !busy && rootAvailable, onClick = onVerify)
-                    .padding(vertical = 10.dp, horizontal = 14.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (isChecking) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(15.dp),
-                            color = LogoSoftPink,
-                            strokeWidth = 2.dp
-                        )
-                    } else {
-                        Icon(
-                            Icons.Default.VerifiedUser,
-                            contentDescription = null,
-                            tint = if (!busy && rootAvailable) LogoSoftPink else TextDisabled,
-                            modifier = Modifier.size(17.dp)
-                        )
-                    }
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        text = if (isChecking) strings.verifyingBtn else strings.verifyBtn,
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = if (!busy && rootAvailable) Color.White else TextDisabled,
-                        letterSpacing = 0.7.sp
-                    )
-                }
-            }
+            PremiumActionButton(
+                text = if (isChecking) strings.verifyingBtn else strings.verifyBtn,
+                icon = Icons.Default.VerifiedUser,
+                enabled = !busy && rootAvailable,
+                loading = isChecking,
+                gradientColors = listOf(Color(0xFF0B5345), Color(0xFF0E6655), Color(0xFF154360)),
+                borderColors = listOf(Color(0xFF2DD4BF).copy(alpha = 0.65f), Color(0xFF38BDF8).copy(alpha = 0.60f)),
+                iconTint = Color(0xFF5EEAD4),
+                onClick = onVerify
+            )
         }
     }
 }
@@ -1455,53 +1486,15 @@ private fun CustomScriptLoadCard(
 
             Spacer(Modifier.height(9.dp))
 
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(11.dp))
-                    .background(
-                        if (!busy && rootAvailable) {
-                            Brush.horizontalGradient(
-                                listOf(
-                                    Color(0xFF2E1049),
-                                    Color(0xFF4A145E),
-                                    Color(0xFF281045)
-                                )
-                            )
-                        } else {
-                            Brush.horizontalGradient(listOf(Surface2, Surface2))
-                        }
-                    )
-                    .border(
-                        1.4.dp,
-                        if (!busy && rootAvailable) {
-                            Brush.horizontalGradient(listOf(LogoPink, LogoMagenta, LogoPurple))
-                        } else {
-                            Brush.horizontalGradient(listOf(BorderSubtle, BorderSubtle))
-                        },
-                        RoundedCornerShape(11.dp)
-                    )
-                    .clickable(enabled = !busy && rootAvailable, onClick = onPickFile)
-                    .padding(vertical = 10.dp, horizontal = 14.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        Icons.Default.FolderOpen,
-                        contentDescription = null,
-                        tint = if (!busy && rootAvailable) LogoSoftPink else TextDisabled,
-                        modifier = Modifier.size(17.dp)
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        text = strings.customScriptPickBtn,
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = if (!busy && rootAvailable) Color.White else TextDisabled,
-                        letterSpacing = 0.8.sp
-                    )
-                }
-            }
+            PremiumActionButton(
+                text = strings.customScriptPickBtn,
+                icon = Icons.Default.FolderOpen,
+                enabled = !busy && rootAvailable,
+                gradientColors = listOf(Color(0xFF6B1D6B), Color(0xFF88207A), Color(0xFF4C1D73)),
+                borderColors = listOf(LogoPink.copy(alpha = 0.70f), LogoPurple.copy(alpha = 0.65f)),
+                iconTint = LogoSoftPink,
+                onClick = onPickFile
+            )
 
             if (hasFile) {
                 Spacer(Modifier.height(8.dp))
@@ -1509,36 +1502,59 @@ private fun CustomScriptLoadCard(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Button(
-                        onClick = onRunPicked,
-                        enabled = !busy && rootAvailable,
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(10.dp),
-                        border = BorderStroke(1.3.dp, StatusOk),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0A3323))
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(
+                                if (!busy && rootAvailable) {
+                                    Brush.horizontalGradient(listOf(Color(0xFF0E5E3E), Color(0xFF117A4B)))
+                                } else {
+                                    Brush.horizontalGradient(listOf(Surface2, Surface2))
+                                }
+                            )
+                            .border(
+                                1.1.dp,
+                                if (!busy && rootAvailable) Color(0xFF34D399).copy(alpha = 0.68f) else BorderSubtle,
+                                RoundedCornerShape(12.dp)
+                            )
+                            .clickable(enabled = !busy && rootAvailable, onClick = onRunPicked)
+                            .padding(vertical = 11.dp, horizontal = 10.dp),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Icon(
-                            Icons.Default.PlayArrow,
-                            contentDescription = null,
-                            tint = StatusOk,
-                            modifier = Modifier.size(17.dp)
-                        )
-                        Spacer(Modifier.width(6.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                Icons.Default.PlayArrow,
+                                contentDescription = null,
+                                tint = if (!busy && rootAvailable) Color(0xFF6EE7B7) else TextDisabled,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                text = strings.customScriptLoadBtn,
+                                color = if (!busy && rootAvailable) Color.White else TextDisabled,
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.ExtraBold
+                            )
+                        }
+                    }
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(
+                                Brush.horizontalGradient(listOf(Color(0xFF6E1730), Color(0xFF8C1D3F)))
+                            )
+                            .border(1.1.dp, Color(0xFFFB7185).copy(alpha = 0.60f), RoundedCornerShape(12.dp))
+                            .clickable(enabled = !busy, onClick = onClearPicked)
+                            .padding(vertical = 11.dp, horizontal = 16.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
                         Text(
-                            text = strings.customScriptLoadBtn,
+                            text = strings.customScriptClearBtn,
                             color = Color.White,
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.ExtraBold
                         )
-                    }
-                    OutlinedButton(
-                        onClick = onClearPicked,
-                        enabled = !busy,
-                        shape = RoundedCornerShape(10.dp),
-                        border = BorderStroke(1.dp, BorderStrong),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = TextSecondary)
-                    ) {
-                        Text(strings.customScriptClearBtn, style = MaterialTheme.typography.labelMedium)
                     }
                 }
             }
@@ -1635,53 +1651,24 @@ private fun SignatureVerificationOffCard(
 
             Spacer(Modifier.height(9.dp))
 
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(11.dp))
-                    .background(
-                        if (!busy && rootAvailable) {
-                            Brush.horizontalGradient(
-                                listOf(
-                                    Color(0xFF281046),
-                                    Color(0xFF45135C),
-                                    Color(0xFF31114C)
-                                )
-                            )
-                        } else {
-                            Brush.horizontalGradient(listOf(Surface2, Surface2))
-                        }
-                    )
-                    .border(
-                        1.4.dp,
-                        if (!busy && rootAvailable) {
-                            Brush.horizontalGradient(listOf(LogoPurple, LogoMagenta, LogoPink))
-                        } else {
-                            Brush.horizontalGradient(listOf(BorderSubtle, BorderSubtle))
-                        },
-                        RoundedCornerShape(11.dp)
-                    )
-                    .clickable(enabled = !busy && rootAvailable, onClick = onPatchSignature)
-                    .padding(vertical = 10.dp, horizontal = 14.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        Icons.Default.Shield,
-                        contentDescription = null,
-                        tint = if (!busy && rootAvailable) LogoSoftPink else TextDisabled,
-                        modifier = Modifier.size(17.dp)
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        text = if (isPatchingSig) strings.sigOffPatchingBtn else strings.sigOffBtn,
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = if (!busy && rootAvailable) Color.White else TextDisabled,
-                        letterSpacing = 0.8.sp
-                    )
-                }
-            }
+            PremiumActionButton(
+                text = if (isPatchingSig) strings.sigOffPatchingBtn else strings.sigOffBtn,
+                icon = Icons.Default.Shield,
+                enabled = !busy && rootAvailable,
+                loading = isPatchingSig,
+                gradientColors = if (isSigDone) {
+                    listOf(Color(0xFF0B5345), Color(0xFF0E6655), Color(0xFF154360))
+                } else {
+                    listOf(Color(0xFF431D7A), Color(0xFF5B2192), Color(0xFF37308A))
+                },
+                borderColors = if (isSigDone) {
+                    listOf(Color(0xFF34D399).copy(alpha = 0.65f), Color(0xFF38BDF8).copy(alpha = 0.60f))
+                } else {
+                    listOf(Color(0xFFC084FC).copy(alpha = 0.65f), Color(0xFF818CF8).copy(alpha = 0.65f))
+                },
+                iconTint = if (isSigDone) Color(0xFF5EEAD4) else Color(0xFFFBBF24),
+                onClick = onPatchSignature
+            )
         }
     }
 }
@@ -1818,6 +1805,8 @@ private fun VariantConsoleSection(
                 icon = Icons.Default.Terminal,
                 description = "Full Console",
                 tint = LogoSoftPink,
+                gradientColors = listOf(Color(0xFF4A1B66), Color(0xFF2E124A)),
+                borderTint = LogoPink,
                 onClick = onOpenFullConsole
             )
             Spacer(Modifier.width(6.dp))
@@ -1825,10 +1814,12 @@ private fun VariantConsoleSection(
         MiniAction(
             icon = Icons.Default.ContentCopy,
             description = "Copy $title",
-            tint = TextSecondary
+            tint = Color(0xFFC4B5FD),
+            gradientColors = listOf(Color(0xFF3B1F6E), Color(0xFF28154D)),
+            borderTint = Color(0xFF8B5CF6)
         ) {
             clipboard.setText(
-                AnnotatedString(lines.joinToString("\n") { "- [${it.type}] ${it.text}" })
+                AnnotatedString(lines.joinToString("\n") { it.text })
             )
             Toast.makeText(context, "Status terminal logs copied!", Toast.LENGTH_SHORT).show()
         }
@@ -1837,7 +1828,9 @@ private fun VariantConsoleSection(
             MiniAction(
                 icon = Icons.Default.Delete,
                 description = "Clear console",
-                tint = TextSecondary,
+                tint = Color(0xFFFDA4AF),
+                gradientColors = listOf(Color(0xFF5E1730), Color(0xFF3E1022)),
+                borderTint = Color(0xFFFB7185),
                 onClick = onClear
             )
         }
@@ -1951,18 +1944,15 @@ private fun VariantConsoleCard(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(vertical = 2.dp),
+                                .padding(vertical = 2.5.dp),
                             verticalAlignment = Alignment.Top
                         ) {
-                            Text(
-                                text = "- [${line.type}]",
-                                style = MaterialTheme.typography.bodySmall.copy(
-                                    fontFamily = FontFamily.Monospace,
-                                    fontSize = 11.5.sp,
-                                    fontWeight = FontWeight.Bold
-                                ),
-                                color = consoleLineColor(line.type),
-                                modifier = Modifier.padding(end = 6.dp, top = 0.5.dp)
+                            Box(
+                                modifier = Modifier
+                                    .padding(top = 6.dp, end = 8.dp)
+                                    .size(6.dp)
+                                    .clip(CircleShape)
+                                    .background(consoleLineColor(line.type))
                             )
                             Text(
                                 text = line.text,
@@ -2253,6 +2243,7 @@ private fun SectionTitle(
             letterSpacing = 1.1.sp,
             modifier = Modifier.weight(1f)
         )
+        Spacer(Modifier.width(8.dp))
         trailing()
     }
 }
@@ -2261,14 +2252,16 @@ private fun SectionTitle(
 private fun MiniAction(
     icon: ImageVector,
     description: String,
-    tint: Color = TextSecondary,
+    tint: Color = LogoSoftPink,
+    gradientColors: List<Color> = listOf(Color(0xFF3B1F6E), Color(0xFF28154D)),
+    borderTint: Color = LogoPurple,
     onClick: () -> Unit
 ) {
     Box(
         modifier = Modifier
-            .clip(RoundedCornerShape(11.dp))
-            .background(Surface2.copy(alpha = 0.85f))
-            .border(1.dp, BorderSubtle, RoundedCornerShape(11.dp))
+            .clip(RoundedCornerShape(10.dp))
+            .background(Brush.linearGradient(gradientColors))
+            .border(1.dp, borderTint.copy(alpha = 0.55f), RoundedCornerShape(10.dp))
             .clickable(onClick = onClick)
             .padding(8.dp)
     ) {
@@ -2276,7 +2269,7 @@ private fun MiniAction(
             icon,
             contentDescription = description,
             tint = tint,
-            modifier = Modifier.size(18.dp)
+            modifier = Modifier.size(17.dp)
         )
     }
 }
@@ -2294,6 +2287,8 @@ private fun DeviceBadge(text: String, color: Color) {
             fontSize = 9.sp,
             color = color,
             fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            softWrap = false,
             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
         )
     }
@@ -2434,12 +2429,18 @@ private fun RingButton(
             shape = CircleShape,
             border = BorderStroke(
                 2.2.dp,
-                Brush.linearGradient(listOf(accentStart, accentMid, accentEnd))
+                if (hot) {
+                    Brush.linearGradient(
+                        listOf(accentStart, accentMid, accentEnd)
+                    )
+                } else {
+                    Brush.linearGradient(listOf(BorderSubtle, BorderStrong))
+                }
             ),
             colors = ButtonDefaults.buttonColors(
                 containerColor = Color.Transparent,
                 contentColor = TextPrimary,
-                disabledContainerColor = Surface1.copy(alpha = 0.6f),
+                disabledContainerColor = Color.Transparent,
                 disabledContentColor = TextDisabled
             ),
             contentPadding = PaddingValues(0.dp),
@@ -2454,11 +2455,11 @@ private fun RingButton(
                 .clip(CircleShape)
                 .background(
                     if (hot) {
-                        Brush.linearGradient(
-                            listOf(
-                                accentStart.copy(alpha = 0.38f),
-                                accentMid.copy(alpha = 0.28f),
-                                accentEnd.copy(alpha = 0.38f)
+                        Brush.radialGradient(
+                            colors = listOf(
+                                accentStart.copy(alpha = 0.72f),
+                                accentMid.copy(alpha = 0.44f),
+                                Color(0xFF280B47)
                             )
                         )
                     } else {
@@ -2640,224 +2641,266 @@ private fun SupportCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
 
-                Button(
-                    onClick = {
-                        if (preparing) return@Button
-                        scope.launch {
-                            preparing = true
-                            stepText = "Collecting device info..."
-                            viewModel.tlog("Building report package (${shortVermagic.ifBlank { "device_dump" }}.zip)...", "CMD")
-                            try {
-                                val pack = withContext(Dispatchers.IO) {
-                                    ReportPackBuilder.buildPack(
-                                        context = context,
-                                        rootAvailable = RootChecker.isRootAvailable(),
-                                        loadedModule = loadedModule,
-                                        bundleTried = viewModel.lastBundleTried.value,
-                                        matchStatus = matchStatus,
-                                        resultText = resultText,
-                                        logText = getLog(),
-                                        onStep = { stepText = it }
-                                    )
-                                }
-                                viewModel.tlog("Report ZIP ready: ${pack.zipName}", "OK")
-                                clipboard.setText(AnnotatedString(SupportContact.TELEGRAM_HANDLE))
-                                val sent = pack.zipFile?.let {
-                                    SupportContact.sendZipViaTelegram(context, it, pack.caption)
-                                } ?: false
-                                if (!sent) {
-                                    context.startActivity(
-                                        Intent(
-                                            Intent.ACTION_VIEW,
-                                            Uri.parse(SupportContact.telegramDirectUrl())
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(
+                            Brush.horizontalGradient(
+                                listOf(Color(0xFF10497E), Color(0xFF165B9E))
+                            )
+                        )
+                        .border(1.1.dp, Color(0xFF38BDF8).copy(alpha = 0.65f), RoundedCornerShape(14.dp))
+                        .clickable(enabled = !preparing) {
+                            scope.launch {
+                                preparing = true
+                                stepText = "Collecting device info..."
+                                viewModel.tlog("Building report package (${shortVermagic.ifBlank { "device_dump" }}.zip)...", "CMD")
+                                try {
+                                    val pack = withContext(Dispatchers.IO) {
+                                        ReportPackBuilder.buildPack(
+                                            context = context,
+                                            rootAvailable = RootChecker.isRootAvailable(),
+                                            loadedModule = loadedModule,
+                                            bundleTried = viewModel.lastBundleTried.value,
+                                            matchStatus = matchStatus,
+                                            resultText = resultText,
+                                            logText = getLog(),
+                                            onStep = { stepText = it }
                                         )
-                                    )
+                                    }
+                                    viewModel.tlog("Report ZIP ready: ${pack.zipName}", "OK")
+                                    clipboard.setText(AnnotatedString(SupportContact.TELEGRAM_HANDLE))
+                                    val sent = pack.zipFile?.let {
+                                        SupportContact.sendZipViaTelegram(context, it, pack.caption)
+                                    } ?: false
+                                    if (!sent) {
+                                        context.startActivity(
+                                            Intent(
+                                                Intent.ACTION_VIEW,
+                                                Uri.parse(SupportContact.telegramDirectUrl())
+                                            )
+                                        )
+                                        Toast.makeText(
+                                            context,
+                                            "Telegram opened (@Jubairdadubm copied)",
+                                            Toast.LENGTH_LONG
+                                        ).show()
+                                    } else {
+                                        Toast.makeText(
+                                            context,
+                                            "Sending ${pack.zipName} to @Jubairdadubm",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                    }
+                                } catch (e: Exception) {
+                                    viewModel.tlog("Report failed: ${e.message}", "ERR")
                                     Toast.makeText(
                                         context,
-                                        "Telegram opened (@Jubairdadubm copied)",
+                                        "Report failed: ${e.message}",
                                         Toast.LENGTH_LONG
                                     ).show()
-                                } else {
-                                    Toast.makeText(
-                                        context,
-                                        "Sending ${pack.zipName} to @Jubairdadubm",
-                                        Toast.LENGTH_SHORT
-                                    ).show()
+                                } finally {
+                                    preparing = false
+                                    stepText = ""
                                 }
-                            } catch (e: Exception) {
-                                viewModel.tlog("Report failed: ${e.message}", "ERR")
-                                Toast.makeText(
-                                    context,
-                                    "Report failed: ${e.message}",
-                                    Toast.LENGTH_LONG
-                                ).show()
-                            } finally {
-                                preparing = false
-                                stepText = ""
                             }
                         }
-                    },
-                    enabled = !preparing,
-                    shape = RoundedCornerShape(14.dp),
-                    border = BorderStroke(1.3.dp, Color(0xFF29B6F6)),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF0C2D48),
-                        contentColor = Color.White
-                    ),
-                    contentPadding = PaddingValues(vertical = 12.dp, horizontal = 10.dp),
-                    modifier = Modifier.weight(1f)
+                        .padding(vertical = 12.dp, horizontal = 10.dp),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.ic_telegram),
-                        contentDescription = "Telegram",
-                        tint = Color(0xFF29B6F6),
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Column(horizontalAlignment = Alignment.Start) {
-                        Text(
-                            text = "Telegram",
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = Color.White
-                        )
-                        Text(
-                            text = SupportContact.TELEGRAM_HANDLE,
-                            style = MonoTiny,
-                            fontSize = 9.5.sp,
-                            color = Color.White.copy(alpha = 0.88f)
-                        )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(30.dp)
+                                .clip(CircleShape)
+                                .background(Color.Black.copy(alpha = 0.24f))
+                                .border(1.dp, Color(0xFF38BDF8).copy(alpha = 0.55f), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_telegram),
+                                contentDescription = "Telegram",
+                                tint = Color(0xFF7DD3FC),
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        Column(horizontalAlignment = Alignment.Start) {
+                            Text(
+                                text = "Telegram",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = Color.White
+                            )
+                            Text(
+                                text = SupportContact.TELEGRAM_HANDLE,
+                                style = MonoTiny,
+                                fontSize = 9.5.sp,
+                                color = Color.White.copy(alpha = 0.88f)
+                            )
+                        }
                     }
                 }
 
-                Button(
-                    onClick = {
-                        if (preparing) return@Button
-                        scope.launch {
-                            preparing = true
-                            stepText = "Collecting device info..."
-                            viewModel.tlog("Building report package (${shortVermagic.ifBlank { "device_dump" }}.zip)...", "CMD")
-                            try {
-                                val pack = withContext(Dispatchers.IO) {
-                                    ReportPackBuilder.buildPack(
-                                        context = context,
-                                        rootAvailable = RootChecker.isRootAvailable(),
-                                        loadedModule = loadedModule,
-                                        bundleTried = viewModel.lastBundleTried.value,
-                                        matchStatus = matchStatus,
-                                        resultText = resultText,
-                                        logText = getLog(),
-                                        onStep = { stepText = it }
-                                    )
-                                }
-                                viewModel.tlog("Report ZIP ready: ${pack.zipName}", "OK")
-                                val sent = pack.zipFile?.let {
-                                    SupportContact.sendZipViaWhatsApp(context, it, pack.caption)
-                                } ?: false
-                                if (!sent) {
-                                    context.startActivity(
-                                        Intent(
-                                            Intent.ACTION_VIEW,
-                                            Uri.parse(
-                                                SupportContact.waLinkReport(
-                                                    "${pack.caption}\n\n${pack.fullText.take(1300)}"
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(
+                            Brush.horizontalGradient(
+                                listOf(Color(0xFF0E5A38), Color(0xFF147245))
+                            )
+                        )
+                        .border(1.1.dp, Color(0xFF4ADE80).copy(alpha = 0.65f), RoundedCornerShape(14.dp))
+                        .clickable(enabled = !preparing) {
+                            scope.launch {
+                                preparing = true
+                                stepText = "Collecting device info..."
+                                viewModel.tlog("Building report package (${shortVermagic.ifBlank { "device_dump" }}.zip)...", "CMD")
+                                try {
+                                    val pack = withContext(Dispatchers.IO) {
+                                        ReportPackBuilder.buildPack(
+                                            context = context,
+                                            rootAvailable = RootChecker.isRootAvailable(),
+                                            loadedModule = loadedModule,
+                                            bundleTried = viewModel.lastBundleTried.value,
+                                            matchStatus = matchStatus,
+                                            resultText = resultText,
+                                            logText = getLog(),
+                                            onStep = { stepText = it }
+                                        )
+                                    }
+                                    viewModel.tlog("Report ZIP ready: ${pack.zipName}", "OK")
+                                    val sent = pack.zipFile?.let {
+                                        SupportContact.sendZipViaWhatsApp(context, it, pack.caption)
+                                    } ?: false
+                                    if (!sent) {
+                                        context.startActivity(
+                                            Intent(
+                                                Intent.ACTION_VIEW,
+                                                Uri.parse(
+                                                    SupportContact.waLinkReport(
+                                                        "${pack.caption}\n\n${pack.fullText.take(1300)}"
+                                                    )
                                                 )
                                             )
                                         )
-                                    )
+                                        Toast.makeText(
+                                            context,
+                                            "ZIP share unavailable — text report opened instead",
+                                            Toast.LENGTH_LONG
+                                        ).show()
+                                    }
+                                } catch (e: Exception) {
+                                    viewModel.tlog("Report failed: ${e.message}", "ERR")
                                     Toast.makeText(
                                         context,
-                                        "ZIP share unavailable — text report opened instead",
+                                        "Report failed: ${e.message}",
                                         Toast.LENGTH_LONG
                                     ).show()
+                                } finally {
+                                    preparing = false
+                                    stepText = ""
                                 }
-                            } catch (e: Exception) {
-                                viewModel.tlog("Report failed: ${e.message}", "ERR")
-                                Toast.makeText(
-                                    context,
-                                    "Report failed: ${e.message}",
-                                    Toast.LENGTH_LONG
-                                ).show()
-                            } finally {
-                                preparing = false
-                                stepText = ""
                             }
                         }
-                    },
-                    enabled = !preparing,
-                    shape = RoundedCornerShape(14.dp),
-                    border = BorderStroke(1.3.dp, Color(0xFF00E676)),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF0A3322),
-                        contentColor = Color.White
-                    ),
-                    contentPadding = PaddingValues(vertical = 12.dp, horizontal = 10.dp),
-                    modifier = Modifier.weight(1f)
+                        .padding(vertical = 12.dp, horizontal = 10.dp),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.ic_whatsapp),
-                        contentDescription = "WhatsApp",
-                        tint = Color(0xFF00E676),
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Column(horizontalAlignment = Alignment.Start) {
-                        Text(
-                            text = "WhatsApp",
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = Color.White
-                        )
-                        Text(
-                            text = SupportContact.WHATSAPP_DISPLAY,
-                            style = MonoTiny,
-                            fontSize = 9.5.sp,
-                            color = Color.White.copy(alpha = 0.9f)
-                        )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(30.dp)
+                                .clip(CircleShape)
+                                .background(Color.Black.copy(alpha = 0.24f))
+                                .border(1.dp, Color(0xFF4ADE80).copy(alpha = 0.55f), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_whatsapp),
+                                contentDescription = "WhatsApp",
+                                tint = Color(0xFF6EE7B7),
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        Column(horizontalAlignment = Alignment.Start) {
+                            Text(
+                                text = "WhatsApp",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = Color.White
+                            )
+                            Text(
+                                text = SupportContact.WHATSAPP_DISPLAY,
+                                style = MonoTiny,
+                                fontSize = 9.5.sp,
+                                color = Color.White.copy(alpha = 0.9f)
+                            )
+                        }
                     }
                 }
             }
 
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(10.dp))
 
-            TextButton(
-                onClick = {
-                    if (preparing) return@TextButton
-                    scope.launch {
-                        preparing = true
-                        try {
-                            val report = withContext(Dispatchers.IO) { collectReport() }
-                            val text = buildReportText(report)
-                            clipboard.setText(AnnotatedString(text))
-                            Toast.makeText(context, "Full build report copied", Toast.LENGTH_SHORT).show()
-                        } catch (e: Exception) {
-                            Toast.makeText(
-                                context,
-                                "Report failed: ${e.message}",
-                                Toast.LENGTH_LONG
-                            ).show()
-                        } finally {
-                            preparing = false
-                            stepText = ""
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(
+                        if (!preparing) {
+                            Brush.horizontalGradient(
+                                listOf(Color(0xFF3B1A66), Color(0xFF551F75))
+                            )
+                        } else {
+                            Brush.horizontalGradient(listOf(Surface2, Surface3))
+                        }
+                    )
+                    .border(
+                        1.dp,
+                        if (!preparing) LogoPurple.copy(alpha = 0.60f) else BorderSubtle,
+                        RoundedCornerShape(12.dp)
+                    )
+                    .clickable(enabled = !preparing) {
+                        scope.launch {
+                            preparing = true
+                            try {
+                                val report = withContext(Dispatchers.IO) { collectReport() }
+                                val text = buildReportText(report)
+                                clipboard.setText(AnnotatedString(text))
+                                Toast.makeText(context, "Full build report copied", Toast.LENGTH_SHORT).show()
+                            } catch (e: Exception) {
+                                Toast.makeText(
+                                    context,
+                                    "Report failed: ${e.message}",
+                                    Toast.LENGTH_LONG
+                                ).show()
+                            } finally {
+                                preparing = false
+                                stepText = ""
+                            }
                         }
                     }
-                },
-                enabled = !preparing,
-                modifier = Modifier.align(Alignment.CenterHorizontally)
+                    .padding(vertical = 10.dp, horizontal = 14.dp),
+                contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    Icons.Default.ContentCopy,
-                    contentDescription = null,
-                    tint = LogoSoftPink,
-                    modifier = Modifier.size(15.dp)
-                )
-                Spacer(Modifier.width(6.dp))
-                Text(
-                    text = if (preparing) strings.collectingReport else strings.copyReportBtn,
-                    style = MonoTiny,
-                    color = LogoSoftPink,
-                    fontWeight = FontWeight.Bold
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Default.ContentCopy,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(15.dp)
+                    )
+                    Spacer(Modifier.width(7.dp))
+                    Text(
+                        text = if (preparing) strings.collectingReport else strings.copyReportBtn,
+                        style = MonoTiny,
+                        color = Color.White,
+                        fontWeight = FontWeight.ExtraBold
+                    )
+                }
             }
         }
     }
@@ -2874,29 +2917,37 @@ private fun StopLoadButton(label: String, onStop: () -> Unit) {
         ),
         label = "stopA"
     )
-    Surface(
-        shape = RoundedCornerShape(50),
-        color = AccentRed.copy(alpha = 0.08f + 0.14f * blink),
-        border = BorderStroke(1.5.dp, AccentRed.copy(alpha = 0.3f + 0.55f * blink)),
-        modifier = Modifier.clickable(onClick = onStop)
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .background(
+                Brush.horizontalGradient(
+                    listOf(
+                        Color(0xFF881337).copy(alpha = 0.90f + 0.10f * blink),
+                        Color(0xFFBE123C).copy(alpha = 0.90f + 0.10f * blink)
+                    )
+                )
+            )
+            .border(1.3.dp, Color(0xFFFB7185).copy(alpha = 0.45f + 0.50f * blink), RoundedCornerShape(50))
+            .clickable(onClick = onStop)
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
+            modifier = Modifier.padding(horizontal = 22.dp, vertical = 9.dp)
         ) {
             Icon(
                 Icons.Default.Stop,
                 contentDescription = null,
-                tint = AccentRed,
-                modifier = Modifier.size(15.dp)
+                tint = Color.White,
+                modifier = Modifier.size(16.dp)
             )
             Spacer(Modifier.width(6.dp))
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Bold,
-                color = AccentRed,
-                letterSpacing = 1.5.sp
+                fontWeight = FontWeight.ExtraBold,
+                color = Color.White,
+                letterSpacing = 1.4.sp
             )
         }
     }
