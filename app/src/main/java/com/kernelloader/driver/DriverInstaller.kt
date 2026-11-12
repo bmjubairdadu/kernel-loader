@@ -18,6 +18,13 @@ class DriverInstaller(private val ctx: Context) {
     )
 
     fun availableScripts(): List<String> {
+        val cachedDir = File(ctx.filesDir, "drivers")
+        val cachedList = if (cachedDir.exists()) {
+            cachedDir.walkTopDown()
+                .filter { it.isFile && it.name.endsWith(".sh") }
+                .map { it.name.removeSuffix(".sh") }
+                .toList()
+        } else emptyList()
         val rtList = ctx.assets.list("drivers/RT")
             ?.filter { it.endsWith(".sh") }
             ?.map { it.removeSuffix(".sh") }
@@ -26,7 +33,7 @@ class DriverInstaller(private val ctx: Context) {
             ?.filter { it.endsWith(".sh") }
             ?.map { it.removeSuffix(".sh") }
             ?: emptyList()
-        return (rtList + rootList).distinct().sorted()
+        return (cachedList + rtList + rootList).distinct().sorted()
     }
 
     fun candidates(release: String): List<String> {
@@ -55,38 +62,62 @@ class DriverInstaller(private val ctx: Context) {
     }
 
     fun install(assetStem: String, onLine: (String) -> Unit = {}): Result {
+        val localA = File(ctx.filesDir, "drivers/$assetStem.sh")
+        val localB = File(ctx.filesDir, "drivers/RT/$assetStem.sh")
+        val candidateLocal = if (localA.exists()) localA else if (localB.exists()) localB else null
+        if (candidateLocal != null) {
+            return installFile(candidateLocal, onLine)
+        }
+
         val work = File(ctx.cacheDir, "ftl").apply { mkdirs() }
         val scriptPath = if (ctx.assets.list("drivers/RT")?.contains("$assetStem.sh") == true) {
             "drivers/RT/$assetStem.sh"
         } else {
             "drivers/$assetStem.sh"
         }
-        val script = copyAsset(scriptPath, File(work, "$assetStem.sh"))
-        val wrapper = copyAsset("sh/driver_load.sh", File(work, "driver_load.sh"))
-        return runWrapper(script, wrapper, onLine)
+        val safeName = "$assetStem.sh"
+        copyAssetToRemote(scriptPath, safeName)
+        copyAssetToRemote("sh/driver_load.sh", "driver_load.sh")
+        return runWrapper(safeName, onLine)
     }
 
     fun installFile(sourceFile: File, onLine: (String) -> Unit = {}): Result {
-        val work = File(ctx.cacheDir, "ftl").apply { mkdirs() }
         val safeName = sourceFile.name.replace(Regex("[^A-Za-z0-9._-]"), "_")
-        val staged = File(work, safeName)
-        if (sourceFile.absolutePath != staged.absolutePath) {
-            sourceFile.copyTo(staged, overwrite = true)
-        }
-        val wrapper = copyAsset("sh/driver_load.sh", File(work, "driver_load.sh"))
-        return runWrapper(staged, wrapper, onLine)
+        copyToRemote(sourceFile, safeName)
+        copyAssetToRemote("sh/driver_load.sh", "driver_load.sh")
+        return runWrapper(safeName, onLine)
     }
 
-    private fun runWrapper(script: File, wrapper: File, onLine: (String) -> Unit): Result {
-        val stage = "mkdir -p $REMOTE && " +
-            "cp -f '${script.absolutePath}' $REMOTE/ && " +
-            "cp -f '${wrapper.absolutePath}' $REMOTE/ && " +
-            "chmod 755 $REMOTE/*.sh"
-        su(stage, onLine)
+    private fun copyToRemote(file: File, remoteName: String): Boolean = try {
+        su("mkdir -p $REMOTE") {}
+        val p = ProcessBuilder("su", "-c", "cat > '$REMOTE/$remoteName' && chmod 755 '$REMOTE/$remoteName'").start()
+        file.inputStream().use { input ->
+            p.outputStream.use { output ->
+                input.copyTo(output)
+            }
+        }
+        p.waitFor() == 0
+    } catch (_: Exception) {
+        false
+    }
 
+    private fun copyAssetToRemote(assetPath: String, remoteName: String): Boolean = try {
+        su("mkdir -p $REMOTE") {}
+        val p = ProcessBuilder("su", "-c", "cat > '$REMOTE/$remoteName' && chmod 755 '$REMOTE/$remoteName'").start()
+        ctx.assets.open(assetPath).use { input ->
+            p.outputStream.use { output ->
+                input.copyTo(output)
+            }
+        }
+        p.waitFor() == 0
+    } catch (_: Exception) {
+        false
+    }
+
+    private fun runWrapper(scriptName: String, onLine: (String) -> Unit): Result {
         val kv = HashMap<String, String>()
         val raw = StringBuilder()
-        val cmd = "sh $REMOTE/driver_load.sh $REMOTE/${script.name} $MODULE"
+        val cmd = "sh $REMOTE/driver_load.sh $REMOTE/$scriptName $MODULE"
         val rc = su(cmd) { line ->
             raw.appendLine(line)
             onLine(line)
@@ -128,23 +159,17 @@ class DriverInstaller(private val ctx: Context) {
     }
 
     fun client(node: String, vararg args: String, onLine: (String) -> Unit = {}): Int {
-        val work = File(ctx.cacheDir, "ftl").apply { mkdirs() }
-        val bin = copyAsset("bin/khack_client_arm64", File(work, "khack_client_arm64"))
+        copyAssetToRemote("bin/khack_client_arm64", "khack_client_arm64")
         val escaped = args.joinToString(" ") { "'${it.replace("'", "'\\''")}'" }
-        val cmd = "mkdir -p $REMOTE && cp -f '${bin.absolutePath}' $REMOTE/khack_client_arm64 && " +
-            "chmod 755 $REMOTE/khack_client_arm64 && " +
-            "$REMOTE/khack_client_arm64 '$node' $escaped"
+        val cmd = "$REMOTE/khack_client_arm64 '$node' $escaped"
         return su(cmd, onLine)
     }
 
     fun verifyLoad(module: String = MODULE, onLine: (String) -> Unit = {}): Pair<Boolean, String?> {
-        val work = File(ctx.cacheDir, "ftl").apply { mkdirs() }
-        val script = copyAsset("sh/verify_load.sh", File(work, "verify_load.sh"))
+        copyAssetToRemote("sh/verify_load.sh", "verify_load.sh")
         var passed = false
         var foundNode: String? = null
-        val cmd = "mkdir -p $REMOTE && cp -f '${script.absolutePath}' $REMOTE/verify_load.sh && " +
-            "chmod 755 $REMOTE/verify_load.sh && " +
-            "$REMOTE/verify_load.sh $module"
+        val cmd = "sh $REMOTE/verify_load.sh $module"
         val rc = su(cmd) { line ->
             val trimmed = line.trim()
             if (trimmed.isNotBlank()) {
@@ -157,13 +182,6 @@ class DriverInstaller(private val ctx: Context) {
         }
         if (rc == 0) passed = true
         return Pair(passed, foundNode)
-    }
-
-    private fun copyAsset(assetPath: String, dst: File): File {
-        ctx.assets.open(assetPath).use { ins ->
-            dst.outputStream().use { outs -> ins.copyTo(outs) }
-        }
-        return dst
     }
 
     private fun su(cmd: String, onLine: (String) -> Unit): Int = try {

@@ -198,33 +198,30 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch {
             manifestStatus.value = "LOADING"
             val app = getApplication<Application>()
-            val m = OtaDriverStore.loadManifest(app)
-            val installer = DriverInstaller(app)
-            val rtList = withContext(Dispatchers.IO) { installer.availableScripts() }
+            val m = withContext(Dispatchers.IO) { OtaDriverStore.loadManifest(app) }
             val release = withContext(Dispatchers.IO) {
                 (RootChecker.getKernelRelease() ?: System.getProperty("os.version") ?: "").trim()
             }
             if (m != null) {
                 remoteManifest.value = m
                 manifestStatus.value = "OK"
-                val totalCount = m.drivers.size.coerceAtLeast(rtList.size)
-                tlog("[DATABASE] Total scripts in database: $totalCount (RT scripts: ${rtList.size})", "OK")
-                val matched = withContext(Dispatchers.IO) { installer.candidates(release) }
+                val totalCount = m.drivers.size
+                tlog("[DATABASE] Connected to online database ($totalCount drivers available)", "OK")
+                val matched = OtaDriverStore.candidatesForEntries(m.drivers, release)
                 if (matched.isNotEmpty()) {
                     tlog(
-                        "[DATABASE] Kernel $release is SUPPORTED -> Matching script(s): ${matched.joinToString(", ") { "$it.sh" }}",
+                        "[DATABASE] Kernel $release is SUPPORTED -> Matching driver: ${matched.joinToString(", ") { "${it.stem()}.sh" }}",
                         "OK"
                     )
                 } else {
                     tlog(
-                        "[DATABASE] Kernel $release is NOT SUPPORTED in database ($totalCount scripts checked)",
+                        "[DATABASE] Kernel $release is NOT SUPPORTED in database ($totalCount drivers checked)",
                         "WARN"
                     )
                 }
             } else {
                 manifestStatus.value = "ERR"
-                tlog("[DATABASE FAIL] Where: OtaDriverStore.loadManifest (assets/drivers/drivers.json & remote OTA)", "ERR")
-                tlog("[DATABASE FAIL] Why: Could not load or parse database manifest (Bundled RT scripts available: ${rtList.size})", "ERR")
+                tlog("[DATABASE FAIL] Could not load database manifest from remote or cache", "ERR")
             }
         }
     }
@@ -373,20 +370,90 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                 val release = withContext(Dispatchers.IO) {
                     (RootChecker.getKernelRelease() ?: System.getProperty("os.version") ?: "").trim()
                 }
+                val vm = withContext(Dispatchers.IO) {
+                    RootChecker.getKernelVermagic().trim()
+                }
                 val installer = DriverInstaller(context)
-                val cand = withContext(Dispatchers.IO) { installer.candidates(release) }
-                lastBundleTried.value = cand.joinToString(", ").ifBlank { "none" }
+                val m = remoteManifest.value ?: withContext(Dispatchers.IO) {
+                    OtaDriverStore.loadManifest(context)
+                }
+                val candidates = if (m != null) {
+                    val cand = OtaDriverStore.candidatesForEntries(m.drivers, release)
+                    if (cand.isNotEmpty()) cand
+                    else listOfNotNull(OtaDriverStore.exactFor(m, release, variant, vm))
+                } else emptyList()
+
                 tlog("Starting driver installation...", "CMD")
                 tlog("Kernel release : $release", "INFO")
-                tlog("Candidates     : ${lastBundleTried.value}", "INFO")
 
-                busyStep.value = "Running driver_load.sh..."
-                val res = withContext(Dispatchers.IO) {
-                    installer.installBest(release) { line ->
-                        tlog(line, classifyLine(line))
+                if (candidates.isEmpty()) {
+                    val localCandidates = withContext(Dispatchers.IO) { installer.candidates(release) }
+                    if (localCandidates.isEmpty()) {
+                        lastBundleTried.value = "none"
+                        tlog("[DATABASE] No matching driver found in database for kernel $release", "WARN")
+                        tlog("Hint: Use 'CUSTOM .SH SCRIPT' to load a custom driver from storage.", "INFO")
+                        applyInstallResult(DriverInstaller.Result(ok = false, error = "no_driver_for_$release"), release)
+                        return@launch
+                    }
+                    lastBundleTried.value = localCandidates.joinToString(", ")
+                    busyStep.value = "Running driver_load.sh..."
+                    val res = withContext(Dispatchers.IO) {
+                        installer.installBest(release) { line ->
+                            tlog(line, classifyLine(line))
+                        }
+                    }
+                    applyInstallResult(res, release)
+                    if (res.ok) {
+                        busyStep.value = "Verifying driver..."
+                        withContext(Dispatchers.IO) {
+                            installer.verifyLoad(res.module.ifBlank { DriverInstaller.MODULE }) { line ->
+                                tlog(line, classifyLine(line))
+                            }
+                        }
+                    }
+                    return@launch
+                }
+
+                lastBundleTried.value = candidates.joinToString(", ") { it.stem() }
+                tlog("Database candidate(s) : ${lastBundleTried.value}", "INFO")
+
+                var finalResult = DriverInstaller.Result(ok = false, error = "download_failed")
+                for (cand in candidates) {
+                    busyStep.value = "Downloading ${cand.stem()}..."
+                    tlog("Fetching driver from database: ${cand.file}...", "CMD")
+                    val downloadedFile = withContext(Dispatchers.IO) {
+                        OtaDriverStore.downloadDriver(context, cand) { progress ->
+                            tlog(progress, if (progress.contains("failed", true) || progress.contains("error", true)) "ERR" else "INFO")
+                        }
+                    }
+                    if (downloadedFile == null || !downloadedFile.exists()) {
+                        tlog("Failed to download driver: ${cand.stem()}", "ERR")
+                        continue
+                    }
+
+                    busyStep.value = "Running driver_load.sh..."
+                    tlog("Executing driver installer...", "CMD")
+                    val res = withContext(Dispatchers.IO) {
+                        installer.installFile(downloadedFile) { line ->
+                            tlog(line, classifyLine(line))
+                        }
+                    }
+                    finalResult = res
+                    if (res.ok) {
+                        applyInstallResult(res, release)
+                        busyStep.value = "Verifying driver..."
+                        withContext(Dispatchers.IO) {
+                            installer.verifyLoad(res.module.ifBlank { DriverInstaller.MODULE }) { line ->
+                                tlog(line, classifyLine(line))
+                            }
+                        }
+                        break
                     }
                 }
-                applyInstallResult(res, release)
+
+                if (!finalResult.ok) {
+                    applyInstallResult(finalResult, release)
+                }
             } catch (_: CancellationException) {
             } catch (e: Exception) {
                 autoLoadOk.value = false
@@ -404,7 +471,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
     private fun detectFailureLocation(err: String, rawLog: String): String {
         val u = (err + "\n" + rawLog).lowercase(Locale.US)
         return when {
-            u.contains("no_driver_for") -> "Database Candidate Lookup (assets/drivers/RT — no script matches this kernel)"
+            u.contains("no_driver_for") -> "Database Candidate Lookup (online database — no matching driver found)"
             u.contains("script_missing") -> "Script Staging (/data/local/tmp/ftl — script file missing)"
             u.contains("module_not_loaded") -> "Kernel Module Load (driver_load.sh -> insmod -> /proc/modules)"
             u.contains("node_not_created") -> "Device Node Creation (/sys/class -> /dev/<6-char> node missing)"

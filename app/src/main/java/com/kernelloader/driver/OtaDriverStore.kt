@@ -5,10 +5,16 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.File
+import java.net.HttpURLConnection
+import java.net.URL
+import java.security.MessageDigest
 
 object OtaDriverStore {
 
     private const val EMBEDDED_MANIFEST_ASSET = "drivers/drivers.json"
+    private const val REMOTE_MANIFEST_URL = "https://raw.githubusercontent.com/bmjubairdadu/kernel-loader/drivers/drivers/drivers.json"
+    private const val REMOTE_DRIVER_BASE_URL = "https://raw.githubusercontent.com/bmjubairdadu/kernel-loader/drivers/drivers/"
 
     data class DriverEntry(
         val kernel: String,
@@ -49,12 +55,134 @@ object OtaDriverStore {
 
     suspend fun loadManifest(context: Context): Manifest? = withContext(Dispatchers.IO) {
         cachedManifest?.let { return@withContext it }
-        val text = runCatching {
-            context.assets.open(EMBEDDED_MANIFEST_ASSET).bufferedReader().use { it.readText() }
-        }.getOrNull() ?: return@withContext null
+        val manifestFile = File(context.filesDir, "drivers_manifest.json")
+        val remoteText = runCatching {
+            val url = URL(REMOTE_MANIFEST_URL)
+            val conn = (url.openConnection() as HttpURLConnection).apply {
+                connectTimeout = 7000
+                readTimeout = 10000
+                setRequestProperty("User-Agent", "KernelLoader/5.0")
+            }
+            if (conn.responseCode == 200) {
+                conn.inputStream.bufferedReader().use { it.readText() }
+            } else null
+        }.getOrNull()
+
+        val text = if (!remoteText.isNullOrBlank()) {
+            runCatching { manifestFile.writeText(remoteText) }
+            remoteText
+        } else if (manifestFile.exists() && manifestFile.length() > 0) {
+            runCatching { manifestFile.readText() }.getOrNull()
+        } else {
+            runCatching {
+                context.assets.open(EMBEDDED_MANIFEST_ASSET).bufferedReader().use { it.readText() }
+            }.getOrNull()
+        } ?: return@withContext null
+
         val parsed = runCatching { parseManifest(text) }.getOrNull() ?: return@withContext null
         cachedManifest = parsed
         parsed
+    }
+
+    suspend fun downloadDriver(
+        context: Context,
+        entry: DriverEntry,
+        onProgress: (String) -> Unit = {}
+    ): File? = withContext(Dispatchers.IO) {
+        val driversDir = File(context.filesDir, "drivers").apply { mkdirs() }
+        val safeName = entry.file.substringAfterLast('/')
+        val targetFile = File(driversDir, safeName)
+
+        if (targetFile.exists()) {
+            if (targetFile.length() > 0L && (entry.size <= 0L || targetFile.length() == entry.size)) {
+                if (entry.sha256.isBlank() || computeSha256(targetFile).equals(entry.sha256, ignoreCase = true)) {
+                    onProgress("Found cached driver: $safeName (${targetFile.length()} bytes)")
+                    return@withContext targetFile
+                }
+            }
+            targetFile.delete()
+        }
+
+        val remoteUrl = "$REMOTE_DRIVER_BASE_URL${entry.file}"
+        onProgress("Downloading driver: ${entry.stem()} (${entry.file})...")
+        val tempFile = File(driversDir, "$safeName.tmp")
+        if (tempFile.exists()) tempFile.delete()
+
+        var downloadedOk = false
+        try {
+            val conn = (URL(remoteUrl).openConnection() as HttpURLConnection).apply {
+                connectTimeout = 15000
+                readTimeout = 30000
+                instanceFollowRedirects = true
+                setRequestProperty("User-Agent", "KernelLoader/5.0")
+            }
+            val code = conn.responseCode
+            if (code == 200) {
+                conn.inputStream.use { input ->
+                    tempFile.outputStream().use { output ->
+                        val buf = ByteArray(8192)
+                        var r: Int
+                        while (input.read(buf).also { r = it } != -1) {
+                            output.write(buf, 0, r)
+                        }
+                        output.flush()
+                    }
+                }
+                downloadedOk = tempFile.exists() && tempFile.length() > 0L
+            } else {
+                onProgress("HTTP $code error while downloading ${entry.file}")
+            }
+        } catch (e: Exception) {
+            onProgress("Network download error: ${e.message}")
+        }
+
+        if (!downloadedOk) {
+            onProgress("Attempting root download fallback...")
+            try {
+                val dlCmd = "curl -k -sL -o '${tempFile.absolutePath}' '$remoteUrl' || wget --no-check-certificate -q -O '${tempFile.absolutePath}' '$remoteUrl'"
+                val p = ProcessBuilder("su", "-c", dlCmd).start()
+                p.waitFor()
+                downloadedOk = tempFile.exists() && tempFile.length() > 0L
+            } catch (_: Exception) {
+            }
+        }
+
+        if (!downloadedOk) {
+            onProgress("Driver download failed")
+            if (tempFile.exists()) tempFile.delete()
+            return@withContext null
+        }
+
+        if (entry.sha256.isNotBlank()) {
+            val actualSha = computeSha256(tempFile)
+            if (!actualSha.equals(entry.sha256, ignoreCase = true)) {
+                onProgress("SHA256 mismatch! Expected: ${entry.sha256.take(8)}... Got: ${actualSha.take(8)}...")
+                tempFile.delete()
+                return@withContext null
+            }
+        }
+
+        if (targetFile.exists()) targetFile.delete()
+        if (!tempFile.renameTo(targetFile)) {
+            tempFile.copyTo(targetFile, overwrite = true)
+            tempFile.delete()
+        }
+        onProgress("Driver downloaded successfully (${targetFile.length()} bytes)")
+        targetFile
+    }
+
+    private fun computeSha256(file: File): String = try {
+        val md = MessageDigest.getInstance("SHA-256")
+        file.inputStream().use { input ->
+            val buf = ByteArray(8192)
+            var r: Int
+            while (input.read(buf).also { r = it } != -1) {
+                md.update(buf, 0, r)
+            }
+        }
+        md.digest().joinToString("") { "%02x".format(it) }
+    } catch (_: Exception) {
+        ""
     }
 
     fun candidatesForEntries(entries: List<DriverEntry>, deviceKernel: String): List<DriverEntry> {
