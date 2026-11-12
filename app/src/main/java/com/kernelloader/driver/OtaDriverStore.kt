@@ -61,7 +61,7 @@ object OtaDriverStore {
             val conn = (url.openConnection() as HttpURLConnection).apply {
                 connectTimeout = 7000
                 readTimeout = 10000
-                setRequestProperty("User-Agent", "KernelLoader/5.0")
+                setRequestProperty("User-Agent", "KernelLoader/5.1")
             }
             if (conn.responseCode == 200) {
                 conn.inputStream.bufferedReader().use { it.readText() }
@@ -114,7 +114,7 @@ object OtaDriverStore {
                 connectTimeout = 15000
                 readTimeout = 30000
                 instanceFollowRedirects = true
-                setRequestProperty("User-Agent", "KernelLoader/5.0")
+                setRequestProperty("User-Agent", "KernelLoader/5.1")
             }
             val code = conn.responseCode
             if (code == 200) {
