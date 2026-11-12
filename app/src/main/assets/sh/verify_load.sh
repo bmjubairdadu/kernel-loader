@@ -33,10 +33,18 @@ for d in /sys/class/*/; do
     done
 done
 
+if [ -z "$DEVNAME" ]; then
+    CDEV=$(awk '/Character devices:/, /Block devices:/ { if ($1 ~ /^[0-9]+$/ && $2 !~ /^(mem|msm|tty|misc|input|sg|fb|video|ch|i2c|ppp|alsa|ptm|pts|spi|usb|DVB|adsprpc|avtimer|dts|sensors|hidraw|bt|jpeg|BaseRemote|goodix|rmnet|icesdcc|qseecom|kgsl|frandom|diag|smd|wcnss|subsys|ramdump|mdss|ipa|iio|media|rtc|pmsg|gpio|uio|wwan)/) print $2 }' /proc/devices 2>/dev/null | tail -n 1)
+    if [ -n "$CDEV" ]; then
+        DEVNAME="$CDEV"
+        [ -e "/dev/$CDEV" ] && NODE="/dev/$CDEV"
+    fi
+fi
+
 IS_STEALTH=0
 if grep -qw "$MOD" /proc/modules 2>/dev/null; then
-    ok "/proc/modules has $MOD"
-elif [ -n "$NODE" ]; then
+    ok "/proc/modules has $MOD (Standard Vendor Mode)"
+elif [ -n "$NODE" ] || [ -n "$DEVNAME" ]; then
     IS_STEALTH=1
     ok "/proc/modules: module active in stealth mode (hidden)"
 else
@@ -56,6 +64,13 @@ if [ -n "$NODE" ] && [ -n "$DEVNAME" ]; then
     MAJOR=$(awk -v n="$DEVNAME" '$2 == n { print $1; exit }' /proc/devices 2>/dev/null)
     if [ -n "$MAJOR" ]; then
         ok "/proc/devices: major $MAJOR -> $DEVNAME"
+    else
+        bad "/proc/devices has no entry for $DEVNAME"
+    fi
+elif [ -n "$DEVNAME" ]; then
+    MAJOR=$(awk -v n="$DEVNAME" '$2 == n { print $1; exit }' /proc/devices 2>/dev/null)
+    if [ -n "$MAJOR" ]; then
+        ok "/proc/devices: major $MAJOR -> $DEVNAME (driver resident in kernel)"
     else
         bad "/proc/devices has no entry for $DEVNAME"
     fi

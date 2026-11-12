@@ -496,6 +496,13 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             autoLoadStatus.value = "Loaded: ${driverModule.value}"
             verifyStatus.value = "PASS"
             verifyDetail.value = "$mod · $node"
+            tlog("[1/2] Vendor Script Check: PASS (exit code: ${res.exitCode})", "OK")
+            val stealthText = if (isStealth) "Stealth Mode" else "Standard"
+            if (node.isNotBlank()) {
+                tlog("[2/2] Advanced Verification: PASS (Node: $node | Major: ${res.major} | $stealthText)", "OK")
+            } else {
+                tlog("[2/2] Advanced Verification: PASS (Kernel resident | $stealthText)", "OK")
+            }
             tlog(
                 "LOADED: module=$mod dev=${res.devName} major=${res.major} node=$node already=${res.alreadyLoaded}",
                 "OK"

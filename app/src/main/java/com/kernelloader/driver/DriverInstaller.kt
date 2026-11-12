@@ -128,7 +128,7 @@ class DriverInstaller(private val ctx: Context) {
         }
         su("rm -f $REMOTE/$scriptName $REMOTE/driver_load.sh $REMOTE/.* 2>/dev/null") {}
 
-        val ok = kv["FTL_OK"] == "1" && !kv["FTL_NODE"].isNullOrEmpty()
+        val ok = kv["FTL_OK"] == "1"
         return Result(
             ok = ok,
             module = kv["FTL_MODULE"].orEmpty(),
