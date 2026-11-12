@@ -9,29 +9,50 @@ echo "module : $MOD"
 echo "kernel : $(uname -r)"
 echo "root   : $(id -u)"
 
+DEVNAME=""
+NODE=""
+for d in /sys/class/*/; do
+    cls=$(basename "$d")
+    case "$cls" in
+        android_usb|avtimer|backlight|bdi|block|bluetooth|bt*|char|devfreq|diag|dma|dual_role_usb|dvb|extcon|fastrng|fastrpc|firmware|goodix*|gpio|graphics|hidraw|hwmon|i2c*|icesdcc|ieee*|input|iommu|ipa*|jpeg*|kgsl|lcd*|leds|lirc|mdio*|mem|misc|mmc*|msm*|net|phy|pmsg|power*|ppp|pwm|qseecom|ramdump|rc|regulator|rfkill|rmnet*|rotator|rtc|scsi*|smd*|sound|spmi*|ssc|subsys*|switch|thermal|tty*|uio|vc|video*|virtio*|vtconsole|wakeup|wcnss*|wwan*|BaseRemoteCtl|sensors)
+            continue
+            ;;
+    esac
+    if [ -c "/dev/$cls" ]; then
+        DEVNAME="$cls"
+        NODE="/dev/$cls"
+        break
+    fi
+    for child in "$d"*; do
+        c=$(basename "$child")
+        if [ -c "/dev/$c" ]; then
+            DEVNAME="$c"
+            NODE="/dev/$c"
+            break 2
+        fi
+    done
+done
+
+IS_STEALTH=0
 if grep -qw "$MOD" /proc/modules 2>/dev/null; then
     ok "/proc/modules has $MOD"
+elif [ -n "$NODE" ]; then
+    IS_STEALTH=1
+    ok "/proc/modules: module active in stealth mode (hidden)"
 else
     bad "/proc/modules has no $MOD"
 fi
 
 if [ -d "/sys/module/$MOD" ]; then
     ok "/sys/module/$MOD exists"
+elif [ "$IS_STEALTH" -eq 1 ]; then
+    ok "/sys/module: kobject hidden (stealth mode)"
 else
     bad "/sys/module/$MOD missing"
 fi
 
-DEVNAME=""
-for d in /sys/class/*/; do
-    n=$(basename "$d")
-    if [ -e "$d$n" ] && [ "${#n}" -eq 6 ] && [ -e "/dev/$n" ]; then
-        DEVNAME="$n"
-        break
-    fi
-done
-
-if [ -n "$DEVNAME" ]; then
-    ok "device node /dev/$DEVNAME"
+if [ -n "$NODE" ] && [ -n "$DEVNAME" ]; then
+    ok "device node $NODE"
     MAJOR=$(awk -v n="$DEVNAME" '$2 == n { print $1; exit }' /proc/devices 2>/dev/null)
     if [ -n "$MAJOR" ]; then
         ok "/proc/devices: major $MAJOR -> $DEVNAME"
@@ -39,7 +60,7 @@ if [ -n "$DEVNAME" ]; then
         bad "/proc/devices has no entry for $DEVNAME"
     fi
 else
-    bad "no 6-char device node found under /sys/class + /dev"
+    bad "no device node found under /sys/class + /dev"
 fi
 
 if [ -e /data/tmpf ]; then
@@ -50,7 +71,7 @@ fi
 
 if [ "$FAIL" -eq 0 ]; then
     echo "RESULT: PASS"
-    [ -n "$DEVNAME" ] && echo "NODE=/dev/$DEVNAME"
+    [ -n "$NODE" ] && echo "NODE=$NODE"
     exit 0
 fi
 

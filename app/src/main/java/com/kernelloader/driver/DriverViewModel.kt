@@ -487,8 +487,9 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
         if (res.ok) {
             val mod = res.module.ifBlank { DriverInstaller.MODULE }
             val node = res.node.trim()
+            val isStealth = res.rawLog.contains("FTL_STEALTH=1")
             driverLoaded.value = true
-            hiddenLoaded.value = false
+            hiddenLoaded.value = isStealth
             loadedModuleName.value = mod
             driverModule.value = if (node.isNotBlank()) "$mod ($node)" else mod
             autoLoadOk.value = true
@@ -677,7 +678,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                             else -> DriverInstaller.MODULE
                         }
                         driverLoaded.value = true
-                        hiddenLoaded.value = false
+                        hiddenLoaded.value = !mainLoaded && !altLoaded && !node.isNullOrBlank()
                         loadedModuleName.value = mod
                         driverModule.value = if (!node.isNullOrBlank()) "$mod ($node)" else mod
                     } else {

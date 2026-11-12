@@ -147,14 +147,15 @@ class DriverInstaller(private val ctx: Context) {
 
     fun findNode(): String? {
         var found: String? = null
-        su(
-            "for d in /sys/class/*/; do " +
-                "n=\$(basename \$d); " +
-                "[ -e \$d\$n ] && [ \${#n} -eq 6 ] && [ -e /dev/\$n ] && echo \$n; " +
-                "done"
-        ) { line ->
+        val cmd = "for d in /sys/class/*/; do " +
+            "cls=\$(basename \$d); " +
+            "case \$cls in android_usb|avtimer|backlight|bdi|block|bluetooth|bt*|char|devfreq|diag|dma|dual_role_usb|dvb|extcon|fastrng|fastrpc|firmware|goodix*|gpio|graphics|hidraw|hwmon|i2c*|icesdcc|ieee*|input|iommu|ipa*|jpeg*|kgsl|lcd*|leds|lirc|mdio*|mem|misc|mmc*|msm*|net|phy|pmsg|power*|ppp|pwm|qseecom|ramdump|rc|regulator|rfkill|rmnet*|rotator|rtc|scsi*|smd*|sound|spmi*|ssc|subsys*|switch|thermal|tty*|uio|vc|video*|virtio*|vtconsole|wakeup|wcnss*|wwan*|BaseRemoteCtl|sensors) continue ;; esac; " +
+            "if [ -c /dev/\$cls ]; then echo /dev/\$cls; break; fi; " +
+            "for child in \"\$d\"*; do c=\$(basename \"\$child\"); if [ -c /dev/\$c ]; then echo /dev/\$c; break 2; fi; done; " +
+            "done"
+        su(cmd) { line ->
             val s = line.trim()
-            if (s.length == 6 && found == null) found = "/dev/$s"
+            if (s.startsWith("/dev/") && found == null) found = s
         }
         return found
     }
