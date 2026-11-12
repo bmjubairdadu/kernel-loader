@@ -3,6 +3,15 @@
   "generated_at": "2026-04-18T00:00:00Z",
   "drivers": [
     {
+      "kernel": "4.9.309-Chidori-Kernel",
+      "vermagic": "4.9.309-Chidori-Kernel SMP preempt mod_unload modversions aarch64",
+      "variant": "rt",
+      "label": "4.9.309",
+      "file": "RT/4.9.309.sh",
+      "sha256": "4165d3140ef6ac3f552d889da371b755d020643c7c2f731dba93efa2125e1858",
+      "size": 353053
+    },
+    {
       "kernel": "4.9.337-DaisyForGaming",
       "vermagic": "4.9.337-DaisyForGaming SMP preempt mod_unload modversions aarch64",
       "variant": "rt",
@@ -219,6 +228,6 @@
       "size": 702290
     }
   ],
-  "count": 24,
-  "updated": "2026-11-12T22:50:37Z"
+  "count": 25,
+  "updated": "2026-11-12T23:24:48Z"
 }
