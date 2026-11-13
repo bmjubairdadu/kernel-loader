@@ -3,6 +3,15 @@
   "generated_at": "2026-04-18T00:00:00Z",
   "drivers": [
     {
+      "kernel": "6.12.58-android16-6-g32fc8147b5dc-4k",
+      "vermagic": "6.12.58-android16-6-g32fc8147b5dc-4k SMP preempt mod_unload modversions aarch64",
+      "variant": "rt",
+      "label": "6.12.58",
+      "file": "RT/6.12.58.sh",
+      "sha256": "5101945e4a78f386d9918a190a4a434d52588ca8050b2612de8392e121bec4ce",
+      "size": 347813
+    },
+    {
       "kernel": "4.19.157-perf+",
       "vermagic": "4.19.157-perf+ SMP preempt mod_unload modversions aarch64",
       "variant": "c",
@@ -264,6 +273,6 @@
       "size": 734778
     }
   ],
-  "count": 29,
-  "updated": "2026-11-13T08:53:20Z"
+  "count": 30,
+  "updated": "2026-11-13T09:38:38Z"
 }
