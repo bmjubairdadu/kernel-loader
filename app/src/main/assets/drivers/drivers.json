@@ -8,26 +8,26 @@
       "variant": "rt",
       "label": "6.1.145",
       "file": "RT/6.1.145.sh",
-      "sha256": "c50b65c72ada54201cbd6c96cbf01b5c6b352c93365b8870489a373aea12ce26",
-      "size": 500061
+      "sha256": "bf38ff927dc83c8e7ac6d50282ede7afafc0ee6f9b5a1c86072d2a4256f894f5",
+      "size": 500125
     },
     {
       "kernel": "6.1.145-android14-11-gfa939bde48aa",
-      "vermagic": "6.1.145-android14-11-gfa939bde48aa SMP preempt mod_unload modversions aarch64",
+      "vermagic": "6.1.145-android14-11-gfa939bde48aa SMP preempt mod_unload modversions vivo aarch64",
       "variant": "rt",
-      "label": "6.1.145-full",
+      "label": "6.1.145",
       "file": "RT/6.1.145.sh",
-      "sha256": "c50b65c72ada54201cbd6c96cbf01b5c6b352c93365b8870489a373aea12ce26",
-      "size": 500061
+      "sha256": "bf38ff927dc83c8e7ac6d50282ede7afafc0ee6f9b5a1c86072d2a4256f894f5",
+      "size": 500125
     },
     {
       "kernel": "6.1.145-android14-11-gfa939bde48aa",
-      "vermagic": "6.1.145-android14-11-gfa939bde48aa preempt mod_unload modversions aarch64",
+      "vermagic": "6.1.145-android14-11-gfa939bde48aa preempt mod_unload modversions vivo aarch64",
       "variant": "rt",
       "label": "6.1.145-nosmp",
       "file": "RT/6.1.145.sh",
-      "sha256": "c50b65c72ada54201cbd6c96cbf01b5c6b352c93365b8870489a373aea12ce26",
-      "size": 500061
+      "sha256": "bf38ff927dc83c8e7ac6d50282ede7afafc0ee6f9b5a1c86072d2a4256f894f5",
+      "size": 500125
     },
     {
       "kernel": "4.19.157-perf-g1a6087bc0325-dirty",
@@ -264,8 +264,8 @@
       "size": 777834
     },
     {
-      "kernel": "5.10.226LZ\u79bb@gnmtl-00002-g7d7b7d0205d2-dirty",
-      "vermagic": "5.10.226LZ\u79bb@gnmtl-00002-g7d7b7d0205d2-dirty SMP preempt mod_unload modversions aarch64",
+      "kernel": "5.10.226LZ离@gnmtl-00002-g7d7b7d0205d2-dirty",
+      "vermagic": "5.10.226LZ离@gnmtl-00002-g7d7b7d0205d2-dirty SMP preempt mod_unload modversions aarch64",
       "variant": "a",
       "label": "5.10",
       "file": "RT/5.10.sh",
@@ -273,8 +273,8 @@
       "size": 899946
     },
     {
-      "kernel": "5.15.167tg@gnmtl\u79bb-00023-g952e16e5fc48-dirty",
-      "vermagic": "5.15.167tg@gnmtl\u79bb-00023-g952e16e5fc48-dirty SMP preempt mod_unload modversions aarch64",
+      "kernel": "5.15.167tg@gnmtl离-00023-g952e16e5fc48-dirty",
+      "vermagic": "5.15.167tg@gnmtl离-00023-g952e16e5fc48-dirty SMP preempt mod_unload modversions aarch64",
       "variant": "a",
       "label": "5.15",
       "file": "RT/5.15.sh",
@@ -310,5 +310,5 @@
     }
   ],
   "count": 34,
-  "updated": "2026-11-13T22:56:00Z"
+  "updated": "2026-11-13T23:40:57Z"
 }
