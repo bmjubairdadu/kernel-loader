@@ -189,15 +189,17 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
         manifestStatus.value = "LOADING"
         val app = getApplication<Application>()
         val m = withContext(Dispatchers.IO) { OtaDriverStore.loadManifest(app, forceRefresh = forceRefresh) }
-        val release = withContext(Dispatchers.IO) {
-            (RootChecker.getKernelRelease() ?: System.getProperty("os.version") ?: "").trim()
+        val (release, vm) = withContext(Dispatchers.IO) {
+            val rel = (RootChecker.getKernelRelease() ?: System.getProperty("os.version") ?: "").trim()
+            val verm = RootChecker.getKernelVermagic().trim()
+            rel to verm
         }
         if (m != null) {
             remoteManifest.value = m
             manifestStatus.value = "OK"
             val totalCount = m.drivers.size
             tlog("Database connected ($totalCount drivers available)", "OK")
-            val matched = OtaDriverStore.candidatesForEntries(m.drivers, release)
+            val matched = OtaDriverStore.candidatesForEntries(m.drivers, release, vm)
             if (matched.isNotEmpty()) {
                 tlog(
                     "Kernel $release supported (${matched.joinToString(", ") { "${it.stem()}.sh" }})",
@@ -415,7 +417,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                     OtaDriverStore.loadManifest(context)
                 }
                 val candidates = if (m != null) {
-                    val cand = OtaDriverStore.candidatesForEntries(m.drivers, release)
+                    val cand = OtaDriverStore.candidatesForEntries(m.drivers, release, vm)
                     if (cand.isNotEmpty()) cand
                     else listOfNotNull(OtaDriverStore.exactFor(m, release, variant, vm))
                 } else emptyList()

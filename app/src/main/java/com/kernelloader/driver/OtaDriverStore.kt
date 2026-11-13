@@ -187,18 +187,34 @@ object OtaDriverStore {
         ""
     }
 
-    fun candidatesForEntries(entries: List<DriverEntry>, deviceKernel: String): List<DriverEntry> {
-        val v = deviceKernel.trim().substringBefore(' ').substringBefore('-').trim()
-        if (v.isEmpty()) return emptyList()
-        val scored = entries
-            .map { it to it.coreVersion() }
-            .filter { (_, core) -> core.isNotEmpty() && (v == core || v.startsWith("$core.")) }
-        if (scored.isEmpty()) return emptyList()
-        val best = scored.maxOf { it.second.length }
-        return scored
-            .filter { it.second.length == best }
-            .sortedBy { it.first.stem() }
-            .map { it.first }
+    private fun normalizeSpaces(s: String): String =
+        s.trim().replace(Regex("\\s+"), " ")
+
+    private fun extractGkiKmi(releaseToken: String): String {
+        val m = Regex("""^(\d+\.\d+(?:\.\d+)?-android\d+-\d+)\b""").find(releaseToken.trim())
+        return m?.groupValues?.getOrNull(1) ?: ""
+    }
+
+    private fun vermagicFlagsTail(vm: String): String {
+        val norm = normalizeSpaces(vm)
+        val sp = norm.indexOf(' ')
+        return if (sp >= 0) norm.substring(sp + 1) else ""
+    }
+
+    fun candidatesForEntries(
+        entries: List<DriverEntry>,
+        deviceKernel: String,
+        deviceVermagic: String = ""
+    ): List<DriverEntry> {
+        val exact = entries.filter { isExactMatch(it, deviceKernel, deviceVermagic) }
+        if (exact.isEmpty()) return emptyList()
+        val dVm = normalizeSpaces(deviceVermagic)
+        val dRel = deviceKernel.trim().substringBefore(' ')
+        return exact.sortedWith(
+            compareByDescending<DriverEntry> { normalizeSpaces(it.vermagic) == dVm && dVm.isNotEmpty() }
+                .thenByDescending { it.kernel.trim().substringBefore(' ') == dRel || it.shortVermagic() == dRel }
+                .thenBy { it.stem() }
+        )
     }
 
     fun isExactMatch(
@@ -206,16 +222,35 @@ object OtaDriverStore {
         deviceKernel: String,
         deviceVermagic: String = ""
     ): Boolean {
-        val v = deviceKernel.trim().substringBefore(' ').substringBefore('-').trim()
-        val core = entry.coreVersion()
-        if (v.isNotEmpty() && core.isNotEmpty() && (v == core || v.startsWith("$core."))) {
-            return true
+        val dVm = normalizeSpaces(deviceVermagic)
+        val eVm = normalizeSpaces(entry.vermagic)
+        val dFlags = vermagicFlagsTail(dVm)
+        val eFlags = vermagicFlagsTail(eVm)
+
+        if (dFlags.isNotEmpty() && eFlags.isNotEmpty() && dFlags != eFlags) {
+            return false
         }
-        val dVm = deviceVermagic.trim()
-        val eVm = entry.vermagic.trim()
+
         if (dVm.isNotEmpty() && eVm.isNotEmpty() && dVm == eVm) {
             return true
         }
+
+        val dRel = deviceKernel.trim().substringBefore(' ')
+        val dShort = dVm.substringBefore(' ')
+        val eRel = entry.kernel.trim().substringBefore(' ')
+        val eShort = entry.shortVermagic()
+        val devReleases = listOf(dRel, dShort).filter { it.isNotEmpty() }
+        val entReleases = listOf(eRel, eShort).filter { it.isNotEmpty() }
+        if (devReleases.any { dr -> entReleases.any { er -> dr == er } }) {
+            return true
+        }
+
+        val devKmis = devReleases.map { extractGkiKmi(it) }.filter { it.isNotEmpty() }
+        val entKmis = entReleases.map { extractGkiKmi(it) }.filter { it.isNotEmpty() }
+        if (devKmis.isNotEmpty() && entKmis.isNotEmpty() && devKmis.any { dk -> entKmis.any { ek -> dk == ek } }) {
+            return true
+        }
+
         return false
     }
 
@@ -226,9 +261,7 @@ object OtaDriverStore {
         deviceVermagic: String = ""
     ): DriverEntry? {
         val pool = if (variant.isBlank()) manifest.drivers else manifest.drivers.filter { it.variant == variant }
-        val candidates = candidatesForEntries(pool, deviceKernel)
-        if (candidates.isNotEmpty()) return candidates.first()
-        return pool.firstOrNull { isExactMatch(it, deviceKernel, deviceVermagic) }
+        return candidatesForEntries(pool, deviceKernel, deviceVermagic).firstOrNull()
     }
 
     fun supportedEntries(manifest: Manifest, variant: String = ""): List<DriverEntry> {

@@ -3,6 +3,33 @@
   "generated_at": "2026-04-18T00:00:00Z",
   "drivers": [
     {
+      "kernel": "6.12.69-android16-6-g37a7d8c11197-4k",
+      "vermagic": "6.12.69-android16-6-g37a7d8c11197-4k SMP preempt mod_unload modversions aarch64",
+      "variant": "rt",
+      "label": "6.12.69",
+      "file": "RT/6.12.69.sh",
+      "sha256": "fc0a356cf8d5b88a28fca9a83ac9090de76323464e6fb49791569c393dc1759b",
+      "size": 702285
+    },
+    {
+      "kernel": "4.14.113-25741823",
+      "vermagic": "4.14.113-25741823 SMP preempt mod_unload modversions aarch64",
+      "variant": "rt",
+      "label": "4.14.113",
+      "file": "RT/4.14.113.sh",
+      "sha256": "dce44fd8b82073344bc400f00ff7bc8c75d9eda4db0034c8e3028c01a163e66e",
+      "size": 349325
+    },
+    {
+      "kernel": "4.9.309-Chidori-Kernel",
+      "vermagic": "4.9.309-Chidori-Kernel SMP preempt mod_unload modversions aarch64",
+      "variant": "rt",
+      "label": "4.9.309",
+      "file": "RT/4.9.309.sh",
+      "sha256": "4165d3140ef6ac3f552d889da371b755d020643c7c2f731dba93efa2125e1858",
+      "size": 353053
+    },
+    {
       "kernel": "4.9.337-DaisyForGaming",
       "vermagic": "4.9.337-DaisyForGaming SMP preempt mod_unload modversions aarch64",
       "variant": "rt",
@@ -208,17 +235,8 @@
       "file": "RT/6.6.sh",
       "sha256": "013c26af00ee3199835888693d4f0055465e442f7200039803b9ee31e3577352",
       "size": 734778
-    },
-    {
-      "kernel": "6.12.23-android16-5-maybe-dirty-4k",
-      "vermagic": "6.12.23-android16-5-maybe-dirty-4k SMP preempt mod_unload modversions aarch64",
-      "variant": "a",
-      "label": "6.12",
-      "file": "RT/6.12.sh",
-      "sha256": "a2d1200f628ce27cff58007924541bb8c9a58c144b4b97e2df27ebe106024e1c",
-      "size": 702290
     }
   ],
-  "count": 24,
-  "updated": "2026-11-12T22:21:12Z"
+  "count": 26,
+  "updated": "2026-11-13T00:59:29Z"
 }
