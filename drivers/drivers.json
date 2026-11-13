@@ -8,8 +8,8 @@
       "variant": "rt",
       "label": "6.12.58",
       "file": "RT/6.12.58.sh",
-      "sha256": "1060379d148f5b4d4bd252d47263e50d5c66e7da8d1dd7750bdfa4a3cb272dfe",
-      "size": 350101
+      "sha256": "81eceb28b916b970fe4f375583c1ec38c4678e887f7de2b9aac0dfed14f31da2",
+      "size": 352541
     },
     {
       "kernel": "4.19.157-perf+",
@@ -274,5 +274,5 @@
     }
   ],
   "count": 30,
-  "updated": "2026-11-13T18:36:35Z"
+  "updated": "2026-11-13T18:47:11Z"
 }
