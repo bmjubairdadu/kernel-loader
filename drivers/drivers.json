@@ -3,6 +3,15 @@
   "generated_at": "2026-04-18T00:00:00Z",
   "drivers": [
     {
+      "kernel": "4.14.113-25741823",
+      "vermagic": "4.14.113-25741823 SMP preempt mod_unload modversions aarch64",
+      "variant": "rt",
+      "label": "4.14.113",
+      "file": "RT/4.14.113.sh",
+      "sha256": "dce44fd8b82073344bc400f00ff7bc8c75d9eda4db0034c8e3028c01a163e66e",
+      "size": 349325
+    },
+    {
       "kernel": "4.9.309-Chidori-Kernel",
       "vermagic": "4.9.309-Chidori-Kernel SMP preempt mod_unload modversions aarch64",
       "variant": "rt",
@@ -228,6 +237,6 @@
       "size": 702290
     }
   ],
-  "count": 25,
-  "updated": "2026-11-12T23:24:48Z"
+  "count": 26,
+  "updated": "2026-11-13T00:32:13Z"
 }
