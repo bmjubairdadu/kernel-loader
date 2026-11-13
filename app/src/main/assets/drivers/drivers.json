@@ -3,6 +3,96 @@
   "generated_at": "2026-04-18T00:00:00Z",
   "drivers": [
     {
+      "kernel": "6.1.145-android14-11-gfa939bde48aa",
+      "vermagic": "6.1.145-android14-11-gfa939bde48aa",
+      "variant": "rt",
+      "label": "6.1.145",
+      "file": "RT/6.1.145.sh",
+      "sha256": "c50b65c72ada54201cbd6c96cbf01b5c6b352c93365b8870489a373aea12ce26",
+      "size": 500061
+    },
+    {
+      "kernel": "6.1.145-android14-11-gfa939bde48aa",
+      "vermagic": "6.1.145-android14-11-gfa939bde48aa SMP preempt mod_unload modversions aarch64",
+      "variant": "rt",
+      "label": "6.1.145-full",
+      "file": "RT/6.1.145.sh",
+      "sha256": "c50b65c72ada54201cbd6c96cbf01b5c6b352c93365b8870489a373aea12ce26",
+      "size": 500061
+    },
+    {
+      "kernel": "6.1.145-android14-11-gfa939bde48aa",
+      "vermagic": "6.1.145-android14-11-gfa939bde48aa preempt mod_unload modversions aarch64",
+      "variant": "rt",
+      "label": "6.1.145-nosmp",
+      "file": "RT/6.1.145.sh",
+      "sha256": "c50b65c72ada54201cbd6c96cbf01b5c6b352c93365b8870489a373aea12ce26",
+      "size": 500061
+    },
+    {
+      "kernel": "4.19.157-perf-g1a6087bc0325-dirty",
+      "vermagic": "4.19.157-perf-g1a6087bc0325-dirty SMP preempt mod_unload modversions aarch64",
+      "variant": "rt",
+      "label": "4.19.157e",
+      "file": "RT/4.19.157e.sh",
+      "sha256": "2a0b0345681a991b7965f01600d80ff27596de5ea5e3cc4d478f464753ea99b7",
+      "size": 291301
+    },
+    {
+      "kernel": "4.9.337-DaisyForGaming",
+      "vermagic": "4.9.337-DaisyForGaming SMP preempt mod_unload modversions aarch64",
+      "variant": "rt",
+      "label": "4.9.337",
+      "file": "RT/4.9.337.sh",
+      "sha256": "6baac6dee81650dd84cb1d7c76c67b18f1f3e64fae5b5b5defd975c5b8c9c78b",
+      "size": 374725
+    },
+    {
+      "kernel": "6.12.58-android16-6-g32fc8147b5dc-4k",
+      "vermagic": "6.12.58-android16-6-g32fc8147b5dc-4k SMP preempt mod_unload modversions aarch64",
+      "variant": "rt",
+      "label": "6.12.58",
+      "file": "RT/6.12.58.sh",
+      "sha256": "f0e7f068d837455beae14649589ac93db79ee61c8ef51d06f8c62a758f7f5f78",
+      "size": 351709
+    },
+    {
+      "kernel": "4.19.157-perf+",
+      "vermagic": "4.19.157-perf+ SMP preempt mod_unload modversions aarch64",
+      "variant": "c",
+      "label": "4.19.157c",
+      "file": "RT/4.19.157c.sh",
+      "sha256": "69b4e1d49732ab8a3df46983d867727f2224703c09854d10f85f2d096471f0e0",
+      "size": 341893
+    },
+    {
+      "kernel": "6.6.30-android15-8-g6b55ce738535-4k",
+      "vermagic": "6.6.30-android15-8-g6b55ce738535-4k SMP preempt mod_unload modversions aarch64",
+      "variant": "rt",
+      "label": "6.6.30",
+      "file": "RT/6.6.30.sh",
+      "sha256": "35dc192d5a8c65b0769fc124d97b1e3d8952aa999d2e365502d52cf65aa9fe44",
+      "size": 325621
+    },
+    {
+      "kernel": "4.14.113-25741605",
+      "vermagic": "4.14.113-25741605 SMP preempt mod_unload modversions aarch64",
+      "variant": "rt",
+      "label": "4.14.113b",
+      "file": "RT/4.14.113b.sh",
+      "sha256": "e36ab966e0640ae2bf621e48219cb14919d75a502a2d1cd198858ef1d77af00d",
+      "size": 349741
+    },
+    {
+      "kernel": "4.19.157-perf-27940246-abA235FXXS4DXA5",
+      "vermagic": "4.19.157-perf-27940246-abA235FXXS4DXA5 SMP preempt mod_unload modversions aarch64",
+      "variant": "rt",
+      "label": "4.19.157d",
+      "file": "RT/4.19.157d.sh",
+      "sha256": "c010a0b650696a891d285fcf631c37e48db16f35007aad99633f98676b45cb72",
+      "size": 405909
+    },
+    {
       "kernel": "6.12.69-android16-6-g37a7d8c11197-4k",
       "vermagic": "6.12.69-android16-6-g37a7d8c11197-4k SMP preempt mod_unload modversions aarch64",
       "variant": "rt",
@@ -28,15 +118,6 @@
       "file": "RT/4.9.309.sh",
       "sha256": "4165d3140ef6ac3f552d889da371b755d020643c7c2f731dba93efa2125e1858",
       "size": 353053
-    },
-    {
-      "kernel": "4.9.337-DaisyForGaming",
-      "vermagic": "4.9.337-DaisyForGaming SMP preempt mod_unload modversions aarch64",
-      "variant": "rt",
-      "label": "4.9.337",
-      "file": "RT/4.9.337.sh",
-      "sha256": "3f4d146bca61301801b1d6e6115db12fd2a712e44df7aeeab7dcae191ba5b46b",
-      "size": 365493
     },
     {
       "kernel": "4.14.117-perf+",
@@ -120,15 +201,6 @@
       "size": 536042
     },
     {
-      "kernel": "4.19.157-perf-g9aba441cf6cd-dirty",
-      "vermagic": "4.19.157-perf-g9aba441cf6cd-dirty SMP preempt mod_unload modversions aarch64",
-      "variant": "a",
-      "label": "4.19.157",
-      "file": "RT/4.19.157.sh",
-      "sha256": "4f869d676251fca322990182c5d31e3b0fe331e8bd4ee0f4066e2d6314d0091f",
-      "size": 546186
-    },
-    {
       "kernel": "4.19.157",
       "vermagic": "4.19.157 SMP preempt mod_unload modversions aarch64",
       "variant": "b",
@@ -136,15 +208,6 @@
       "file": "RT/4.19.157b.sh",
       "sha256": "445c4fdaa4d4458b06e67f1bfc3c6f646117e40032f9db656bec196c64435ada",
       "size": 627386
-    },
-    {
-      "kernel": "4.19.157-perf+",
-      "vermagic": "4.19.157-perf+ SMP preempt mod_unload modversions aarch64",
-      "variant": "c",
-      "label": "4.19.157c",
-      "file": "RT/4.19.157c.sh",
-      "sha256": "09ad635f596d5aac5af926805dac62ebac66ae9e23d1f7e5a6e1821014fc9846",
-      "size": 607234
     },
     {
       "kernel": "4.19.191-perf-g42825e29c289-dirty",
@@ -201,8 +264,8 @@
       "size": 777834
     },
     {
-      "kernel": "5.10.226LZ离@gnmtl-00002-g7d7b7d0205d2-dirty",
-      "vermagic": "5.10.226LZ离@gnmtl-00002-g7d7b7d0205d2-dirty SMP preempt mod_unload modversions aarch64",
+      "kernel": "5.10.226LZ\u79bb@gnmtl-00002-g7d7b7d0205d2-dirty",
+      "vermagic": "5.10.226LZ\u79bb@gnmtl-00002-g7d7b7d0205d2-dirty SMP preempt mod_unload modversions aarch64",
       "variant": "a",
       "label": "5.10",
       "file": "RT/5.10.sh",
@@ -210,8 +273,8 @@
       "size": 899946
     },
     {
-      "kernel": "5.15.167tg@gnmtl离-00023-g952e16e5fc48-dirty",
-      "vermagic": "5.15.167tg@gnmtl离-00023-g952e16e5fc48-dirty SMP preempt mod_unload modversions aarch64",
+      "kernel": "5.15.167tg@gnmtl\u79bb-00023-g952e16e5fc48-dirty",
+      "vermagic": "5.15.167tg@gnmtl\u79bb-00023-g952e16e5fc48-dirty SMP preempt mod_unload modversions aarch64",
       "variant": "a",
       "label": "5.15",
       "file": "RT/5.15.sh",
@@ -235,8 +298,17 @@
       "file": "RT/6.6.sh",
       "sha256": "013c26af00ee3199835888693d4f0055465e442f7200039803b9ee31e3577352",
       "size": 734778
+    },
+    {
+      "kernel": "4.19.157-perf-g9aba441cf6cd-dirty",
+      "vermagic": "4.19.157-perf-g9aba441cf6cd-dirty SMP preempt mod_unload modversions aarch64",
+      "variant": "a",
+      "label": "4.19.157",
+      "file": "RT/4.19.157.sh",
+      "sha256": "4f869d676251fca322990182c5d31e3b0fe331e8bd4ee0f4066e2d6314d0091f",
+      "size": 546186
     }
   ],
-  "count": 26,
-  "updated": "2026-11-13T00:59:29Z"
+  "count": 34,
+  "updated": "2026-11-13T22:56:00Z"
 }

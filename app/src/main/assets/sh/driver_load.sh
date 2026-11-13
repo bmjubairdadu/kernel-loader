@@ -27,7 +27,7 @@ find_stealth_node() {
         [ -d "$d" ] || continue
         cls=$(basename "$d")
         case "$cls" in
-            android_usb|avtimer|backlight|battery*|bdi|block|bluetooth|bt*|char|charger*|devfreq|diag|dma|drm|dual_role_usb|dvb|extcon|fastrng|fastrpc|fingerprint|firmware|fuse|goodix*|gpio|graphics|hidraw|hwmon|i2c*|icesdcc|ieee*|input|iommu|ion|ipa*|jpeg*|kgsl|kmsg|lcd*|leds|lirc|mdio*|mem|misc|mmc*|msm*|net|phy|pmsg|power*|ppp|pwm|qg*|qpnp*|qseecom|ramdump|rc|regulator|remoteproc|rfkill|rmnet*|rotator|rpmsg|rtc|scsi*|sensors|smb*|smd*|soc*|sound|spidev|spmi*|ssc|subsys*|switch|tee|thermal|tty*|typec|uhid|uinput|uio|usb*|vc|video*|virtio*|vtconsole|wakeup|watchdog*|wcnss*|wwan*|zram*|BaseRemoteCtl)
+            android_usb|avtimer|backlight|battery*|bdi|block|bluetooth|bt*|char|charger*|devfreq|diag|dma|drm|dual_role_usb|dvb|extcon|fastrng|fastrpc|fingerprint|firmware|fuse|goodix*|gpio|graphics|hidraw|hwmon|i2c*|icesdcc|ieee*|input|iommu|ion|ipa*|jpeg*|kgsl|kmsg|lcd*|leds|lirc|mdio*|mem|misc|mmc*|msm*|net|phy|pmsg|power*|ppp|pwm|qg*|qpnp*|qseecom|ramdump|rc|regulator|remoteproc|rfkill|rmnet*|rotator|rpmsg|rtc|scsi*|sensors|smb*|smd*|soc*|sound|spidev|spmi*|ssc|subsys*|switch|tee|thermal|tty*|typec|uhid|uinput|uio|usb*|vc|video*|virtio*|vtconsole|wakeup|watchdog*|wcnss*|wwan*|zram*|BaseRemoteCtl|accdet*|mrdump*)
                 continue
                 ;;
         esac
@@ -194,8 +194,8 @@ if [ -z "$NODE" ] && [ -n "$NEW_CLS" ]; then
     fi
 fi
 
-# Fallback scan for active stealth device
-if [ -z "$NODE" ]; then
+# Fallback scan for active stealth device (only when vendor script succeeded)
+if [ -z "$NODE" ] && [ "$RC" -eq 0 ]; then
     find_stealth_node || true
 fi
 
@@ -230,7 +230,7 @@ if [ -z "$MOD" ]; then
     if [ "$RC" -eq 0 ] && [ -n "$NODE" ]; then
         MOD="${EXPECT:-rt}"
         IS_STEALTH=1
-    elif [ -n "$NODE" ] && [ -n "$MAJOR" ]; then
+    elif [ "$RC" -eq 0 ] && [ -n "$NODE" ] && [ -n "$MAJOR" ]; then
         MOD="${EXPECT:-rt}"
         IS_STEALTH=1
         ALREADY=1
