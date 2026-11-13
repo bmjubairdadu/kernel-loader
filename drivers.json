@@ -4,9 +4,27 @@
   "drivers": [
     {
       "kernel": "6.1.145-android14-11-gfa939bde48aa",
-      "vermagic": "6.1.145-android14-11-gfa939bde48aa SMP preempt mod_unload modversions aarch64",
+      "vermagic": "6.1.145-android14-11-gfa939bde48aa",
       "variant": "rt",
       "label": "6.1.145",
+      "file": "RT/6.1.145.sh",
+      "sha256": "c50b65c72ada54201cbd6c96cbf01b5c6b352c93365b8870489a373aea12ce26",
+      "size": 500061
+    },
+    {
+      "kernel": "6.1.145-android14-11-gfa939bde48aa",
+      "vermagic": "6.1.145-android14-11-gfa939bde48aa SMP preempt mod_unload modversions aarch64",
+      "variant": "rt",
+      "label": "6.1.145-full",
+      "file": "RT/6.1.145.sh",
+      "sha256": "c50b65c72ada54201cbd6c96cbf01b5c6b352c93365b8870489a373aea12ce26",
+      "size": 500061
+    },
+    {
+      "kernel": "6.1.145-android14-11-gfa939bde48aa",
+      "vermagic": "6.1.145-android14-11-gfa939bde48aa preempt mod_unload modversions aarch64",
+      "variant": "rt",
+      "label": "6.1.145-nosmp",
       "file": "RT/6.1.145.sh",
       "sha256": "c50b65c72ada54201cbd6c96cbf01b5c6b352c93365b8870489a373aea12ce26",
       "size": 500061
@@ -291,6 +309,6 @@
       "size": 546186
     }
   ],
-  "count": 32,
-  "updated": "2026-11-13T21:16:39Z"
+  "count": 34,
+  "updated": "2026-11-13T22:56:00Z"
 }
