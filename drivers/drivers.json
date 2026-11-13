@@ -8,26 +8,26 @@
       "variant": "rt",
       "label": "6.1.145",
       "file": "RT/6.1.145.sh",
-      "sha256": "fb207a6bb2db54ce408c6acde8b714f5f35db5967f33867fc03c0664c193a0c0",
-      "size": 500061
+      "sha256": "bf38ff927dc83c8e7ac6d50282ede7afafc0ee6f9b5a1c86072d2a4256f894f5",
+      "size": 500125
     },
     {
       "kernel": "6.1.145-android14-11-gfa939bde48aa",
-      "vermagic": "6.1.145-android14-11-gfa939bde48aa SMP preempt mod_unload modversions aarch64",
+      "vermagic": "6.1.145-android14-11-gfa939bde48aa SMP preempt mod_unload modversions vivo aarch64",
       "variant": "rt",
       "label": "6.1.145",
       "file": "RT/6.1.145.sh",
-      "sha256": "fb207a6bb2db54ce408c6acde8b714f5f35db5967f33867fc03c0664c193a0c0",
-      "size": 500061
+      "sha256": "bf38ff927dc83c8e7ac6d50282ede7afafc0ee6f9b5a1c86072d2a4256f894f5",
+      "size": 500125
     },
     {
       "kernel": "6.1.145-android14-11-gfa939bde48aa",
-      "vermagic": "6.1.145-android14-11-gfa939bde48aa preempt mod_unload modversions aarch64",
+      "vermagic": "6.1.145-android14-11-gfa939bde48aa preempt mod_unload modversions vivo aarch64",
       "variant": "rt",
       "label": "6.1.145-nosmp",
       "file": "RT/6.1.145.sh",
-      "sha256": "fb207a6bb2db54ce408c6acde8b714f5f35db5967f33867fc03c0664c193a0c0",
-      "size": 500061
+      "sha256": "bf38ff927dc83c8e7ac6d50282ede7afafc0ee6f9b5a1c86072d2a4256f894f5",
+      "size": 500125
     },
     {
       "kernel": "4.19.157-perf-g1a6087bc0325-dirty",
@@ -310,5 +310,5 @@
     }
   ],
   "count": 34,
-  "updated": "2026-11-13T23:21:48Z"
+  "updated": "2026-11-13T23:40:57Z"
 }
