@@ -235,17 +235,8 @@
       "file": "RT/6.6.sh",
       "sha256": "013c26af00ee3199835888693d4f0055465e442f7200039803b9ee31e3577352",
       "size": 734778
-    },
-    {
-      "kernel": "6.12.23-android16-5-maybe-dirty-4k",
-      "vermagic": "6.12.23-android16-5-maybe-dirty-4k SMP preempt mod_unload modversions aarch64",
-      "variant": "a",
-      "label": "6.12",
-      "file": "RT/6.12.sh",
-      "sha256": "a2d1200f628ce27cff58007924541bb8c9a58c144b4b97e2df27ebe106024e1c",
-      "size": 702290
     }
   ],
-  "count": 27,
-  "updated": "2026-11-13T00:59:03Z"
+  "count": 26,
+  "updated": "2026-11-13T00:59:29Z"
 }
