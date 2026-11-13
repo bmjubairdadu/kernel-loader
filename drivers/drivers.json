@@ -6,8 +6,8 @@
       "kernel": "4.19.157-perf-27940246-abA235FXXS4DXA5",
       "vermagic": "4.19.157-perf-27940246-abA235FXXS4DXA5 SMP preempt mod_unload modversions aarch64",
       "variant": "rt",
-      "label": "4.19.157",
-      "file": "RT/4.19.157.sh",
+      "label": "4.19.157d",
+      "file": "RT/4.19.157d.sh",
       "sha256": "c010a0b650696a891d285fcf631c37e48db16f35007aad99633f98676b45cb72",
       "size": 405909
     },
@@ -129,6 +129,15 @@
       "size": 536042
     },
     {
+      "kernel": "4.19.157-perf-g9aba441cf6cd-dirty",
+      "vermagic": "4.19.157-perf-g9aba441cf6cd-dirty SMP preempt mod_unload modversions aarch64",
+      "variant": "a",
+      "label": "4.19.157",
+      "file": "RT/4.19.157.sh",
+      "sha256": "4f869d676251fca322990182c5d31e3b0fe331e8bd4ee0f4066e2d6314d0091f",
+      "size": 546186
+    },
+    {
       "kernel": "4.19.157",
       "vermagic": "4.19.157 SMP preempt mod_unload modversions aarch64",
       "variant": "b",
@@ -237,6 +246,6 @@
       "size": 734778
     }
   ],
-  "count": 26,
-  "updated": "2026-11-13T01:49:23Z"
+  "count": 27,
+  "updated": "2026-11-13T01:59:23Z"
 }
