@@ -3,6 +3,87 @@
   "generated_at": "2026-04-18T00:00:00Z",
   "drivers": [
     {
+      "kernel": "4.19.275-niigo-enanan-yoka-ks32386",
+      "vermagic": "4.19.275-niigo-enanan-yoka-ks32386",
+      "variant": "rt",
+      "label": "4.19.275",
+      "file": "RT/4.19.275.sh",
+      "sha256": "c59057643b387cc768ee6107df94d21f6f10fa16a0d8e4afbad980a12910e277",
+      "size": 276533
+    },
+    {
+      "kernel": "4.19.275-niigo-enanan-yoka-ks32386",
+      "vermagic": "4.19.275-niigo-enanan-yoka-ks32386 SMP preempt mod_unload modversions aarch64",
+      "variant": "rt",
+      "label": "4.19.275",
+      "file": "RT/4.19.275.sh",
+      "sha256": "c59057643b387cc768ee6107df94d21f6f10fa16a0d8e4afbad980a12910e277",
+      "size": 276533
+    },
+    {
+      "kernel": "4.19.275-niigo-enanan-yoka-ks32386",
+      "vermagic": "4.19.275-niigo-enanan-yoka-ks32386 preempt mod_unload modversions aarch64",
+      "variant": "rt",
+      "label": "4.19.275-nosmp",
+      "file": "RT/4.19.275.sh",
+      "sha256": "c59057643b387cc768ee6107df94d21f6f10fa16a0d8e4afbad980a12910e277",
+      "size": 276533
+    },
+    {
+      "kernel": "5.10.209-gki-g551c5e51f5e6-dirty",
+      "vermagic": "5.10.209-gki-g551c5e51f5e6-dirty",
+      "variant": "rt",
+      "label": "5.10.209",
+      "file": "RT/5.10.209.sh",
+      "sha256": "4d2b11c89dd3ffbbeaa2bfcd29ab831e59ab78e96e0980fb531d65613961c55b",
+      "size": 462653
+    },
+    {
+      "kernel": "5.10.209-gki-g551c5e51f5e6-dirty",
+      "vermagic": "5.10.209-gki-g551c5e51f5e6-dirty SMP preempt mod_unload modversions aarch64",
+      "variant": "rt",
+      "label": "5.10.209",
+      "file": "RT/5.10.209.sh",
+      "sha256": "4d2b11c89dd3ffbbeaa2bfcd29ab831e59ab78e96e0980fb531d65613961c55b",
+      "size": 462653
+    },
+    {
+      "kernel": "5.10.209-gki-g551c5e51f5e6-dirty",
+      "vermagic": "5.10.209-gki-g551c5e51f5e6-dirty preempt mod_unload modversions aarch64",
+      "variant": "rt",
+      "label": "5.10.209-nosmp",
+      "file": "RT/5.10.209.sh",
+      "sha256": "4d2b11c89dd3ffbbeaa2bfcd29ab831e59ab78e96e0980fb531d65613961c55b",
+      "size": 462653
+    },
+    {
+      "kernel": "4.19.191-g216400aba14e-dirty",
+      "vermagic": "4.19.191-g216400aba14e-dirty",
+      "variant": "rt",
+      "label": "4.19.191d",
+      "file": "RT/4.19.191d.sh",
+      "sha256": "d70e8cbe9e52b1143d3f0baa6be1a034ee08ddf048f6e09c860aaa5659fee0ed",
+      "size": 277061
+    },
+    {
+      "kernel": "4.19.191-g216400aba14e-dirty",
+      "vermagic": "4.19.191-g216400aba14e-dirty SMP preempt mod_unload modversions aarch64",
+      "variant": "rt",
+      "label": "4.19.191d",
+      "file": "RT/4.19.191d.sh",
+      "sha256": "d70e8cbe9e52b1143d3f0baa6be1a034ee08ddf048f6e09c860aaa5659fee0ed",
+      "size": 277061
+    },
+    {
+      "kernel": "4.19.191-g216400aba14e-dirty",
+      "vermagic": "4.19.191-g216400aba14e-dirty preempt mod_unload modversions aarch64",
+      "variant": "rt",
+      "label": "4.19.191d-nosmp",
+      "file": "RT/4.19.191d.sh",
+      "sha256": "d70e8cbe9e52b1143d3f0baa6be1a034ee08ddf048f6e09c860aaa5659fee0ed",
+      "size": 277061
+    },
+    {
       "kernel": "4.14.113-25741823",
       "vermagic": "4.14.113-25741823 SMP preempt mod_unload modversions aarch64",
       "variant": "rt",
@@ -165,29 +246,6 @@
       "size": 635474
     },
     {
-      "kernel": "4.19.191-g216400aba14e-dirty",
-      "vermagic": "4.19.191-g216400aba14e-dirty SMP preempt mod_unload modversions aarch64",
-      "variant": "d",
-      "label": "4.19.191d",
-      "file": "RT/4.19.191d.sh",
-      "sha256": "ebd7fd64ca246bd9133f36b8172315cd411c31f84eb5063eab743d00b55b4b1f",
-      "size": 503213,
-      "device": "TECNO-BF7",
-      "model": "TECNO BF7",
-      "brand": "TECNO",
-      "product": "BF7-GL",
-      "androidVersion": "12",
-      "supportedDevices": [
-        "TECNO-BF7",
-        "BF7-GL",
-        "TECNO BF7",
-        "TECNO TECNO BF7",
-        "mt6761"
-      ],
-      "moduleLayoutCrc": "0xaefd27b2",
-      "crcCount": 56
-    },
-    {
       "kernel": "4.19.81-perf-g236f9eb09-dirty",
       "vermagic": "4.19.81-perf-g236f9eb09-dirty SMP preempt mod_unload modversions aarch64",
       "variant": "a",
@@ -274,8 +332,8 @@
       "variant": "rt",
       "label": "6.1.145",
       "file": "RT/6.1.145.sh",
-      "sha256": "e9decad513cad5e4baa9a8575d8e818001fa88254f75ce2a1429a0274d5af1cc",
-      "size": 498469
+      "sha256": "a5409267adfe64449482571e95d7a423568ca1f9ac45a65fd4a498f386f6e955",
+      "size": 465453
     },
     {
       "kernel": "6.1.145-android14-11-gfa939bde48aa",
@@ -283,8 +341,8 @@
       "variant": "rt",
       "label": "6.1.145",
       "file": "RT/6.1.145.sh",
-      "sha256": "e9decad513cad5e4baa9a8575d8e818001fa88254f75ce2a1429a0274d5af1cc",
-      "size": 498469
+      "sha256": "a5409267adfe64449482571e95d7a423568ca1f9ac45a65fd4a498f386f6e955",
+      "size": 465453
     },
     {
       "kernel": "6.1.145-android14-11-gfa939bde48aa",
@@ -292,8 +350,8 @@
       "variant": "rt",
       "label": "6.1.145-nosmp",
       "file": "RT/6.1.145.sh",
-      "sha256": "e9decad513cad5e4baa9a8575d8e818001fa88254f75ce2a1429a0274d5af1cc",
-      "size": 498469
+      "sha256": "a5409267adfe64449482571e95d7a423568ca1f9ac45a65fd4a498f386f6e955",
+      "size": 465453
     },
     {
       "kernel": "6.12.58-android16-6-g32fc8147b5dc-4k",
@@ -332,6 +390,6 @@
       "size": 325621
     }
   ],
-  "count": 35,
-  "updated": "2026-11-13T23:58:13Z"
+  "count": 43,
+  "updated": "2026-11-14T04:27:36Z"
 }

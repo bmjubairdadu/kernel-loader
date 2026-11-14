@@ -68,6 +68,25 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
 
     init {
         initLogStore(application)
+        refreshDriverState(application)
+    }
+
+    fun refreshDriverState(context: Context? = null) {
+        val appCtx = context ?: getApplication()
+        val (active, info) = DriverSessionManager.isSessionActive(appCtx)
+        if (active) {
+            val (node, mod, stealth) = info
+            val displayLabel = if (stealth) "Stealth" else mod.ifBlank { DriverInstaller.MODULE }
+            driverLoaded.value = true
+            hiddenLoaded.value = stealth
+            loadedModuleName.value = displayLabel
+            driverModule.value = if (node.isNotBlank() && node != "dynamic") "$displayLabel ($node)" else displayLabel
+        } else {
+            driverLoaded.value = false
+            hiddenLoaded.value = false
+            loadedModuleName.value = ""
+            driverModule.value = ""
+        }
     }
 
     fun dismissErrorDialog() {

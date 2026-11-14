@@ -154,6 +154,7 @@ fun HomeScreen(
     DisposableEffect(lifecycleOwner) {
         val obs = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.refreshDriverState(context)
                 screenScope.launch(Dispatchers.IO) {
                     val root = RootChecker.isRootAvailable()
                     val kVer = RootChecker.getKernelVersion()
@@ -196,6 +197,7 @@ fun HomeScreen(
     LaunchedEffect(Unit) {
         IpLanguageManager.init(context)
         viewModel.initLogStore(context)
+        viewModel.refreshDriverState(context)
         launch(Dispatchers.IO) {
             delay(250L)
             val root = RootChecker.isRootAvailable()
