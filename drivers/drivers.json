@@ -3,6 +3,33 @@
   "generated_at": "2026-04-18T00:00:00Z",
   "drivers": [
     {
+      "kernel": "4.19.191-g216400aba14e-dirty",
+      "vermagic": "4.19.191-g216400aba14e-dirty",
+      "variant": "rt",
+      "label": "4.19.191",
+      "file": "RT/4.19.191.sh",
+      "sha256": "361533ec6b43247fac0a05b4274cd75f2f760b375909c04a267d986866dd231b",
+      "size": 503205
+    },
+    {
+      "kernel": "4.19.191-g216400aba14e-dirty",
+      "vermagic": "4.19.191-g216400aba14e-dirty SMP preempt mod_unload modversions aarch64",
+      "variant": "rt",
+      "label": "4.19.191",
+      "file": "RT/4.19.191.sh",
+      "sha256": "361533ec6b43247fac0a05b4274cd75f2f760b375909c04a267d986866dd231b",
+      "size": 503205
+    },
+    {
+      "kernel": "4.19.191-g216400aba14e-dirty",
+      "vermagic": "4.19.191-g216400aba14e-dirty preempt mod_unload modversions aarch64",
+      "variant": "rt",
+      "label": "4.19.191-nosmp",
+      "file": "RT/4.19.191.sh",
+      "sha256": "361533ec6b43247fac0a05b4274cd75f2f760b375909c04a267d986866dd231b",
+      "size": 503205
+    },
+    {
       "kernel": "6.1.145-android14-11-gfa939bde48aa",
       "vermagic": "6.1.145-android14-11-gfa939bde48aa",
       "variant": "rt",
@@ -210,15 +237,6 @@
       "size": 627386
     },
     {
-      "kernel": "4.19.191-perf-g42825e29c289-dirty",
-      "vermagic": "4.19.191-perf-g42825e29c289-dirty SMP preempt mod_unload modversions aarch64",
-      "variant": "a",
-      "label": "4.19.191",
-      "file": "RT/4.19.191.sh",
-      "sha256": "5ef20136ec74d4ffe7bae29550ab8e685246f1e423ac4942027df16630db35fa",
-      "size": 628330
-    },
-    {
       "kernel": "4.19.191+",
       "vermagic": "4.19.191+ SMP preempt mod_unload modversions aarch64",
       "variant": "b",
@@ -309,6 +327,6 @@
       "size": 546186
     }
   ],
-  "count": 34,
-  "updated": "2026-11-14T00:22:13Z"
+  "count": 36,
+  "updated": "2026-11-14T00:51:25Z"
 }
