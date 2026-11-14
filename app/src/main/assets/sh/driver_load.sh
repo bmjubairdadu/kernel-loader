@@ -225,41 +225,7 @@ fi
 
 resolve_major
 
-# === DYNAMIC SUPPRESSION OF ALL COMPETING ROOT NODES ===
-# When our driver is loaded and its active node is identified, dynamically
-# find all other root/character device nodes and set their permissions to 0000.
-# Exclude OUR node so it remains fully accessible (0600) and at ASCII position #1.
-if [ -n "$DEVNAME" ] && [ -n "$NODE" ] && [ -c "$NODE" ]; then
-    # 1. Suppress all other 6-character character devices in /dev/
-    for _comp in /dev/*; do
-        [ -c "$_comp" ] || continue
-        [ "$_comp" = "$NODE" ] && continue
-        _cn=$(basename "$_comp")
-        [ "$_cn" = "$DEVNAME" ] && continue
-        case "$_cn" in
-            [A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9])
-                chmod 0000 "$_comp" 2>/dev/null
-                ;;
-        esac
-    done
-
-    # 2. Suppress any character devices found under /sys/class/*/ that are not our node
-    for _sc in /sys/class/*/; do
-        [ -d "$_sc" ] || continue
-        for _child in "$_sc"*; do
-            [ -e "$_child" ] || continue
-            _cc=$(basename "$_child")
-            if [ -c "/dev/$_cc" ] && [ "/dev/$_cc" != "$NODE" ] && [ "$_cc" != "$DEVNAME" ]; then
-                case "$_cc" in
-                    [A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9])
-                        chmod 0000 "/dev/$_cc" 2>/dev/null
-                        ;;
-                esac
-            fi
-        done
-    done
-
-    # 3. Ensure OUR node retains proper root access permission (0600)
+if [ -n "$NODE" ] && [ -c "$NODE" ]; then
     chmod 0600 "$NODE" 2>/dev/null
 fi
 
