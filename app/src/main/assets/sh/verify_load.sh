@@ -1,5 +1,6 @@
 #!/system/bin/sh
 MOD="${1:-suvhwvwrtnb}"
+TARGET_NODE="${2:-}"
 FAIL=0
 
 ok()   { echo "PASS: $1"; }
@@ -26,26 +27,11 @@ if [ -n "$TARGET_NODE" ] && [ -c "$TARGET_NODE" ]; then
     CLSNAME="$DEVNAME"
 fi
 
-# Priority 2: Check active node marker recorded at insmod time
-if [ -z "$NODE" ] && [ -s /dev/.kloder_active_node ]; then
-    RECORDED=$(cat /dev/.kloder_active_node 2>/dev/null)
-    if [ -n "$RECORDED" ] && [ -c "$RECORDED" ]; then
-        NODE="$RECORDED"
-        DEVNAME=$(basename "$RECORDED")
-        CLSNAME="$DEVNAME"
-    fi
-fi
-
-# Priority 3: Fallback scan only if no recorded active node (must start with digit)
+# Priority 2: Fallback scan only if no target node specified (must start with digit)
 if [ -z "$NODE" ]; then
     for d in /sys/class/*/; do
         [ -d "$d" ] || continue
         cls=$(basename "$d")
-        case "$cls" in
-            android_usb|avtimer|backlight|battery*|bdi|block|bluetooth|bt*|char|charger*|devfreq|diag|dma|drm|dual_role_usb|dvb|extcon|fastrng|fastrpc|fingerprint|firmware|fuse|goodix*|gpio|graphics|hidraw|hwmon|i2c*|icesdcc|ieee*|input|iommu|ion|ipa*|jpeg*|kgsl|kmsg|lcd*|leds|lirc|mdio*|mem|misc|mmc*|msm*|net|phy|pmsg|power*|ppp|pwm|qg*|qpnp*|qseecom|ramdump|rc|regulator|remoteproc|rfkill|rmnet*|rotator|rpmsg|rtc|scsi*|sensors|smb*|smd*|soc*|sound|spidev|spmi*|ssc|subsys*|switch|tee|thermal|tty*|typec|uhid|uinput|uio|usb*|vc|video*|virtio*|vtconsole|wakeup|watchdog*|wcnss*|wwan*|zram*|BaseRemoteCtl|Vcodec*|vcodec*|accdet*|mrdump*|ndctl*|dimm*|dpa*)
-                continue
-                ;;
-        esac
         case "$cls" in
             [0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9])
                 if [ -c "/dev/$cls" ]; then
@@ -75,19 +61,11 @@ if [ -z "$NODE" ]; then
     done
 fi
 
-if [ -z "$DEVNAME" ]; then
-    CDEV=$(awk '/Character devices:/, /Block devices:/ { if ($1 ~ /^[0-9]+$/ && $2 ~ /^[A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9]$/ && $2 !~ /^(mem|msm|tty|misc|input|sg|fb|video|ch|i2c|ppp|alsa|ptm|pts|spi|usb|DVB|adsprpc|avtimer|dts|sensors|hidraw|bt|jpeg|BaseRemote|goodix|rmnet|icesdcc|qseecom|kgsl|frandom|diag|smd|wcnss|subsys|ramdump|mdss|ipa|iio|media|rtc|pmsg|gpio|uio|wwan|rfkill|extcon|switch|spidev|Vcodec|vcodec|accdet|mrdump|ndctl|dimm|dpa)/) print $2 }' /proc/devices 2>/dev/null | tail -n 1)
-    if [ -n "$CDEV" ]; then
-        DEVNAME="$CDEV"
-        [ -c "/dev/$CDEV" ] && NODE="/dev/$CDEV"
-    fi
-fi
-
 OPEN_FD=""
 OPEN_NODE=""
 OWNER_PID=""
 if [ -z "$NODE" ] && [ -z "$DEVNAME" ]; then
-    FD_HIT=$(ls -l /proc/[0-9]*/fd 2>/dev/null | awk '/^\/proc\/[0-9]+\/fd:/ { pid=$1; sub(/^\/proc\//,"",pid); sub(/\/fd:$/,"",pid); next } / -> \/dev\/[A-Za-z0-9]{6} \(deleted\)$/ { fd=$(NF-3); dev=$(NF-1); sub(/^\/dev\//,"",dev); if (dev !~ /^(binder|common|ashmem|random)$/) { print pid "|" fd "|" dev; exit } }')
+    FD_HIT=$(ls -l /proc/[0-9]*/fd 2>/dev/null | awk '/^\/proc\/[0-9]+\/fd:/ { pid=$1; sub(/^\/proc\//,"",pid); sub(/\/fd:$/,"",pid); next } / -> \/dev\/[0-9][A-Za-z0-9]{5} \(deleted\)$/ { fd=$(NF-3); dev=$(NF-1); sub(/^\/dev\//,"",dev); if (dev !~ /^(binder|common|ashmem|random)$/) { print pid "|" fd "|" dev; exit } }')
     if [ -n "$FD_HIT" ]; then
         OLD_IFS="$IFS"
         IFS='|'

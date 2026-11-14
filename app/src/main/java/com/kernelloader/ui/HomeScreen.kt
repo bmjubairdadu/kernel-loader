@@ -29,6 +29,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -112,6 +113,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -147,6 +149,7 @@ fun HomeScreen(
     val deviceVermagic = remember { mutableStateOf("") }
 
     var showSplash by remember { mutableStateOf(!SplashTracker.shown) }
+    var showLanguageDialog by remember { mutableStateOf(false) }
 
     val lifecycleOwner = LocalLifecycleOwner.current
     val screenScope = rememberCoroutineScope()
@@ -274,7 +277,8 @@ fun HomeScreen(
                     version = "v${BuildConfig.VERSION_NAME}",
                     busy = busy,
                     onSelectCountryLang = { IpLanguageManager.selectCountryLanguage(context) },
-                    onSelectEnglish = { IpLanguageManager.selectEnglish(context) }
+                    onSelectEnglish = { IpLanguageManager.selectEnglish(context) },
+                    onOpenLanguageDialog = { showLanguageDialog = true }
                 )
 
                 UpdateBannerSection(
@@ -464,6 +468,21 @@ fun HomeScreen(
             info = errorInfo,
             onDismiss = { viewModel.dismissErrorDialog() },
             onCopyLog = { viewModel.copyTerminalToClipboard(context) }
+        )
+    }
+
+    if (showLanguageDialog) {
+        LanguageSelectionDialog(
+            strings = s,
+            onDismiss = { showLanguageDialog = false },
+            onSelectLanguage = { code ->
+                IpLanguageManager.selectLanguage(context, code)
+                showLanguageDialog = false
+            },
+            onSelectAutoIp = {
+                IpLanguageManager.selectAutoIp(context)
+                showLanguageDialog = false
+            }
         )
     }
 }
@@ -692,7 +711,8 @@ private fun PremiumHomeHeader(
     version: String,
     busy: Boolean,
     onSelectCountryLang: () -> Unit,
-    onSelectEnglish: () -> Unit
+    onSelectEnglish: () -> Unit,
+    onOpenLanguageDialog: () -> Unit
 ) {
     val countryFlag = IpLanguageManager.detectedCountryFlag()
     val isEnActive = IpLanguageManager.activeLangCode == "en"
@@ -813,6 +833,20 @@ private fun PremiumHomeHeader(
                     ) {
                         Text(
                             text = "🇺🇸",
+                            fontSize = 15.sp
+                        )
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .clip(CircleShape)
+                            .background(Brush.linearGradient(listOf(Color.Transparent, Color.Transparent)))
+                            .clickable(onClick = onOpenLanguageDialog)
+                            .padding(horizontal = 7.dp, vertical = 4.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "🌐",
                             fontSize = 15.sp
                         )
                     }
@@ -2910,4 +2944,167 @@ private object HomeScreenReportWipe {
 
 private object SplashTracker {
     @Volatile var shown: Boolean = false
+}
+
+@Composable
+private fun LanguageSelectionDialog(
+    strings: UiStrings,
+    onDismiss: () -> Unit,
+    onSelectLanguage: (String) -> Unit,
+    onSelectAutoIp: () -> Unit
+) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth(0.92f)
+                .fillMaxHeight(0.80f),
+            shape = RoundedCornerShape(22.dp),
+            colors = CardDefaults.cardColors(containerColor = Surface1),
+            border = BorderStroke(
+                1.2.dp,
+                Brush.linearGradient(listOf(LogoPink, LogoMagenta, LogoPurple))
+            )
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(text = "🌐", fontSize = 20.sp)
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = strings.languageDialogTitle,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = TextPrimary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .size(28.dp)
+                            .clip(CircleShape)
+                            .background(Color.White.copy(alpha = 0.08f))
+                            .clickable(onClick = onDismiss),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Default.Close,
+                            contentDescription = null,
+                            tint = TextMuted,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+
+                Spacer(Modifier.height(12.dp))
+
+                val isAutoIp = IpLanguageManager.manualOverrideLang == null
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = if (isAutoIp) LogoPurple.copy(alpha = 0.22f) else SurfaceInset,
+                    border = BorderStroke(
+                        1.dp,
+                        if (isAutoIp) LogoPink.copy(alpha = 0.8f) else Color.White.copy(alpha = 0.08f)
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(onClick = onSelectAutoIp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 11.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(text = "🌐", fontSize = 18.sp)
+                        Spacer(Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = strings.autoIpDetectOption,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = TextPrimary
+                            )
+                            Text(
+                                text = "${IpLanguageManager.detectedCountryFlag()} ${IpLanguageManager.detectedCountryCode} (Auto)",
+                                style = MonoTiny,
+                                fontSize = 10.5.sp,
+                                color = AccentAmber
+                            )
+                        }
+                        if (isAutoIp) {
+                            Text(text = "✓", color = StatusOk, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(10.dp))
+
+                HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+
+                Spacer(Modifier.height(8.dp))
+
+                LazyColumn(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    items(IpLanguageManager.SupportedLanguages) { item ->
+                        val isSelected = !isAutoIp && IpLanguageManager.activeLangCode == item.code
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = if (isSelected) LogoPurple.copy(alpha = 0.24f) else SurfaceInset.copy(alpha = 0.7f),
+                            border = BorderStroke(
+                                1.dp,
+                                if (isSelected) LogoPink.copy(alpha = 0.8f) else Color.Transparent
+                            ),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onSelectLanguage(item.code) }
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(text = item.flag, fontSize = 20.sp)
+                                Spacer(Modifier.width(12.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = item.nativeName,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isSelected) Color.White else TextPrimary
+                                    )
+                                    Text(
+                                        text = item.name,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontSize = 11.sp,
+                                        color = TextMuted
+                                    )
+                                }
+                                if (isSelected) {
+                                    Text(text = "✓", color = StatusOk, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }

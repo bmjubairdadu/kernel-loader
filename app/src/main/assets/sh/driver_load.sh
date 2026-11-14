@@ -1,63 +1,19 @@
 #!/system/bin/sh
+# Advanced Driver Execution Engine for Kernel Loader
+# Diff-driven stealth device registration without static blacklist guessing
+
 SCRIPT="$1"
-EXPECT="${2:-suvhwvwrtnb}"
-WORK=/data/local/tmp/ftl
+EXPECT="$2"
+WORK="/data/local/tmp/ftl_work_$$"
 
 if [ -z "$SCRIPT" ] || [ ! -f "$SCRIPT" ]; then
-    echo "FTL_ERROR=missing-script"
-    echo "FTL_OK=0"
-    exit 1
-fi
-
-if [ "$(id -u)" -ne 0 ]; then
-    echo "FTL_ERROR=not-root"
+    echo "FTL_ERROR=script_missing"
     echo "FTL_OK=0"
     exit 3
 fi
 
 mkdir -p "$WORK" || exit 1
 trap 'rm -rf "$WORK" /dev/.kloder_session 2>/dev/null' EXIT
-
-find_stealth_node() {
-    DEVNAME=""
-    NODE=""
-    CLSNAME=""
-    OPEN_FD=""
-    for d in /sys/class/*/; do
-        [ -d "$d" ] || continue
-        cls=$(basename "$d")
-        case "$cls" in
-            android_usb|avtimer|backlight|battery*|bdi|block|bluetooth|bt*|char|charger*|devfreq|diag|dma|drm|dual_role_usb|dvb|extcon|fastrng|fastrpc|fingerprint|firmware|fuse|goodix*|gpio|graphics|hidraw|hwmon|i2c*|icesdcc|ieee*|input|iommu|ion|ipa*|jpeg*|kgsl|kmsg|lcd*|leds|lirc|mdio*|mem|misc|mmc*|msm*|net|phy|pmsg|power*|ppp|pwm|qg*|qpnp*|qseecom|ramdump|rc|regulator|remoteproc|rfkill|rmnet*|rotator|rpmsg|rtc|scsi*|sensors|smb*|smd*|soc*|sound|spidev|spmi*|ssc|subsys*|switch|tee|thermal|tty*|typec|uhid|uinput|uio|usb*|vc|video*|virtio*|vtconsole|wakeup|watchdog*|wcnss*|wwan*|zram*|BaseRemoteCtl|accdet*|mrdump*|Vcodec*|vcodec*|ndctl*|dimm*|dpa*)
-                continue
-                ;;
-        esac
-        case "$cls" in
-            [0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9])
-                if [ -c "/dev/$cls" ]; then
-                    CLSNAME="$cls"
-                    DEVNAME="$cls"
-                    NODE="/dev/$cls"
-                    return 0
-                fi
-                ;;
-        esac
-        for child in "$d"*; do
-            [ -e "$child" ] || continue
-            c=$(basename "$child")
-            case "$c" in
-                [0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9])
-                    if [ -c "/dev/$c" ]; then
-                        CLSNAME="$cls"
-                        DEVNAME="$c"
-                        NODE="/dev/$c"
-                        return 0
-                    fi
-                    ;;
-            esac
-        done
-    done
-    return 1
-}
 
 resolve_major() {
     MAJOR=""
@@ -75,19 +31,9 @@ resolve_major() {
     fi
 }
 
-# Clean up any leftover temporary active-node marker before running fresh install
-rm -f /dev/.kloder_active_node 2>/dev/null
-
 PRE_MOD=""
-PRE_ALREADY=0
-PRE_STEALTH=0
-PRE_DEVNAME=""
-PRE_NODE=""
-PRE_CLSNAME=""
-
 if [ -n "$EXPECT" ] && grep -qw "$EXPECT" /proc/modules 2>/dev/null; then
     PRE_MOD="$EXPECT"
-    PRE_ALREADY=1
     echo "FTL_MODULE=$PRE_MOD"
     echo "FTL_EXIT=0"
     echo "FTL_ALREADY=1"
@@ -116,49 +62,26 @@ if [ -z "$MOD" ] && [ -n "$EXPECT" ] && grep -qw "$EXPECT" /proc/modules 2>/dev/
     ALREADY=1
 fi
 
-ls -1 /dev 2>/dev/null | sort > "$WORK/.dev.after"
-NEW_DEV=$(grep -vxF -f "$WORK/.dev.before" "$WORK/.dev.after" 2>/dev/null | grep -v '^\.' | head -n 1)
-
-awk '/Character devices:/, /Block devices:/ { if ($1 ~ /^[0-9]+$/) print $2 }' /proc/devices 2>/dev/null | sort > "$WORK/.cdev.after"
-NEW_CDEV=$(grep -vxF -f "$WORK/.cdev.before" "$WORK/.cdev.after" 2>/dev/null | head -n 1)
-
-ls -1 /sys/class 2>/dev/null | sort > "$WORK/.cls.after"
-NEW_CLS=$(grep -vxF -f "$WORK/.cls.before" "$WORK/.cls.after" 2>/dev/null | head -n 1)
-
 DEVNAME=""
 NODE=""
 CLSNAME=""
 
-# Priority 1: Direct node marker created by vendor insmod execution
-if [ -s /dev/.kloder_active_node ]; then
-    ACT_NODE=$(cat /dev/.kloder_active_node 2>/dev/null)
-    if [ -n "$ACT_NODE" ] && [ -c "$ACT_NODE" ]; then
-        NODE="$ACT_NODE"
-        DEVNAME=$(basename "$ACT_NODE")
-        CLSNAME="$DEVNAME"
+# True diff of /dev newly created during installer execution (must start with digit)
+ls -1 /dev 2>/dev/null | sort > "$WORK/.dev.after"
+for cand in $(grep -vxF -f "$WORK/.dev.before" "$WORK/.dev.after" 2>/dev/null | grep -v '^\.'); do
+    if [ -c "/dev/$cand" ]; then
+        case "$cand" in
+            [0-9]*)
+                DEVNAME="$cand"
+                NODE="/dev/$cand"
+                CLSNAME="$cand"
+                break
+                ;;
+        esac
     fi
-fi
+done
 
-# Priority 2: True diff of /dev newly created during installer execution (must start with digit)
-if [ -z "$NODE" ]; then
-    ls -1 /dev 2>/dev/null | sort > "$WORK/.dev.after"
-    for cand in $(grep -vxF -f "$WORK/.dev.before" "$WORK/.dev.after" 2>/dev/null | grep -v '^\.'); do
-        if [ -c "/dev/$cand" ]; then
-            case "$cand" in
-                [0-9]*)
-                    DEVNAME="$cand"
-                    NODE="/dev/$cand"
-                    CLSNAME="$cand"
-                    echo "$NODE" > /dev/.kloder_active_node 2>/dev/null
-                    chmod 0644 /dev/.kloder_active_node 2>/dev/null
-                    break
-                    ;;
-            esac
-        fi
-    done
-fi
-
-# Priority 3: True diff of /sys/class newly created during installer execution
+# True diff of /sys/class newly created during installer execution
 if [ -z "$NODE" ]; then
     ls -1 /sys/class 2>/dev/null | sort > "$WORK/.cls.after"
     for cand_cls in $(grep -vxF -f "$WORK/.cls.before" "$WORK/.cls.after" 2>/dev/null); do
@@ -168,8 +91,6 @@ if [ -z "$NODE" ]; then
                     DEVNAME="$cand_cls"
                     NODE="/dev/$cand_cls"
                     CLSNAME="$cand_cls"
-                    echo "$NODE" > /dev/.kloder_active_node 2>/dev/null
-                    chmod 0644 /dev/.kloder_active_node 2>/dev/null
                     break
                 fi
                 ;;
@@ -181,8 +102,6 @@ resolve_major
 
 if [ -n "$NODE" ] && [ -c "$NODE" ]; then
     chmod 0600 "$NODE" 2>/dev/null
-    echo "$NODE" > /dev/.kloder_active_node 2>/dev/null
-    chmod 0600 /dev/.kloder_active_node 2>/dev/null
 fi
 
 IS_STEALTH=0

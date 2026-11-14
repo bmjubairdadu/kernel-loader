@@ -154,15 +154,6 @@ class DriverInstaller(private val ctx: Context) {
         verifyLoadDetailed(module).ok
 
     fun findNode(): String? {
-        var recordedNode: String? = null
-        su("if [ -s /dev/.kloder_active_node ]; then cat /dev/.kloder_active_node; fi") { line ->
-            val s = line.trim()
-            if (s.startsWith("/dev/") && s.length >= 6) {
-                recordedNode = s
-            }
-        }
-        if (recordedNode != null) return recordedNode
-
         var digitNode: String? = null
         val cmd = "for d in /sys/class/*/; do " +
             "[ -d \"\$d\" ] || continue; " +
