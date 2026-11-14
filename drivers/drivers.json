@@ -1,9 +1,18 @@
 {
   "schema": 1,
-  "count": 5,
+  "count": 6,
   "generated_at": "2026-11-14T09:26:15Z",
-  "updated": "2026-11-14T18:16:12Z",
+  "updated": "2026-11-14T19:06:08Z",
   "drivers": [
+    {
+      "kernel": "4.9.309-Chidori-Kernel",
+      "vermagic": "4.9.309-Chidori-Kernel SMP preempt mod_unload modversions aarch64",
+      "variant": "rt",
+      "label": "4.9.309",
+      "file": "RT/4.9.309.sh",
+      "sha256": "7db590a9d92594334c69b7afd01c80bd553795a0d34a620d8bd9e665ed7ba876",
+      "size": 371064
+    },
     {
       "kernel": "4.19.157-perf-27940246-abA235FXXS4DXA5",
       "vermagic": "4.19.157-perf-27940246-abA235FXXS4DXA5 SMP preempt mod_unload modversions aarch64",
