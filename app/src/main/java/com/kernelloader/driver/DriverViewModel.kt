@@ -107,10 +107,10 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
     private fun classifyLine(line: String): String {
         val u = line.uppercase()
         return when {
-            line.startsWith("FTL_OK=1") || line.startsWith("PASS") || u.contains("RESULT: PASS") || u.contains("SUCCESS") || u.contains("[OK]") -> "OK"
-            line.startsWith("FTL_ERROR=") && line != "FTL_ERROR=" -> "ERR"
-            line.startsWith("FAIL") || u.contains("RESULT: FAIL") || u.contains("ERROR") || u.contains("FAIL") || u.contains("REJECTED") -> "ERR"
-            line.startsWith("###") || line.startsWith("FTL_") -> "CMD"
+            line.contains("[OK]") || line.startsWith("PASS") || u.contains("RESULT: PASS") || u.contains("SUCCESS") || u.contains("[+] ACTIVE NODE") -> "OK"
+            line.contains("[ERR]") || line.startsWith("FAIL") || u.contains("RESULT: FAIL") || u.contains("ERROR") || u.contains("REJECTED") -> "ERR"
+            line.contains("[WARN]") -> "WARN"
+            line.startsWith("[1/") || line.startsWith("[2/") || line.startsWith("[3/") || line.startsWith("[4/") || line.startsWith("[5/") || line.startsWith("[STEP") || line.startsWith("[~]") -> "CMD"
             else -> "INFO"
         }
     }
@@ -378,11 +378,6 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             clean.startsWith("###") ||
             clean.startsWith("===") ||
             clean.startsWith("---") ||
-            clean.startsWith("Driver:") ||
-            clean.startsWith("Device Configuration") ||
-            clean.startsWith("[~]") ||
-            clean.equals("Driver Loaded Successfully", ignoreCase = true) ||
-            clean.equals("Driver Failed to Load", ignoreCase = true) ||
             clean.startsWith("RESULT:") ||
             clean.startsWith("NODE=") ||
             clean.startsWith("STEALTH=") ||
@@ -390,7 +385,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             clean.startsWith("OWNER_PID=") ||
             clean.startsWith("module :") ||
             clean.startsWith("kernel :") ||
-            clean.startsWith("root")
+            clean.startsWith("root   :")
         ) {
             return
         }
