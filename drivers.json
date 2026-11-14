@@ -3,6 +3,33 @@
   "generated_at": "2026-04-18T00:00:00Z",
   "drivers": [
     {
+      "kernel": "5.4.210-android12-9-667269-g856cdf2f247e-ab665",
+      "vermagic": "5.4.210-android12-9-667269-g856cdf2f247e-ab665",
+      "variant": "rt",
+      "label": "5.4.210",
+      "file": "RT/5.4.210.sh",
+      "sha256": "341c24583c4bb82f73a683f66b5461922cb26f8adaaa50573591218331e8f9b8",
+      "size": 382397
+    },
+    {
+      "kernel": "5.4.210-android12-9-667269-g856cdf2f247e-ab665",
+      "vermagic": "5.4.210-android12-9-667269-g856cdf2f247e-ab665 SMP preempt mod_unload modversions aarch64",
+      "variant": "rt",
+      "label": "5.4.210",
+      "file": "RT/5.4.210.sh",
+      "sha256": "341c24583c4bb82f73a683f66b5461922cb26f8adaaa50573591218331e8f9b8",
+      "size": 382397
+    },
+    {
+      "kernel": "5.4.210-android12-9-667269-g856cdf2f247e-ab665",
+      "vermagic": "5.4.210-android12-9-667269-g856cdf2f247e-ab665 preempt mod_unload modversions aarch64",
+      "variant": "rt",
+      "label": "5.4.210-nosmp",
+      "file": "RT/5.4.210.sh",
+      "sha256": "341c24583c4bb82f73a683f66b5461922cb26f8adaaa50573591218331e8f9b8",
+      "size": 382397
+    },
+    {
       "kernel": "4.19.275-niigo-enanan-yoka-ks32386",
       "vermagic": "4.19.275-niigo-enanan-yoka-ks32386",
       "variant": "rt",
@@ -390,6 +417,6 @@
       "size": 325621
     }
   ],
-  "count": 43,
-  "updated": "2026-11-14T04:27:36Z"
+  "count": 46,
+  "updated": "2026-11-14T04:56:15Z"
 }
