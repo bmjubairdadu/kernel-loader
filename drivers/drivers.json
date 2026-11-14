@@ -3,6 +3,33 @@
   "generated_at": "2026-04-18T00:00:00Z",
   "drivers": [
     {
+      "kernel": "4.19.191-g216400aba14e-dirty",
+      "vermagic": "4.19.191-g216400aba14e-dirty",
+      "variant": "rt",
+      "label": "4.19.191d",
+      "file": "RT/4.19.191d.sh",
+      "sha256": "d70e8cbe9e52b1143d3f0baa6be1a034ee08ddf048f6e09c860aaa5659fee0ed",
+      "size": 277061
+    },
+    {
+      "kernel": "4.19.191-g216400aba14e-dirty",
+      "vermagic": "4.19.191-g216400aba14e-dirty SMP preempt mod_unload modversions aarch64",
+      "variant": "rt",
+      "label": "4.19.191d",
+      "file": "RT/4.19.191d.sh",
+      "sha256": "d70e8cbe9e52b1143d3f0baa6be1a034ee08ddf048f6e09c860aaa5659fee0ed",
+      "size": 277061
+    },
+    {
+      "kernel": "4.19.191-g216400aba14e-dirty",
+      "vermagic": "4.19.191-g216400aba14e-dirty preempt mod_unload modversions aarch64",
+      "variant": "rt",
+      "label": "4.19.191d-nosmp",
+      "file": "RT/4.19.191d.sh",
+      "sha256": "d70e8cbe9e52b1143d3f0baa6be1a034ee08ddf048f6e09c860aaa5659fee0ed",
+      "size": 277061
+    },
+    {
       "kernel": "4.14.113-25741823",
       "vermagic": "4.14.113-25741823 SMP preempt mod_unload modversions aarch64",
       "variant": "rt",
@@ -165,29 +192,6 @@
       "size": 635474
     },
     {
-      "kernel": "4.19.191-g216400aba14e-dirty",
-      "vermagic": "4.19.191-g216400aba14e-dirty SMP preempt mod_unload modversions aarch64",
-      "variant": "d",
-      "label": "4.19.191d",
-      "file": "RT/4.19.191d.sh",
-      "sha256": "ebd7fd64ca246bd9133f36b8172315cd411c31f84eb5063eab743d00b55b4b1f",
-      "size": 503213,
-      "device": "TECNO-BF7",
-      "model": "TECNO BF7",
-      "brand": "TECNO",
-      "product": "BF7-GL",
-      "androidVersion": "12",
-      "supportedDevices": [
-        "TECNO-BF7",
-        "BF7-GL",
-        "TECNO BF7",
-        "TECNO TECNO BF7",
-        "mt6761"
-      ],
-      "moduleLayoutCrc": "0xaefd27b2",
-      "crcCount": 56
-    },
-    {
       "kernel": "4.19.81-perf-g236f9eb09-dirty",
       "vermagic": "4.19.81-perf-g236f9eb09-dirty SMP preempt mod_unload modversions aarch64",
       "variant": "a",
@@ -332,6 +336,6 @@
       "size": 325621
     }
   ],
-  "count": 35,
-  "updated": "2026-11-14T00:51:25Z"
+  "count": 37,
+  "updated": "2026-11-14T02:30:16Z"
 }
