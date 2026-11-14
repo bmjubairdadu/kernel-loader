@@ -3,6 +3,33 @@
   "generated_at": "2026-04-18T00:00:00Z",
   "drivers": [
     {
+      "kernel": "4.19.275-niigo-enanan-yoka-ks32386",
+      "vermagic": "4.19.275-niigo-enanan-yoka-ks32386",
+      "variant": "rt",
+      "label": "4.19.275",
+      "file": "RT/4.19.275.sh",
+      "sha256": "c59057643b387cc768ee6107df94d21f6f10fa16a0d8e4afbad980a12910e277",
+      "size": 276533
+    },
+    {
+      "kernel": "4.19.275-niigo-enanan-yoka-ks32386",
+      "vermagic": "4.19.275-niigo-enanan-yoka-ks32386 SMP preempt mod_unload modversions aarch64",
+      "variant": "rt",
+      "label": "4.19.275",
+      "file": "RT/4.19.275.sh",
+      "sha256": "c59057643b387cc768ee6107df94d21f6f10fa16a0d8e4afbad980a12910e277",
+      "size": 276533
+    },
+    {
+      "kernel": "4.19.275-niigo-enanan-yoka-ks32386",
+      "vermagic": "4.19.275-niigo-enanan-yoka-ks32386 preempt mod_unload modversions aarch64",
+      "variant": "rt",
+      "label": "4.19.275-nosmp",
+      "file": "RT/4.19.275.sh",
+      "sha256": "c59057643b387cc768ee6107df94d21f6f10fa16a0d8e4afbad980a12910e277",
+      "size": 276533
+    },
+    {
       "kernel": "5.10.209-gki-g551c5e51f5e6-dirty",
       "vermagic": "5.10.209-gki-g551c5e51f5e6-dirty",
       "variant": "rt",
@@ -363,6 +390,6 @@
       "size": 325621
     }
   ],
-  "count": 40,
-  "updated": "2026-11-14T03:30:33Z"
+  "count": 43,
+  "updated": "2026-11-14T04:27:36Z"
 }
