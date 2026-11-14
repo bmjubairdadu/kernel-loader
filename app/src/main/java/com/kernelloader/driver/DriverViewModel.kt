@@ -107,10 +107,10 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
     private fun classifyLine(line: String): String {
         val u = line.uppercase()
         return when {
-            line.contains("[OK]") || line.startsWith("PASS") || u.contains("RESULT: PASS") || u.contains("SUCCESS") || u.contains("[+] ACTIVE NODE") -> "OK"
-            line.contains("[ERR]") || line.startsWith("FAIL") || u.contains("RESULT: FAIL") || u.contains("ERROR") || u.contains("REJECTED") -> "ERR"
-            line.contains("[WARN]") -> "WARN"
-            line.startsWith("[1/") || line.startsWith("[2/") || line.startsWith("[3/") || line.startsWith("[4/") || line.startsWith("[5/") || line.startsWith("[STEP") || line.startsWith("[~]") -> "CMD"
+            u.contains("SUCCESS") || u.contains("ACCEPTED") || u.contains("ACTIVE NODE:") || u.contains("PERMISSIONS LOCKED") || u.contains("PAYLOAD STAGED") || line.startsWith("PASS") || u.contains("RESULT: PASS") -> "OK"
+            u.contains("ERROR") || u.contains("FAILED") || u.contains("REJECTED") || line.startsWith("FAIL") || u.contains("RESULT: FAIL") -> "ERR"
+            u.contains("WARN") -> "WARN"
+            line.startsWith("- ") || line.startsWith("[~]") -> "CMD"
             else -> "INFO"
         }
     }
