@@ -26,22 +26,6 @@ data class DriverErrorInfo(
             val combined = "$rawError $dmesg $logs".lowercase(Locale.US)
 
             return when {
-                combined.contains("signature unlocked") ||
-                combined.contains("restart phone once") -> {
-                    DriverErrorInfo(
-                        errorType = DriverErrorType.SIGNATURE_LOCKED,
-                        titleEn = "Kernel Signature Unlocked!",
-                        rawError = "Kernel signature enforcement unlocked in boot image",
-                        descriptionEn = "Kernel signature check has been unlocked in your boot partition! Please restart your phone now. After reboot, tap LOAD and the driver will load instantly without any signature rejection.",
-                        solutionStepsEn = listOf(
-                            "Tap 'Reboot Now' below to restart your phone.",
-                            "After rebooting, open Kernel Loader and tap LOAD.",
-                            "Your Stealth Engine driver will load cleanly with a green checkmark!"
-                        ),
-                        canReboot = true
-                    )
-                }
-
                 combined.contains("unsigned module") ||
                 combined.contains("signature locked") ||
                 combined.contains("module_sig_force") ||
@@ -55,9 +39,9 @@ data class DriverErrorInfo(
                         rawError = if (rawError.isNotBlank()) rawError else "CONFIG_MODULE_SIG_FORCE active (Unsigned module rejected)",
                         descriptionEn = "Your device's kernel enforces strict module signature verification (CONFIG_MODULE_SIG_FORCE=y) and rejects unsigned drivers.",
                         solutionStepsEn = listOf(
-                            "Tap LOAD again - the app writes the signature sysctl and retries the insmod automatically.",
-                            "If the kernel still rejects the module, the app patches the boot image signature check and asks for one reboot.",
-                            "Reboot your phone once, open Kernel Loader, and tap LOAD - the embedded driver will load cleanly."
+                            "Reboot your device once and verify root access is operating normally.",
+                            "Ensure that a kernel module signature bypass or permissive module loading module is enabled.",
+                            "Check terminal console output for detailed kernel dmesg logs."
                         )
                     )
                 }

@@ -53,7 +53,6 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
     var updateStatus = mutableStateOf("IDLE")
     var updateProgress = mutableStateOf(0)
     var rebooting = mutableStateOf(false)
-    var sigPatchStatus = mutableStateOf("IDLE")
     var verifyStatus = mutableStateOf("IDLE")
     var verifyDetail = mutableStateOf("")
     var loadErrorDialogData = mutableStateOf<DriverErrorInfo?>(null)
@@ -124,25 +123,6 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 f.writeText("")
-            } catch (_: Exception) {
-            }
-            checkPersistedSigStatus()
-        }
-    }
-
-    private fun checkPersistedSigStatus() {
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                if (!RootChecker.isRootAvailable()) return@launch
-                val prop = Shell.cmd("cat /data/adb/kernel_loader/status.prop 2>/dev/null")
-                    .exec().out.joinToString("\n")
-                if (prop.contains("sig_unlocked=true")) {
-                    withContext(Dispatchers.Main) {
-                        if (sigPatchStatus.value == "IDLE") {
-                            sigPatchStatus.value = "DONE"
-                        }
-                    }
-                }
             } catch (_: Exception) {
             }
         }
@@ -907,50 +887,6 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             }
             isBusy.value = false
             busyStep.value = ""
-        }
-    }
-
-    fun patchKernelSignature(context: Context) {
-        if (isBusy.value) return
-        viewModelScope.launch {
-            isBusy.value = true
-            sigPatchStatus.value = "PATCHING"
-            busyStep.value = "Patching boot image signature check..."
-            tlog("Kernel signature bypass started", "CMD")
-            tlog("Unpacking boot.img & patching module_sig_check...", "INFO")
-            try {
-                val (ok, detail) = withContext(Dispatchers.IO) {
-                    UniversalKernelLoader.autoUnlockSignatureStandaloneDetail(context, this@DriverViewModel)
-                }
-                if (ok) {
-                    val alreadyPatched = detail.contains("ALREADY_PATCHED")
-                    sigPatchStatus.value = "DONE"
-                    if (alreadyPatched) {
-                        tlog("Boot partition is ALREADY patched & verified", "OK")
-                        Toast.makeText(context, "Signature Verification is already disabled!", Toast.LENGTH_LONG).show()
-                    } else {
-                        tlog("Boot image patched & verified on flash! Rebooting in 3 seconds...", "OK")
-                        Toast.makeText(context, "Signature Bypass Applied! Rebooting in 3s...", Toast.LENGTH_LONG).show()
-                        delay(3000)
-                        rebootDevice(context)
-                    }
-                } else {
-                    sigPatchStatus.value = "FAILED"
-                    val reason = detail.lineSequence().lastOrNull { it.isNotBlank() } ?: "Unknown error"
-                    tlog("Signature bypass failed: $reason", "ERR")
-                    tlog("Where: Boot partition unpack / module_sig_check binary patch", "ERR")
-                    detail.lineSequence().filter { it.isNotBlank() }.forEach { line ->
-                        tlog("Stage: $line", "WARN")
-                    }
-                    Toast.makeText(context, "Signature Bypass Failed: $reason", Toast.LENGTH_LONG).show()
-                }
-            } catch (e: Exception) {
-                sigPatchStatus.value = "FAILED"
-                tlog("Signature bypass error: ${e.message}", "ERR")
-            } finally {
-                isBusy.value = false
-                busyStep.value = ""
-            }
         }
     }
 }

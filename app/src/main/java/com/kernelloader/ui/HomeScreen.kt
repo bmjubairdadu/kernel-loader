@@ -185,7 +185,6 @@ fun HomeScreen(
     val loaded = viewModel.driverLoaded.value
     val hidden = viewModel.hiddenLoaded.value
     val loadedModule = viewModel.driverModule.value.ifBlank { viewModel.loadedModuleName.value }
-    val sigPatchStatus = viewModel.sigPatchStatus.value
 
     if (!HomeScreenReportWipe.done) {
         HomeScreenReportWipe.done = true
@@ -407,17 +406,6 @@ fun HomeScreen(
                     onPickFile = onPickFile,
                     onRunPicked = { viewModel.loadPickedFile(context) },
                     onClearPicked = { viewModel.clearPickedFile() }
-                )
-
-                Spacer(Modifier.height(10.dp))
-
-                SignatureVerificationOffCard(
-                    strings = s,
-                    busy = busy,
-                    busyStep = busyStep,
-                    rootAvailable = rootAvailable,
-                    sigPatchStatus = sigPatchStatus,
-                    onPatchSignature = { viewModel.patchKernelSignature(context) }
                 )
 
                 Spacer(Modifier.height(14.dp))
@@ -1560,117 +1548,6 @@ private fun CustomScriptLoadCard(
                     }
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun SignatureVerificationOffCard(
-    strings: UiStrings,
-    busy: Boolean,
-    busyStep: String,
-    rootAvailable: Boolean,
-    sigPatchStatus: String,
-    onPatchSignature: () -> Unit
-) {
-    val isPatchingSig = busy && (busyStep.contains("signature", true) || busyStep.contains("boot", true))
-    val isSigDone = sigPatchStatus == "DONE"
-    val subText = when (sigPatchStatus) {
-        "DONE" -> "✓ Signature verification disabled in boot.img"
-        "PATCHING" -> strings.sigOffPatchingBtn
-        "FAILED" -> "✕ Signature bypass failed — check terminal"
-        else -> strings.sigOffSub
-    }
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Surface1),
-        border = BorderStroke(
-            1.2.dp,
-            Brush.horizontalGradient(
-                listOf(
-                    if (isSigDone) StatusOk else LogoPurple.copy(alpha = 0.75f),
-                    LogoMagenta.copy(alpha = 0.55f),
-                    AccentAmber.copy(alpha = 0.65f)
-                )
-            )
-        )
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(
-                    Brush.horizontalGradient(
-                        listOf(
-                            LogoPurple.copy(alpha = 0.10f),
-                            AccentAmber.copy(alpha = 0.06f)
-                        )
-                    )
-                )
-                .padding(horizontal = 14.dp, vertical = 11.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(LogoPurple.copy(alpha = 0.18f))
-                        .border(1.dp, LogoPurple.copy(alpha = 0.5f), RoundedCornerShape(10.dp)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        Icons.Default.Security,
-                        contentDescription = null,
-                        tint = if (isSigDone) StatusOk else LogoSoftPink,
-                        modifier = Modifier.size(19.dp)
-                    )
-                }
-                Spacer(Modifier.width(10.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        text = strings.sigOffTitle,
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = TextPrimary
-                    )
-                    Text(
-                        text = subText,
-                        style = MaterialTheme.typography.bodySmall,
-                        fontSize = 11.sp,
-                        color = when (sigPatchStatus) {
-                            "DONE" -> StatusOk
-                            "FAILED" -> AccentRed
-                            else -> TextMuted
-                        },
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-            }
-
-            Spacer(Modifier.height(9.dp))
-
-            PremiumActionButton(
-                text = if (isPatchingSig) strings.sigOffPatchingBtn else strings.sigOffBtn,
-                icon = Icons.Default.Shield,
-                enabled = !busy && rootAvailable,
-                loading = isPatchingSig,
-                gradientColors = if (isSigDone) {
-                    listOf(Color(0xFF0B5345), Color(0xFF0E6655), Color(0xFF154360))
-                } else {
-                    listOf(Color(0xFF431D7A), Color(0xFF5B2192), Color(0xFF37308A))
-                },
-                borderColors = if (isSigDone) {
-                    listOf(Color(0xFF34D399).copy(alpha = 0.65f), Color(0xFF38BDF8).copy(alpha = 0.60f))
-                } else {
-                    listOf(Color(0xFFC084FC).copy(alpha = 0.65f), Color(0xFF818CF8).copy(alpha = 0.65f))
-                },
-                iconTint = if (isSigDone) Color(0xFF5EEAD4) else Color(0xFFFBBF24),
-                onClick = onPatchSignature
-            )
         }
     }
 }
