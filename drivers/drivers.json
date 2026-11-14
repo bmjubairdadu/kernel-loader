@@ -2,15 +2,15 @@
   "schema": 1,
   "count": 9,
   "generated_at": "2026-11-14T09:26:15Z",
-  "updated": "2026-11-14T21:41:41Z",
+  "updated": "2026-11-14T21:49:55Z",
   "drivers": [
     {
       "kernel": "4.19.191+",
       "vermagic": "4.19.191+ SMP preempt mod_unload modversions aarch64",
-      "variant": "rt",
+      "variant": "a",
       "label": "4.19.191b",
       "file": "RT/4.19.191b.sh",
-      "sha256": "bb626bad18e65a20d5e94001d14a040bd074b9f28dbd4a4fb18564015d6700b6",
+      "sha256": "f05aa65a2a047d7a8922cb49231f316bc3fa79478dcd6c471317a314f1d3b069",
       "size": 379604
     },
     {
