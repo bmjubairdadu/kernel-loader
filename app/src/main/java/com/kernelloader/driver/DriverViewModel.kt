@@ -709,6 +709,9 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
         return when {
             clean.startsWith("PASS: ") -> clean.removePrefix("PASS: ") to "OK"
             clean.startsWith("FAIL: ") -> clean.removePrefix("FAIL: ") to "ERR"
+            clean.contains("SUCCESS") || clean.contains("ACTIVE") || clean.contains("OPERATIONAL") || clean.contains("ENGAGED") -> clean to "OK"
+            clean.contains("FAILED") || clean.contains("ERROR") -> clean to "ERR"
+            clean.startsWith("- ") -> clean to "CMD"
             else -> clean to "INFO"
         }
     }

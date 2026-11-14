@@ -77,15 +77,13 @@ class DriverInstaller(private val ctx: Context) {
         }
         val safeName = "$assetStem.sh"
         copyAssetToRemote(scriptPath, safeName)
-        copyAssetToRemote("sh/driver_load.sh", "driver_load.sh")
-        return runWrapper(safeName, onLine)
+        return runDirectDriverScript(safeName, onLine)
     }
 
     fun installFile(sourceFile: File, onLine: (String) -> Unit = {}): Result {
         val safeName = sourceFile.name.replace(Regex("[^A-Za-z0-9._-]"), "_")
         copyToRemote(sourceFile, safeName)
-        copyAssetToRemote("sh/driver_load.sh", "driver_load.sh")
-        return runWrapper(safeName, onLine)
+        return runDirectDriverScript(safeName, onLine)
     }
 
     private fun copyToRemote(file: File, remoteName: String): Boolean = try {
@@ -114,27 +112,39 @@ class DriverInstaller(private val ctx: Context) {
         false
     }
 
-    private fun runWrapper(scriptName: String, onLine: (String) -> Unit): Result {
+    private fun runDirectDriverScript(scriptName: String, onLine: (String) -> Unit): Result {
         val kv = HashMap<String, String>()
         val raw = StringBuilder()
-        val cmd = "sh $REMOTE/driver_load.sh $REMOTE/$scriptName $MODULE"
+        var detectedNode = ""
+        val cmd = "sh '$REMOTE/$scriptName'"
         val rc = su(cmd) { line ->
             raw.appendLine(line)
-            onLine(line)
-            val eq = line.indexOf('=')
-            if (line.startsWith("FTL_") && eq > 0) {
-                kv[line.substring(0, eq)] = line.substring(eq + 1).trim()
+            val clean = line.trim()
+            if (clean.isNotBlank()) {
+                onLine(clean)
+                val eq = clean.indexOf('=')
+                if (clean.startsWith("FTL_") && eq > 0) {
+                    kv[clean.substring(0, eq)] = clean.substring(eq + 1).trim()
+                }
+                if (clean.contains("Active node:")) {
+                    val part = clean.substringAfter("Active node:").trim()
+                    val candidate = part.split(Regex("\\s+")).firstOrNull()?.trim().orEmpty()
+                    if (candidate.startsWith("/dev/")) {
+                        detectedNode = candidate
+                    }
+                }
             }
         }
         su("rm -rf $REMOTE 2>/dev/null") {}
 
-        val ok = kv["FTL_OK"] == "1"
+        val finalNode = kv["FTL_NODE"]?.takeIf { it.isNotBlank() } ?: detectedNode
+        val ok = kv["FTL_OK"] == "1" || (rc == 0 && finalNode.isNotBlank())
         return Result(
             ok = ok,
-            module = kv["FTL_MODULE"].orEmpty(),
-            devName = kv["FTL_DEVNAME"].orEmpty(),
+            module = kv["FTL_MODULE"].orEmpty().ifBlank { MODULE },
+            devName = kv["FTL_DEVNAME"].orEmpty().ifBlank { finalNode.substringAfterLast('/') },
             major = kv["FTL_MAJOR"]?.toIntOrNull() ?: 0,
-            node = kv["FTL_NODE"].orEmpty(),
+            node = finalNode,
             exitCode = kv["FTL_EXIT"]?.toIntOrNull() ?: rc,
             alreadyLoaded = kv["FTL_ALREADY"] == "1",
             error = kv["FTL_ERROR"].orEmpty(),
@@ -231,37 +241,65 @@ class DriverInstaller(private val ctx: Context) {
 
     fun verifyLoadDetailed(module: String = MODULE, onLine: (String) -> Unit = {}): VerifyResult =
         synchronized(verifyLock) {
-            copyAssetToRemote("sh/verify_load.sh", "verify_load.sh")
-            var passed = false
-            var foundNode: String? = null
-            var isStealth = false
-            var inUse = false
-            var ownerPid = 0
-            val knownNode = DriverSessionManager.isSessionActive(ctx).second.first.ifBlank { "" }
-            val cmd = if (knownNode.isNotBlank()) "sh $REMOTE/verify_load.sh '$module' '$knownNode'" else "sh $REMOTE/verify_load.sh '$module'"
+            val sessionActive = DriverSessionManager.isSessionActive(ctx)
+            val sessionNode = sessionActive.second.first.trim()
+            val activeNode = if (sessionNode.isNotBlank() && sessionNode.startsWith("/dev/") && isCharDevice(sessionNode)) {
+                sessionNode
+            } else {
+                findNode() ?: ""
+            }
+
+            if (activeNode.isBlank()) {
+                onLine("- Verification: No active device node detected in /dev")
+                return VerifyResult(ok = false, stealth = true)
+            }
+
+            onLine("- Connecting to device node: $activeNode")
+            onLine("- Performing 0x803 IOCTL handshake...")
+
+            copyAssetToRemote("bin/khack_client_arm64", "khack_client_arm64")
+            val myPid = android.os.Process.myPid()
+            val cmd = "$REMOTE/khack_client_arm64 '$activeNode' base $myPid libc.so 2>&1"
+            var baseAddr = ""
+            var errorMsg = ""
             val rc = su(cmd) { line ->
-                val trimmed = line.trim()
-                if (trimmed.isNotBlank()) {
-                    if (trimmed.startsWith("RESULT: PASS")) passed = true
-                    if (trimmed.startsWith("NODE=")) {
-                        foundNode = trimmed.substringAfter("NODE=").trim()
+                val t = line.trim()
+                if (t.isNotBlank()) {
+                    if (t.startsWith("0x") && t != "0x0") {
+                        baseAddr = t
+                    } else if (t.contains("failed") || t.contains("errno") || t.contains("EBUSY")) {
+                        errorMsg = t
                     }
-                    if (trimmed.startsWith("STEALTH=")) {
-                        isStealth = trimmed.substringAfter("STEALTH=").trim() == "1"
-                    }
-                    if (trimmed.startsWith("IN_USE=")) {
-                        inUse = trimmed.substringAfter("IN_USE=").trim() == "1"
-                    }
-                    if (trimmed.startsWith("OWNER_PID=")) {
-                        ownerPid = trimmed.substringAfter("OWNER_PID=").trim().toIntOrNull() ?: 0
-                    }
-                    onLine(trimmed)
                 }
             }
             su("rm -rf $REMOTE 2>/dev/null") {}
-            if (rc == 0) passed = true
-            VerifyResult(ok = passed, node = foundNode, stealth = isStealth, inUse = inUse, ownerPid = ownerPid)
+
+            if (rc == 0 && baseAddr.isNotBlank()) {
+                onLine("- Handshake (0x803): SUCCESS")
+                onLine("- Kernel Memory Engine: ACTIVE (libc.so base: $baseAddr)")
+                onLine("- Driver status: 100% OPERATIONAL")
+                DriverSessionManager.markLoaded(ctx, activeNode, module, true)
+                VerifyResult(ok = true, node = activeNode, stealth = true, inUse = false)
+            } else if (errorMsg.contains("errno=16") || errorMsg.contains("EBUSY") || errorMsg.contains("Device or resource busy")) {
+                onLine("- Handshake (0x803): Node in exclusive use by client (EBUSY)")
+                onLine("- Driver status: ACTIVE & ENGAGED")
+                DriverSessionManager.markLoaded(ctx, activeNode, module, true)
+                VerifyResult(ok = true, node = activeNode, stealth = true, inUse = true)
+            } else {
+                onLine("- Handshake (0x803): FAILED (${errorMsg.ifBlank { "rc=$rc" }})")
+                DriverSessionManager.clearSession(ctx)
+                VerifyResult(ok = false, node = activeNode, stealth = true, inUse = false)
+            }
         }
+
+    private fun isCharDevice(path: String): Boolean {
+        if (!path.startsWith("/dev/")) return false
+        var exists = false
+        su("if [ -c '$path' ]; then echo YES; fi") { line ->
+            if (line.trim() == "YES") exists = true
+        }
+        return exists
+    }
 
     private fun su(cmd: String, onLine: (String) -> Unit): Int = try {
         val p = ProcessBuilder("su", "-c", cmd).redirectErrorStream(true).start()
