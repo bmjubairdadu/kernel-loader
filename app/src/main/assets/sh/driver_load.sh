@@ -75,6 +75,9 @@ resolve_major() {
     fi
 }
 
+# Clean up any leftover temporary active-node marker before running fresh install
+rm -f /dev/.kloder_active_node 2>/dev/null
+
 PRE_MOD=""
 PRE_ALREADY=0
 PRE_STEALTH=0
@@ -85,49 +88,10 @@ PRE_CLSNAME=""
 if [ -n "$EXPECT" ] && grep -qw "$EXPECT" /proc/modules 2>/dev/null; then
     PRE_MOD="$EXPECT"
     PRE_ALREADY=1
-else
-    if find_stealth_node; then
-        case "$DEVNAME" in
-            [A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9])
-                if ! grep -qw "$DEVNAME" /proc/devices 2>/dev/null; then
-                    PRE_DEVNAME="$DEVNAME"
-                    PRE_NODE="$NODE"
-                    PRE_CLSNAME="$CLSNAME"
-                    PRE_MOD="$EXPECT"
-                    PRE_ALREADY=1
-                    PRE_STEALTH=1
-                fi
-                ;;
-        esac
-    fi
-    if [ "$PRE_ALREADY" -eq 0 ]; then
-        FD_HIT=$(ls -l /proc/[0-9]*/fd 2>/dev/null | awk '/ -> \/dev\/[A-Za-z0-9]{6} \(deleted\)$/ { dev=$(NF-1); sub(/^\/dev\//,"",dev); if (dev !~ /^(binder|common|ashmem|random)$/) { print dev; exit } }')
-        if [ -n "$FD_HIT" ]; then
-            PRE_DEVNAME="$FD_HIT"
-            PRE_NODE="/dev/$FD_HIT"
-            PRE_MOD="$EXPECT"
-            PRE_ALREADY=1
-            PRE_STEALTH=1
-        fi
-    fi
-fi
-
-if [ "$PRE_ALREADY" -eq 1 ]; then
-    MOD="$PRE_MOD"
-    DEVNAME="$PRE_DEVNAME"
-    NODE="$PRE_NODE"
-    CLSNAME="$PRE_CLSNAME"
-    ALREADY=1
-    IS_STEALTH="$PRE_STEALTH"
-    RC=0
-    resolve_major
-    echo "FTL_MODULE=$MOD"
-    echo "FTL_DEVNAME=${DEVNAME:-}"
-    echo "FTL_MAJOR=${MAJOR:-}"
-    echo "FTL_NODE=${NODE:-}"
+    echo "FTL_MODULE=$PRE_MOD"
     echo "FTL_EXIT=0"
     echo "FTL_ALREADY=1"
-    echo "FTL_STEALTH=$IS_STEALTH"
+    echo "FTL_STEALTH=0"
     echo "FTL_OK=1"
     exit 0
 fi
@@ -165,68 +129,60 @@ DEVNAME=""
 NODE=""
 CLSNAME=""
 
-if [ -n "$NEW_DEV" ] && [ -c "/dev/$NEW_DEV" ]; then
-    DEVNAME="$NEW_DEV"
-    NODE="/dev/$NEW_DEV"
-    CLSNAME="$NEW_DEV"
-fi
-
-if [ -z "$NODE" ] && [ -n "$NEW_CDEV" ] && [ -c "/dev/$NEW_CDEV" ]; then
-    DEVNAME="$NEW_CDEV"
-    NODE="/dev/$NEW_CDEV"
-    CLSNAME="$NEW_CDEV"
-fi
-
-if [ -z "$NODE" ] && [ -n "$NEW_CLS" ]; then
-    CLSNAME="$NEW_CLS"
-    if [ -c "/dev/$NEW_CLS" ]; then
-        DEVNAME="$NEW_CLS"
-        NODE="/dev/$NEW_CLS"
-    else
-        for child in "/sys/class/$NEW_CLS"/*; do
-            c=$(basename "$child")
-            if [ -c "/dev/$c" ]; then
-                DEVNAME="$c"
-                NODE="/dev/$c"
-                break
-            fi
-        done
+# Priority 1: Direct node marker created by vendor insmod execution
+if [ -s /dev/.kloder_active_node ]; then
+    ACT_NODE=$(cat /dev/.kloder_active_node 2>/dev/null)
+    if [ -n "$ACT_NODE" ] && [ -c "$ACT_NODE" ]; then
+        NODE="$ACT_NODE"
+        DEVNAME=$(basename "$ACT_NODE")
+        CLSNAME="$DEVNAME"
     fi
 fi
 
-# Fallback scan for active stealth device (only when vendor script succeeded)
-if [ -z "$NODE" ] && [ "$RC" -eq 0 ]; then
-    find_stealth_node || true
-fi
-
-# If node was still not found but vendor script succeeded (RC=0), give kernel a moment to register node
-if [ -z "$NODE" ] && [ "$RC" -eq 0 ]; then
-    sleep 0.3
+# Priority 2: True diff of /dev newly created during installer execution (must start with digit)
+if [ -z "$NODE" ]; then
     ls -1 /dev 2>/dev/null | sort > "$WORK/.dev.after"
-    NEW_DEV=$(grep -vxF -f "$WORK/.dev.before" "$WORK/.dev.after" 2>/dev/null | grep -v '^\.' | head -n 1)
-    if [ -n "$NEW_DEV" ] && [ -c "/dev/$NEW_DEV" ]; then
-        DEVNAME="$NEW_DEV"
-        NODE="/dev/$NEW_DEV"
-        CLSNAME="$NEW_DEV"
-    fi
-    if [ -z "$NODE" ]; then
-        find_stealth_node || true
-    fi
+    for cand in $(grep -vxF -f "$WORK/.dev.before" "$WORK/.dev.after" 2>/dev/null | grep -v '^\.'); do
+        if [ -c "/dev/$cand" ]; then
+            case "$cand" in
+                [0-9]*)
+                    DEVNAME="$cand"
+                    NODE="/dev/$cand"
+                    CLSNAME="$cand"
+                    echo "$NODE" > /dev/.kloder_active_node 2>/dev/null
+                    chmod 0644 /dev/.kloder_active_node 2>/dev/null
+                    break
+                    ;;
+            esac
+        fi
+    done
 fi
 
-# Check proc/devices fallback if node opened and class deleted
-if [ -z "$DEVNAME" ]; then
-    CDEV=$(awk '/Character devices:/, /Block devices:/ { if ($1 ~ /^[0-9]+$/ && $2 ~ /^[A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9]$/ && $2 !~ /^(mem|msm|tty|misc|input|sg|fb|video|ch|i2c|ppp|alsa|ptm|pts|spi|usb|DVB|adsprpc|avtimer|dts|sensors|hidraw|bt|jpeg|BaseRemote|goodix|rmnet|icesdcc|qseecom|kgsl|frandom|diag|smd|wcnss|subsys|ramdump|mdss|ipa|iio|media|rtc|pmsg|gpio|uio|wwan|rfkill|extcon|switch|spidev|Vcodec|vcodec|accdet|mrdump|ndctl|dimm|dpa)/) print $2 }' /proc/devices 2>/dev/null | tail -n 1)
-    if [ -n "$CDEV" ]; then
-        DEVNAME="$CDEV"
-        [ -c "/dev/$CDEV" ] && NODE="/dev/$CDEV"
-    fi
+# Priority 3: True diff of /sys/class newly created during installer execution
+if [ -z "$NODE" ]; then
+    ls -1 /sys/class 2>/dev/null | sort > "$WORK/.cls.after"
+    for cand_cls in $(grep -vxF -f "$WORK/.cls.before" "$WORK/.cls.after" 2>/dev/null); do
+        case "$cand_cls" in
+            [0-9]*)
+                if [ -c "/dev/$cand_cls" ]; then
+                    DEVNAME="$cand_cls"
+                    NODE="/dev/$cand_cls"
+                    CLSNAME="$cand_cls"
+                    echo "$NODE" > /dev/.kloder_active_node 2>/dev/null
+                    chmod 0644 /dev/.kloder_active_node 2>/dev/null
+                    break
+                fi
+                ;;
+        esac
+    done
 fi
 
 resolve_major
 
 if [ -n "$NODE" ] && [ -c "$NODE" ]; then
-    chmod 0600 "$NODE" 2>/dev/null
+    chmod 0666 "$NODE" 2>/dev/null
+    echo "$NODE" > /dev/.kloder_active_node 2>/dev/null
+    chmod 0644 /dev/.kloder_active_node 2>/dev/null
 fi
 
 IS_STEALTH=0
@@ -234,10 +190,6 @@ if [ -z "$MOD" ]; then
     if [ "$RC" -eq 0 ] && [ -n "$NODE" ]; then
         MOD="${EXPECT:-rt}"
         IS_STEALTH=1
-    elif [ "$RC" -eq 0 ] && [ -n "$NODE" ] && [ -n "$MAJOR" ]; then
-        MOD="${EXPECT:-rt}"
-        IS_STEALTH=1
-        ALREADY=1
     fi
 fi
 

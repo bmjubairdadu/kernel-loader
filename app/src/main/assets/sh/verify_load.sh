@@ -9,6 +9,7 @@ echo "module : $MOD"
 echo "kernel : $(uname -r)"
 echo "root   : $(id -u)"
 
+TARGET_NODE="${2:-}"
 CLSNAME=""
 DEVNAME=""
 NODE=""
@@ -18,41 +19,61 @@ _FALLBACK_DEV=""
 _FALLBACK_NODE=""
 _FALLBACK_SYSDEV=""
 
-for d in /sys/class/*/; do
-    [ -d "$d" ] || continue
-    cls=$(basename "$d")
-    case "$cls" in
-        android_usb|avtimer|backlight|battery*|bdi|block|bluetooth|bt*|char|charger*|devfreq|diag|dma|drm|dual_role_usb|dvb|extcon|fastrng|fastrpc|fingerprint|firmware|fuse|goodix*|gpio|graphics|hidraw|hwmon|i2c*|icesdcc|ieee*|input|iommu|ion|ipa*|jpeg*|kgsl|kmsg|lcd*|leds|lirc|mdio*|mem|misc|mmc*|msm*|net|phy|pmsg|power*|ppp|pwm|qg*|qpnp*|qseecom|ramdump|rc|regulator|remoteproc|rfkill|rmnet*|rotator|rpmsg|rtc|scsi*|sensors|smb*|smd*|soc*|sound|spidev|spmi*|ssc|subsys*|switch|tee|thermal|tty*|typec|uhid|uinput|uio|usb*|vc|video*|virtio*|vtconsole|wakeup|watchdog*|wcnss*|wwan*|zram*|BaseRemoteCtl|Vcodec*|vcodec*|accdet*|mrdump*|ndctl*|dimm*|dpa*)
-            continue
-            ;;
-    esac
-    case "$cls" in
-        [0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9])
-            if [ -c "/dev/$cls" ]; then
-                CLSNAME="$cls"
-                DEVNAME="$cls"
-                NODE="/dev/$cls"
-                SYSDEV="/sys/class/$cls/$cls/dev"
-                break
-            fi
-            ;;
-    esac
-    for child in "$d"*; do
-        [ -e "$child" ] || continue
-        c=$(basename "$child")
-        case "$c" in
+# Priority 1: Check known node passed as parameter
+if [ -n "$TARGET_NODE" ] && [ -c "$TARGET_NODE" ]; then
+    NODE="$TARGET_NODE"
+    DEVNAME=$(basename "$TARGET_NODE")
+    CLSNAME="$DEVNAME"
+fi
+
+# Priority 2: Check active node marker recorded at insmod time
+if [ -z "$NODE" ] && [ -s /dev/.kloder_active_node ]; then
+    RECORDED=$(cat /dev/.kloder_active_node 2>/dev/null)
+    if [ -n "$RECORDED" ] && [ -c "$RECORDED" ]; then
+        NODE="$RECORDED"
+        DEVNAME=$(basename "$RECORDED")
+        CLSNAME="$DEVNAME"
+    fi
+fi
+
+# Priority 3: Fallback scan only if no recorded active node (must start with digit)
+if [ -z "$NODE" ]; then
+    for d in /sys/class/*/; do
+        [ -d "$d" ] || continue
+        cls=$(basename "$d")
+        case "$cls" in
+            android_usb|avtimer|backlight|battery*|bdi|block|bluetooth|bt*|char|charger*|devfreq|diag|dma|drm|dual_role_usb|dvb|extcon|fastrng|fastrpc|fingerprint|firmware|fuse|goodix*|gpio|graphics|hidraw|hwmon|i2c*|icesdcc|ieee*|input|iommu|ion|ipa*|jpeg*|kgsl|kmsg|lcd*|leds|lirc|mdio*|mem|misc|mmc*|msm*|net|phy|pmsg|power*|ppp|pwm|qg*|qpnp*|qseecom|ramdump|rc|regulator|remoteproc|rfkill|rmnet*|rotator|rpmsg|rtc|scsi*|sensors|smb*|smd*|soc*|sound|spidev|spmi*|ssc|subsys*|switch|tee|thermal|tty*|typec|uhid|uinput|uio|usb*|vc|video*|virtio*|vtconsole|wakeup|watchdog*|wcnss*|wwan*|zram*|BaseRemoteCtl|Vcodec*|vcodec*|accdet*|mrdump*|ndctl*|dimm*|dpa*)
+                continue
+                ;;
+        esac
+        case "$cls" in
             [0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9])
-                if [ -c "/dev/$c" ]; then
+                if [ -c "/dev/$cls" ]; then
                     CLSNAME="$cls"
-                    DEVNAME="$c"
-                    NODE="/dev/$c"
-                    SYSDEV="/sys/class/$cls/$c/dev"
-                    break 2
+                    DEVNAME="$cls"
+                    NODE="/dev/$cls"
+                    SYSDEV="/sys/class/$cls/$cls/dev"
+                    break
                 fi
                 ;;
         esac
+        for child in "$d"*; do
+            [ -e "$child" ] || continue
+            c=$(basename "$child")
+            case "$c" in
+                [0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9])
+                    if [ -c "/dev/$c" ]; then
+                        CLSNAME="$cls"
+                        DEVNAME="$c"
+                        NODE="/dev/$c"
+                        SYSDEV="/sys/class/$cls/$c/dev"
+                        break 2
+                    fi
+                    ;;
+            esac
+        done
     done
-done
+fi
 
 if [ -z "$DEVNAME" ]; then
     CDEV=$(awk '/Character devices:/, /Block devices:/ { if ($1 ~ /^[0-9]+$/ && $2 ~ /^[A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9]$/ && $2 !~ /^(mem|msm|tty|misc|input|sg|fb|video|ch|i2c|ppp|alsa|ptm|pts|spi|usb|DVB|adsprpc|avtimer|dts|sensors|hidraw|bt|jpeg|BaseRemote|goodix|rmnet|icesdcc|qseecom|kgsl|frandom|diag|smd|wcnss|subsys|ramdump|mdss|ipa|iio|media|rtc|pmsg|gpio|uio|wwan|rfkill|extcon|switch|spidev|Vcodec|vcodec|accdet|mrdump|ndctl|dimm|dpa)/) print $2 }' /proc/devices 2>/dev/null | tail -n 1)

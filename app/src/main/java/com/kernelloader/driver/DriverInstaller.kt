@@ -154,28 +154,33 @@ class DriverInstaller(private val ctx: Context) {
         verifyLoadDetailed(module).ok
 
     fun findNode(): String? {
+        var recordedNode: String? = null
+        su("if [ -s /dev/.kloder_active_node ]; then cat /dev/.kloder_active_node; fi") { line ->
+            val s = line.trim()
+            if (s.startsWith("/dev/") && s.length >= 6) {
+                recordedNode = s
+            }
+        }
+        if (recordedNode != null) return recordedNode
+
         var digitNode: String? = null
-        var fallbackNode: String? = null
         val cmd = "for d in /sys/class/*/; do " +
             "[ -d \"\$d\" ] || continue; " +
             "cls=\$(basename \"\$d\"); " +
-            "case \"\$cls\" in android_usb|avtimer|backlight|battery*|bdi|block|bluetooth|bt*|char|charger*|devfreq|diag|dma|drm|dual_role_usb|dvb|extcon|fastrng|fastrpc|fingerprint|firmware|fuse|goodix*|gpio|graphics|hidraw|hwmon|i2c*|icesdcc|ieee*|input|iommu|ion|ipa*|jpeg*|kgsl|kmsg|lcd*|leds|lirc|mdio*|mem|misc|mmc*|msm*|net|phy|pmsg|power*|ppp|pwm|qg*|qpnp*|qseecom|ramdump|rc|regulator|remoteproc|rfkill|rmnet*|rotator|rpmsg|rtc|scsi*|sensors|smb*|smd*|soc*|sound|spidev|spmi*|ssc|subsys*|switch|tee|thermal|tty*|typec|uhid|uinput|uio|usb*|vc|video*|virtio*|vtconsole|wakeup|watchdog*|wcnss*|wwan*|zram*|BaseRemoteCtl|Vcodec*|vcodec*|accdet*|mrdump*|ndctl*|dimm*|dpa*) continue ;; esac; " +
             "case \"\$cls\" in [0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9]) if [ -c \"/dev/\$cls\" ]; then echo \"/dev/\$cls\"; fi ;; esac; " +
             "for child in \"\$d\"*; do c=\$(basename \"\$child\"); case \"\$c\" in [0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9]) if [ -c \"/dev/\$c\" ]; then echo \"/dev/\$c\"; fi ;; esac; done; " +
             "done; " +
-            "ls -l /proc/[0-9]*/fd 2>/dev/null | awk '/ -> \\/dev\\/[A-Za-z0-9]{6} \\(deleted\\)\$/ { dev=\$(NF-1); sub(/^\\/dev\\//,\"\",dev); if (dev !~ /^(binder|common|ashmem|random)\$/) { print \"/dev/\" dev; exit } }'"
+            "ls -l /proc/[0-9]*/fd 2>/dev/null | awk '/ -> \\/dev\\/[0-9][A-Za-z0-9]{5} \\(deleted\\)\$/ { dev=\$(NF-1); sub(/^\\/dev\\//,\"\",dev); if (dev !~ /^(binder|common|ashmem|random)\$/) { print \"/dev/\" dev; exit } }'"
         su(cmd) { line ->
             val s = line.trim()
             if (s.startsWith("/dev/") && s.length >= 6) {
                 val nodeName = s.substringAfterLast('/')
                 if (nodeName.length == 6 && nodeName[0].isDigit() && digitNode == null) {
                     digitNode = s
-                } else if (fallbackNode == null) {
-                    fallbackNode = s
                 }
             }
         }
-        return digitNode ?: fallbackNode
+        return digitNode
     }
 
     fun client(node: String, vararg args: String, onLine: (String) -> Unit = {}): Int {
@@ -241,7 +246,8 @@ class DriverInstaller(private val ctx: Context) {
             var isStealth = false
             var inUse = false
             var ownerPid = 0
-            val cmd = "sh $REMOTE/verify_load.sh $module"
+            val knownNode = DriverSessionManager.isSessionActive(ctx).second.first.ifBlank { "" }
+            val cmd = if (knownNode.isNotBlank()) "sh $REMOTE/verify_load.sh '$module' '$knownNode'" else "sh $REMOTE/verify_load.sh '$module'"
             val rc = su(cmd) { line ->
                 val trimmed = line.trim()
                 if (trimmed.isNotBlank()) {
