@@ -2,8 +2,17 @@
   "schema": 1,
   "count": 9,
   "generated_at": "2026-11-14T09:26:15Z",
-  "updated": "2026-11-14T22:32:36Z",
+  "updated": "2026-11-14T22:54:57Z",
   "drivers": [
+    {
+      "kernel": "4.9.309-Chidori-Kernel",
+      "vermagic": "4.9.309-Chidori-Kernel SMP preempt mod_unload modversions aarch64",
+      "variant": "rt",
+      "label": "4.9.309",
+      "file": "RT/4.9.309.sh",
+      "sha256": "1345c2e5afdf902f72ed558890b22574f5a10686faa7f0a544104f9aeea91ac7",
+      "size": 370798
+    },
     {
       "kernel": "4.19.191+",
       "vermagic": "4.19.191+ SMP preempt mod_unload modversions aarch64",
@@ -39,15 +48,6 @@
       "file": "RT/4.19.157a.sh",
       "sha256": "e139b91c3700a1e0c4931cd3582d0f8637cc25c499f69452fdfe68115cc742c0",
       "size": 378974
-    },
-    {
-      "kernel": "4.9.309-Chidori-Kernel",
-      "vermagic": "4.9.309-Chidori-Kernel SMP preempt mod_unload modversions aarch64",
-      "variant": "rt",
-      "label": "4.9.309",
-      "file": "RT/4.9.309.sh",
-      "sha256": "7db590a9d92594334c69b7afd01c80bd553795a0d34a620d8bd9e665ed7ba876",
-      "size": 371064
     },
     {
       "kernel": "4.19.157-perf-27940246-abA235FXXS4DXA5",
