@@ -8,8 +8,8 @@
       "variant": "rt",
       "label": "5.4.210",
       "file": "RT/5.4.210.sh",
-      "sha256": "812743def1eb65b34bce89f26263784d882d2f90fac8bd62597e764805ad4b5f",
-      "size": 385565
+      "sha256": "89236f5637f4648d7a048816ef2d16320edf907fcae06876cd20a36aa2ecee92",
+      "size": 384595
     },
     {
       "kernel": "4.19.275-niigo-enanan-yoka-ks32386",
@@ -328,5 +328,5 @@
     }
   ],
   "count": 36,
-  "updated": "2026-11-14T06:21:16Z"
+  "updated": "2026-11-14T06:35:38Z"
 }
