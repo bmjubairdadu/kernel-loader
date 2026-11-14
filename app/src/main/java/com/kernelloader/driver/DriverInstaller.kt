@@ -160,8 +160,8 @@ class DriverInstaller(private val ctx: Context) {
             "[ -d \"\$d\" ] || continue; " +
             "cls=\$(basename \"\$d\"); " +
             "case \"\$cls\" in android_usb|avtimer|backlight|battery*|bdi|block|bluetooth|bt*|char|charger*|devfreq|diag|dma|drm|dual_role_usb|dvb|extcon|fastrng|fastrpc|fingerprint|firmware|fuse|goodix*|gpio|graphics|hidraw|hwmon|i2c*|icesdcc|ieee*|input|iommu|ion|ipa*|jpeg*|kgsl|kmsg|lcd*|leds|lirc|mdio*|mem|misc|mmc*|msm*|net|phy|pmsg|power*|ppp|pwm|qg*|qpnp*|qseecom|ramdump|rc|regulator|remoteproc|rfkill|rmnet*|rotator|rpmsg|rtc|scsi*|sensors|smb*|smd*|soc*|sound|spidev|spmi*|ssc|subsys*|switch|tee|thermal|tty*|typec|uhid|uinput|uio|usb*|vc|video*|virtio*|vtconsole|wakeup|watchdog*|wcnss*|wwan*|zram*|BaseRemoteCtl|Vcodec*|vcodec*|accdet*|mrdump*|ndctl*|dimm*|dpa*) continue ;; esac; " +
-            "case \"\$cls\" in [A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9]) if [ -c \"/dev/\$cls\" ]; then echo \"/dev/\$cls\"; fi ;; esac; " +
-            "for child in \"\$d\"*; do c=\$(basename \"\$child\"); case \"\$c\" in [A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9]) if [ -c \"/dev/\$c\" ]; then echo \"/dev/\$c\"; fi ;; esac; done; " +
+            "case \"\$cls\" in [0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9]) if [ -c \"/dev/\$cls\" ]; then echo \"/dev/\$cls\"; fi ;; esac; " +
+            "for child in \"\$d\"*; do c=\$(basename \"\$child\"); case \"\$c\" in [0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9]) if [ -c \"/dev/\$c\" ]; then echo \"/dev/\$c\"; fi ;; esac; done; " +
             "done; " +
             "ls -l /proc/[0-9]*/fd 2>/dev/null | awk '/ -> \\/dev\\/[A-Za-z0-9]{6} \\(deleted\\)\$/ { dev=\$(NF-1); sub(/^\\/dev\\//,\"\",dev); if (dev !~ /^(binder|common|ashmem|random)\$/) { print \"/dev/\" dev; exit } }'"
         su(cmd) { line ->

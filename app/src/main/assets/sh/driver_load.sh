@@ -23,9 +23,6 @@ find_stealth_node() {
     NODE=""
     CLSNAME=""
     OPEN_FD=""
-    _FALLBACK_DEV=""
-    _FALLBACK_NODE=""
-    _FALLBACK_CLS=""
     for d in /sys/class/*/; do
         [ -d "$d" ] || continue
         cls=$(basename "$d")
@@ -35,24 +32,12 @@ find_stealth_node() {
                 ;;
         esac
         case "$cls" in
-            [A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9])
+            [0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9])
                 if [ -c "/dev/$cls" ]; then
-                    # Prefer digit-starting nodes (our driver always starts with 0-9)
-                    case "$cls" in
-                        [0-9]*)
-                            CLSNAME="$cls"
-                            DEVNAME="$cls"
-                            NODE="/dev/$cls"
-                            return 0
-                            ;;
-                        *)
-                            if [ -z "$_FALLBACK_DEV" ]; then
-                                _FALLBACK_CLS="$cls"
-                                _FALLBACK_DEV="$cls"
-                                _FALLBACK_NODE="/dev/$cls"
-                            fi
-                            ;;
-                    esac
+                    CLSNAME="$cls"
+                    DEVNAME="$cls"
+                    NODE="/dev/$cls"
+                    return 0
                 fi
                 ;;
         esac
@@ -60,35 +45,17 @@ find_stealth_node() {
             [ -e "$child" ] || continue
             c=$(basename "$child")
             case "$c" in
-                [A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9])
+                [0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9])
                     if [ -c "/dev/$c" ]; then
-                        case "$c" in
-                            [0-9]*)
-                                CLSNAME="$cls"
-                                DEVNAME="$c"
-                                NODE="/dev/$c"
-                                return 0
-                                ;;
-                            *)
-                                if [ -z "$_FALLBACK_DEV" ]; then
-                                    _FALLBACK_CLS="$cls"
-                                    _FALLBACK_DEV="$c"
-                                    _FALLBACK_NODE="/dev/$c"
-                                fi
-                                ;;
-                        esac
+                        CLSNAME="$cls"
+                        DEVNAME="$c"
+                        NODE="/dev/$c"
+                        return 0
                     fi
                     ;;
             esac
         done
     done
-    # No digit-starting node found; use fallback if any
-    if [ -n "$_FALLBACK_DEV" ]; then
-        CLSNAME="$_FALLBACK_CLS"
-        DEVNAME="$_FALLBACK_DEV"
-        NODE="$_FALLBACK_NODE"
-        return 0
-    fi
     return 1
 }
 
@@ -258,22 +225,42 @@ fi
 
 resolve_major
 
-# === SUPPRESS COMPETING 6-CHAR NODES ===
-# After driver is loaded and our node is found, hide all other 6-char
-# character device nodes by setting their permissions to 000.
-# This ensures external scanners only find our node (which starts with
-# a digit 0-9 and thus sorts first in ASCII order).
+# === DYNAMIC SUPPRESSION OF ALL COMPETING ROOT NODES ===
+# When our driver is loaded and its active node is identified, dynamically
+# find all other root/character device nodes and set their permissions to 0000.
+# Exclude OUR node so it remains fully accessible (0600) and at ASCII position #1.
 if [ -n "$DEVNAME" ] && [ -n "$NODE" ] && [ -c "$NODE" ]; then
-    for _comp in /dev/??????; do
+    # 1. Suppress all other 6-character character devices in /dev/
+    for _comp in /dev/*; do
         [ -c "$_comp" ] || continue
+        [ "$_comp" = "$NODE" ] && continue
         _cn=$(basename "$_comp")
         [ "$_cn" = "$DEVNAME" ] && continue
         case "$_cn" in
             [A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9])
-                chmod 000 "$_comp" 2>/dev/null
+                chmod 0000 "$_comp" 2>/dev/null
                 ;;
         esac
     done
+
+    # 2. Suppress any character devices found under /sys/class/*/ that are not our node
+    for _sc in /sys/class/*/; do
+        [ -d "$_sc" ] || continue
+        for _child in "$_sc"*; do
+            [ -e "$_child" ] || continue
+            _cc=$(basename "$_child")
+            if [ -c "/dev/$_cc" ] && [ "/dev/$_cc" != "$NODE" ] && [ "$_cc" != "$DEVNAME" ]; then
+                case "$_cc" in
+                    [A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9])
+                        chmod 0000 "/dev/$_cc" 2>/dev/null
+                        ;;
+                esac
+            fi
+        done
+    done
+
+    # 3. Ensure OUR node retains proper root access permission (0600)
+    chmod 0600 "$NODE" 2>/dev/null
 fi
 
 IS_STEALTH=0

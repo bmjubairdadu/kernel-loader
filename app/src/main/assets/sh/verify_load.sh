@@ -27,25 +27,13 @@ for d in /sys/class/*/; do
             ;;
     esac
     case "$cls" in
-        [A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9])
+        [0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9])
             if [ -c "/dev/$cls" ]; then
-                case "$cls" in
-                    [0-9]*)
-                        CLSNAME="$cls"
-                        DEVNAME="$cls"
-                        NODE="/dev/$cls"
-                        SYSDEV="/sys/class/$cls/$cls/dev"
-                        break
-                        ;;
-                    *)
-                        if [ -z "$_FALLBACK_DEV" ]; then
-                            _FALLBACK_CLS="$cls"
-                            _FALLBACK_DEV="$cls"
-                            _FALLBACK_NODE="/dev/$cls"
-                            _FALLBACK_SYSDEV="/sys/class/$cls/$cls/dev"
-                        fi
-                        ;;
-                esac
+                CLSNAME="$cls"
+                DEVNAME="$cls"
+                NODE="/dev/$cls"
+                SYSDEV="/sys/class/$cls/$cls/dev"
+                break
             fi
             ;;
     esac
@@ -53,38 +41,18 @@ for d in /sys/class/*/; do
         [ -e "$child" ] || continue
         c=$(basename "$child")
         case "$c" in
-            [A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9])
+            [0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9])
                 if [ -c "/dev/$c" ]; then
-                    case "$c" in
-                        [0-9]*)
-                            CLSNAME="$cls"
-                            DEVNAME="$c"
-                            NODE="/dev/$c"
-                            SYSDEV="/sys/class/$cls/$c/dev"
-                            break 2
-                            ;;
-                        *)
-                            if [ -z "$_FALLBACK_DEV" ]; then
-                                _FALLBACK_CLS="$cls"
-                                _FALLBACK_DEV="$c"
-                                _FALLBACK_NODE="/dev/$c"
-                                _FALLBACK_SYSDEV="/sys/class/$cls/$c/dev"
-                            fi
-                            ;;
-                    esac
+                    CLSNAME="$cls"
+                    DEVNAME="$c"
+                    NODE="/dev/$c"
+                    SYSDEV="/sys/class/$cls/$c/dev"
+                    break 2
                 fi
                 ;;
         esac
     done
 done
-
-# Fallback to letter-starting node if no digit-starting found
-if [ -z "$DEVNAME" ] && [ -n "$_FALLBACK_DEV" ]; then
-    CLSNAME="$_FALLBACK_CLS"
-    DEVNAME="$_FALLBACK_DEV"
-    NODE="$_FALLBACK_NODE"
-    SYSDEV="$_FALLBACK_SYSDEV"
-fi
 
 if [ -z "$DEVNAME" ]; then
     CDEV=$(awk '/Character devices:/, /Block devices:/ { if ($1 ~ /^[0-9]+$/ && $2 ~ /^[A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9]$/ && $2 !~ /^(mem|msm|tty|misc|input|sg|fb|video|ch|i2c|ppp|alsa|ptm|pts|spi|usb|DVB|adsprpc|avtimer|dts|sensors|hidraw|bt|jpeg|BaseRemote|goodix|rmnet|icesdcc|qseecom|kgsl|frandom|diag|smd|wcnss|subsys|ramdump|mdss|ipa|iio|media|rtc|pmsg|gpio|uio|wwan|rfkill|extcon|switch|spidev|Vcodec|vcodec|accdet|mrdump|ndctl|dimm|dpa)/) print $2 }' /proc/devices 2>/dev/null | tail -n 1)
