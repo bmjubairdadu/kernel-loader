@@ -1,9 +1,18 @@
 {
   "schema": 1,
-  "count": 2,
+  "count": 3,
   "generated_at": "2026-11-14T09:26:15Z",
-  "updated": "2026-11-14T09:45:22Z",
+  "updated": "2026-11-14T10:33:41Z",
   "drivers": [
+    {
+      "kernel": "4.14.113-25741823",
+      "vermagic": "4.14.113-25741823 SMP preempt mod_unload modversions aarch64",
+      "variant": "rt",
+      "label": "4.14.113",
+      "file": "RT/4.14.113.sh",
+      "sha256": "87592f379683f6627bb1acbddede103808914d77ff5ec661580c8a7813785014",
+      "size": 357584
+    },
     {
       "kernel": "4.9.337-DaisyForGaming",
       "vermagic": "4.9.337-DaisyForGaming SMP preempt mod_unload modversions aarch64",
