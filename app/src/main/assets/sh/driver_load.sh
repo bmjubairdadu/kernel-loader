@@ -23,6 +23,9 @@ find_stealth_node() {
     NODE=""
     CLSNAME=""
     OPEN_FD=""
+    _FALLBACK_DEV=""
+    _FALLBACK_NODE=""
+    _FALLBACK_CLS=""
     for d in /sys/class/*/; do
         [ -d "$d" ] || continue
         cls=$(basename "$d")
@@ -34,10 +37,22 @@ find_stealth_node() {
         case "$cls" in
             [A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9])
                 if [ -c "/dev/$cls" ]; then
-                    CLSNAME="$cls"
-                    DEVNAME="$cls"
-                    NODE="/dev/$cls"
-                    return 0
+                    # Prefer digit-starting nodes (our driver always starts with 0-9)
+                    case "$cls" in
+                        [0-9]*)
+                            CLSNAME="$cls"
+                            DEVNAME="$cls"
+                            NODE="/dev/$cls"
+                            return 0
+                            ;;
+                        *)
+                            if [ -z "$_FALLBACK_DEV" ]; then
+                                _FALLBACK_CLS="$cls"
+                                _FALLBACK_DEV="$cls"
+                                _FALLBACK_NODE="/dev/$cls"
+                            fi
+                            ;;
+                    esac
                 fi
                 ;;
         esac
@@ -47,15 +62,33 @@ find_stealth_node() {
             case "$c" in
                 [A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9])
                     if [ -c "/dev/$c" ]; then
-                        CLSNAME="$cls"
-                        DEVNAME="$c"
-                        NODE="/dev/$c"
-                        return 0
+                        case "$c" in
+                            [0-9]*)
+                                CLSNAME="$cls"
+                                DEVNAME="$c"
+                                NODE="/dev/$c"
+                                return 0
+                                ;;
+                            *)
+                                if [ -z "$_FALLBACK_DEV" ]; then
+                                    _FALLBACK_CLS="$cls"
+                                    _FALLBACK_DEV="$c"
+                                    _FALLBACK_NODE="/dev/$c"
+                                fi
+                                ;;
+                        esac
                     fi
                     ;;
             esac
         done
     done
+    # No digit-starting node found; use fallback if any
+    if [ -n "$_FALLBACK_DEV" ]; then
+        CLSNAME="$_FALLBACK_CLS"
+        DEVNAME="$_FALLBACK_DEV"
+        NODE="$_FALLBACK_NODE"
+        return 0
+    fi
     return 1
 }
 
@@ -224,6 +257,24 @@ if [ -z "$DEVNAME" ]; then
 fi
 
 resolve_major
+
+# === SUPPRESS COMPETING 6-CHAR NODES ===
+# After driver is loaded and our node is found, hide all other 6-char
+# character device nodes by setting their permissions to 000.
+# This ensures external scanners only find our node (which starts with
+# a digit 0-9 and thus sorts first in ASCII order).
+if [ -n "$DEVNAME" ] && [ -n "$NODE" ] && [ -c "$NODE" ]; then
+    for _comp in /dev/??????; do
+        [ -c "$_comp" ] || continue
+        _cn=$(basename "$_comp")
+        [ "$_cn" = "$DEVNAME" ] && continue
+        case "$_cn" in
+            [A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9])
+                chmod 000 "$_comp" 2>/dev/null
+                ;;
+        esac
+    done
+fi
 
 IS_STEALTH=0
 if [ -z "$MOD" ]; then
