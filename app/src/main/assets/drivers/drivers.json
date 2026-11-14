@@ -1,9 +1,18 @@
 {
   "schema": 1,
-  "count": 10,
+  "count": 11,
   "generated_at": "2026-11-14T09:26:15Z",
-  "updated": "2026-11-14T22:56:47Z",
+  "updated": "2026-11-14T23:27:37Z",
   "drivers": [
+    {
+      "kernel": "4.19.325-cip129-st13-早瀬悠花",
+      "vermagic": "4.19.325-cip129-st13-早瀬悠花 SMP preempt mod_unload modversions aarch64",
+      "variant": "rt",
+      "label": "4.19.325",
+      "file": "RT/4.19.325.sh",
+      "sha256": "3b100f93fca796d5b35127f7c1600fa3f989b651766881f13f55e65eb8b71841",
+      "size": 290726
+    },
     {
       "kernel": "4.9.190+",
       "vermagic": "4.9.190+ SMP preempt mod_unload modversions aarch64",
