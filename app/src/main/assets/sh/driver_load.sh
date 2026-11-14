@@ -180,9 +180,9 @@ fi
 resolve_major
 
 if [ -n "$NODE" ] && [ -c "$NODE" ]; then
-    chmod 0666 "$NODE" 2>/dev/null
+    chmod 0600 "$NODE" 2>/dev/null
     echo "$NODE" > /dev/.kloder_active_node 2>/dev/null
-    chmod 0644 /dev/.kloder_active_node 2>/dev/null
+    chmod 0600 /dev/.kloder_active_node 2>/dev/null
 fi
 
 IS_STEALTH=0
