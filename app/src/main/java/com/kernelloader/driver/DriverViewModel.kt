@@ -220,8 +220,9 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             tlog("Database connected ($totalCount drivers available)", "OK")
             val matched = OtaDriverStore.candidatesForEntries(m.drivers, release, vm)
             if (matched.isNotEmpty()) {
+                val candidateNames = matched.map { "${it.stem()}.sh" }.distinct().joinToString(", ")
                 tlog(
-                    "Kernel $release supported (${matched.joinToString(", ") { "${it.stem()}.sh" }})",
+                    "Kernel $release supported ($candidateNames)",
                     "OK"
                 )
             } else {
