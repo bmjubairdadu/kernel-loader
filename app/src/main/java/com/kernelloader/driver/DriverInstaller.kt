@@ -163,26 +163,35 @@ class DriverInstaller(private val ctx: Context) {
     fun isLoaded(module: String = MODULE): Boolean =
         verifyLoadDetailed(module).ok
 
-    fun findNode(): String? {
-        var digitNode: String? = null
-        val cmd = "for d in /sys/class/*/; do " +
-            "[ -d \"\$d\" ] || continue; " +
-            "cls=\$(basename \"\$d\"); " +
-            "case \"\$cls\" in [0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9]) if [ -c \"/dev/\$cls\" ]; then echo \"/dev/\$cls\"; fi ;; esac; " +
-            "for child in \"\$d\"*; do c=\$(basename \"\$child\"); case \"\$c\" in [0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9]) if [ -c \"/dev/\$c\" ]; then echo \"/dev/\$c\"; fi ;; esac; done; " +
+    fun findCandidateNodes(): List<String> {
+        val candidates = LinkedHashSet<String>()
+        val sessionNode = DriverSessionManager.isSessionActive(ctx).second.first.trim()
+        if (sessionNode.isNotBlank() && sessionNode.startsWith("/dev/") && isCharDevice(sessionNode)) {
+            candidates.add(sessionNode)
+        }
+
+        val cmd = "for d in /dev/[0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9]; do " +
+            "[ -c \"\$d\" ] && echo \"\$d\"; " +
             "done; " +
-            "ls -l /proc/[0-9]*/fd 2>/dev/null | awk '/ -> \\/dev\\/[0-9][A-Za-z0-9]{5} \\(deleted\\)\$/ { dev=\$(NF-1); sub(/^\\/dev\\//,\"\",dev); if (dev !~ /^(binder|common|ashmem|random)\$/) { print \"/dev/\" dev; exit } }'"
+            "for d in /sys/class/[0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9]/; do " +
+            "[ -d \"\$d\" ] || continue; " +
+            "c=\$(basename \"\$d\"); " +
+            "[ -c \"/dev/\$c\" ] && echo \"/dev/\$c\"; " +
+            "done; " +
+            "ls -l /proc/[0-9]*/fd 2>/dev/null | awk '/ -> \\/dev\\/[0-9][A-Za-z0-9]{5} \\(deleted\\)\$/ { dev=\$(NF-1); sub(/^\\/dev\\//,\"\",dev); if (dev !~ /^(binder|common|ashmem|random)\$/) { print \"/dev/\" dev } }'"
         su(cmd) { line ->
             val s = line.trim()
-            if (s.startsWith("/dev/") && s.length >= 6) {
+            if (s.startsWith("/dev/")) {
                 val nodeName = s.substringAfterLast('/')
-                if (nodeName.length == 6 && nodeName[0].isDigit() && digitNode == null) {
-                    digitNode = s
+                if (nodeName.length == 6 && nodeName[0].isDigit()) {
+                    candidates.add(s)
                 }
             }
         }
-        return digitNode
+        return candidates.toList()
     }
+
+    fun findNode(): String? = findCandidateNodes().firstOrNull()
 
     fun client(node: String, vararg args: String, onLine: (String) -> Unit = {}): Int {
         copyAssetToRemote("bin/khack_client_arm64", "khack_client_arm64")
@@ -241,54 +250,54 @@ class DriverInstaller(private val ctx: Context) {
 
     fun verifyLoadDetailed(module: String = MODULE, onLine: (String) -> Unit = {}): VerifyResult =
         synchronized(verifyLock) {
-            val sessionActive = DriverSessionManager.isSessionActive(ctx)
-            val sessionNode = sessionActive.second.first.trim()
-            val activeNode = if (sessionNode.isNotBlank() && sessionNode.startsWith("/dev/") && isCharDevice(sessionNode)) {
-                sessionNode
-            } else {
-                findNode() ?: ""
-            }
-
-            if (activeNode.isBlank()) {
-                onLine("- Verification: No active device node detected in /dev")
+            val candidates = findCandidateNodes()
+            if (candidates.isEmpty()) {
+                onLine("- Verification: No candidate driver nodes detected in /dev")
+                DriverSessionManager.clearSession(ctx)
                 return VerifyResult(ok = false, stealth = true)
             }
 
-            onLine("- Connecting to device node: $activeNode")
-            onLine("- Performing 0x803 IOCTL handshake...")
-
             copyAssetToRemote("bin/khack_client_arm64", "khack_client_arm64")
             val myPid = android.os.Process.myPid()
-            val cmd = "$REMOTE/khack_client_arm64 '$activeNode' base $myPid libc.so 2>&1"
-            var baseAddr = ""
-            var errorMsg = ""
-            val rc = su(cmd) { line ->
-                val t = line.trim()
-                if (t.isNotBlank()) {
-                    if (t.startsWith("0x") && t != "0x0") {
-                        baseAddr = t
-                    } else if (t.contains("failed") || t.contains("errno") || t.contains("EBUSY")) {
-                        errorMsg = t
+
+            try {
+                for (cand in candidates) {
+                    onLine("- Probing node candidate: $cand (0x803 IOCTL)...")
+                    val cmd = "$REMOTE/khack_client_arm64 '$cand' base $myPid libc.so 2>&1"
+                    var baseAddr = ""
+                    var errorMsg = ""
+                    val rc = su(cmd) { line ->
+                        val t = line.trim()
+                        if (t.isNotBlank()) {
+                            if (t.startsWith("0x") && t != "0x0") {
+                                baseAddr = t
+                            } else if (t.contains("failed") || t.contains("errno") || t.contains("EBUSY") || t.contains("Device or resource busy")) {
+                                errorMsg = t
+                            }
+                        }
+                    }
+
+                    if (rc == 0 && baseAddr.isNotBlank()) {
+                        onLine("- Handshake (0x803): SUCCESS on $cand")
+                        onLine("- Kernel Memory Engine: ACTIVE (libc.so base: $baseAddr)")
+                        onLine("- Driver status: 100% OPERATIONAL")
+                        DriverSessionManager.markLoaded(ctx, cand, module, true)
+                        return VerifyResult(ok = true, node = cand, stealth = true, inUse = false)
+                    } else if (errorMsg.contains("errno=16") || errorMsg.contains("EBUSY") || errorMsg.contains("Device or resource busy")) {
+                        onLine("- Handshake (0x803): Node $cand is in exclusive use by client (EBUSY)")
+                        onLine("- Driver status: ACTIVE & ENGAGED")
+                        DriverSessionManager.markLoaded(ctx, cand, module, true)
+                        return VerifyResult(ok = true, node = cand, stealth = true, inUse = true)
+                    } else {
+                        onLine("- Probe $cand: No response to 0x803 IOCTL (${errorMsg.ifBlank { "rc=$rc" }})")
                     }
                 }
-            }
-            su("rm -rf $REMOTE 2>/dev/null") {}
 
-            if (rc == 0 && baseAddr.isNotBlank()) {
-                onLine("- Handshake (0x803): SUCCESS")
-                onLine("- Kernel Memory Engine: ACTIVE (libc.so base: $baseAddr)")
-                onLine("- Driver status: 100% OPERATIONAL")
-                DriverSessionManager.markLoaded(ctx, activeNode, module, true)
-                VerifyResult(ok = true, node = activeNode, stealth = true, inUse = false)
-            } else if (errorMsg.contains("errno=16") || errorMsg.contains("EBUSY") || errorMsg.contains("Device or resource busy")) {
-                onLine("- Handshake (0x803): Node in exclusive use by client (EBUSY)")
-                onLine("- Driver status: ACTIVE & ENGAGED")
-                DriverSessionManager.markLoaded(ctx, activeNode, module, true)
-                VerifyResult(ok = true, node = activeNode, stealth = true, inUse = true)
-            } else {
-                onLine("- Handshake (0x803): FAILED (${errorMsg.ifBlank { "rc=$rc" }})")
+                onLine("- Verification: None of the candidate nodes responded to 0x803 IOCTL")
                 DriverSessionManager.clearSession(ctx)
-                VerifyResult(ok = false, node = activeNode, stealth = true, inUse = false)
+                VerifyResult(ok = false, stealth = true)
+            } finally {
+                su("rm -rf $REMOTE 2>/dev/null") {}
             }
         }
 
