@@ -1404,19 +1404,17 @@ private fun DriverStatusSummaryCard(
                 }
             }
 
-            if (activeDisplay) {
-                Spacer(Modifier.height(10.dp))
-                PremiumActionButton(
-                    text = if (isChecking) strings.verifyingBtn else strings.verifyBtn,
-                    icon = Icons.Default.VerifiedUser,
-                    enabled = !busy && rootAvailable,
-                    loading = isChecking,
-                    gradientColors = listOf(Color(0xFF0B5345), Color(0xFF0E6655), Color(0xFF154360)),
-                    borderColors = listOf(Color(0xFF2DD4BF).copy(alpha = 0.65f), Color(0xFF38BDF8).copy(alpha = 0.60f)),
-                    iconTint = Color(0xFF5EEAD4),
-                    onClick = onVerify
-                )
-            }
+            Spacer(Modifier.height(10.dp))
+            PremiumActionButton(
+                text = if (isChecking) strings.verifyingBtn else strings.verifyBtn,
+                icon = Icons.Default.VerifiedUser,
+                enabled = !busy && rootAvailable,
+                loading = isChecking,
+                gradientColors = listOf(Color(0xFF0B5345), Color(0xFF0E6655), Color(0xFF154360)),
+                borderColors = listOf(Color(0xFF2DD4BF).copy(alpha = 0.65f), Color(0xFF38BDF8).copy(alpha = 0.60f)),
+                iconTint = Color(0xFF5EEAD4),
+                onClick = onVerify
+            )
         }
     }
 }
