@@ -2,7 +2,7 @@
   "schema": 1,
   "count": 18,
   "generated_at": "2026-11-14T09:26:15Z",
-  "updated": "2026-11-15T23:59:15Z",
+  "updated": "2026-11-15T23:59:43Z",
   "drivers": [
     {
       "kernel": "4.19.191-perf-g41be13074ee9",
@@ -10,7 +10,7 @@
       "variant": "rt",
       "label": "4.19.191c",
       "file": "RT/4.19.191c.sh",
-      "sha256": "1003fed4139dc9625f4b5c093dab91bd4888852ff9546909bc3e36ce049755ba",
+      "sha256": "8e77fbfb0b76ddfa6092e85086118dcd6f35570852729d25fdcf17c4a5fa8672",
       "size": 295753
     },
     {
@@ -95,8 +95,8 @@
       "size": 294954
     },
     {
-      "kernel": "4.19.325-cip129-st13-\u65e9\u702c\u60a0\u82b1",
-      "vermagic": "4.19.325-cip129-st13-\u65e9\u702c\u60a0\u82b1 SMP preempt mod_unload modversions aarch64",
+      "kernel": "4.19.325-cip129-st13-早瀬悠花",
+      "vermagic": "4.19.325-cip129-st13-早瀬悠花 SMP preempt mod_unload modversions aarch64",
       "variant": "rt",
       "label": "4.19.325",
       "file": "RT/4.19.325.sh",
