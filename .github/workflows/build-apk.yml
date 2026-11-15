@@ -41,3 +41,13 @@ jobs:
           path: app/build/outputs/apk/release/Kernel-Loader-*.apk
           if-no-files-found: error
 
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: app/build/outputs/apk/release/Kernel-Loader-*.apk
+          name: Kernel Loader ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+

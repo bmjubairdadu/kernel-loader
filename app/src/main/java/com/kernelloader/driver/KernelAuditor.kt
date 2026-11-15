@@ -94,8 +94,25 @@ class KernelAuditor(private val ctx: Context) {
             onLine("  - Fix: Flash a 64-bit ROM / kernel", "FIX")
         }
 
+        var hasDevtmpfs = false
+        val cfgRes = Shell.cmd("zcat /proc/config.gz 2>/dev/null | grep -E '^CONFIG_DEVTMPFS=y'").exec()
+        if (cfgRes.isSuccess && cfgRes.out.isNotEmpty()) {
+            hasDevtmpfs = true
+        } else {
+            val dfDev = Shell.cmd("df /dev 2>/dev/null | grep -i devtmpfs").exec()
+            if (dfDev.isSuccess && dfDev.out.isNotEmpty()) {
+                hasDevtmpfs = true
+            }
+        }
+
+        var pltRequired = false
+        val cfgPlt = Shell.cmd("zcat /proc/config.gz 2>/dev/null | grep -E '^CONFIG_ARM64_MODULE_PLTS=y'").exec()
+        if (cfgPlt.isSuccess && cfgPlt.out.isNotEmpty()) {
+            pltRequired = true
+        }
+
         if (blockerCount == 0) {
-            onLine("- Driver Loading Capability: Ready (Kernel will accept and load driver)", "OK")
+            onLine("- Driver Loading Capability: Ready (Kernel module loading permitted)", "OK")
         } else {
             onLine("- Driver Loading Capability: Blocked (Resolve signature or root first)", "ERR")
         }
@@ -111,15 +128,12 @@ class KernelAuditor(private val ctx: Context) {
         if (isPermissive) {
             onLine("- Node Creation Permission: GRANTED (Permissive mode allows all operations)", "OK")
             onLine("- ueventd Node Policy: Active (All /dev node operations permitted)", "OK")
-            onLine("- Node Auto-Creation (/dev): Operational (Kernel device_create will auto-create node)", "OK")
         } else if (modInstalled) {
             onLine("- Node Creation Permission: GRANTED (Kernel_SELinux_Node_Fixer active)", "OK")
             onLine("- ueventd Node Policy: Active (sepolicy.rule active for ueventd chr_file create)", "OK")
-            onLine("- Node Auto-Creation (/dev): Operational (ueventd unlocked via Magisk module)", "OK")
         } else if (sdk <= 30) {
             onLine("- Node Creation Permission: GRANTED (Stock Android $androidVer policy permits creation)", "OK")
             onLine("- ueventd Node Policy: Active (Stock rule: allow ueventd dev_type chr_file create)", "OK")
-            onLine("- Node Auto-Creation (/dev): Operational (System ueventd will auto-create /dev node)", "OK")
         } else {
             val liveRulesCheck = Shell.cmd("magiskpolicy --print-rules 2>/dev/null | grep -E 'allow ueventd (device|dev_type|unlabeled) chr_file.*create|permissive ueventd'").exec()
             val liveRuleActive = liveRulesCheck.isSuccess && liveRulesCheck.out.isNotEmpty()
@@ -128,15 +142,25 @@ class KernelAuditor(private val ctx: Context) {
                 val matched = liveRulesCheck.out.firstOrNull()?.trim() ?: "chr_file create active"
                 onLine("- Node Creation Permission: GRANTED (Live policy rules verified)", "OK")
                 onLine("- ueventd Node Policy: Active ($matched)", "OK")
-                onLine("- Node Auto-Creation (/dev): Operational (ueventd unlocked via live policy)", "OK")
             } else {
                 warnCount++
                 onLine("- Node Creation Permission: BLOCKED (SELinux Enforcing denies ueventd)", "WARN")
                 onLine("- ueventd Node Policy: Blocked (Android $androidVer SELinux restriction)", "WARN")
-                onLine("- Node Auto-Creation (/dev): Restricted (Kernel cannot auto-create node in /dev)", "WARN")
                 onLine("  - Issue: SELinux Enforcing blocks ueventd from creating custom driver node", "WARN")
                 onLine("  - Fix: Flash Kernel_SELinux_Node_Fixer.zip in Magisk to grant permission", "FIX")
             }
+        }
+
+        if (hasDevtmpfs) {
+            onLine("- Node Auto-Creation (/dev): Synchronous (CONFIG_DEVTMPFS=y, instant in-kernel)", "OK")
+        } else {
+            onLine("- Node Auto-Creation (/dev): Asynchronous (DEVTMPFS disabled, relies on ueventd daemon)", "WARN")
+            onLine("  - Notice: Kernel will NOT create /dev node directly; requires adaptive uevent wait", "WARN")
+            warnCount++
+        }
+
+        if (pltRequired) {
+            onLine("- Kernel Memory Model: ARM64 Module PLTs active (Must include .init.plt in driver)", "INFO")
         }
 
         val nsTest = Shell.cmd("sh -c 'touch /dev/.kl_ns_chk 2>/dev/null' && test -f /dev/.kl_ns_chk && rm -f /dev/.kl_ns_chk").exec()
@@ -154,7 +178,6 @@ class KernelAuditor(private val ctx: Context) {
             val names = candidates.joinToString(", ") { "$it.sh" }
             onLine("- Database Driver: Available ($names)", "OK")
         } else {
-            warnCount++
             onLine("- Database Driver: No exact prebuilt driver found for $release", "WARN")
             onLine("  - Fix: Compile driver from kernel source or tap 'SEND REPORT' below", "FIX")
         }

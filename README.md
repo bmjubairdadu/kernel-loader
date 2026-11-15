@@ -2,7 +2,7 @@
 
 <img src="app/src/main/res/mipmap-xxxhdpi/ic_launcher.png" width="76" alt="Kernel Loader" onerror="this.style.display='none'"/>
 
-# Kernel Loader (v5.9)
+# Kernel Loader (v6.0)
 
 ### Enterprise-Grade Kernel Driver Engine & Diagnostic Suite for Android
 **Adaptive UI · AES-256-GCM Driver Security · Live Verification · SELinux Audit · OTA Updates**
@@ -24,8 +24,12 @@
 
 ---
 
-## ✨ What's New in v5.9
+## ✨ What's New in v6.0
 
+- **Deep Kernel & Node Creation Audit:** Inspects `CONFIG_DEVTMPFS=y` in kernel config to determine whether `/dev` device nodes are created synchronously inside the kernel or asynchronously by `ueventd`.
+- **ARM64 Module PLT Audit:** Analyzes `CONFIG_ARM64_MODULE_PLTS=y` to verify kernel relocation model compatibility.
+- **Adaptive Dynamic Sysfs & Node Polling:** Scans for character device nodes with instant completion the moment the node appears, eliminating fixed waiting delays.
+- **Hardened Node Security (0600 root:root):** Locks character device nodes in `/dev` to `0600` root permissions so unprivileged user apps and anti-cheat scanners cannot probe the node.
 - **Clean Hyphenated Diagnostics Log:** Purged legacy verbose tags (`FTL_*`), presenting clean `- Step` diagnostic reporting directly in the terminal interface.
 - **Robust Driver Parsing Engine:** Added fallback pattern matching for dynamic stealth nodes and kernel memory status, ensuring robust driver detection even with stripped logs.
 - **Universal Proportional Layout Engine:** Automatically normalizes screen density to a 392dp baseline across 720p budget devices, 1080p standards, 2K flagships, foldables, and tablets without text truncation.
@@ -87,7 +91,7 @@ cd kernel-loader
 ```
 
 Built release APK:
-`app/build/outputs/apk/release/Kernel-Loader-v5.9.apk`
+`app/build/outputs/apk/release/Kernel-Loader-v6.0.apk`
 
 ---
 

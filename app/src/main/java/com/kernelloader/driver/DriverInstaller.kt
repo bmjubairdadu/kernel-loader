@@ -123,10 +123,11 @@ class DriverInstaller(private val ctx: Context) {
             raw.appendLine(line)
             val clean = line.trim()
             if (clean.isNotBlank()) {
-                onLine(clean)
                 val eq = clean.indexOf('=')
                 if (clean.startsWith("FTL_") && eq > 0) {
                     kv[clean.substring(0, eq)] = clean.substring(eq + 1).trim()
+                } else {
+                    onLine(clean)
                 }
                 if (clean.contains("Active node:")) {
                     val part = clean.substringAfter("Active node:").trim()

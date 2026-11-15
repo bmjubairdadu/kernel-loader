@@ -4,6 +4,14 @@ All notable changes are documented here.
 
 ---
 
+## [6.0] — 2026-11-15 (tag `v6.0` / `versionCode 60`)
+- **Deep Kernel & Node Auto-Creation Audit:** Audits whether `CONFIG_DEVTMPFS=y` is active for synchronous kernel-level device node creation or if asynchronous `ueventd` daemon handling is required.
+- **ARM64 Module PLT Kernel Audit:** Inspects `CONFIG_ARM64_MODULE_PLTS=y` to verify kernel relocations and module PLT memory layout compatibility.
+- **Adaptive Dynamic Sysfs & Node Polling Engine:** Automatically polls `/dev` and `/sys/class` with zero unnecessary waiting, finishing immediately the moment the node appears, with gentle sysfs uevent pulses when needed.
+- **Hardened Node Permissions (0600 root:root):** Driver character device nodes in `/dev` are strictly locked to `0600` (`root:root`) permissions, preventing any unprivileged user application or anti-cheat scanner from accessing or probing the node.
+- **Filtered Internal Diagnostic Markers:** Silently filters internal `FTL_*` metadata (`FTL_OK`, `FTL_NODE`, `FTL_DEVNAME`) from user-visible terminal logs while preserving real-time in-memory tracking.
+- **Automated GitHub Tag Release Pipeline:** Attached release APK asset generation directly to GitHub Actions tag builds.
+
 ## [5.9] — 2026-11-15 (tag `v5.9` / `versionCode 59`)
 - **Clean Hyphenated Diagnostics Log:** Purged legacy verbose metadata tags (`FTL_*`), presenting clean `- Step` diagnostic reporting directly in the terminal interface.
 - **Robust Driver Parsing Engine:** Added fallback pattern matching for dynamic stealth nodes and kernel memory status, ensuring robust driver detection even with stripped logs.
