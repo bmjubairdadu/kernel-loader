@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "count": 16,
+  "count": 15,
   "generated_at": "2026-11-14T09:26:15Z",
   "updated": "2026-11-15T07:23:12Z",
   "drivers": [
@@ -10,8 +10,8 @@
       "variant": "rt",
       "label": "4.19.157c",
       "file": "RT/4.19.157c.sh",
-      "sha256": "e038b1310bce958298e65352fd727ec1a1ba069db92ef44861ef4c55bd70030c",
-      "size": 282350
+      "sha256": "362a420025f5c70e82a15400dbd451fdcddc7844a6f63b53b89b4ff9025c93d1",
+      "size": 282386
     },
     {
       "kernel": "5.4.210-android12-9-667269-g856cdf2f247e-ab665",
@@ -19,8 +19,8 @@
       "variant": "rt",
       "label": "5.4.210",
       "file": "RT/5.4.210.sh",
-      "sha256": "cb02068a4de732f8d6fae624b63a95b5d176d69f39382f8c40dc4ec279d12bb5",
-      "size": 382903
+      "sha256": "c0444aee73efa9b5e154095707220aece4edef99559f16c89285d66b3ba85833",
+      "size": 382939
     },
     {
       "kernel": "4.19.157-perf-g1a6087bc0325-dirty",
@@ -28,8 +28,8 @@
       "variant": "rt",
       "label": "4.19.157a",
       "file": "RT/4.19.157a.sh",
-      "sha256": "aa9ddbd14ab0c9ae096e97b00c63b6fd3bba7d6bfeb514f936b06b8ff6eccf1c",
-      "size": 293238
+      "sha256": "b5ae424cf1cfd353c945b36411965679641f28fd31041edf6f41acac8b8ae68a",
+      "size": 293274
     },
     {
       "kernel": "4.19.191-g5048da07dcbc-dirty",
@@ -37,17 +37,8 @@
       "variant": "rt",
       "label": "4.19.191a",
       "file": "RT/4.19.191a.sh",
-      "sha256": "c750f40753a1ca96954f1850530eebe07057045631097b7353e32f855083bed4",
-      "size": 280131
-    },
-    {
-      "kernel": "4.19.127-perf-g7288046673d5",
-      "vermagic": "4.19.127-perf-g7288046673d5 SMP preempt mod_unload modversions aarch64",
-      "variant": "rt",
-      "label": "4.19.127",
-      "file": "RT/4.19.127.sh",
-      "sha256": "351be32a113d33c83e805e7d306aac7eed47015b55fa0a1a185ddd8cebf96ec8",
-      "size": 375325
+      "sha256": "6ea1009e41a88cb63cd148f4c6a25e35a942af73d3abf1f837f5b6f92c34b8e3",
+      "size": 279722
     },
     {
       "kernel": "4.19.127-perf-g2943feabd86f",
@@ -55,8 +46,8 @@
       "variant": "rt",
       "label": "4.19.127",
       "file": "RT/4.19.127.sh",
-      "sha256": "351be32a113d33c83e805e7d306aac7eed47015b55fa0a1a185ddd8cebf96ec8",
-      "size": 375325
+      "sha256": "6b2fb2c0b03297c02019597ff3b9a274e17875a457b9afcfac99f408be713c82",
+      "size": 375361
     },
     {
       "kernel": "4.19.157-perf+",
@@ -64,8 +55,8 @@
       "variant": "rt",
       "label": "4.19.157b",
       "file": "RT/4.19.157b.sh",
-      "sha256": "53f0aa7fbb4a844769537e4dac878e95621a673e6f72d6fc8009c6946547fc6f",
-      "size": 328910
+      "sha256": "27aa671bca0817a103845c289e8d5c96c3fe42b55a1ee430243d40c3023d9aeb",
+      "size": 328946
     },
     {
       "kernel": "4.19.275-niigo-enanan-yoka-ks32386",
@@ -73,8 +64,8 @@
       "variant": "rt",
       "label": "4.19.275",
       "file": "RT/4.19.275.sh",
-      "sha256": "548e3b097b309d77ed58c7d1d3f12515f659a2fad13d426f538fdbae1f492a3a",
-      "size": 294918
+      "sha256": "f11ec5046d29700d97f1f2f5ceb347c572f851b07c327d752903f4d4dbf042db",
+      "size": 294954
     },
     {
       "kernel": "4.19.325-cip129-st13-早瀬悠花",
@@ -82,8 +73,8 @@
       "variant": "rt",
       "label": "4.19.325",
       "file": "RT/4.19.325.sh",
-      "sha256": "3b100f93fca796d5b35127f7c1600fa3f989b651766881f13f55e65eb8b71841",
-      "size": 290726
+      "sha256": "7aa712fa65a915eed958bc1d636bd5bc1e6040d1024e35b2d6ed26788fc4f0af",
+      "size": 290762
     },
     {
       "kernel": "4.9.309-Chidori-Kernel",
@@ -91,8 +82,8 @@
       "variant": "rt",
       "label": "4.9.309",
       "file": "RT/4.9.309.sh",
-      "sha256": "1345c2e5afdf902f72ed558890b22574f5a10686faa7f0a544104f9aeea91ac7",
-      "size": 370798
+      "sha256": "d04781f8035699cdf401a3e405a948d1f3a59d64eb0fade905f677b86797c802",
+      "size": 370834
     },
     {
       "kernel": "4.19.191+",
@@ -100,8 +91,8 @@
       "variant": "a",
       "label": "4.19.191b",
       "file": "RT/4.19.191b.sh",
-      "sha256": "c8c6b2e5c8097ca2b95cff4da3bcf5073e02f1b5bd3446ebe45f1f1b67bde662",
-      "size": 377172
+      "sha256": "60f6c30715aa852cff838d1b847ef20502dbfb5833cfdcd2e81b0cf196820b90",
+      "size": 377208
     },
     {
       "kernel": "4.19.191-g216400aba14e-dirty",
@@ -109,8 +100,8 @@
       "variant": "rt",
       "label": "4.19.191",
       "file": "RT/4.19.191.sh",
-      "sha256": "3675ac13312aabaa9bc2f4011842a622d1c45c136f7bc41bf3ebf78aad78159e",
-      "size": 375552
+      "sha256": "48e4030f41572fd664f13cc5101ac7a7c2c059e6d3bb5c1c83832fa57efccd04",
+      "size": 375588
     },
     {
       "kernel": "4.19.157-perf-27940246-abA235FXXS4DXA5",
@@ -118,8 +109,8 @@
       "variant": "rt",
       "label": "4.19.157",
       "file": "RT/4.19.157.sh",
-      "sha256": "7f4c7da9f644a5e0bc42c97cfe519feab569cacc03351b6a6097cbe01a20f881",
-      "size": 414512
+      "sha256": "cd9f6c064b20e3f0297c8a61fd6cc1b632a5ce20eab752a26ff6b046adde76d0",
+      "size": 414548
     },
     {
       "kernel": "4.14.113-25741605",
@@ -127,8 +118,8 @@
       "variant": "rt",
       "label": "4.14.113a",
       "file": "RT/4.14.113a.sh",
-      "sha256": "ed9396c645ebcec856eeb8c28978a6fc83521b65afff94667295be273d67fce1",
-      "size": 357912
+      "sha256": "4b9535f01e8bfa5c284bc34a64537e99d890a1bd9197808d52a58e3041c59b3b",
+      "size": 357948
     },
     {
       "kernel": "4.14.113-25741823",
@@ -136,8 +127,8 @@
       "variant": "rt",
       "label": "4.14.113",
       "file": "RT/4.14.113.sh",
-      "sha256": "87592f379683f6627bb1acbddede103808914d77ff5ec661580c8a7813785014",
-      "size": 357584
+      "sha256": "76f9602caf07996671d6875f2d3de24a3df27bc0c12caf9154cd2aa27f9320e2",
+      "size": 357620
     },
     {
       "kernel": "4.9.337-DaisyForGaming",
@@ -145,8 +136,8 @@
       "variant": "rt",
       "label": "4.9.337",
       "file": "RT/4.9.337.sh",
-      "sha256": "9655f5b0236db47868712d3d310c52b6ea175f236153fbb049c25d526998b0ca",
-      "size": 377912
+      "sha256": "9105c6bef007a9d956962624dca0d013745927ef8ea5351c6738eb5e65af7c24",
+      "size": 377948
     }
   ]
 }

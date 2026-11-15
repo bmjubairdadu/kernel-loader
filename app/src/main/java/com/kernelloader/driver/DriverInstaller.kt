@@ -89,10 +89,11 @@ class DriverInstaller(private val ctx: Context) {
     private fun copyToRemote(file: File, remoteName: String): Boolean = try {
         su("mkdir -p $REMOTE") {}
         val p = ProcessBuilder("su", "-c", "cat > '$REMOTE/$remoteName' && chmod 755 '$REMOTE/$remoteName'").start()
-        file.inputStream().use { input ->
-            p.outputStream.use { output ->
-                input.copyTo(output)
-            }
+        val rawBytes = file.readBytes()
+        val payload = DriverCrypto.decrypt(rawBytes, ctx)
+        p.outputStream.use { output ->
+            output.write(payload)
+            output.flush()
         }
         p.waitFor() == 0
     } catch (_: Exception) {
@@ -102,10 +103,11 @@ class DriverInstaller(private val ctx: Context) {
     private fun copyAssetToRemote(assetPath: String, remoteName: String): Boolean = try {
         su("mkdir -p $REMOTE") {}
         val p = ProcessBuilder("su", "-c", "cat > '$REMOTE/$remoteName' && chmod 755 '$REMOTE/$remoteName'").start()
-        ctx.assets.open(assetPath).use { input ->
-            p.outputStream.use { output ->
-                input.copyTo(output)
-            }
+        val rawBytes = ctx.assets.open(assetPath).use { it.readBytes() }
+        val payload = DriverCrypto.decrypt(rawBytes, ctx)
+        p.outputStream.use { output ->
+            output.write(payload)
+            output.flush()
         }
         p.waitFor() == 0
     } catch (_: Exception) {

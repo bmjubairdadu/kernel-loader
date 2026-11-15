@@ -58,29 +58,35 @@ object OtaDriverStore {
             cachedManifest?.let { return@withContext it }
         }
         val manifestFile = File(context.filesDir, "drivers_manifest.json")
-        val remoteText = runCatching {
+        val remoteBytes = runCatching {
             val url = URL(REMOTE_MANIFEST_URL)
             val conn = (url.openConnection() as HttpURLConnection).apply {
                 connectTimeout = 7000
                 readTimeout = 10000
-                setRequestProperty("User-Agent", "KernelLoader/5.1")
+                setRequestProperty("User-Agent", "KernelLoader/5.8")
+                setRequestProperty("X-KernelLoader-Client", "Official")
             }
             if (conn.responseCode == 200) {
-                conn.inputStream.bufferedReader().use { it.readText() }
+                conn.inputStream.use { it.readBytes() }
             } else null
         }.getOrNull()
 
-        val text = if (!remoteText.isNullOrBlank()) {
-            runCatching { manifestFile.writeText(remoteText) }
-            remoteText
+        val rawBytes = if (remoteBytes != null && remoteBytes.isNotEmpty()) {
+            runCatching { manifestFile.writeBytes(remoteBytes) }
+            remoteBytes
         } else if (manifestFile.exists() && manifestFile.length() > 0) {
-            runCatching { manifestFile.readText() }.getOrNull()
+            runCatching { manifestFile.readBytes() }.getOrNull()
         } else {
             runCatching {
-                context.assets.open(EMBEDDED_MANIFEST_ASSET).bufferedReader().use { it.readText() }
+                context.assets.open(EMBEDDED_MANIFEST_ASSET).use { it.readBytes() }
             }.getOrNull()
         } ?: return@withContext null
 
+        val decryptedBytes = runCatching {
+            DriverCrypto.decrypt(rawBytes, context)
+        }.getOrNull() ?: rawBytes
+
+        val text = decryptedBytes.toString(Charsets.UTF_8)
         val parsed = runCatching { parseManifest(text) }.getOrNull() ?: return@withContext null
         cachedManifest = parsed
         parsed
@@ -116,7 +122,8 @@ object OtaDriverStore {
                 connectTimeout = 15000
                 readTimeout = 30000
                 instanceFollowRedirects = true
-                setRequestProperty("User-Agent", "KernelLoader/5.1")
+                setRequestProperty("User-Agent", "KernelLoader/5.8")
+                setRequestProperty("X-KernelLoader-Client", "Official")
             }
             val code = conn.responseCode
             if (code == 200) {
