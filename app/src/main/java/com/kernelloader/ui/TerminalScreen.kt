@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -141,13 +142,18 @@ fun ConsoleScreen(
     }
 
     AppBackground {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .statusBarsPadding()
-                .navigationBarsPadding()
-                .padding(12.dp)
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.TopCenter
         ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .widthIn(max = 680.dp)
+                    .statusBarsPadding()
+                    .navigationBarsPadding()
+                    .padding(12.dp)
+            ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
@@ -401,6 +407,7 @@ fun ConsoleScreen(
         }
     }
 }
+}
 
 @Composable
 private fun StatusPill(label: String, value: String, ok: Boolean) {
@@ -476,26 +483,30 @@ private fun TerminalLineRow(line: TerminalLine) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 2.5.dp),
+            .padding(vertical = 1.5.dp),
         verticalAlignment = Alignment.Top
     ) {
-        Box(
-            modifier = Modifier
-                .padding(top = 6.dp, end = 8.dp)
-                .size(6.dp)
-                .clip(CircleShape)
-                .background(typeColor)
-        )
+        val startsWithDash = line.text.startsWith("-") || line.text.startsWith("  -")
+        if (!startsWithDash) {
+            Box(
+                modifier = Modifier
+                    .padding(top = 6.dp, end = 7.dp)
+                    .size(5.dp)
+                    .clip(CircleShape)
+                    .background(typeColor)
+            )
+        }
         Text(
             text = line.text,
-            color = if (line.type == "OK" || line.type == "ERR" || line.type == "WARN" || line.type == "CMD") {
+            color = if (line.type == "OK" || line.type == "ERR" || line.type == "WARN" || line.type == "CMD" || line.type == "FIX") {
                 typeColor
             } else {
                 TextPrimary
             },
             style = MaterialTheme.typography.bodySmall.copy(
                 fontFamily = FontFamily.Monospace,
-                fontSize = 12.sp
+                fontSize = 12.sp,
+                lineHeight = 16.sp
             ),
             modifier = Modifier.weight(1f)
         )

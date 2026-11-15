@@ -871,7 +871,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             kernelCheckIssuesCount.value = 0
             kernelCheckHasBlockers.value = false
             busyStep.value = "Auditing kernel..."
-            tlog("Starting Kernel Compatibility Audit...", "CMD")
+            tlog("- Starting Kernel Compatibility Audit...", "CMD")
             withContext(Dispatchers.IO) {
                 try {
                     val app = getApplication<Application>()

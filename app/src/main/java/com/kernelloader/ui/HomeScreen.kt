@@ -38,6 +38,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -262,14 +263,19 @@ fun HomeScreen(
         } else {
             Box(modifier = Modifier.fillMaxSize()) {
                 AppBackground {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .statusBarsPadding()
-                            .navigationBarsPadding()
-                            .verticalScroll(scroll)
-                            .padding(horizontal = 14.dp)
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.TopCenter
                     ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .widthIn(max = 580.dp)
+                                .statusBarsPadding()
+                                .navigationBarsPadding()
+                                .verticalScroll(scroll)
+                                .padding(horizontal = 14.dp)
+                        ) {
                 Spacer(Modifier.height(10.dp))
 
                 PremiumHomeHeader(
@@ -471,6 +477,7 @@ fun HomeScreen(
             }
         }
     }
+}
 }
 }
 
@@ -733,102 +740,85 @@ private fun PremiumHomeHeader(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(containerColor = Surface1.copy(alpha = 0.94f)),
-        border = BorderStroke(
-            1.2.dp,
-            Brush.linearGradient(
-                listOf(
-                    LogoPink.copy(alpha = 0.8f),
-                    LogoMagenta.copy(alpha = 0.5f),
-                    LogoPurple.copy(alpha = 0.8f)
-                )
-            )
-        )
+        border = BorderStroke(1.dp, BorderSubtle.copy(alpha = 0.55f))
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(
-                    Brush.horizontalGradient(
-                        listOf(
-                            LogoPink.copy(alpha = 0.12f),
-                            LogoMagenta.copy(alpha = 0.06f),
-                            LogoPurple.copy(alpha = 0.14f)
-                        )
-                    )
-                )
-                .padding(horizontal = 12.dp, vertical = 10.dp),
+                .padding(horizontal = 14.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     Text(
                         text = strings.appName,
                         style = MaterialTheme.typography.titleLarge.copy(
-                            fontWeight = FontWeight.ExtraBold,
-                            brush = Brush.linearGradient(
-                                listOf(Color.White, LogoPink, LogoMagenta, LogoPurple)
-                            )
+                            fontWeight = FontWeight.Black,
+                            fontSize = 20.sp,
+                            letterSpacing = 0.4.sp
                         ),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        color = Color.White,
+                        maxLines = 1
                     )
-                    Spacer(Modifier.width(7.dp))
                     Surface(
                         shape = RoundedCornerShape(6.dp),
-                        color = LogoPink.copy(alpha = 0.18f),
-                        border = BorderStroke(1.dp, LogoPink.copy(alpha = 0.6f))
+                        color = LogoPink.copy(alpha = 0.16f),
+                        border = BorderStroke(1.dp, LogoPink.copy(alpha = 0.45f))
                     ) {
                         Text(
                             text = version,
-                            style = MonoTiny,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
+                            style = MonoTiny.copy(
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 11.sp
+                            ),
                             color = LogoSoftPink,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.5.dp)
+                            maxLines = 1,
+                            softWrap = false,
+                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
                         )
                     }
                 }
-                Spacer(Modifier.height(2.dp))
+                Spacer(Modifier.height(3.dp))
                 Text(
                     text = strings.subtitle,
-                    style = MonoTiny,
-                    fontSize = 9.5.sp,
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        fontSize = 10.5.sp
+                    ),
                     color = TextSecondary,
-                    letterSpacing = 0.6.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
             }
 
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(10.dp))
 
             Surface(
                 shape = RoundedCornerShape(50),
                 color = SurfaceInset,
-                border = BorderStroke(
-                    1.dp,
-                    Brush.horizontalGradient(listOf(LogoPink.copy(alpha = 0.65f), LogoPurple.copy(alpha = 0.65f)))
-                )
+                border = BorderStroke(1.dp, BorderSubtle.copy(alpha = 0.6f))
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 3.dp),
-                    horizontalArrangement = Arrangement.spacedBy(3.dp)
+                    modifier = Modifier.padding(horizontal = 3.dp, vertical = 3.dp),
+                    horizontalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
                     Box(
                         modifier = Modifier
                             .clip(CircleShape)
                             .background(
-                                if (!isEnActive) Brush.linearGradient(listOf(LogoPink, LogoPurple))
+                                if (!isEnActive) Brush.linearGradient(listOf(LogoPink.copy(alpha = 0.7f), LogoPurple.copy(alpha = 0.7f)))
                                 else Brush.linearGradient(listOf(Color.Transparent, Color.Transparent))
                             )
                             .clickable(onClick = onSelectCountryLang)
-                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                            .padding(horizontal = 7.dp, vertical = 4.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
                             text = countryFlag,
-                            fontSize = 15.sp
+                            fontSize = 14.sp
                         )
                     }
 
@@ -836,38 +826,34 @@ private fun PremiumHomeHeader(
                         modifier = Modifier
                             .clip(CircleShape)
                             .background(
-                                if (isEnActive) Brush.linearGradient(listOf(LogoPink, LogoPurple))
+                                if (isEnActive) Brush.linearGradient(listOf(LogoPink.copy(alpha = 0.7f), LogoPurple.copy(alpha = 0.7f)))
                                 else Brush.linearGradient(listOf(Color.Transparent, Color.Transparent))
                             )
                             .clickable(onClick = onSelectEnglish)
-                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                            .padding(horizontal = 7.dp, vertical = 4.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
                             text = "🇺🇸",
-                            fontSize = 15.sp
+                            fontSize = 14.sp
                         )
                     }
 
                     Box(
                         modifier = Modifier
                             .clip(CircleShape)
-                            .background(Brush.linearGradient(listOf(Color.Transparent, Color.Transparent)))
+                            .background(Color.Transparent)
                             .clickable(onClick = onOpenLanguageDialog)
-                            .padding(horizontal = 7.dp, vertical = 4.dp),
+                            .padding(horizontal = 6.dp, vertical = 4.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
                             text = "🌐",
-                            fontSize = 15.sp
+                            fontSize = 14.sp
                         )
                     }
                 }
             }
-
-            Spacer(Modifier.width(8.dp))
-
-            AnimatedHeaderLogo(busy = busy)
         }
     }
 }
@@ -1024,22 +1010,18 @@ private fun StatusBoxesSection(
                     trailingAction = {
                         Box(
                             modifier = Modifier
-                                .size(26.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(
-                                    Brush.linearGradient(
-                                        listOf(Color(0xFF4C1D7A), Color(0xFF331559))
-                                    )
-                                )
-                                .border(1.dp, LogoPink.copy(alpha = 0.55f), RoundedCornerShape(8.dp))
+                                .size(24.dp)
+                                .clip(RoundedCornerShape(7.dp))
+                                .background(Color(0xFF8B5CF6).copy(alpha = 0.20f))
+                                .border(1.dp, Color(0xFF8B5CF6).copy(alpha = 0.45f), RoundedCornerShape(7.dp))
                                 .clickable(onClick = onRefreshDb),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Refresh,
                                 contentDescription = "Refresh",
-                                tint = LogoSoftPink,
-                                modifier = Modifier.size(14.dp)
+                                tint = Color(0xFFC4B5FD),
+                                modifier = Modifier.size(13.dp)
                             )
                         }
                     }
@@ -1049,18 +1031,9 @@ private fun StatusBoxesSection(
 
         Card(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(14.dp),
+            shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(containerColor = Surface1.copy(alpha = 0.94f)),
-            border = BorderStroke(
-                1.dp,
-                Brush.horizontalGradient(
-                    listOf(
-                        LogoPink.copy(alpha = 0.7f),
-                        LogoMagenta.copy(alpha = 0.45f),
-                        LogoPurple.copy(alpha = 0.7f)
-                    )
-                )
-            )
+            border = BorderStroke(1.dp, BorderSubtle.copy(alpha = 0.5f))
         ) {
             Row(
                 modifier = Modifier
@@ -1068,27 +1041,27 @@ private fun StatusBoxesSection(
                     .background(
                         Brush.horizontalGradient(
                             listOf(
-                                LogoPink.copy(alpha = 0.10f),
-                                LogoPurple.copy(alpha = 0.08f)
+                                LogoPink.copy(alpha = 0.08f),
+                                LogoPurple.copy(alpha = 0.06f)
                             )
                         )
                     )
-                    .padding(horizontal = 11.dp, vertical = 8.dp),
+                    .padding(horizontal = 12.dp, vertical = 9.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Box(
                     modifier = Modifier
-                        .size(34.dp)
-                        .clip(RoundedCornerShape(9.dp))
+                        .size(36.dp)
+                        .clip(RoundedCornerShape(10.dp))
                         .background(LogoPink.copy(alpha = 0.16f))
-                        .border(1.dp, LogoPink.copy(alpha = 0.5f), RoundedCornerShape(9.dp)),
+                        .border(1.dp, LogoPink.copy(alpha = 0.45f), RoundedCornerShape(10.dp)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Default.Memory,
                         contentDescription = strings.vermagicTitle,
                         tint = LogoPink,
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(19.dp)
                     )
                 }
 
@@ -1097,12 +1070,14 @@ private fun StatusBoxesSection(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = strings.vermagicTitle,
-                        style = MonoTiny,
-                        fontSize = 9.5.sp,
-                        color = LogoSoftPink,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 0.6.sp
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 10.sp,
+                            letterSpacing = 0.5.sp
+                        ),
+                        color = LogoSoftPink
                     )
+                    Spacer(Modifier.height(1.dp))
                     Text(
                         text = shortVermagic.ifBlank { strings.vermagicDetecting },
                         style = MaterialTheme.typography.bodyMedium.copy(
@@ -1123,7 +1098,7 @@ private fun StatusBoxesSection(
                     description = "Copy Vermagic",
                     tint = Color(0xFFC4B5FD),
                     gradientColors = listOf(Color(0xFF3B1F6E), Color(0xFF28154D)),
-                    borderTint = Color(0xFF8B5CF6),
+                    borderTint = Color(0xFF8B5CF6).copy(alpha = 0.6f),
                     onClick = onCopyVermagic
                 )
                 Spacer(Modifier.width(5.dp))
@@ -1132,7 +1107,7 @@ private fun StatusBoxesSection(
                     description = "Open Console",
                     tint = LogoSoftPink,
                     gradientColors = listOf(Color(0xFF4A1B66), Color(0xFF2E124A)),
-                    borderTint = LogoPink,
+                    borderTint = LogoPink.copy(alpha = 0.6f),
                     onClick = onConsole
                 )
                 Spacer(Modifier.width(5.dp))
@@ -1141,7 +1116,7 @@ private fun StatusBoxesSection(
                     description = "Credits",
                     tint = Color(0xFF67E8F9),
                     gradientColors = listOf(Color(0xFF213163), Color(0xFF1A2049)),
-                    borderTint = Color(0xFF38BDF8),
+                    borderTint = Color(0xFF38BDF8).copy(alpha = 0.6f),
                     onClick = onCredits
                 )
             }
@@ -1160,16 +1135,11 @@ private fun InfoStatusBox(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = Surface1.copy(alpha = 0.95f)),
         border = BorderStroke(
-            1.3.dp,
-            Brush.linearGradient(
-                listOf(
-                    accentColor.copy(alpha = 0.90f),
-                    accentColor.copy(alpha = 0.45f)
-                )
-            )
+            1.dp,
+            if (isPositive) StatusOk.copy(alpha = 0.40f) else AccentRed.copy(alpha = 0.40f)
         )
     ) {
         Column(
@@ -1178,12 +1148,12 @@ private fun InfoStatusBox(
                 .background(
                     Brush.verticalGradient(
                         listOf(
-                            accentColor.copy(alpha = if (isPositive) 0.14f else 0.16f),
+                            accentColor.copy(alpha = if (isPositive) 0.10f else 0.12f),
                             Surface1.copy(alpha = 0.95f)
                         )
                     )
                 )
-                .padding(horizontal = 10.dp, vertical = 9.dp)
+                .padding(horizontal = 11.dp, vertical = 9.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -1191,26 +1161,28 @@ private fun InfoStatusBox(
             ) {
                 Box(
                     modifier = Modifier
-                        .size(26.dp)
+                        .size(24.dp)
                         .clip(RoundedCornerShape(7.dp))
-                        .background(accentColor.copy(alpha = 0.20f))
-                        .border(1.dp, accentColor.copy(alpha = 0.65f), RoundedCornerShape(7.dp)),
+                        .background(accentColor.copy(alpha = 0.18f))
+                        .border(1.dp, accentColor.copy(alpha = 0.45f), RoundedCornerShape(7.dp)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = icon,
                         contentDescription = title,
                         tint = accentColor,
-                        modifier = Modifier.size(15.dp)
+                        modifier = Modifier.size(14.dp)
                     )
                 }
                 Spacer(Modifier.width(7.dp))
                 Text(
                     text = title,
-                    style = MonoTiny,
-                    fontSize = 10.5.sp,
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 10.5.sp,
+                        letterSpacing = 0.3.sp
+                    ),
                     color = TextPrimary,
-                    fontWeight = FontWeight.Bold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f)
@@ -1220,19 +1192,19 @@ private fun InfoStatusBox(
                 } else {
                     Box(
                         modifier = Modifier
-                            .size(8.dp)
+                            .size(7.dp)
                             .clip(CircleShape)
                             .background(accentColor)
                     )
                 }
             }
 
-            Spacer(Modifier.height(7.dp))
+            Spacer(Modifier.height(8.dp))
 
             Surface(
                 shape = RoundedCornerShape(8.dp),
-                color = accentColor.copy(alpha = 0.20f),
-                border = BorderStroke(1.dp, accentColor.copy(alpha = 0.70f)),
+                color = accentColor.copy(alpha = 0.14f),
+                border = BorderStroke(1.dp, accentColor.copy(alpha = 0.45f)),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text(
@@ -1245,7 +1217,7 @@ private fun InfoStatusBox(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 6.dp)
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 5.dp)
                 )
             }
         }
@@ -1336,42 +1308,48 @@ private fun DriverStatusSummaryCard(
     val activeDisplay = loaded || verifyStatus == "PASS"
     val stateColor = if (activeDisplay) StatusOk else AccentRed
     val isChecking = verifyStatus == "CHECKING"
+
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = Surface1),
         border = BorderStroke(
-            1.2.dp,
-            if (activeDisplay) Brush.horizontalGradient(listOf(StatusOk, Color(0xFF00E5FF)))
-            else Brush.horizontalGradient(listOf(AccentRed.copy(alpha = 0.65f), LogoPurple.copy(alpha = 0.55f)))
+            1.dp,
+            if (activeDisplay) StatusOk.copy(alpha = 0.45f)
+            else BorderSubtle.copy(alpha = 0.5f)
         )
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(stateColor.copy(alpha = 0.08f))
-                .padding(horizontal = 12.dp, vertical = 10.dp)
+                .background(
+                    if (activeDisplay) StatusOk.copy(alpha = 0.08f)
+                    else Surface1
+                )
+                .padding(horizontal = 14.dp, vertical = 11.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 StatusDot(loaded = activeDisplay)
-                Spacer(Modifier.width(9.dp))
+                Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
                     Text(
                         text = if (activeDisplay) {
                             if (hidden) strings.driverStatusHidden
                             else "${strings.driverStatusLoaded} · $loadedModule"
                         } else strings.driverStatusNotLoaded,
-                        style = MonoSmall,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = if (activeDisplay) StatusOk else AccentRed
+                        style = MaterialTheme.typography.titleSmall.copy(
+                            fontWeight = FontWeight.ExtraBold,
+                            fontSize = 13.5.sp
+                        ),
+                        color = if (activeDisplay) StatusOk else TextPrimary
                     )
+                    Spacer(Modifier.height(1.dp))
                     Text(
                         text = if (activeDisplay) strings.driverStatusLoadedHint else strings.driverStatusNotLoadedHint,
-                        style = MaterialTheme.typography.bodySmall,
-                        fontSize = 11.sp,
+                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
                         color = TextSecondary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
@@ -1382,7 +1360,7 @@ private fun DriverStatusSummaryCard(
                         Icons.Default.CheckCircle,
                         contentDescription = null,
                         tint = StatusOk,
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(19.dp)
                     )
                 }
             }
@@ -1393,8 +1371,8 @@ private fun DriverStatusSummaryCard(
                 Spacer(Modifier.height(8.dp))
                 Surface(
                     shape = RoundedCornerShape(8.dp),
-                    color = vColor.copy(alpha = 0.16f),
-                    border = BorderStroke(1.dp, vColor.copy(alpha = 0.70f)),
+                    color = vColor.copy(alpha = 0.14f),
+                    border = BorderStroke(1.dp, vColor.copy(alpha = 0.55f)),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
@@ -1426,18 +1404,19 @@ private fun DriverStatusSummaryCard(
                 }
             }
 
-            Spacer(Modifier.height(9.dp))
-
-            PremiumActionButton(
-                text = if (isChecking) strings.verifyingBtn else strings.verifyBtn,
-                icon = Icons.Default.VerifiedUser,
-                enabled = !busy && rootAvailable,
-                loading = isChecking,
-                gradientColors = listOf(Color(0xFF0B5345), Color(0xFF0E6655), Color(0xFF154360)),
-                borderColors = listOf(Color(0xFF2DD4BF).copy(alpha = 0.65f), Color(0xFF38BDF8).copy(alpha = 0.60f)),
-                iconTint = Color(0xFF5EEAD4),
-                onClick = onVerify
-            )
+            if (activeDisplay) {
+                Spacer(Modifier.height(10.dp))
+                PremiumActionButton(
+                    text = if (isChecking) strings.verifyingBtn else strings.verifyBtn,
+                    icon = Icons.Default.VerifiedUser,
+                    enabled = !busy && rootAvailable,
+                    loading = isChecking,
+                    gradientColors = listOf(Color(0xFF0B5345), Color(0xFF0E6655), Color(0xFF154360)),
+                    borderColors = listOf(Color(0xFF2DD4BF).copy(alpha = 0.65f), Color(0xFF38BDF8).copy(alpha = 0.60f)),
+                    iconTint = Color(0xFF5EEAD4),
+                    onClick = onVerify
+                )
+            }
         }
     }
 }
@@ -1455,17 +1434,17 @@ private fun KernelAuditCard(
     val isScanning = status == "SCANNING"
     val isDone = status == "DONE"
     val cardBorder = if (isDone) {
-        if (hasBlockers) Brush.horizontalGradient(listOf(AccentRed.copy(alpha = 0.7f), LogoPurple.copy(alpha = 0.6f)))
-        else Brush.horizontalGradient(listOf(StatusOk.copy(alpha = 0.7f), Color(0xFF00E5FF).copy(alpha = 0.6f)))
+        if (hasBlockers) AccentRed.copy(alpha = 0.55f)
+        else StatusOk.copy(alpha = 0.45f)
     } else {
-        Brush.horizontalGradient(listOf(Color(0xFF38BDF8).copy(alpha = 0.7f), LogoPurple.copy(alpha = 0.6f)))
+        Color(0xFF0284C7).copy(alpha = 0.45f)
     }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = Surface1),
-        border = BorderStroke(1.2.dp, cardBorder)
+        border = BorderStroke(1.dp, cardBorder)
     ) {
         Column(
             modifier = Modifier
@@ -1473,8 +1452,8 @@ private fun KernelAuditCard(
                 .background(
                     Brush.horizontalGradient(
                         listOf(
-                            Color(0xFF0284C7).copy(alpha = 0.08f),
-                            LogoPurple.copy(alpha = 0.08f)
+                            Color(0xFF0284C7).copy(alpha = 0.07f),
+                            LogoPurple.copy(alpha = 0.05f)
                         )
                     )
                 )
@@ -1503,16 +1482,18 @@ private fun KernelAuditCard(
                 Column(Modifier.weight(1f)) {
                     Text(
                         text = strings.checkKernelTitle,
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.titleSmall.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.5.sp
+                        ),
                         color = TextPrimary
                     )
+                    Spacer(Modifier.height(1.dp))
                     Text(
                         text = strings.checkKernelSub,
-                        style = MaterialTheme.typography.bodySmall,
-                        fontSize = 11.sp,
+                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
                         color = TextSecondary,
-                        maxLines = 1,
+                        maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
                 }
@@ -1524,7 +1505,7 @@ private fun KernelAuditCard(
                 Surface(
                     shape = RoundedCornerShape(8.dp),
                     color = bannerColor.copy(alpha = 0.14f),
-                    border = BorderStroke(1.dp, bannerColor.copy(alpha = 0.60f)),
+                    border = BorderStroke(1.dp, bannerColor.copy(alpha = 0.55f)),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
@@ -1551,7 +1532,7 @@ private fun KernelAuditCard(
                 }
             }
 
-            Spacer(Modifier.height(9.dp))
+            Spacer(Modifier.height(10.dp))
 
             PremiumActionButton(
                 text = if (isScanning) strings.checkKernelCheckingBtn else strings.checkKernelBtn,
@@ -1582,16 +1563,7 @@ private fun CustomScriptLoadCard(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = Surface1),
-        border = BorderStroke(
-            1.2.dp,
-            Brush.horizontalGradient(
-                listOf(
-                    LogoPink.copy(alpha = 0.7f),
-                    LogoMagenta.copy(alpha = 0.5f),
-                    LogoPurple.copy(alpha = 0.7f)
-                )
-            )
-        )
+        border = BorderStroke(1.dp, LogoPurple.copy(alpha = 0.45f))
     ) {
         Column(
             modifier = Modifier
@@ -1599,8 +1571,8 @@ private fun CustomScriptLoadCard(
                 .background(
                     Brush.horizontalGradient(
                         listOf(
-                            LogoPink.copy(alpha = 0.08f),
-                            LogoPurple.copy(alpha = 0.08f)
+                            LogoPink.copy(alpha = 0.07f),
+                            LogoPurple.copy(alpha = 0.05f)
                         )
                     )
                 )
@@ -1629,23 +1601,25 @@ private fun CustomScriptLoadCard(
                 Column(Modifier.weight(1f)) {
                     Text(
                         text = strings.customScriptTitle,
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.titleSmall.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.5.sp
+                        ),
                         color = TextPrimary
                     )
+                    Spacer(Modifier.height(1.dp))
                     Text(
                         text = if (hasFile) "${strings.customScriptSelected} $pickedFile"
                         else strings.customScriptSub,
-                        style = MaterialTheme.typography.bodySmall,
-                        fontSize = 11.sp,
-                        color = if (hasFile) StatusOk else TextMuted,
-                        maxLines = 1,
+                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                        color = if (hasFile) StatusOk else TextSecondary,
+                        maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
                 }
             }
 
-            Spacer(Modifier.height(9.dp))
+            Spacer(Modifier.height(10.dp))
 
             PremiumActionButton(
                 text = strings.customScriptPickBtn,
@@ -1699,22 +1673,21 @@ private fun CustomScriptLoadCard(
                             )
                         }
                     }
+
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(12.dp))
-                            .background(
-                                Brush.horizontalGradient(listOf(Color(0xFF6E1730), Color(0xFF8C1D3F)))
-                            )
-                            .border(1.1.dp, Color(0xFFFB7185).copy(alpha = 0.60f), RoundedCornerShape(12.dp))
+                            .background(Surface2)
+                            .border(1.dp, BorderSubtle, RoundedCornerShape(12.dp))
                             .clickable(enabled = !busy, onClick = onClearPicked)
-                            .padding(vertical = 11.dp, horizontal = 16.dp),
+                            .padding(vertical = 11.dp, horizontal = 14.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            text = strings.customScriptClearBtn,
-                            color = Color.White,
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.ExtraBold
+                        Icon(
+                            Icons.Default.Close,
+                            contentDescription = "Clear",
+                            tint = Color(0xFFFDA4AF),
+                            modifier = Modifier.size(18.dp)
                         )
                     }
                 }
@@ -1921,16 +1894,7 @@ private fun VariantConsoleCard(
             .height(height)
             .clip(RoundedCornerShape(16.dp)),
         colors = CardDefaults.cardColors(containerColor = SurfaceInset),
-        border = BorderStroke(
-            1.2.dp,
-            Brush.horizontalGradient(
-                listOf(
-                    LogoPink.copy(alpha = 0.55f),
-                    LogoMagenta.copy(alpha = 0.35f),
-                    LogoPurple.copy(alpha = 0.55f)
-                )
-            )
-        )
+        border = BorderStroke(1.dp, BorderSubtle.copy(alpha = 0.5f))
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
 
@@ -1959,7 +1923,7 @@ private fun VariantConsoleCard(
                     color = LogoSoftPink
                 )
             }
-            HorizontalDivider(color = BorderSubtle.copy(alpha = 0.7f))
+            HorizontalDivider(color = BorderSubtle.copy(alpha = 0.6f))
 
             if (lines.isEmpty()) {
                 Column(
@@ -1986,29 +1950,32 @@ private fun VariantConsoleCard(
             } else {
                 LazyColumn(
                     state = listState,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = 10.dp, vertical = 8.dp)
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                    modifier = Modifier.fillMaxSize()
                 ) {
                     items(lines) { line ->
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(vertical = 2.5.dp),
+                                .padding(vertical = 1.5.dp),
                             verticalAlignment = Alignment.Top
                         ) {
-                            Box(
-                                modifier = Modifier
-                                    .padding(top = 6.dp, end = 8.dp)
-                                    .size(6.dp)
-                                    .clip(CircleShape)
-                                    .background(consoleLineColor(line.type))
-                            )
+                            val startsWithDash = line.text.startsWith("-") || line.text.startsWith("  -")
+                            if (!startsWithDash) {
+                                Box(
+                                    modifier = Modifier
+                                        .padding(top = 6.dp, end = 7.dp)
+                                        .size(5.dp)
+                                        .clip(CircleShape)
+                                        .background(consoleLineColor(line.type))
+                                )
+                            }
                             Text(
                                 text = line.text,
                                 style = MaterialTheme.typography.bodySmall.copy(
                                     fontFamily = FontFamily.Monospace,
-                                    fontSize = 12.sp
+                                    fontSize = 12.sp,
+                                    lineHeight = 16.sp
                                 ),
                                 color = if (line.type == "OK" || line.type == "ERR" || line.type == "WARN" || line.type == "CMD" || line.type == "FIX") {
                                     consoleLineColor(line.type)
@@ -2020,7 +1987,7 @@ private fun VariantConsoleCard(
                         }
                     }
                     item {
-                        Spacer(Modifier.height(2.dp))
+                        Spacer(Modifier.height(4.dp))
                     }
                 }
             }
@@ -2067,16 +2034,7 @@ private fun KernelListSection(
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp)),
         colors = CardDefaults.cardColors(containerColor = SurfaceInset),
-        border = BorderStroke(
-            1.2.dp,
-            Brush.horizontalGradient(
-                listOf(
-                    LogoPurple.copy(alpha = 0.6f),
-                    LogoMagenta.copy(alpha = 0.45f),
-                    LogoPink.copy(alpha = 0.6f)
-                )
-            )
-        )
+        border = BorderStroke(1.dp, BorderSubtle.copy(alpha = 0.5f))
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
 
@@ -2570,12 +2528,8 @@ private fun SupportCard(
             containerColor = if (loadFailed) Surface2 else Surface1
         ),
         border = BorderStroke(
-            1.2.dp,
-            if (loadFailed) {
-                Brush.horizontalGradient(listOf(AccentRed, LogoPink))
-            } else {
-                Brush.horizontalGradient(listOf(LogoPink, LogoMagenta, LogoPurple))
-            }
+            1.dp,
+            if (loadFailed) AccentRed.copy(alpha = 0.5f) else BorderSubtle.copy(alpha = 0.5f)
         )
     ) {
         Column(

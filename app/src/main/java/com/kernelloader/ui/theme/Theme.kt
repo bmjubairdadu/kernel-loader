@@ -9,7 +9,13 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
+import kotlin.math.min
 
 private val DarkColorScheme = darkColorScheme(
     primary = AccentGreen,
@@ -80,9 +86,36 @@ fun KernelLoderTheme(
         else -> LightColorScheme
     }
 
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = Typography,
-        content = content
-    )
+    val context = LocalContext.current
+    val configuration = LocalConfiguration.current
+    val systemDensity = LocalDensity.current
+
+    // Adaptive UI scaling: Ensures consistent layout across different screen sizes and densities.
+    // 1. Normalizes fontScale to 1.0f so system "Large Font" settings don't deform UI cards and buttons.
+    // 2. Calculates proportional density based on standard mobile width (392dp) so budget 720p, 1080p,
+    //    and 2K devices render cards and text at the exact same proportional scale.
+    val customDensity = remember(configuration.screenWidthDp, configuration.screenHeightDp, systemDensity) {
+        val displayMetrics = context.resources.displayMetrics
+        val isTablet = configuration.smallestScreenWidthDp >= 600
+
+        if (isTablet) {
+            Density(density = systemDensity.density, fontScale = 1.0f)
+        } else {
+            val shortDimensionPx = min(displayMetrics.widthPixels, displayMetrics.heightPixels).toFloat()
+            val targetDensity = if (shortDimensionPx > 0f) {
+                (shortDimensionPx / 392f).coerceIn(1.0f, 6.0f)
+            } else {
+                systemDensity.density
+            }
+            Density(density = targetDensity, fontScale = 1.0f)
+        }
+    }
+
+    CompositionLocalProvider(LocalDensity provides customDensity) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            typography = Typography,
+            content = content
+        )
+    }
 }

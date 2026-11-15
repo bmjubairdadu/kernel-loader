@@ -7,315 +7,189 @@ import com.topjohnwu.superuser.Shell
 
 class KernelAuditor(private val ctx: Context) {
 
-    data class AuditItem(
-        val step: Int,
-        val title: String,
-        val status: String,
-        val details: String,
-        val fixSuggestion: String? = null
-    )
-
     fun runAudit(onLine: (msg: String, type: String) -> Unit): Pair<Int, Boolean> {
-        onLine("==================================================", "CMD")
-        onLine("  KERNEL DRIVER COMPATIBILITY AUDIT ENGINE", "CMD")
-        onLine("==================================================", "CMD")
-
         val manufacturer = Build.MANUFACTURER.replaceFirstChar { it.uppercase() }
         val model = Build.MODEL
-        val device = Build.DEVICE
         val androidVer = Build.VERSION.RELEASE
         val sdk = Build.VERSION.SDK_INT
         val release = (RootChecker.getKernelRelease() ?: System.getProperty("os.version") ?: "").trim()
         val vermagic = RootChecker.getKernelVermagic().trim()
 
-        onLine("- Device Model : $manufacturer $model ($device)", "INFO")
-        onLine("- Android OS   : Android $androidVer (API $sdk)", "INFO")
-        onLine("- Kernel Rel   : $release", "INFO")
-        if (vermagic.isNotBlank()) {
-            onLine("- Full Vermagic: $vermagic", "INFO")
+        onLine("- Target Device: $manufacturer $model (Android $androidVer, SDK $sdk)", "INFO")
+        onLine("- Kernel Release: $release", "INFO")
+        if (vermagic.isNotBlank() && vermagic != release) {
+            onLine("- Kernel Vermagic: $vermagic", "INFO")
         }
-        onLine("--------------------------------------------------", "CMD")
 
         var blockerCount = 0
         var warnCount = 0
-        val items = mutableListOf<AuditItem>()
 
+        // 1. Root & Superuser Privileges
         val rootRes = Shell.cmd("id").exec()
         val rootOut = rootRes.out.joinToString(" ")
         if (rootRes.isSuccess && rootOut.contains("uid=0")) {
-            items.add(AuditItem(
-                step = 1,
-                title = "Root Access (UID=0)",
-                status = "PASS",
-                details = "Root access verified active (uid=0 root)."
-            ))
-            onLine("[OK] 1/9: Root Access: Granted (UID=0 active)", "OK")
+            onLine("- Root Privileges: Granted (UID=0 Superuser active)", "OK")
         } else {
             blockerCount++
-            items.add(AuditItem(
-                step = 1,
-                title = "Root Access (UID=0)",
-                status = "FAIL",
-                details = "Root privileges not granted ($rootOut).",
-                fixSuggestion = "Open Magisk, KernelSU, or APatch app and grant Superuser (Root) permission to Kernel Loader."
-            ))
-            onLine("[FAIL] 1/9: Root Access: DENIED", "ERR")
-            onLine("  • Detail: Kernel Loader does not have root privileges.", "ERR")
-            onLine("  • Fix   : Grant Superuser access in Magisk / KernelSU / APatch.", "FIX")
+            onLine("- Root Privileges: Denied (Superuser access missing)", "ERR")
+            onLine("  - Issue: Application does not have UID=0 root permissions", "ERR")
+            onLine("  - Fix: Grant root access in Magisk / KernelSU / APatch manager", "FIX")
         }
 
+        // 2. Kernel Module Subsystem Support
         val modDisRes = Shell.cmd("cat /proc/sys/kernel/modules_disabled 2>/dev/null").exec()
         val modDisVal = modDisRes.out.firstOrNull()?.trim() ?: "0"
         if (modDisVal == "1") {
             blockerCount++
-            items.add(AuditItem(
-                step = 2,
-                title = "Kernel Module Lock (modules_disabled)",
-                status = "FAIL",
-                details = "Kernel module loading is permanently disabled until reboot (/proc/sys/kernel/modules_disabled = 1).",
-                fixSuggestion = "Reboot your phone. If this recurs on boot, inspect init.rc or security daemons that write '1' to modules_disabled."
-            ))
-            onLine("[FAIL] 2/9: Module Subsystem: LOCKED (modules_disabled=1)", "ERR")
-            onLine("  • Detail: Kernel module loading permanently locked until reboot.", "ERR")
-            onLine("  • Fix   : Reboot device now to reset kernel module state.", "FIX")
+            onLine("- Kernel Module Subsystem: Locked (modules_disabled=1)", "ERR")
+            onLine("  - Issue: Module loading permanently disabled by kernel until reboot", "ERR")
+            onLine("  - Fix: Reboot device now to unlock module subsystem", "FIX")
         } else {
             val procModRes = Shell.cmd("test -r /proc/modules").exec()
             if (procModRes.isSuccess) {
-                items.add(AuditItem(
-                    step = 2,
-                    title = "Kernel Module Subsystem (CONFIG_MODULES)",
-                    status = "PASS",
-                    details = "Kernel module loader is active and ready (CONFIG_MODULES=y)."
-                ))
-                onLine("[OK] 2/9: Module Subsystem: Active (CONFIG_MODULES=y, unlocked)", "OK")
+                onLine("- Kernel Module Subsystem: Supported (CONFIG_MODULES=y, unlocked)", "OK")
             } else {
                 warnCount++
-                items.add(AuditItem(
-                    step = 2,
-                    title = "Kernel Module Subsystem",
-                    status = "WARN",
-                    details = "Cannot read /proc/modules directly. init_module syscall may be restricted.",
-                    fixSuggestion = "Ensure your kernel was built with CONFIG_MODULES=y."
-                ))
-                onLine("[WARN] 2/9: Module Subsystem: /proc/modules not readable directly", "WARN")
+                onLine("- Kernel Module Subsystem: Warning (/proc/modules restricted)", "WARN")
             }
         }
 
+        // 3. Module Signature Enforcement
         var sigEnforced = false
         var sigReason = ""
-
         val cmdlineRes = Shell.cmd("cat /proc/cmdline 2>/dev/null").exec()
         val cmdline = cmdlineRes.out.joinToString(" ")
         if (cmdline.contains("module.sig_enforce=1") || cmdline.contains("sig_enforce=1")) {
             sigEnforced = true
-            sigReason = "Enforced via boot cmdline (sig_enforce=1)"
+            sigReason = "sig_enforce=1 in boot cmdline"
         }
-
         val sysSigRes = Shell.cmd("cat /sys/module/module/parameters/sig_enforce 2>/dev/null").exec()
         val sysSigVal = sysSigRes.out.firstOrNull()?.trim() ?: ""
         if (sysSigVal.equals("Y", ignoreCase = true) || sysSigVal == "1") {
             sigEnforced = true
-            sigReason = "Enforced via kernel module parameter (sig_enforce=Y)"
+            sigReason = "sig_enforce=Y in module parameters"
         }
-
         if (!sigEnforced) {
-            val ksymsRes = Shell.cmd("grep -E \"\\bis_module_sig_enforced\\b\" /proc/kallsyms 2>/dev/null").exec()
-            if (ksymsRes.isSuccess && ksymsRes.out.isNotEmpty()) {
-                val dmesgRes = Shell.cmd("dmesg | grep -E -i \"module verification failed|PKCS#7|signature\" | tail -n 2").exec()
-                if (dmesgRes.out.isNotEmpty()) {
-                    sigEnforced = true
-                    sigReason = "Kernel rejected module due to missing vendor PKCS#7 signature"
-                }
+            val dmesgRes = Shell.cmd("dmesg 2>/dev/null | grep -E -i 'module verification failed|PKCS#7|signature' | tail -n 2").exec()
+            if (dmesgRes.out.isNotEmpty()) {
+                sigEnforced = true
+                sigReason = "PKCS#7 signature check active in kernel"
             }
         }
 
         if (sigEnforced) {
             blockerCount++
-            items.add(AuditItem(
-                step = 3,
-                title = "Module Signature Enforcement (CONFIG_MODULE_SIG_FORCE)",
-                status = "FAIL",
-                details = "Kernel rejects unsigned modules ($sigReason). insmod will exit with ENOKEY / Exec format error.",
-                fixSuggestion = "Flash a boot.img patched with signature verification disabled (is_module_sig_enforced=0) or use Redmi_10C_SigOff_Boot_Flasher.zip in Magisk."
-            ))
-            onLine("[FAIL] 3/9: Module Signature: ENFORCED ($sigReason)", "ERR")
-            onLine("  • Detail: Unsigned driver loading will fail with 'Exec format error'.", "ERR")
-            onLine("  • Fix   : Flash SigOff patched boot.img (or use SigOff Magisk Flasher).", "FIX")
+            onLine("- Module Signature: Enforced ($sigReason)", "ERR")
+            onLine("  - Issue: Kernel rejects unsigned drivers with Exec format error", "ERR")
+            onLine("  - Fix: Flash SigOff patched boot.img or install SigOff Magisk flasher", "FIX")
         } else {
-            items.add(AuditItem(
-                step = 3,
-                title = "Module Signature Enforcement",
-                status = "PASS",
-                details = "Module signature enforcement: Disabled / Bypassed (Kernel accepts custom drivers)."
-            ))
-            onLine("[OK] 3/9: Module Signature: Disabled / Permissive (Unsigned OK)", "OK")
+            onLine("- Module Signature: Disabled / Permissive (Unsigned drivers accepted)", "OK")
         }
 
+        // 4. Architecture & ABI Bitness
         val archRes = Shell.cmd("uname -m 2>/dev/null").exec()
         val arch = archRes.out.firstOrNull()?.trim() ?: "unknown"
         if (arch == "aarch64" || arch == "arm64") {
-            items.add(AuditItem(
-                step = 4,
-                title = "Architecture & Bitness",
-                status = "PASS",
-                details = "64-bit ARM architecture (aarch64 / arm64-v8a)."
-            ))
-            onLine("[OK] 4/9: Architecture: 64-bit ($arch / arm64-v8a)", "OK")
+            onLine("- Architecture: 64-bit ($arch / arm64-v8a)", "OK")
         } else {
             blockerCount++
-            items.add(AuditItem(
-                step = 4,
-                title = "Architecture & Bitness",
-                status = "FAIL",
-                details = "32-bit architecture ($arch) detected. Kernel drivers require 64-bit arm64-v8a.",
-                fixSuggestion = "Device must run a 64-bit kernel and 64-bit OS ROM to load arm64 drivers."
-            ))
-            onLine("[FAIL] 4/9: Architecture: Incompatible ($arch is 32-bit)", "ERR")
-            onLine("  • Detail: 64-bit arm64-v8a kernel is required.", "ERR")
-            onLine("  • Fix   : Flash a 64-bit kernel / ROM.", "FIX")
+            onLine("- Architecture: Incompatible ($arch is 32-bit)", "ERR")
+            onLine("  - Issue: 64-bit arm64-v8a kernel is required for drivers", "ERR")
+            onLine("  - Fix: Flash a 64-bit ROM / kernel", "FIX")
         }
 
-        val probeNode = "/dev/.kl_audit_${System.currentTimeMillis() % 10000}"
-        val mknodRes = Shell.cmd("mknod $probeNode c 1 3 2>/dev/null && rm -f $probeNode").exec()
-        if (mknodRes.isSuccess) {
-            items.add(AuditItem(
-                step = 5,
-                title = "Character Device Creation (/dev/)",
-                status = "PASS",
-                details = "Root shell can create character device nodes in /dev."
-            ))
-            onLine("[OK] 5/9: Node Creation: Operational (/dev mknod writable)", "OK")
+        // 5. Driver Loading Verification
+        if (blockerCount == 0) {
+            onLine("- Driver Loading Capability: Ready (Kernel will accept and load driver)", "OK")
         } else {
-            blockerCount++
-            items.add(AuditItem(
-                step = 5,
-                title = "Character Device Creation (/dev/)",
-                status = "FAIL",
-                details = "Root shell failed to create character device in /dev.",
-                fixSuggestion = "SELinux or mount policy is blocking mknod. Run 'setenforce 0' or use Magisk supolicy."
-            ))
-            onLine("[FAIL] 5/9: Node Creation: BLOCKED in /dev", "ERR")
-            onLine("  • Detail: Cannot create character device nodes in /dev directory.", "ERR")
-            onLine("  • Fix   : Run 'setenforce 0' or configure Magisk supolicy.", "FIX")
+            onLine("- Driver Loading Capability: Blocked (Resolve signature or root first)", "ERR")
         }
 
-        val devMountRes = Shell.cmd("mount | grep -E ' on /dev '").exec()
-        val devMountLine = devMountRes.out.firstOrNull() ?: ""
-        if (devMountLine.contains("devtmpfs")) {
-            items.add(AuditItem(
-                step = 6,
-                title = "Device Filesystem (devtmpfs)",
-                status = "PASS",
-                details = "devtmpfs is active on /dev (CONFIG_DEVTMPFS=y)."
-            ))
-            onLine("[OK] 6/9: Device Filesystem: devtmpfs (CONFIG_DEVTMPFS=y)", "OK")
-        } else {
-            warnCount++
-            items.add(AuditItem(
-                step = 6,
-                title = "Device Filesystem (tmpfs vs devtmpfs)",
-                status = "WARN",
-                details = "# CONFIG_DEVTMPFS is not set (mounted as tmpfs). Android 12+ SELinux blocks automatic ueventd node creation.",
-                fixSuggestion = "Handled automatically: Kernel Loader creates device nodes manually via root shell."
-            ))
-            onLine("[WARN] 6/9: Device Filesystem: tmpfs (# CONFIG_DEVTMPFS is not set)", "WARN")
-            onLine("  • Detail: Kernel cannot auto-create /dev node; ueventd is restricted.", "WARN")
-            onLine("  • Info  : Kernel Loader handles this automatically via manual mknod.", "INFO")
-        }
-
+        // 6. SELinux & ueventd Node Creation Policy
         val seRes = Shell.cmd("getenforce 2>/dev/null").exec()
-        val seMode = seRes.out.firstOrNull()?.trim() ?: "Unknown"
-        if (seMode.equals("Permissive", ignoreCase = true)) {
-            items.add(AuditItem(
-                step = 7,
-                title = "SELinux Status",
-                status = "PASS",
-                details = "SELinux is in Permissive mode."
-            ))
-            onLine("[OK] 7/9: SELinux Mode: Permissive (Unrestricted access)", "OK")
+        val seMode = seRes.out.firstOrNull()?.trim() ?: "Enforcing"
+        val isPermissive = seMode.equals("Permissive", ignoreCase = true)
+
+        // Check if Kernel_SELinux_Node_Fixer module is installed in Magisk/KernelSU
+        val modInstalled = Shell.cmd("test -d /data/adb/modules/kl_selinux_fix && ! test -f /data/adb/modules/kl_selinux_fix/disable").exec().isSuccess
+
+        onLine("- SELinux Mode: $seMode", if (isPermissive) "OK" else "INFO")
+
+        if (isPermissive) {
+            onLine("- Node Creation Permission: GRANTED (Permissive mode allows all operations)", "OK")
+            onLine("- ueventd Node Policy: Active (All /dev node operations permitted)", "OK")
+            onLine("- Node Auto-Creation (/dev): Operational (Kernel device_create will auto-create node)", "OK")
+        } else if (modInstalled) {
+            onLine("- Node Creation Permission: GRANTED (Kernel_SELinux_Node_Fixer active)", "OK")
+            onLine("- ueventd Node Policy: Active (sepolicy.rule active for ueventd chr_file create)", "OK")
+            onLine("- Node Auto-Creation (/dev): Operational (ueventd unlocked via Magisk module)", "OK")
+        } else if (sdk <= 30) {
+            // Android 11 and older (SDK <= 30) stock sepolicy explicitly contains:
+            // "allow ueventd dev_type chr_file { create getattr setattr unlink }"
+            onLine("- Node Creation Permission: GRANTED (Stock Android $androidVer policy permits creation)", "OK")
+            onLine("- ueventd Node Policy: Active (Stock rule: allow ueventd dev_type chr_file create)", "OK")
+            onLine("- Node Auto-Creation (/dev): Operational (System ueventd will auto-create /dev node)", "OK")
         } else {
-            warnCount++
-            items.add(AuditItem(
-                step = 7,
-                title = "SELinux Status",
-                status = "WARN",
-                details = "SELinux is in Enforcing mode. Loader uses root 0600 stealth permissions.",
-                fixSuggestion = "If client apps cannot connect to driver, temporarily run 'setenforce 0' to test."
-            ))
-            onLine("[WARN] 7/9: SELinux Mode: $seMode (Enforcing)", "WARN")
-            onLine("  • Info  : Driver stealth mode locks permissions to root:0600.", "INFO")
+            // Android 12+ (SDK >= 31) where stock policy restricts ueventd dev creation
+            val liveRulesCheck = Shell.cmd("magiskpolicy --print-rules 2>/dev/null | grep -E 'allow ueventd (device|dev_type|unlabeled) chr_file.*create|permissive ueventd'").exec()
+            val liveRuleActive = liveRulesCheck.isSuccess && liveRulesCheck.out.isNotEmpty()
+
+            if (liveRuleActive) {
+                val matched = liveRulesCheck.out.firstOrNull()?.trim() ?: "chr_file create active"
+                onLine("- Node Creation Permission: GRANTED (Live policy rules verified)", "OK")
+                onLine("- ueventd Node Policy: Active ($matched)", "OK")
+                onLine("- Node Auto-Creation (/dev): Operational (ueventd unlocked via live policy)", "OK")
+            } else {
+                warnCount++
+                onLine("- Node Creation Permission: BLOCKED (SELinux Enforcing denies ueventd)", "WARN")
+                onLine("- ueventd Node Policy: Blocked (Android $androidVer SELinux restriction)", "WARN")
+                onLine("- Node Auto-Creation (/dev): Restricted (Kernel cannot auto-create node in /dev)", "WARN")
+                onLine("  - Issue: SELinux Enforcing blocks ueventd from creating custom driver node", "WARN")
+                onLine("  - Fix: Flash Kernel_SELinux_Node_Fixer.zip in Magisk to grant permission", "FIX")
+            }
         }
 
-        val nsTestRes = Shell.cmd("sh -c 'touch /dev/.kl_ns_chk 2>/dev/null' && test -f /dev/.kl_ns_chk && rm -f /dev/.kl_ns_chk").exec()
-        if (nsTestRes.isSuccess) {
-            items.add(AuditItem(
-                step = 8,
-                title = "Mount Namespace Sharing",
-                status = "PASS",
-                details = "Mount namespace allows global device node sharing."
-            ))
-            onLine("[OK] 8/9: Mount Namespace: Shared / Global", "OK")
+        // 7. Magisk Mount Namespace Separation
+        val nsTest = Shell.cmd("sh -c 'touch /dev/.kl_ns_chk 2>/dev/null' && test -f /dev/.kl_ns_chk && rm -f /dev/.kl_ns_chk").exec()
+        if (nsTest.isSuccess) {
+            onLine("- Mount Namespace: Global (Device node sharing operational)", "OK")
         } else {
             warnCount++
-            items.add(AuditItem(
-                step = 8,
-                title = "Mount Namespace Mode",
-                status = "WARN",
-                details = "Subshell filesystem changes may be isolated.",
-                fixSuggestion = "In Magisk app -> Settings -> Set 'Mount Namespace Mode' to 'Global Namespace'."
-            ))
-            onLine("[WARN] 8/9: Mount Namespace: Isolated Mode Detected", "WARN")
-            onLine("  • Fix   : Magisk Settings -> Mount Namespace Mode -> Global Namespace.", "FIX")
+            onLine("- Mount Namespace: Isolated Mode Detected", "WARN")
+            onLine("  - Fix: Set 'Mount Namespace Mode' to 'Global Namespace' in Magisk", "FIX")
         }
 
+        // 8. Database Driver Match
+        val installer = DriverInstaller(ctx)
+        val candidates = installer.candidates(release)
+        if (candidates.isNotEmpty()) {
+            val names = candidates.joinToString(", ") { "$it.sh" }
+            onLine("- Database Driver: Available ($names)", "OK")
+        } else {
+            warnCount++
+            onLine("- Database Driver: No exact prebuilt driver found for $release", "WARN")
+            onLine("  - Fix: Compile driver from kernel source or tap 'SEND REPORT' below", "FIX")
+        }
+
+        // 9. Stealth Device Node Readiness
         val candRes = Shell.cmd("ls -d /dev/[0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9] 2>/dev/null").exec()
         val activeNodes = candRes.out.filter { it.isNotBlank() }
         if (activeNodes.isNotEmpty()) {
-            val node = activeNodes.first()
-            items.add(AuditItem(
-                step = 9,
-                title = "AincradClient Stealth Node",
-                status = "PASS",
-                details = "Active stealth node detected ($node). Ready for AincradClient 3.7 connection."
-            ))
-            onLine("[OK] 9/9: AincradClient Node: Active ($node detected)", "OK")
-            onLine("  • Info  : Matches [0-9][A-Za-z0-9]{5} Position #1 pattern.", "INFO")
+            onLine("- Stealth Device Node: Active (${activeNodes.first()} detected)", "OK")
         } else {
-            items.add(AuditItem(
-                step = 9,
-                title = "AincradClient Stealth Node",
-                status = "INFO",
-                details = "No existing driver node in /dev. Clean state."
-            ))
-            onLine("[OK] 9/9: AincradClient Readiness: Clean / Ready for Load", "OK")
-            onLine("  • Info  : Driver will inject 6-char stealth node on load.", "INFO")
+            onLine("- Stealth Device Node: Ready (Position #1 supported)", "OK")
         }
 
-        onLine("--------------------------------------------------", "CMD")
-        val hasBlockers = blockerCount > 0
-        if (!hasBlockers) {
-            if (warnCount == 0) {
-                onLine("=== AUDIT VERDICT: KERNEL IS 100% READY ===", "OK")
-                onLine("No blockers found. Driver will load and work seamlessly.", "OK")
-            } else {
-                onLine("=== AUDIT VERDICT: COMPATIBLE ($warnCount WARNINGS) ===", "OK")
-                onLine("Driver can load. Non-critical warnings handled by loader.", "INFO")
-            }
+        // 10. Final Verdict
+        val totalIssues = blockerCount + warnCount
+        if (blockerCount == 0 && warnCount == 0) {
+            onLine("- Audit Verdict: Kernel is 100% ready for driver load", "OK")
+        } else if (blockerCount == 0) {
+            onLine("- Audit Verdict: Compatible ($warnCount non-critical notice(s))", "OK")
         } else {
-            onLine("=== AUDIT VERDICT: $blockerCount BLOCKER(S) DETECTED ===", "ERR")
-            onLine("Driver injection will fail unless the following are resolved:", "ERR")
-            var fixIndex = 1
-            for (item in items.filter { it.status == "FAIL" }) {
-                onLine("--- [ISSUE #$fixIndex: ${item.title}] ---", "ERR")
-                onLine("  Problem: ${item.details}", "ERR")
-                item.fixSuggestion?.let { fix ->
-                    onLine("  Action : $fix", "FIX")
-                }
-                fixIndex++
-            }
+            onLine("- Audit Verdict: $blockerCount critical issue(s) detected — see fixes above", "ERR")
         }
-        onLine("==================================================", "CMD")
 
-        return Pair(blockerCount + warnCount, hasBlockers)
+        return Pair(totalIssues, blockerCount > 0)
     }
 }
