@@ -98,16 +98,16 @@ OUR_DEV=""
 OUR_MAJOR=""
 OUR_MINOR=""
 
-# Strategy A: Check /dev for newly created character device
+# Strategy A: Check /dev for newly created 6-char character device (digit leading)
 for attempt in 1 2 3 4; do
     for d in $(ls -1 /dev 2>/dev/null); do
         if ! echo "$DEV_BEFORE" | grep -qx "$d"; then
             if [ -c "/dev/$d" ]; then
                 case "$d" in
-                    [0-9]*)
+                    [0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9])
                         OUR_NODE="/dev/$d"
                         OUR_DEV="$d"
-                        echo -e "${COL_GREEN}  • Strategy A: Detected node in /dev: /dev/${d}${COL_RESET}"
+                        echo -e "${COL_GREEN}  • Strategy A: Detected stealth node in /dev: /dev/${d}${COL_RESET}"
                         break 2
                         ;;
                 esac
@@ -117,51 +117,50 @@ for attempt in 1 2 3 4; do
     sleep 0.1
 done
 
-# Strategy B: Scan all /sys/class/* entries
+# Strategy B: Scan /sys/class/* strictly matching 6-char stealth tag [0-9][A-Za-z0-9]{5}
 if [ -z "$OUR_NODE" ]; then
     for cls in /sys/class/*; do
         [ -d "$cls" ] || continue
         cname=$(basename "$cls")
         case "$cname" in
-            net|input|block|tty|sound|graphics|drm|kgsl|power_supply|thermal|rtc|misc|i2c*|spidev*|regulator|pci*|platform|firmware|mem|gpio|leds|backlight|hidraw)
-                continue
+            [0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9])
+                dev_file=""
+                if [ -f "$cls/$cname/dev" ]; then
+                    dev_file="$cls/$cname/dev"
+                elif [ -f "$cls/dev" ]; then
+                    dev_file="$cls/dev"
+                else
+                    for sub in "$cls"/*; do
+                        if [ -f "$sub/dev" ]; then
+                            dev_file="$sub/dev"
+                            break
+                        fi
+                    done
+                fi
+
+                if [ -n "$dev_file" ] && [ -f "$dev_file" ]; then
+                    dev_num=$(cat "$dev_file" 2>/dev/null)
+                    if [ -n "$dev_num" ] && echo "$dev_num" | grep -q ":"; then
+                        OUR_MAJOR=$(echo "$dev_num" | cut -d: -f1)
+                        OUR_MINOR=$(echo "$dev_num" | cut -d: -f2)
+                        echo -e "${COL_GREEN}  • Found stealth driver class: '${cname}' (Major=${OUR_MAJOR}, Minor=${OUR_MINOR})${COL_RESET}"
+                        if [ ! -c "/dev/$cname" ]; then
+                            mknod "/dev/$cname" c "$OUR_MAJOR" "$OUR_MINOR" 2>/dev/null
+                            echo -e "${COL_GREEN}  • Created stealth character device: /dev/${cname}${COL_RESET}"
+                        fi
+                        if [ -c "/dev/$cname" ]; then
+                            OUR_NODE="/dev/$cname"
+                            OUR_DEV="$cname"
+                            break
+                        fi
+                    fi
+                fi
                 ;;
         esac
-        dev_file=""
-        if [ -f "$cls/$cname/dev" ]; then
-            dev_file="$cls/$cname/dev"
-        elif [ -f "$cls/dev" ]; then
-            dev_file="$cls/dev"
-        else
-            for sub in "$cls"/*; do
-                if [ -f "$sub/dev" ]; then
-                    dev_file="$sub/dev"
-                    break
-                fi
-            done
-        fi
-
-        if [ -n "$dev_file" ] && [ -f "$dev_file" ]; then
-            dev_num=$(cat "$dev_file" 2>/dev/null)
-            if [ -n "$dev_num" ] && echo "$dev_num" | grep -q ":"; then
-                OUR_MAJOR=$(echo "$dev_num" | cut -d: -f1)
-                OUR_MINOR=$(echo "$dev_num" | cut -d: -f2)
-                echo -e "${COL_GREEN}  • Found driver class: '${cname}' (Major=${OUR_MAJOR}, Minor=${OUR_MINOR})${COL_RESET}"
-                if [ ! -c "/dev/$cname" ]; then
-                    mknod "/dev/$cname" c "$OUR_MAJOR" "$OUR_MINOR" 2>/dev/null
-                    echo -e "${COL_GREEN}  • Created character device: /dev/${cname}${COL_RESET}"
-                fi
-                if [ -c "/dev/$cname" ]; then
-                    OUR_NODE="/dev/$cname"
-                    OUR_DEV="$cname"
-                    break
-                fi
-            fi
-        fi
     done
 fi
 
-# Strategy C: Direct scan of /sys/dev/char/*
+# Strategy C: Direct scan of /sys/dev/char/* pointing to virtual 6-char stealth tag
 if [ -z "$OUR_NODE" ]; then
     for chrentry in /sys/dev/char/*; do
         [ -e "$chrentry" ] || continue
@@ -173,8 +172,8 @@ if [ -z "$OUR_NODE" ]; then
                 OUR_MINOR=$(echo "$dev_num" | cut -d: -f2)
                 cand_name=$(basename "$tgt")
                 case "$cand_name" in
-                    [0-9]*)
-                        echo -e "${COL_GREEN}  • Found sysfs char device: '${cand_name}' (${OUR_MAJOR}:${OUR_MINOR})${COL_RESET}"
+                    [0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9])
+                        echo -e "${COL_GREEN}  • Found sysfs stealth char device: '${cand_name}' (${OUR_MAJOR}:${OUR_MINOR})${COL_RESET}"
                         [ ! -c "/dev/$cand_name" ] && mknod "/dev/$cand_name" c "$OUR_MAJOR" "$OUR_MINOR" 2>/dev/null
                         if [ -c "/dev/$cand_name" ]; then
                             OUR_NODE="/dev/$cand_name"
@@ -196,7 +195,7 @@ if [ -z "$OUR_NODE" ]; then
                 if [ -c "/dev/$d" ]; then
                     OUR_NODE="/dev/$d"
                     OUR_DEV="$d"
-                    echo -e "${COL_GREEN}  • Found existing device node: /dev/${d}${COL_RESET}"
+                    echo -e "${COL_GREEN}  • Found existing stealth device node: /dev/${d}${COL_RESET}"
                     break
                 fi
                 ;;
