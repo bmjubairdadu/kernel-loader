@@ -1,155 +1,96 @@
 <div align="center">
 
-<img src="app/src/main/res/mipmap-xxxhdpi/ic_launcher.png" width="72" alt="Kernel Loader" onerror="this.style.display='none'"/>
+<img src="app/src/main/res/mipmap-xxxhdpi/ic_launcher.png" width="76" alt="Kernel Loader" onerror="this.style.display='none'"/>
 
-# Kernel Loader
+# Kernel Loader (v5.8)
 
-### Automated Kernel Module Loader and Diagnostic Suite for Android
-**Detects running kernel · Downloads matching module · In-app verification**
+### Enterprise-Grade Kernel Driver Engine & Diagnostic Suite for Android
+**Adaptive UI · AES-256-GCM Driver Security · Live Verification · SELinux Audit · OTA Updates**
 
-[![Release](https://img.shields.io/github/v/release/bmjubairdadu/kernel-loader?style=flat-square)](../../releases/latest)
+[![Release](https://img.shields.io/github/v/release/bmjubairdadu/kernel-loader?color=blue&style=flat-square)](https://github.com/bmjubairdadu/kernel-loader/releases/latest)
 [![Platform](https://img.shields.io/badge/platform-Android%209%2B%20arm64-green?style=flat-square)](#requirements)
 [![Root](https://img.shields.io/badge/root-Magisk%20%7C%20KernelSU%20%7C%20APatch-red?style=flat-square)](#requirements)
+[![Security](https://img.shields.io/badge/database-AES--256--GCM%20KLENC-purple?style=flat-square)](#security--driver-database-protection)
+[![Languages](https://img.shields.io/badge/languages-28%20Global%20Locales-orange?style=flat-square)](#internationalization-28-languages)
 [![License: GPL-3.0](https://img.shields.io/badge/license-GPL%20v3-blue?style=flat-square)](LICENSE)
 
 </div>
 
 ---
 
-**Kernel Loader** is a root-powered Android application designed to resolve, insert, and verify kernel modules (`.ko`) across Linux kernels 4.9 through 6.12. It matches the running kernel against an embedded driver database shipped inside the APK, verifies real-time physical memory read/write access via an integrated verification binary (`Driver.sh`), and packages complete hardware diagnostic dumps for custom driver compilation.
+**Kernel Loader** is a powerful root-driven Android application engineered to inspect, verify, and load stealth Linux kernel drivers and polyglot `.sh` installer scripts across Android Linux kernels **4.9 through 6.12**. Built with modern Jetpack Compose, an adaptive universal layout engine, and military-grade AES-256-GCM payload encryption, Kernel Loader guarantees safe, authenticated, and seamless driver operation across all device form factors.
 
 ---
 
-## Key Features
+## ✨ What's New in v5.8
 
-- **Unified Load Pipeline**: Automatically matches the running kernel against the embedded driver database, extracts the matching module from APK assets, verifies its SHA-256, and loads it into kernel space through a single `insmod` call.
-- **Single Signature Path**: The only load method is kernel signature enforcement bypass (sysctl first, boot-image patch + reboot when `CONFIG_MODULE_SIG_FORCE` is active). Custom `.ko` picking, KernelSU/Engine Bridge loaders, `insmod -f`, hide parameters, and custom kernel ZIP flashing were removed.
-- **In-App R/W Verification**: Direct execution of the `Driver.sh` memory engine to verify physical memory read and write operations on the driver's `/dev/<node>`.
-- **Detailed Error Reporting**: When a module load fails, the loader extracts and displays the root cause directly from kernel ring buffers (`dmesg`), avoiding generic verification errors.
-- **Diagnostic Report Pack**: Generates a self-contained ZIP archive containing:
-  - Exact `boot.img` partition dump (detected via active A/B slot and block device mapping).
-  - Full kernel symbol table (`/proc/kallsyms`).
-  - Sample OEM vendor module (`.ko`) with extracted compiler vermagic and configuration.
-  - Decompressed kernel configuration (`/proc/config.gz` or `/proc/config`).
-  - Embedded driver audit: `.ko` file, SHA-256, vermagic, MODVERSIONS CRCs, undefined symbols, CFI flavour, build ID.
-  - Driver source files (`driver_src_*`), `database.json`, and an agent-oriented `README_AGENT.md` build guide.
-  - Target BTF (`/sys/kernel/btf/vmlinux`) when readable.
-  - Kernel ring buffer logs (`dmesg`) and live application logs.
-- **One-Tap Sharing**: Direct integration with WhatsApp and Telegram with full FileProvider permission handling and clip-data propagation.
-- **Security and Hardening**:
-  - Full-mode R8 code shrinking and class obfuscation.
-  - Runtime anti-tamper shield detecting Frida, debuggers, ptrace, and Xposed hooks.
-  - Network security configuration enforcing direct connections (`NO_PROXY`).
+- **Universal Proportional Layout Engine:** Automatically normalizes screen density to a 392dp baseline across 720p budget devices, 1080p standards, 2K flagships, foldables, and tablets without text truncation.
+- **AES-256-GCM Encrypted Driver Security (`KLENC001`):** Complete remote driver database protection preventing unauthorized extraction, tampering, or third-party database theft.
+- **Zero-Trace In-Memory Execution:** OTA drivers decrypt directly in memory and stream to the root process pipe; temporary execution buffers are wiped from disk instantly.
+- **SELinux & ueventd Node Audit:** 10-point comprehensive kernel diagnostics clearly displaying SELinux mode, ueventd node creation permissions, and automatic policy checks.
+- **Always-Accessible Live Driver Verification:** One-click on-demand verification of active character nodes and stealth modules in `/dev`.
+- **28 Native Languages:** Complete multi-language localization with auto-IP country detection and an interactive language picker dialog.
 
 ---
 
-## Screenshots
+## 🚀 Key Features
 
-| Home | Live Terminal |
-|---|---|
-| ![Home](docs/screenshots/main.png) | ![Console](docs/screenshots/console.png) |
+### 1. Universal Adaptive UI
+- Proportional density scaling guarantees that cards, symmetric status boxes (`ROOT PERMISSION`, `DATABASE`), vermagic badges, and action buttons render with identical aesthetics on every screen size.
+- Resilient font-scaling normalization prevents layout deformation from system accessibility font magnification.
+- Tablet and foldable-aware containers (`widthIn(max = 580.dp)`) ensure balanced centered proportions.
+
+### 2. Comprehensive Kernel Compatibility Audit
+The built-in audit engine validates 10 vital kernel layers before driver insertion:
+1. **Root Access:** Validates UID=0 Superuser execution.
+2. **Module Subsystem:** Inspects `/proc/sys/kernel/modules_disabled` and `/proc/modules`.
+3. **Signature Enforcement:** Checks `sig_enforce` across `/proc/cmdline`, module parameters, and kernel ring buffers.
+4. **Architecture & ABI:** Validates 64-bit arm64-v8a compatibility.
+5. **Driver Loading Capability:** Evaluates overall kernel acceptance readiness.
+6. **SELinux & ueventd Policy:** Diagnoses `/dev` node auto-creation permissions across Android 11 through Android 14.
+7. **Mount Namespace:** Validates Global vs Isolated namespace mode.
+8. **Database Match:** Scans local and remote databases for exact vermagic matches.
+9. **Stealth Device Node:** Checks stealth character device node positions.
+10. **Final Verdict:** Clear actionable diagnosis with explicit fixes when needed.
+
+### 3. Security & Driver Database Protection
+- **AES-256-GCM Encryption:** Remote driver scripts and manifests are encrypted with a 256-bit symmetric key (`KLENC001` envelope with 12-byte random IVs and 128-bit authentication tags).
+- **Anti-Theft Storage:** Downloaded drivers are never stored in unencrypted format on public storage (`/sdcard`).
+- **In-Memory Pipe Streaming:** Drivers decrypt on-the-fly and pipe directly to `su`, deleting temporary buffers immediately upon module insertion.
+- **R8 Obfuscation & Hardening:** Aggressive class and identifier renaming with runtime anti-debug and anti-frida checks.
+
+### 4. Internationalization (28 Languages)
+Supports auto IP-based detection and manual selection across 28 languages:
+English, বাংলা (Bengali), हिन्दी (Hindi), اردو (Urdu), Bahasa Indonesia, Bahasa Melayu, العربية (Arabic), فارسی (Persian), Português, Русский (Russian), Українська (Ukrainian), Español, Français, Deutsch, Italiano, Türkçe, Tiếng Việt, ภาษาไทย (Thai), Filipino, 简体中文, 日本語, 한국어, Polski, नेपाली, မြန်မာ, ភាសាខ្មែរ, and සිංහල.
 
 ---
 
-## Requirements
+## 📱 Requirements
 
 | Component | Requirement |
 |---|---|
 | Root Provider | Magisk, KernelSU, or APatch (Superuser access required) |
-| Architecture | ARM64 (aarch64) |
-| Android Version | Android 9.0 (API level 28) or higher |
-| Connectivity | Not required for driver loading (database and drivers are embedded); only the app update checker and optional `kcrc_dump` fetch use the network |
+| Architecture | ARM64 (`aarch64` / `arm64-v8a`) |
+| Android Version | Android 9.0 (API level 28) through Android 15 |
+| Connectivity | Required only for OTA database refresh and in-app update checks |
 
 ---
 
-## Execution Workflow
-
-```text
-Tap LOAD
-   │
-   ├─► Pre-flight validation (Root check, Kernel release, Architecture)
-   │
-   ├─► Embedded database resolution (exact kernel match from APK assets)
-   │
-   ├─► Extract asset + SHA-256/size verification
-   │
-   ├─► Signature bypass + single insmod execution via root shell
-   │
-   └─► Device node verification and live dmesg validation
-```
-
----
-
-## Diagnostic Report Structure
-
-When building custom drivers for unsupported kernels, the generated ZIP archive includes:
-
-```text
-report_<device>_<kernel>.zip
-├─ boot.img                  Raw boot partition dump (kernel + ramdisk + dtb)
-├─ boot_info.txt             Block device path, header version, and sizes
-├─ kallsyms.txt              Kernel symbol addresses (/proc/kallsyms)
-├─ sample_vendor_module.ko   Real OEM module from /vendor/lib/modules
-├─ vendor_modinfo.txt        Compiler version, vermagic, and module info
-├─ config.txt                Kernel configuration options (IKCONFIG)
-├─ embedded_driver.ko        Embedded module selected for this kernel
-├─ embedded_driver_info.txt  SHA-256, vermagic, CFI, build ID, MODVERSIONS
-├─ driver_requirements.txt   Undefined symbols + expected __versions CRCs
-├─ Module.symvers.embedded.txt  CRCs the embedded module was linked against
-├─ Module.symvers.txt        Target CRC table from kcrc_dump (when available)
-├─ vmlinux.btf               Target BTF (when readable)
-├─ database.json             Full embedded driver manifest
-├─ driver_src_*              Driver source, Kbuild, Makefile
-├─ README_AGENT.md           Source-less rebuild instructions for an agent
-├─ dmesg.txt                 Kernel ring buffer tail and insmod error details
-├─ applog.txt                Application execution console log
-├─ proc_cmdline.txt          Kernel boot arguments
-├─ proc_version.txt          Kernel compiler and toolchain identification
-├─ proc_cpuinfo.txt          CPU hardware specifications
-├─ device_props.txt          Android system properties dump
-└─ manifest.txt              Summary manifest of all collected artifacts
-```
-
----
-
-## Building from Source
+## 🛠️ Building from Source
 
 ```bash
 git clone https://github.com/bmjubairdadu/kernel-loader.git
 cd kernel-loader
-./gradlew assembleRelease
+./gradlew :app:assembleRelease
 ```
 
-The release APK will be generated at:
-`app/build/outputs/apk/release/Kernel-Loader-v5.0.apk`
-
-- Language: Kotlin
-- UI Framework: Jetpack Compose
-- Root Management: libsu
-- Target SDK: 34 (Android 14)
-- Minimum SDK: 28 (Android 9)
+Built release APK:
+`app/build/outputs/apk/release/Kernel-Loader-v5.8.apk`
 
 ---
 
-## Security Model
+## 📄 License & Author
 
-| Security Layer | Implementation |
-|---|---|
-| Code Obfuscation | R8 full-mode enabled with aggressive name mangling |
-| Debugger Protection | Checks `TracerPid` in `/proc/self/status` and `android.os.Debug` |
-| Instrumentation Guard | Inspects loaded memory maps for Frida (`frida-agent.so`, `/data/local/tmp/re.frida.server`) |
-| Network Integrity | Cleartext traffic disabled; network requests bypass proxy configurations |
-| Storage Isolation | Diagnostic staging files isolated in application cache with restricted permissions |
-
----
-
-## Disclaimer
-
-Loading custom kernel modules requires root access and carries inherent risks including device reboots or bootloops if an incompatible module is loaded. While Kernel Loader conducts pre-load validations, users are advised to maintain backups of their boot images.
-
----
-
-## License
-
-Author: [JUBAIR HOSEN](https://github.com/bmjubairdadu)  
-Licensed under the [GNU General Public License v3.0](LICENSE).
+- **Author:** [JUBAIR HOSEN](https://github.com/bmjubairdadu)
+- **Telegram Support:** [@Jubairdadubm](https://t.me/Jubairdadubm)
+- **License:** [GNU General Public License v3.0](LICENSE)
