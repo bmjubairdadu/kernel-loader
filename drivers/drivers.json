@@ -2,7 +2,7 @@
   "schema": 1,
   "count": 15,
   "generated_at": "2026-11-14T09:26:15Z",
-  "updated": "2026-11-15T03:18:18Z",
+  "updated": "2026-11-15T03:23:57Z",
   "drivers": [
     {
       "kernel": "5.4.210-android12-9-667269-g856cdf2f247e-ab665",
@@ -10,8 +10,8 @@
       "variant": "rt",
       "label": "5.4.210",
       "file": "RT/5.4.210.sh",
-      "sha256": "4bc7c090dbee26fcd919b998003f04de2304359cc2461ae3585d5c487b2fcc8c",
-      "size": 387015
+      "sha256": "cb02068a4de732f8d6fae624b63a95b5d176d69f39382f8c40dc4ec279d12bb5",
+      "size": 382903
     },
     {
       "kernel": "4.19.157-perf-g1a6087bc0325-dirty",
