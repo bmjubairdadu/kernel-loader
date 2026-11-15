@@ -1,0 +1,59 @@
+name: CI - Pull Request Verification
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify-build:
+    name: Verify Code & Build APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Verify No Comments in Kotlin Source
+        run: |
+          python3 -c "
+          import glob
+          all_kt = glob.glob('app/src/main/java/**/*.kt', recursive=True)
+          found = []
+          for path in all_kt:
+              with open(path) as f:
+                  content = f.read()
+              for i, line in enumerate(content.splitlines(), 1):
+                  s = line.strip()
+                  if s.startswith('//') or s.startswith('/*') or s.startswith('* ') or s.startswith('*/'):
+                      found.append((path, i, s))
+          if found:
+              print(f'Error: Found {len(found)} comments in Kotlin files. Comments are not allowed in Kotlin source:')
+              for item in found:
+                  print(item)
+              exit(1)
+          print('Code quality check passed: zero comments in Kotlin files.')
+          "
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          cmdline-tools-version: 13114758
+          packages: platform-tools platforms;android-34 build-tools;34.0.0
+
+      - name: Make gradlew executable
+        run: chmod +x gradlew
+
+      - name: Verify Release Build Compilation
+        run: ./gradlew :app:assembleRelease --no-daemon --stacktrace

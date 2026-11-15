@@ -1,0 +1,72 @@
+name: "🐛 Bug Report"
+description: "Report an issue, crash, or unexpected behavior in Kernel Loader"
+title: "[BUG]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting a bug. Please fill in the details below to help us diagnose and fix the issue.
+
+  - type: input
+    id: device
+    attributes:
+      label: Device Model & Manufacturer
+      placeholder: "e.g., Xiaomi Redmi 10C (fog), Poco M3 (citrus), Samsung Galaxy S21"
+    validations:
+      required: true
+
+  - type: input
+    id: android_version
+    attributes:
+      label: Android Version
+      placeholder: "e.g., Android 12, Android 13, Android 14"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: root_solution
+    attributes:
+      label: Root Solution
+      options:
+        - Magisk
+        - KernelSU
+        - APatch
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: vermagic
+    attributes:
+      label: Kernel Vermagic
+      description: "Shown on the app home screen or run 'cat /proc/version' in terminal"
+      placeholder: "e.g., 4.19.191-g5048da07dcbc-dirty SMP preempt mod_unload modversions aarch64"
+    validations:
+      required: true
+
+  - type: textarea
+    id: bug_description
+    attributes:
+      label: Bug Description
+      description: "Describe clearly what happened and what you expected to happen instead."
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps_to_reproduce
+    attributes:
+      label: Steps to Reproduce
+      placeholder: |
+        1. Open Kernel Loader
+        2. Tap on "LOAD"
+        3. See error ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Terminal Logs / Logcat Output
+      description: "Paste relevant output from the app's built-in terminal or logcat."
+      render: shell

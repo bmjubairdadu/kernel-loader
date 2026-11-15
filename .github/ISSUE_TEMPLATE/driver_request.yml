@@ -1,0 +1,48 @@
+name: "⚡ Driver Compatibility Request"
+description: "Request driver support or report a new kernel vermagic target"
+title: "[DRIVER REQUEST]: "
+labels: ["enhancement", "driver-request"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please provide your kernel parameters and device specifications to help us add support for your kernel.
+
+  - type: input
+    id: device_model
+    attributes:
+      label: Device Model & Manufacturer
+      placeholder: "e.g., Infinix Hot 40i (X6525), Realme C35, Xiaomi Redmi Note 11"
+    validations:
+      required: true
+
+  - type: input
+    id: soc_chipset
+    attributes:
+      label: SoC / Chipset
+      placeholder: "e.g., Unisoc T606, MediaTek Helio G88, Snapdragon 680"
+    validations:
+      required: true
+
+  - type: input
+    id: uname_r
+    attributes:
+      label: Kernel Release (uname -r)
+      placeholder: "e.g., 5.4.210-android12-9-667269-g856cdf2f247e-ab665"
+    validations:
+      required: true
+
+  - type: textarea
+    id: vermagic
+    attributes:
+      label: Full Kernel Vermagic
+      description: "Run 'modinfo <any_module.ko>' or copy the vermagic badge from Kernel Loader app"
+      placeholder: "e.g., 5.4.210-android12-9-667269-g856cdf2f247e-ab665 SMP preempt mod_unload modversions aarch64"
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional_info
+    attributes:
+      label: Additional Info or Attached Report ZIP
+      description: "You can generate a device diagnostic ZIP using the in-app Report Builder and attach it here or link to it."

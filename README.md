@@ -11,7 +11,9 @@
 [![Platform](https://img.shields.io/badge/platform-Android%209%2B%20arm64-green?style=flat-square)](#requirements)
 [![Root](https://img.shields.io/badge/root-Magisk%20%7C%20KernelSU%20%7C%20APatch-red?style=flat-square)](#requirements)
 [![Security](https://img.shields.io/badge/database-AES--256--GCM%20KLENC-purple?style=flat-square)](#security--driver-database-protection)
-[![Languages](https://img.shields.io/badge/languages-28%20Global%20Locales-orange?style=flat-square)](#internationalization-28-languages)
+[![Languages](https://img.shields.io/badge/languages-28%20Global%20Locales-orange?style=flat-square)](https://github.com/bmjubairdadu/kernel-loader#internationalization-28-languages)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat-square)](CONTRIBUTING.md)
+[![Contributors](https://img.shields.io/github/contributors/bmjubairdadu/kernel-loader?style=flat-square)](https://github.com/bmjubairdadu/kernel-loader/graphs/contributors)
 [![License: GPL-3.0](https://img.shields.io/badge/license-GPL%20v3-blue?style=flat-square)](LICENSE)
 
 </div>
@@ -86,6 +88,20 @@ cd kernel-loader
 
 Built release APK:
 `app/build/outputs/apk/release/Kernel-Loader-v5.8.apk`
+
+---
+
+## 🤝 Contributing
+
+Contributions are warmly welcome! Whether you are:
+- Reporting an issue or bug on a specific device
+- Submitting a new kernel `vermagic` driver compatibility profile
+- Adding or improving localizations/translations (28+ languages supported)
+- Opening a pull request with bug fixes, optimizations, or new features
+
+Please check out our **[Contributing Guidelines](CONTRIBUTING.md)** and review our **[Code of Conduct](CODE_OF_CONDUCT.md)** before submitting pull requests.
+
+Feel free to open an issue or reach out directly on Telegram if you'd like to collaborate!
 
 ---
 

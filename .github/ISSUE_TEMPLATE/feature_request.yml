@@ -1,0 +1,38 @@
+name: "💡 Feature Request"
+description: "Suggest a new feature, UI enhancement, or improvement for Kernel Loader"
+title: "[FEATURE]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Have an idea to make Kernel Loader better? We would love to hear it!
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Is your feature request related to a problem?
+      description: "A clear and concise description of what the problem or limitation is."
+      placeholder: "I'm always frustrated when..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed_solution
+    attributes:
+      label: Describe the solution you'd like
+      description: "A clear and concise description of what you want to happen."
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Describe alternatives you've considered
+      description: "Any alternative solutions or features you've evaluated."
+
+  - type: textarea
+    id: additional_context
+    attributes:
+      label: Additional Context
+      description: "Add mockups, screenshots, or any other context about the feature request."
