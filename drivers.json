@@ -1,9 +1,18 @@
 {
   "schema": 1,
-  "count": 14,
+  "count": 15,
   "generated_at": "2026-11-14T09:26:15Z",
-  "updated": "2026-11-15T00:57:16Z",
+  "updated": "2026-11-15T01:32:56Z",
   "drivers": [
+    {
+      "kernel": "4.19.191-g5048da07dcbc-dirty",
+      "vermagic": "4.19.191-g5048da07dcbc-dirty SMP preempt mod_unload modversions aarch64",
+      "variant": "rt",
+      "label": "4.19.191a",
+      "file": "RT/4.19.191a.sh",
+      "sha256": "e44efd48bd40844ec0ae2f3e37b395947e800c23d7b67b6bb584ee73402a4086",
+      "size": 279686
+    },
     {
       "kernel": "4.19.127-perf-g2943feabd86f",
       "vermagic": "4.19.127-perf-g2943feabd86f SMP preempt mod_unload modversions aarch64",
