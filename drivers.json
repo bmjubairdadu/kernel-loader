@@ -1,9 +1,18 @@
 {
   "schema": 1,
-  "count": 11,
+  "count": 12,
   "generated_at": "2026-11-14T09:26:15Z",
-  "updated": "2026-11-14T23:27:37Z",
+  "updated": "2026-11-15T00:17:13Z",
   "drivers": [
+    {
+      "kernel": "4.19.275-niigo-enanan-yoka-ks32386",
+      "vermagic": "4.19.275-niigo-enanan-yoka-ks32386 SMP preempt mod_unload modversions aarch64",
+      "variant": "rt",
+      "label": "4.19.275",
+      "file": "RT/4.19.275.sh",
+      "sha256": "548e3b097b309d77ed58c7d1d3f12515f659a2fad13d426f538fdbae1f492a3a",
+      "size": 294918
+    },
     {
       "kernel": "4.19.325-cip129-st13-早瀬悠花",
       "vermagic": "4.19.325-cip129-st13-早瀬悠花 SMP preempt mod_unload modversions aarch64",
