@@ -55,6 +55,9 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
     var rebooting = mutableStateOf(false)
     var verifyStatus = mutableStateOf("IDLE")
     var verifyDetail = mutableStateOf("")
+    var kernelCheckStatus = mutableStateOf("IDLE")
+    var kernelCheckIssuesCount = mutableStateOf(0)
+    var kernelCheckHasBlockers = mutableStateOf(false)
     var loadErrorDialogData = mutableStateOf<DriverErrorInfo?>(null)
 
     val terminalLines = mutableStateListOf<TerminalLine>()
@@ -855,6 +858,39 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             }
             verifyStatus.value = if (passed) "PASS" else "FAIL"
             verifyDetail.value = summaryDetail
+            isBusy.value = false
+            busyStep.value = ""
+        }
+    }
+
+    fun checkKernelCompatibility() {
+        if (isBusy.value) return
+        viewModelScope.launch {
+            isBusy.value = true
+            kernelCheckStatus.value = "SCANNING"
+            kernelCheckIssuesCount.value = 0
+            kernelCheckHasBlockers.value = false
+            busyStep.value = "Auditing kernel..."
+            tlog("Starting Kernel Compatibility Audit...", "CMD")
+            withContext(Dispatchers.IO) {
+                try {
+                    val app = getApplication<Application>()
+                    val auditor = KernelAuditor(app)
+                    val (issueCount, hasBlockers) = auditor.runAudit { msg, type ->
+                        tlog(msg, type)
+                    }
+                    withContext(Dispatchers.Main) {
+                        kernelCheckIssuesCount.value = issueCount
+                        kernelCheckHasBlockers.value = hasBlockers
+                        kernelCheckStatus.value = "DONE"
+                    }
+                } catch (e: Exception) {
+                    tlog("Audit error: ${e.message}", "ERR")
+                    withContext(Dispatchers.Main) {
+                        kernelCheckStatus.value = "DONE"
+                    }
+                }
+            }
             isBusy.value = false
             busyStep.value = ""
         }

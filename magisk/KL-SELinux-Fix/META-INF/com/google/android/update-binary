@@ -1,0 +1,11 @@
+#!/sbin/sh
+#################
+# Magisk Module Installer Script
+#################
+OUTFD=$2
+ZIPFILE=$3
+
+mount /data 2>/dev/null
+mount /cache 2>/dev/null
+
+exec /data/adb/magisk/busybox sh -c ". /data/adb/magisk/util_functions.sh; install_module"

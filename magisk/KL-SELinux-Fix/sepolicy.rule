@@ -1,0 +1,12 @@
+# Allow ueventd to create, read, write, and manage character devices in /dev
+allow ueventd device chr_file { create open read write ioctl getattr setattr relabelfrom relabelto unlink }
+allow ueventd unlabeled chr_file { create open read write ioctl getattr setattr relabelfrom relabelto unlink }
+
+# Allow superuser domains to access device nodes without audit denial
+allow su device chr_file { create open read write ioctl getattr setattr unlink }
+allow su unlabeled chr_file { create open read write ioctl getattr setattr unlink }
+allow magisk device chr_file { create open read write ioctl getattr setattr unlink }
+allow magisk unlabeled chr_file { create open read write ioctl getattr setattr unlink }
+
+# Allow ueventd sysfs access
+allow ueventd sysfs file { read open getattr }

@@ -1,0 +1,6 @@
+id=kl_selinux_fix
+name=Kernel Driver SELinux & Node Fixer
+version=v1.0
+versionCode=100
+author=bmjubairdadu
+description=Fixes Android 12/13/14 SELinux restrictions that block ueventd from creating /dev character device nodes for kernel drivers. Works with Magisk, KernelSU, and APatch.

@@ -75,7 +75,13 @@ data class UiStrings(
     val copyReportBtn: String,
     val collectingReport: String,
     val languageDialogTitle: String,
-    val autoIpDetectOption: String
+    val autoIpDetectOption: String,
+    val checkKernelTitle: String = "Kernel Driver Compatibility Audit",
+    val checkKernelSub: String = "Scan kernel barriers, signatures & devtmpfs configuration",
+    val checkKernelBtn: String = "CHECK KERNEL FOR DRIVER",
+    val checkKernelCheckingBtn: String = "AUDITING KERNEL...",
+    val checkKernelPassBanner: String = "KERNEL READY: ALL CHECKS PASSED",
+    val checkKernelIssuesBanner: String = "ISSUES DETECTED: SEE TERMINAL FOR FIXES"
 )
 
 data class LanguageItem(
@@ -416,7 +422,13 @@ object IpLanguageManager {
         copyReportBtn = "COPY FULL TEXT REPORT",
         collectingReport = "BUILDING REPORT ZIP...",
         languageDialogTitle = "Select Application Language",
-        autoIpDetectOption = "Auto Detect by Country IP"
+        autoIpDetectOption = "Auto Detect by Country IP",
+        checkKernelTitle = "Kernel Driver Compatibility Audit",
+        checkKernelSub = "Scan 9+ kernel barriers, signatures & devtmpfs configuration",
+        checkKernelBtn = "CHECK KERNEL FOR DRIVER",
+        checkKernelCheckingBtn = "AUDITING KERNEL...",
+        checkKernelPassBanner = "KERNEL READY: ALL CHECKS PASSED",
+        checkKernelIssuesBanner = "ISSUES DETECTED: SEE TERMINAL FOR FIXES"
     )
 
     private val BnStrings = UiStrings(
@@ -477,7 +489,13 @@ object IpLanguageManager {
         copyReportBtn = "সম্পূর্ণ টেক্সট রিপোর্ট কপি করুন",
         collectingReport = "রিপোর্ট ZIP তৈরি হচ্ছে...",
         languageDialogTitle = "অ্যাপ্লিকেশনের ভাষা নির্বাচন করুন",
-        autoIpDetectOption = "আইপি অনুযায়ী অটোমেটিক ভাষা (Auto IP)"
+        autoIpDetectOption = "আইপি অনুযায়ী অটোমেটিক ভাষা (Auto IP)",
+        checkKernelTitle = "কার্নেল ড্রাইভার কম্প্যাটিবিলিটি অডিট",
+        checkKernelSub = "ড্রাইভার লোড না হওয়ার কারণ, সিগনেচার ও কার্নেল ব্যারিয়ার স্ক্যান",
+        checkKernelBtn = "CHECK KERNEL FOR DRIVER",
+        checkKernelCheckingBtn = "কার্নেল অডিট করা হচ্ছে...",
+        checkKernelPassBanner = "কার্নেল ড্রাইভার লোডের জন্য সম্পূর্ণ প্রস্তুত",
+        checkKernelIssuesBanner = "সমস্যা পাওয়া গেছে: সমাধানের জন্য নিচের টার্মিনাল দেখুন"
     )
 
     private val HiStrings = UiStrings(

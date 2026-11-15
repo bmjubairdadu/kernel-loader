@@ -402,6 +402,18 @@ fun HomeScreen(
 
                 Spacer(Modifier.height(10.dp))
 
+                KernelAuditCard(
+                    strings = s,
+                    busy = busy,
+                    rootAvailable = rootAvailable,
+                    status = viewModel.kernelCheckStatus.value,
+                    issuesCount = viewModel.kernelCheckIssuesCount.value,
+                    hasBlockers = viewModel.kernelCheckHasBlockers.value,
+                    onCheckKernel = { viewModel.checkKernelCompatibility() }
+                )
+
+                Spacer(Modifier.height(10.dp))
+
                 CustomScriptLoadCard(
                     strings = s,
                     pickedFile = viewModel.pickedFileName.value,
@@ -1431,6 +1443,131 @@ private fun DriverStatusSummaryCard(
 }
 
 @Composable
+private fun KernelAuditCard(
+    strings: UiStrings,
+    busy: Boolean,
+    rootAvailable: Boolean,
+    status: String,
+    issuesCount: Int,
+    hasBlockers: Boolean,
+    onCheckKernel: () -> Unit
+) {
+    val isScanning = status == "SCANNING"
+    val isDone = status == "DONE"
+    val cardBorder = if (isDone) {
+        if (hasBlockers) Brush.horizontalGradient(listOf(AccentRed.copy(alpha = 0.7f), LogoPurple.copy(alpha = 0.6f)))
+        else Brush.horizontalGradient(listOf(StatusOk.copy(alpha = 0.7f), Color(0xFF00E5FF).copy(alpha = 0.6f)))
+    } else {
+        Brush.horizontalGradient(listOf(Color(0xFF38BDF8).copy(alpha = 0.7f), LogoPurple.copy(alpha = 0.6f)))
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Surface1),
+        border = BorderStroke(1.2.dp, cardBorder)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(
+                    Brush.horizontalGradient(
+                        listOf(
+                            Color(0xFF0284C7).copy(alpha = 0.08f),
+                            LogoPurple.copy(alpha = 0.08f)
+                        )
+                    )
+                )
+                .padding(horizontal = 14.dp, vertical = 11.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(Color(0xFF0284C7).copy(alpha = 0.16f))
+                        .border(1.dp, Color(0xFF0284C7).copy(alpha = 0.45f), RoundedCornerShape(10.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Default.Security,
+                        contentDescription = null,
+                        tint = Color(0xFF38BDF8),
+                        modifier = Modifier.size(19.dp)
+                    )
+                }
+                Spacer(Modifier.width(10.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        text = strings.checkKernelTitle,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = TextPrimary
+                    )
+                    Text(
+                        text = strings.checkKernelSub,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontSize = 11.sp,
+                        color = TextSecondary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+
+            if (isDone) {
+                Spacer(Modifier.height(8.dp))
+                val bannerColor = if (hasBlockers) AccentRed else StatusOk
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = bannerColor.copy(alpha = 0.14f),
+                    border = BorderStroke(1.dp, bannerColor.copy(alpha = 0.60f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            if (hasBlockers) Icons.Default.Warning else Icons.Default.CheckCircle,
+                            contentDescription = null,
+                            tint = bannerColor,
+                            modifier = Modifier.size(15.dp)
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            text = if (hasBlockers) "${strings.checkKernelIssuesBanner} ($issuesCount)"
+                            else strings.checkKernelPassBanner,
+                            style = MonoTiny,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = bannerColor,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(9.dp))
+
+            PremiumActionButton(
+                text = if (isScanning) strings.checkKernelCheckingBtn else strings.checkKernelBtn,
+                icon = Icons.Default.Bolt,
+                enabled = !busy && rootAvailable,
+                loading = isScanning,
+                gradientColors = listOf(Color(0xFF0369A1), Color(0xFF0284C7), Color(0xFF4338CA)),
+                borderColors = listOf(Color(0xFF38BDF8).copy(alpha = 0.70f), LogoPurple.copy(alpha = 0.65f)),
+                iconTint = Color(0xFFBAE6FD),
+                onClick = onCheckKernel
+            )
+        }
+    }
+}
+
+@Composable
 private fun CustomScriptLoadCard(
     strings: UiStrings,
     pickedFile: String?,
@@ -1873,7 +2010,7 @@ private fun VariantConsoleCard(
                                     fontFamily = FontFamily.Monospace,
                                     fontSize = 12.sp
                                 ),
-                                color = if (line.type == "OK" || line.type == "ERR" || line.type == "WARN" || line.type == "CMD") {
+                                color = if (line.type == "OK" || line.type == "ERR" || line.type == "WARN" || line.type == "CMD" || line.type == "FIX") {
                                     consoleLineColor(line.type)
                                 } else {
                                     TextPrimary
