@@ -2,7 +2,7 @@
 
 <img src="app/src/main/res/mipmap-xxxhdpi/ic_launcher.png" width="76" alt="Kernel Loader" onerror="this.style.display='none'"/>
 
-# Kernel Loader (v5.8)
+# Kernel Loader (v5.9)
 
 ### Enterprise-Grade Kernel Driver Engine & Diagnostic Suite for Android
 **Adaptive UI · AES-256-GCM Driver Security · Live Verification · SELinux Audit · OTA Updates**
@@ -24,14 +24,14 @@
 
 ---
 
-## ✨ What's New in v5.8
+## ✨ What's New in v5.9
 
+- **Clean Hyphenated Diagnostics Log:** Purged legacy verbose tags (`FTL_*`), presenting clean `- Step` diagnostic reporting directly in the terminal interface.
+- **Robust Driver Parsing Engine:** Added fallback pattern matching for dynamic stealth nodes and kernel memory status, ensuring robust driver detection even with stripped logs.
 - **Universal Proportional Layout Engine:** Automatically normalizes screen density to a 392dp baseline across 720p budget devices, 1080p standards, 2K flagships, foldables, and tablets without text truncation.
 - **AES-256-GCM Encrypted Driver Security (`KLENC001`):** Complete remote driver database protection preventing unauthorized extraction, tampering, or third-party database theft.
 - **Zero-Trace In-Memory Execution:** OTA drivers decrypt directly in memory and stream to the root process pipe; temporary execution buffers are wiped from disk instantly.
-- **SELinux & ueventd Node Audit:** 10-point comprehensive kernel diagnostics clearly displaying SELinux mode, ueventd node creation permissions, and automatic policy checks.
 - **Always-Accessible Live Driver Verification:** One-click on-demand verification of active character nodes and stealth modules in `/dev`.
-- **28 Native Languages:** Complete multi-language localization with auto-IP country detection and an interactive language picker dialog.
 
 ---
 
@@ -87,7 +87,7 @@ cd kernel-loader
 ```
 
 Built release APK:
-`app/build/outputs/apk/release/Kernel-Loader-v5.8.apk`
+`app/build/outputs/apk/release/Kernel-Loader-v5.9.apk`
 
 ---
 

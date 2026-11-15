@@ -504,7 +504,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
         if (res.ok) {
             val mod = res.module.ifBlank { DriverInstaller.MODULE }
             val node = res.node.trim()
-            val isStealth = res.rawLog.contains("FTL_STEALTH=1")
+            val isStealth = res.rawLog.contains("FTL_STEALTH=1") || res.rawLog.contains("stealth")
             val displayLabel = if (isStealth) "Stealth" else mod
             driverLoaded.value = true
             hiddenLoaded.value = isStealth

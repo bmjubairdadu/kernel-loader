@@ -140,7 +140,8 @@ class DriverInstaller(private val ctx: Context) {
         su("rm -rf $REMOTE 2>/dev/null") {}
 
         val finalNode = kv["FTL_NODE"]?.takeIf { it.isNotBlank() } ?: detectedNode
-        val ok = kv["FTL_OK"] == "1" || (rc == 0 && finalNode.isNotBlank())
+        val successText = raw.contains("Driver Loaded Successfully")
+        val ok = kv["FTL_OK"] == "1" || successText || (rc == 0 && finalNode.isNotBlank())
         return Result(
             ok = ok,
             module = kv["FTL_MODULE"].orEmpty().ifBlank { MODULE },
@@ -148,7 +149,7 @@ class DriverInstaller(private val ctx: Context) {
             major = kv["FTL_MAJOR"]?.toIntOrNull() ?: 0,
             node = finalNode,
             exitCode = kv["FTL_EXIT"]?.toIntOrNull() ?: rc,
-            alreadyLoaded = kv["FTL_ALREADY"] == "1",
+            alreadyLoaded = kv["FTL_ALREADY"] == "1" || raw.contains("already resident in Linux kernel"),
             error = kv["FTL_ERROR"].orEmpty(),
             rawLog = raw.toString()
         )
