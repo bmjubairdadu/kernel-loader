@@ -2,7 +2,7 @@
   "schema": 1,
   "count": 17,
   "generated_at": "2026-11-14T09:26:15Z",
-  "updated": "2026-11-15T22:58:55Z",
+  "updated": "2026-11-15T23:00:49Z",
   "drivers": [
     {
       "kernel": "4.9.117+",
@@ -10,7 +10,7 @@
       "variant": "rt",
       "label": "4.9.117",
       "file": "RT/4.9.117.sh",
-      "sha256": "5c046c6dad531f0811ffd8fb7dd7b7bb86789757317b4e461595d22644b50796",
+      "sha256": "d424d75e92b40dec67cec6e968d6828c120b74fa00696abb9a7584e69a0fd7d0",
       "size": 393057
     },
     {
