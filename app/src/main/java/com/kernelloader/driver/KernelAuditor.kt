@@ -24,7 +24,6 @@ class KernelAuditor(private val ctx: Context) {
         var blockerCount = 0
         var warnCount = 0
 
-        // 1. Root & Superuser Privileges
         val rootRes = Shell.cmd("id").exec()
         val rootOut = rootRes.out.joinToString(" ")
         if (rootRes.isSuccess && rootOut.contains("uid=0")) {
@@ -36,7 +35,6 @@ class KernelAuditor(private val ctx: Context) {
             onLine("  - Fix: Grant root access in Magisk / KernelSU / APatch manager", "FIX")
         }
 
-        // 2. Kernel Module Subsystem Support
         val modDisRes = Shell.cmd("cat /proc/sys/kernel/modules_disabled 2>/dev/null").exec()
         val modDisVal = modDisRes.out.firstOrNull()?.trim() ?: "0"
         if (modDisVal == "1") {
@@ -54,7 +52,6 @@ class KernelAuditor(private val ctx: Context) {
             }
         }
 
-        // 3. Module Signature Enforcement
         var sigEnforced = false
         var sigReason = ""
         val cmdlineRes = Shell.cmd("cat /proc/cmdline 2>/dev/null").exec()
@@ -86,7 +83,6 @@ class KernelAuditor(private val ctx: Context) {
             onLine("- Module Signature: Disabled / Permissive (Unsigned drivers accepted)", "OK")
         }
 
-        // 4. Architecture & ABI Bitness
         val archRes = Shell.cmd("uname -m 2>/dev/null").exec()
         val arch = archRes.out.firstOrNull()?.trim() ?: "unknown"
         if (arch == "aarch64" || arch == "arm64") {
@@ -98,19 +94,16 @@ class KernelAuditor(private val ctx: Context) {
             onLine("  - Fix: Flash a 64-bit ROM / kernel", "FIX")
         }
 
-        // 5. Driver Loading Verification
         if (blockerCount == 0) {
             onLine("- Driver Loading Capability: Ready (Kernel will accept and load driver)", "OK")
         } else {
             onLine("- Driver Loading Capability: Blocked (Resolve signature or root first)", "ERR")
         }
 
-        // 6. SELinux & ueventd Node Creation Policy
         val seRes = Shell.cmd("getenforce 2>/dev/null").exec()
         val seMode = seRes.out.firstOrNull()?.trim() ?: "Enforcing"
         val isPermissive = seMode.equals("Permissive", ignoreCase = true)
 
-        // Check if Kernel_SELinux_Node_Fixer module is installed in Magisk/KernelSU
         val modInstalled = Shell.cmd("test -d /data/adb/modules/kl_selinux_fix && ! test -f /data/adb/modules/kl_selinux_fix/disable").exec().isSuccess
 
         onLine("- SELinux Mode: $seMode", if (isPermissive) "OK" else "INFO")
@@ -124,13 +117,10 @@ class KernelAuditor(private val ctx: Context) {
             onLine("- ueventd Node Policy: Active (sepolicy.rule active for ueventd chr_file create)", "OK")
             onLine("- Node Auto-Creation (/dev): Operational (ueventd unlocked via Magisk module)", "OK")
         } else if (sdk <= 30) {
-            // Android 11 and older (SDK <= 30) stock sepolicy explicitly contains:
-            // "allow ueventd dev_type chr_file { create getattr setattr unlink }"
             onLine("- Node Creation Permission: GRANTED (Stock Android $androidVer policy permits creation)", "OK")
             onLine("- ueventd Node Policy: Active (Stock rule: allow ueventd dev_type chr_file create)", "OK")
             onLine("- Node Auto-Creation (/dev): Operational (System ueventd will auto-create /dev node)", "OK")
         } else {
-            // Android 12+ (SDK >= 31) where stock policy restricts ueventd dev creation
             val liveRulesCheck = Shell.cmd("magiskpolicy --print-rules 2>/dev/null | grep -E 'allow ueventd (device|dev_type|unlabeled) chr_file.*create|permissive ueventd'").exec()
             val liveRuleActive = liveRulesCheck.isSuccess && liveRulesCheck.out.isNotEmpty()
 
@@ -149,7 +139,6 @@ class KernelAuditor(private val ctx: Context) {
             }
         }
 
-        // 7. Magisk Mount Namespace Separation
         val nsTest = Shell.cmd("sh -c 'touch /dev/.kl_ns_chk 2>/dev/null' && test -f /dev/.kl_ns_chk && rm -f /dev/.kl_ns_chk").exec()
         if (nsTest.isSuccess) {
             onLine("- Mount Namespace: Global (Device node sharing operational)", "OK")
@@ -159,7 +148,6 @@ class KernelAuditor(private val ctx: Context) {
             onLine("  - Fix: Set 'Mount Namespace Mode' to 'Global Namespace' in Magisk", "FIX")
         }
 
-        // 8. Database Driver Match
         val installer = DriverInstaller(ctx)
         val candidates = installer.candidates(release)
         if (candidates.isNotEmpty()) {
@@ -171,7 +159,6 @@ class KernelAuditor(private val ctx: Context) {
             onLine("  - Fix: Compile driver from kernel source or tap 'SEND REPORT' below", "FIX")
         }
 
-        // 9. Stealth Device Node Readiness
         val candRes = Shell.cmd("ls -d /dev/[0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9] 2>/dev/null").exec()
         val activeNodes = candRes.out.filter { it.isNotBlank() }
         if (activeNodes.isNotEmpty()) {
@@ -180,7 +167,6 @@ class KernelAuditor(private val ctx: Context) {
             onLine("- Stealth Device Node: Ready (Position #1 supported)", "OK")
         }
 
-        // 10. Final Verdict
         val totalIssues = blockerCount + warnCount
         if (blockerCount == 0 && warnCount == 0) {
             onLine("- Audit Verdict: Kernel is 100% ready for driver load", "OK")

@@ -6,16 +6,10 @@ import javax.crypto.Cipher
 import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.SecretKeySpec
 
-/**
- * Enterprise-grade AES-256-GCM encryption & decryption engine for Kernel Loader.
- * Protects .sh scripts, .ko kernel modules, and driver manifests from unauthorized extraction,
- * reverse engineering, or external database theft.
- */
 object DriverCrypto {
 
-    private val MAGIC = byteArrayOf(0x4B, 0x4C, 0x45, 0x4E, 0x43, 0x30, 0x30, 0x31) // "KLENC001"
+    private val MAGIC = byteArrayOf(0x4B, 0x4C, 0x45, 0x4E, 0x43, 0x30, 0x30, 0x31)
 
-    // Multi-stage XOR Obfuscated Master Key fragments
     private val M1 = byteArrayOf(
         (-94).toByte(), (-17).toByte(), (-88).toByte(), (126).toByte(),
         (37).toByte(), (47).toByte(), (-29).toByte(), (42).toByte(),
@@ -49,9 +43,6 @@ object DriverCrypto {
         return key
     }
 
-    /**
-     * Checks if the given byte array starts with the KLENC001 magic header.
-     */
     fun isEncrypted(data: ByteArray): Boolean {
         if (data.size < 20) return false
         for (i in 0 until 8) {
@@ -60,10 +51,6 @@ object DriverCrypto {
         return true
     }
 
-    /**
-     * Decrypts AES-256-GCM encrypted payload.
-     * If data does not start with KLENC001, returns the raw data unchanged (backward compatibility).
-     */
     fun decrypt(data: ByteArray, context: Context? = null): ByteArray {
         if (!isEncrypted(data)) {
             return data
@@ -80,9 +67,6 @@ object DriverCrypto {
         return cipher.doFinal(ct)
     }
 
-    /**
-     * Encrypts payload with AES-256-GCM and prepends KLENC001 magic + 12-byte random IV.
-     */
     fun encrypt(data: ByteArray, context: Context? = null): ByteArray {
         val nonce = ByteArray(12)
         SecureRandom().nextBytes(nonce)
