@@ -1,8 +1,8 @@
 {
   "schema": 1,
-  "count": 15,
+  "count": 14,
   "generated_at": "2026-11-14T09:26:15Z",
-  "updated": "2026-11-15T03:44:29Z",
+  "updated": "2026-11-15T04:08:12Z",
   "drivers": [
     {
       "kernel": "5.4.210-android12-9-667269-g856cdf2f247e-ab665",
@@ -66,15 +66,6 @@
       "file": "RT/4.19.325.sh",
       "sha256": "3b100f93fca796d5b35127f7c1600fa3f989b651766881f13f55e65eb8b71841",
       "size": 290726
-    },
-    {
-      "kernel": "4.9.190+",
-      "vermagic": "4.9.190+ SMP preempt mod_unload modversions aarch64",
-      "variant": "rt",
-      "label": "4.9.190",
-      "file": "RT/4.9.190.sh",
-      "sha256": "d0b54724e4269abdb45d6cd09ae1589e36a32e6210e15009975f76696ff03c22",
-      "size": 334510
     },
     {
       "kernel": "4.9.309-Chidori-Kernel",
