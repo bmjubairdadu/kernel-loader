@@ -2,7 +2,7 @@
   "schema": 1,
   "count": 19,
   "generated_at": "2026-11-14T09:26:15Z",
-  "updated": "2026-11-16T21:38:57Z",
+  "updated": "2026-11-16T22:05:41Z",
   "drivers": [
     {
       "kernel": "4.9.337-DaisyForGaming",
@@ -10,8 +10,8 @@
       "variant": "rt",
       "label": "4.9.337",
       "file": "RT/4.9.337.sh",
-      "sha256": "9f637c322947af1b278c2d5a42e47a360ce6478f177fef1511b1ae6d0b930634",
-      "size": 364554
+      "sha256": "4bfebbb7f2f1a2a88920cfbe0d201538a41b272194da4e3ed227e63b77c0f4c3",
+      "size": 353450
     },
     {
       "kernel": "4.14.186-perf-g14b9756acb79",
