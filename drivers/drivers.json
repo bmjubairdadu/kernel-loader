@@ -2,7 +2,7 @@
   "schema": 1,
   "count": 19,
   "generated_at": "2026-11-14T09:26:15Z",
-  "updated": "2026-11-16T05:56:44Z",
+  "updated": "2026-11-16T06:35:22Z",
   "drivers": [
     {
       "kernel": "4.19.325-cip136-st20-Kuroha",
@@ -10,8 +10,8 @@
       "variant": "rt",
       "label": "4.19.325",
       "file": "RT/4.19.325.sh",
-      "sha256": "3db0481d2b9b33483be44797b102ffa29622bd4d2082b9da030a8bf2d06b33b0",
-      "size": 347728
+      "sha256": "ecefdae59d4c64270cc12da0ee00731d8fd2b626b533ef125307afe99e975894",
+      "size": 346854
     },
     {
       "kernel": "4.14.186-perf-g14b9756acb79",
