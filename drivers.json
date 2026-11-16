@@ -2,8 +2,17 @@
   "schema": 1,
   "count": 19,
   "generated_at": "2026-11-14T09:26:15Z",
-  "updated": "2026-11-16T05:26:47Z",
+  "updated": "2026-11-16T05:56:44Z",
   "drivers": [
+    {
+      "kernel": "4.19.325-cip136-st20-Kuroha",
+      "vermagic": "4.19.325-cip136-st20-Kuroha SMP preempt mod_unload modversions aarch64",
+      "variant": "rt",
+      "label": "4.19.325",
+      "file": "RT/4.19.325.sh",
+      "sha256": "3db0481d2b9b33483be44797b102ffa29622bd4d2082b9da030a8bf2d06b33b0",
+      "size": 347728
+    },
     {
       "kernel": "4.14.186-perf-g14b9756acb79",
       "vermagic": "4.14.186-perf-g14b9756acb79 SMP preempt mod_unload modversions aarch64",
@@ -102,15 +111,6 @@
       "file": "RT/4.19.275.sh",
       "sha256": "f11ec5046d29700d97f1f2f5ceb347c572f851b07c327d752903f4d4dbf042db",
       "size": 294954
-    },
-    {
-      "kernel": "4.19.325-cip129-st13-早瀬悠花",
-      "vermagic": "4.19.325-cip129-st13-早瀬悠花 SMP preempt mod_unload modversions aarch64",
-      "variant": "rt",
-      "label": "4.19.325",
-      "file": "RT/4.19.325.sh",
-      "sha256": "7aa712fa65a915eed958bc1d636bd5bc1e6040d1024e35b2d6ed26788fc4f0af",
-      "size": 290762
     },
     {
       "kernel": "4.9.309-Chidori-Kernel",
