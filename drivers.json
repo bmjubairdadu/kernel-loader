@@ -2,8 +2,17 @@
   "schema": 1,
   "count": 19,
   "generated_at": "2026-11-14T09:26:15Z",
-  "updated": "2026-11-16T09:39:28Z",
+  "updated": "2026-11-16T10:18:17Z",
   "drivers": [
+    {
+      "kernel": "4.9.337-DaisyForGaming",
+      "vermagic": "4.9.337-DaisyForGaming SMP preempt mod_unload modversions aarch64",
+      "variant": "rt",
+      "label": "4.9.337",
+      "file": "RT/4.9.337.sh",
+      "sha256": "db0ad494c1768216547cf6cabeac9464fea5aa86e55b983e3ff65fa34cead2d3",
+      "size": 363402
+    },
     {
       "kernel": "4.14.186-perf-g14b9756acb79",
       "vermagic": "4.14.186-perf-g14b9756acb79 SMP preempt mod_unload modversions aarch64",
@@ -156,15 +165,6 @@
       "file": "RT/4.14.113.sh",
       "sha256": "76f9602caf07996671d6875f2d3de24a3df27bc0c12caf9154cd2aa27f9320e2",
       "size": 357620
-    },
-    {
-      "kernel": "4.9.337-DaisyForGaming",
-      "vermagic": "4.9.337-DaisyForGaming SMP preempt mod_unload modversions aarch64",
-      "variant": "rt",
-      "label": "4.9.337",
-      "file": "RT/4.9.337.sh",
-      "sha256": "9105c6bef007a9d956962624dca0d013745927ef8ea5351c6738eb5e65af7c24",
-      "size": 377948
     },
     {
       "kernel": "4.19.191-g216400aba14e-dirty",
