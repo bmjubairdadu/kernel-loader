@@ -1,9 +1,27 @@
 {
   "schema": 1,
-  "count": 17,
+  "count": 18,
   "generated_at": "2026-11-17T21:41:30Z",
-  "updated": "2026-11-17T21:41:30Z",
+  "updated": "2026-11-17T21:46:39Z",
   "drivers": [
+    {
+      "kernel": "4.14.186-perf-g14b9756acb79",
+      "vermagic": "4.14.186-perf-g14b9756acb79 SMP preempt mod_unload modversions aarch64",
+      "variant": "rt",
+      "label": "4.14.186a",
+      "file": "RT/4.14.186a.sh",
+      "sha256": "302412b9c1a24a1c5a8f2cdcaedadc90364b436f13b90cf5e319a7f02e5b0427",
+      "size": 356759,
+      "device": "",
+      "model": "",
+      "status": "Active",
+      "upload_date": "2026-11-17T21:46:39Z",
+      "download_count": 0,
+      "load_success_count": 0,
+      "last_accessed": null,
+      "note": "",
+      "reboot_required": false
+    },
     {
       "kernel": "4.14.186-perf-g14b9756acb79",
       "vermagic": "4.14.186-perf-g14b9756acb79 SMP preempt mod_unload modversions aarch64",
@@ -95,8 +113,8 @@
       "reboot_required": false
     },
     {
-      "kernel": "4.9.117\u002B",
-      "vermagic": "4.9.117\u002B SMP preempt mod_unload modversions aarch64",
+      "kernel": "4.9.117+",
+      "vermagic": "4.9.117+ SMP preempt mod_unload modversions aarch64",
       "variant": "rt",
       "label": "4.9.117",
       "file": "RT/4.9.117.sh",
@@ -203,8 +221,8 @@
       "reboot_required": false
     },
     {
-      "kernel": "4.19.157-perf\u002B",
-      "vermagic": "4.19.157-perf\u002B SMP preempt mod_unload modversions aarch64",
+      "kernel": "4.19.157-perf+",
+      "vermagic": "4.19.157-perf+ SMP preempt mod_unload modversions aarch64",
       "variant": "rt",
       "label": "4.19.157b",
       "file": "RT/4.19.157b.sh",
