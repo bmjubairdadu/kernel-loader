@@ -279,32 +279,7 @@ object OtaDriverStore {
             }
         }
 
-        // 3. Try Offline Embedded Assets Fallback
-        if (!downloadedOk) {
-            val assetCandidates = listOf(
-                "drivers/${entry.file}",
-                "drivers/RT/$safeName",
-                "drivers/QX/$safeName",
-                "drivers/$safeName"
-            )
-            for (assetPath in assetCandidates) {
-                try {
-                    context.assets.open(assetPath).use { input ->
-                        tempFile.outputStream().use { output ->
-                            input.copyTo(output)
-                        }
-                    }
-                    if (tempFile.exists() && tempFile.length() > 0L) {
-                        downloadedOk = true
-                        onProgress("Loaded from embedded package (${tempFile.length()} bytes)")
-                        break
-                    }
-                } catch (_: Exception) {
-                }
-            }
-        }
-
-        // 4. Try root curl/wget fallback with mirrors
+        // 3. Try root curl/wget fallback with mirrors
         if (!downloadedOk) {
             onProgress("Attempting root download fallback...")
             val rootMirrors = listOf(
