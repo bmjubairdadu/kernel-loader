@@ -696,9 +696,9 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
         fun performStealthCleanupAndExit(context: Context) {
             Thread {
                 try {
-
                     Shell.cmd(
-                        "rm -rf /data/local/tmp/ftl /data/local/tmp/kl_sig_unlock /data/tmpf /data/local/tmp/kl_update.apk /data/local/tmp/magiskboot /data/local/tmp/sigpatch /data/.km_* /dev/.kloder_session 2>/dev/null"
+                        "rm -rf /data/local/tmp/ftl /data/local/tmp/kl_sig_unlock /data/tmpf /data/local/tmp/kl_update.apk /data/local/tmp/magiskboot /data/local/tmp/sigpatch /data/.km_* /dev/.kloder_session 2>/dev/null",
+                        "logcat -c 2>/dev/null"
                     ).exec()
                 } catch (_: Exception) {
                 }
