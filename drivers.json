@@ -70,9 +70,9 @@
       "model": "",
       "status": "Active",
       "upload_date": "2026-11-17T18:45:24.8137687Z",
-      "download_count": 0,
+      "download_count": 1,
       "load_success_count": 0,
-      "last_accessed": null,
+      "last_accessed": "2026-11-17T18:46:04.7714973Z",
       "note": "",
       "reboot_required": false
     },
