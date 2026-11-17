@@ -69,7 +69,6 @@ class DriverInstaller(private val ctx: Context) {
             return installFile(candidateLocal, onLine)
         }
 
-        val work = File(ctx.cacheDir, "ftl").apply { mkdirs() }
         val scriptPath = if (ctx.assets.list("drivers/RT")?.contains("$assetStem.sh") == true) {
             "drivers/RT/$assetStem.sh"
         } else {
@@ -164,9 +163,6 @@ class DriverInstaller(private val ctx: Context) {
         val ownerPid: Int = 0
     )
 
-    fun isLoaded(module: String = MODULE): Boolean =
-        verifyLoadDetailed(module).ok
-
     fun findCandidateNodes(): List<String> {
         val candidates = LinkedHashSet<String>()
         val sessionNode = DriverSessionManager.isSessionActive(ctx).second.first.trim()
@@ -196,18 +192,6 @@ class DriverInstaller(private val ctx: Context) {
     }
 
     fun findNode(): String? = findCandidateNodes().firstOrNull()
-
-    fun client(node: String, vararg args: String, onLine: (String) -> Unit = {}): Int {
-        copyAssetToRemote("bin/khack_client_arm64", "khack_client_arm64")
-        return try {
-            val escaped = args.joinToString(" ") { "'${it.replace("'", "'\\''")}'" }
-            val safeNode = node.replace("'", "'\\''")
-            val cmd = "$REMOTE/khack_client_arm64 '$safeNode' $escaped"
-            su(cmd, onLine)
-        } finally {
-            su("rm -rf $REMOTE 2>/dev/null") {}
-        }
-    }
 
     fun testReadWrite(node: String, targetPid: Int, onLine: (String) -> Unit = {}): Pair<Boolean, String> {
         if (!node.startsWith("/dev/") || targetPid <= 0) {
@@ -245,11 +229,6 @@ class DriverInstaller(private val ctx: Context) {
         } finally {
             su("rm -rf $REMOTE 2>/dev/null") {}
         }
-    }
-
-    fun verifyLoad(module: String = MODULE, onLine: (String) -> Unit = {}): Pair<Boolean, String?> {
-        val vr = verifyLoadDetailed(module, onLine)
-        return Pair(vr.ok, vr.node)
     }
 
     fun verifyLoadDetailed(module: String = MODULE, onLine: (String) -> Unit = {}): VerifyResult =

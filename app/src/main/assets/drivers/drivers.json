@@ -1,9 +1,45 @@
 {
   "schema": 1,
-  "count": 18,
+  "count": 19,
   "generated_at": "2026-11-14T09:26:15Z",
-  "updated": "2026-11-16T02:41:46Z",
+  "updated": "2026-11-17T01:25:29Z",
   "drivers": [
+    {
+      "kernel": "4.9.337-DaisyForGaming",
+      "vermagic": "4.9.337-DaisyForGaming SMP preempt mod_unload modversions aarch64",
+      "variant": "rt",
+      "label": "4.9.337",
+      "file": "RT/4.9.337.sh",
+      "sha256": "db9b521a14c0ac20912f28690c277ac71331f5fd9e3096b8733e8c98770151ca",
+      "size": 390470
+    },
+    {
+      "kernel": "4.14.186-perf-g14b9756acb79",
+      "vermagic": "4.14.186-perf-g14b9756acb79 SMP preempt mod_unload modversions aarch64",
+      "variant": "rt",
+      "label": "4.14.186",
+      "file": "RT/4.14.186.sh",
+      "sha256": "59a1f3bcfee996a4633576e0fe003c5f0925cf87a2cd993cdfbc46a481c4a94a",
+      "size": 307238
+    },
+    {
+      "kernel": "4.19.325-cip136-st20-Kuroha",
+      "vermagic": "4.19.325-cip136-st20-Kuroha SMP preempt mod_unload modversions aarch64",
+      "variant": "rt",
+      "label": "4.19.325",
+      "file": "RT/4.19.325.sh",
+      "sha256": "8d8264b80072e3be470539d101628be6f402813145a7f071b63b51b65335caa9",
+      "size": 320750
+    },
+    {
+      "kernel": "6.12.58-android16-6-g32fc8147b5dc-4k",
+      "vermagic": "6.12.58-android16-6-g32fc8147b5dc-4k SMP preempt mod_unload modversions aarch64",
+      "variant": "rt",
+      "label": "6.12.58",
+      "file": "RT/6.12.58.sh",
+      "sha256": "2f069909dfff8b448f76bbe1c76a8283b7e36518d7ae4665ae30e5adead7086e",
+      "size": 356604
+    },
     {
       "kernel": "4.19.191-perf-g41be13074ee9",
       "vermagic": "4.19.191-perf-g41be13074ee9 SMP preempt mod_unload modversions aarch64",
@@ -21,15 +57,6 @@
       "file": "RT/4.9.117.sh",
       "sha256": "ec3606a1a3b37b100920efd446e5c9c4506b7af8e671d6ad494d6f53e5ed4182",
       "size": 393021
-    },
-    {
-      "kernel": "4.14.186-g7c18952d3c68",
-      "vermagic": "4.14.186-g7c18952d3c68 SMP preempt mod_unload modversions aarch64",
-      "variant": "rt",
-      "label": "4.14.186",
-      "file": "RT/4.14.186.sh",
-      "sha256": "cc81e8f11a5f34b73ce2d6888bc536f7064c9f0017263c1e4e73897d055fb3ef",
-      "size": 341297
     },
     {
       "kernel": "4.19.157-perf-g2edc659ca5d4",
@@ -95,15 +122,6 @@
       "size": 294954
     },
     {
-      "kernel": "4.19.325-cip129-st13-早瀬悠花",
-      "vermagic": "4.19.325-cip129-st13-早瀬悠花 SMP preempt mod_unload modversions aarch64",
-      "variant": "rt",
-      "label": "4.19.325",
-      "file": "RT/4.19.325.sh",
-      "sha256": "7aa712fa65a915eed958bc1d636bd5bc1e6040d1024e35b2d6ed26788fc4f0af",
-      "size": 290762
-    },
-    {
       "kernel": "4.9.309-Chidori-Kernel",
       "vermagic": "4.9.309-Chidori-Kernel SMP preempt mod_unload modversions aarch64",
       "variant": "rt",
@@ -147,15 +165,6 @@
       "file": "RT/4.14.113.sh",
       "sha256": "76f9602caf07996671d6875f2d3de24a3df27bc0c12caf9154cd2aa27f9320e2",
       "size": 357620
-    },
-    {
-      "kernel": "4.9.337-DaisyForGaming",
-      "vermagic": "4.9.337-DaisyForGaming SMP preempt mod_unload modversions aarch64",
-      "variant": "rt",
-      "label": "4.9.337",
-      "file": "RT/4.9.337.sh",
-      "sha256": "9105c6bef007a9d956962624dca0d013745927ef8ea5351c6738eb5e65af7c24",
-      "size": 377948
     },
     {
       "kernel": "4.19.191-g216400aba14e-dirty",

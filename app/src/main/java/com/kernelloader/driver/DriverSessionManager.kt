@@ -16,8 +16,6 @@ object DriverSessionManager {
     private const val KEY_MODULE = "module"
     private const val KEY_STEALTH = "stealth"
 
-    fun getBootId(): String = getKernelBootId()
-
     fun getKernelBootId(): String = try {
         File("/proc/sys/kernel/random/boot_id").readText().trim()
     } catch (_: Exception) {

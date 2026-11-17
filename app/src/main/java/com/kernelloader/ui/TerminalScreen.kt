@@ -61,14 +61,9 @@ import com.kernelloader.driver.OtaDriverStore
 import com.kernelloader.driver.TerminalLine
 import com.kernelloader.root.RootChecker
 import com.kernelloader.ui.theme.AccentAmber
-import com.kernelloader.ui.theme.AccentBlue
 import com.kernelloader.ui.theme.AccentGreen
 import com.kernelloader.ui.theme.AccentRed
-import com.kernelloader.ui.theme.AccentViolet
 import com.kernelloader.ui.theme.BorderSubtle
-import com.kernelloader.ui.theme.GradientRtStart
-import com.kernelloader.ui.theme.FamilyQx
-import com.kernelloader.ui.theme.FamilyRt
 import com.kernelloader.ui.theme.LogCmd
 import com.kernelloader.ui.theme.LogErr
 import com.kernelloader.ui.theme.LogFix

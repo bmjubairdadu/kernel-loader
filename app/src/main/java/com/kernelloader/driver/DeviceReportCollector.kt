@@ -58,9 +58,6 @@ object DeviceReportCollector {
 
         val deviceLine: String get() = "$manufacturer $model".trim()
 
-        val issueTitle: String =
-            "[BUILD REQUEST] $manufacturer $model — $kernelShort ($kernelArch)"
-
         fun buildText(
             appName: String,
             appVersion: String,

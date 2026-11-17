@@ -28,12 +28,6 @@ import com.kernelloader.ui.theme.Surface0
 import com.kernelloader.ui.theme.Surface1
 import com.kernelloader.ui.theme.Surface2
 import com.kernelloader.ui.theme.SurfaceDeep
-import com.kernelloader.ui.theme.TopGlow
-
-val BrandBgTop = Surface0
-val BrandBgMid = Surface1
-val BrandBgBottom = Surface2
-val BrandAccent = TopGlow
 
 @Composable
 fun AppBackground(
