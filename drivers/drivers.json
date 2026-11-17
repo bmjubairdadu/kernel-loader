@@ -2,7 +2,7 @@
   "schema": 1,
   "count": 19,
   "generated_at": "2026-11-14T09:26:15Z",
-  "updated": "2026-11-17T07:03:30Z",
+  "updated": "2026-11-17T07:15:19Z",
   "drivers": [
     {
       "kernel": "4.19.325-cip136-st20-Sakayori",
@@ -10,7 +10,7 @@
       "variant": "rt",
       "label": "4.19.325",
       "file": "RT/4.19.325.sh",
-      "sha256": "fc344ea915abeb3e18689d6cef0558088295d6625be896c415e292a1b4b3cf09",
+      "sha256": "19265bf2bccb8821738bdfd27921be83526eb1883fb3d55926549e5d8e389956",
       "size": 23572
     },
     {
