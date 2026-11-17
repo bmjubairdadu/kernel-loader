@@ -48,7 +48,8 @@ object OtaDriverStore {
     data class Manifest(
         val schema: Int,
         val generatedAt: String,
-        val drivers: List<DriverEntry>
+        val drivers: List<DriverEntry>,
+        val killRebootDrivers: List<String> = emptyList()
     )
 
     @Volatile private var cachedManifest: Manifest? = null
@@ -113,6 +114,24 @@ object OtaDriverStore {
         val text = decryptedBytes.toString(Charsets.UTF_8)
         val parsed = runCatching { parseManifest(text) }.getOrNull() ?: return@withContext null
         cachedManifest = parsed
+
+        if (parsed.killRebootDrivers.isNotEmpty()) {
+            val (sessionActive, _) = DriverSessionManager.isSessionActive(context)
+            if (sessionActive) {
+                val curFile = DriverSessionManager.getLoadedDriverFile(context)
+                val curSha = DriverSessionManager.getLoadedDriverSha(context)
+                val curLabel = DriverSessionManager.getLoadedDriverLabel(context)
+                val shouldReboot = parsed.killRebootDrivers.any { k ->
+                    (curFile.isNotBlank() && curFile.contains(k, ignoreCase = true)) ||
+                    (curSha.isNotBlank() && curSha.equals(k, ignoreCase = true)) ||
+                    (curLabel.isNotBlank() && curLabel.equals(k, ignoreCase = true))
+                }
+                if (shouldReboot) {
+                    DriverSessionManager.triggerDeviceReboot(context, "Driver was frozen/deleted with restart by administrator.")
+                }
+            }
+        }
+
         parsed
     }
 
@@ -376,6 +395,12 @@ object OtaDriverStore {
                 model = o.optString("model", "")
             )
         }
-        return Manifest(schema = schema, generatedAt = gen, drivers = out)
+        val killArr = root.optJSONArray("kill_reboot_drivers") ?: JSONArray()
+        val killList = ArrayList<String>(killArr.length())
+        for (i in 0 until killArr.length()) {
+            val s = killArr.optString(i, "")
+            if (s.isNotBlank()) killList.add(s)
+        }
+        return Manifest(schema = schema, generatedAt = gen, drivers = out, killRebootDrivers = killList)
     }
 }

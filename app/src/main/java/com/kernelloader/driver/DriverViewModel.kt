@@ -20,6 +20,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -78,6 +79,20 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             val licResult = ControllerApiClient.verifyLicense(application)
             if (!licResult.valid && licResult.status.equals("Revoked", ignoreCase = true)) {
                 accessRevokedMessage.value = ControllerApiClient.REVOKED_POPUP_MESSAGE
+            }
+        }
+
+        viewModelScope.launch(Dispatchers.IO) {
+            while (isActive) {
+                kotlinx.coroutines.delay(10000)
+                val (active, _) = DriverSessionManager.isSessionActive(application)
+                if (active) {
+                    val curFile = DriverSessionManager.getLoadedDriverFile(application)
+                    val curSha = DriverSessionManager.getLoadedDriverSha(application)
+                    if (curFile.isNotBlank() || curSha.isNotBlank()) {
+                        ControllerApiClient.checkActiveDriverStatus(application, curFile, curSha)
+                    }
+                }
             }
         }
     }
@@ -465,7 +480,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                             logFilteredInstallerLine(line)
                         }
                     }
-                    applyInstallResult(res, release)
+                    applyInstallResult(res, release, driverFile = lastBundleTried.value)
                     return@launch
                 }
 
@@ -507,7 +522,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                         withContext(Dispatchers.IO) {
                             ControllerApiClient.notifyLoad(context, cand.file, true)
                         }
-                        applyInstallResult(res, release)
+                        applyInstallResult(res, release, driverFile = cand.file, driverSha = cand.sha256, driverLabel = cand.label)
                         break
                     }
                 }
@@ -544,7 +559,13 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    private suspend fun applyInstallResult(res: DriverInstaller.Result, targetLabel: String) {
+    private suspend fun applyInstallResult(
+        res: DriverInstaller.Result,
+        targetLabel: String,
+        driverFile: String = "",
+        driverSha: String = "",
+        driverLabel: String = ""
+    ) {
         if (res.ok) {
             val mod = res.module.ifBlank { DriverInstaller.MODULE }
             val node = res.node.trim()
@@ -554,7 +575,15 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             hiddenLoaded.value = isStealth
             loadedModuleName.value = displayLabel
             driverModule.value = if (node.isNotBlank()) "$displayLabel ($node)" else displayLabel
-            DriverSessionManager.markLoaded(getApplication(), node, mod, isStealth)
+            DriverSessionManager.markLoaded(
+                getApplication(),
+                node,
+                mod,
+                isStealth,
+                driverFile = driverFile,
+                driverSha = driverSha,
+                driverLabel = driverLabel.ifBlank { targetLabel }
+            )
             autoLoadOk.value = true
             autoLoadStatus.value = if (res.alreadyLoaded) {
                 "Already Loaded: ${driverModule.value}"
@@ -673,7 +702,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                         ControllerApiClient.notifyLoad(context, localFile.name, true)
                     }
                 }
-                applyInstallResult(res, localFile.name)
+                applyInstallResult(res, localFile.name, driverFile = localFile.name)
             } catch (_: CancellationException) {
             } catch (e: Exception) {
                 autoLoadOk.value = false

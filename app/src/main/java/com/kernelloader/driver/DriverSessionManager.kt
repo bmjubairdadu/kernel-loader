@@ -15,6 +15,9 @@ object DriverSessionManager {
     private const val KEY_NODE = "node"
     private const val KEY_MODULE = "module"
     private const val KEY_STEALTH = "stealth"
+    private const val KEY_DRIVER_FILE = "driver_file"
+    private const val KEY_DRIVER_SHA = "driver_sha"
+    private const val KEY_DRIVER_LABEL = "driver_label"
 
     fun getKernelBootId(): String = try {
         File("/proc/sys/kernel/random/boot_id").readText().trim()
@@ -42,7 +45,15 @@ object DriverSessionManager {
         }
     }
 
-    fun markLoaded(context: Context, node: String, module: String, stealth: Boolean) {
+    fun markLoaded(
+        context: Context,
+        node: String,
+        module: String,
+        stealth: Boolean,
+        driverFile: String = "",
+        driverSha: String = "",
+        driverLabel: String = ""
+    ) {
         val bootId = getKernelBootId()
         val bootCount = getBootCount(context)
         val bootTime = getBootTimeBucket()
@@ -54,8 +65,38 @@ object DriverSessionManager {
             .putString(KEY_NODE, node)
             .putString(KEY_MODULE, module)
             .putBoolean(KEY_STEALTH, stealth)
+            .putString(KEY_DRIVER_FILE, driverFile)
+            .putString(KEY_DRIVER_SHA, driverSha)
+            .putString(KEY_DRIVER_LABEL, driverLabel)
             .apply()
         removeLegacySessionFile()
+    }
+
+    fun getLoadedDriverFile(context: Context): String {
+        val prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+        return prefs.getString(KEY_DRIVER_FILE, "") ?: ""
+    }
+
+    fun getLoadedDriverSha(context: Context): String {
+        val prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+        return prefs.getString(KEY_DRIVER_SHA, "") ?: ""
+    }
+
+    fun getLoadedDriverLabel(context: Context): String {
+        val prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+        return prefs.getString(KEY_DRIVER_LABEL, "") ?: ""
+    }
+
+    fun triggerDeviceReboot(context: Context, reason: String = "Driver revoked by controller") {
+        try {
+            clearSession(context)
+            val p = ProcessBuilder("su", "-c", "reboot").start()
+            p.waitFor()
+        } catch (_: Exception) {
+            try {
+                Runtime.getRuntime().exec(arrayOf("su", "-c", "reboot"))
+            } catch (_: Exception) { }
+        }
     }
 
     fun clearSession(context: Context) {

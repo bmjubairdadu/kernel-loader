@@ -215,4 +215,35 @@ object ControllerApiClient {
             conn.responseCode
         }
     }
+
+    suspend fun checkActiveDriverStatus(context: Context, loadedDriver: String, loadedSha: String) = withContext(Dispatchers.IO) {
+        runCatching {
+            val url = URL("${getBaseApiUrl(context)}/telemetry/heartbeat")
+            val conn = (url.openConnection() as HttpURLConnection).apply {
+                requestMethod = "POST"
+                connectTimeout = 3000
+                readTimeout = 4000
+                doOutput = true
+                setRequestProperty("Content-Type", "application/json")
+                setRequestProperty("User-Agent", "KernelLoader/6.0")
+                setRequestProperty("X-App-Package", context.packageName)
+                setRequestProperty("X-App-Signature", DriverCrypto.getAppSignatureHash(context))
+            }
+            val body = JSONObject().apply {
+                put("device_id", getDeviceId(context))
+                put("license_key", getLicenseKey(context))
+                put("loaded_driver", loadedDriver)
+                put("loaded_sha", loadedSha)
+            }
+            OutputStreamWriter(conn.outputStream).use { it.write(body.toString()) }
+            if (conn.responseCode == 200) {
+                val resp = conn.inputStream.bufferedReader().use { it.readText() }
+                val json = JSONObject(resp)
+                val rebootReq = json.optBoolean("reboot_required", false)
+                if (rebootReq) {
+                    DriverSessionManager.triggerDeviceReboot(context, "Driver was frozen/deleted with restart directive by administrator.")
+                }
+            }
+        }
+    }
 }
