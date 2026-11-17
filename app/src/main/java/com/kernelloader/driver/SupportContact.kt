@@ -119,4 +119,15 @@ object SupportContact {
     }
 
     fun telegramDirectUrl(): String = TELEGRAM_URL
+
+    fun openWhatsApp(context: Context, text: String = "Hello Support, my driver access is suspended.") {
+        try {
+            val url = "https://wa.me/$WHATSAPP_NUMBER?text=" + URLEncoder.encode(text, "UTF-8")
+            val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+        } catch (_: Exception) {
+        }
+    }
 }

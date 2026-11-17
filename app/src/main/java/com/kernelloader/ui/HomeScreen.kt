@@ -514,7 +514,7 @@ fun HomeScreen(
                 TextButton(
                     onClick = {
                         viewModel.dismissAccessRevoked()
-                        SupportContact.openTelegram(context)
+                        SupportContact.openWhatsApp(context)
                     }
                 ) {
                     Text("Contact Support", color = BrandCyan)
