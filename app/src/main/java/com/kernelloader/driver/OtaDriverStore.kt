@@ -53,17 +53,50 @@ object OtaDriverStore {
 
     @Volatile private var cachedManifest: Manifest? = null
 
+    fun cleanTempDrivers(context: Context) {
+        runCatching {
+            val tempDir = File(context.cacheDir, "temp_drivers")
+            if (tempDir.exists()) {
+                tempDir.listFiles()?.forEach { it.delete() }
+            }
+            // Also clean legacy directories if any exist
+            val oldDir = File(context.filesDir, "drivers")
+            if (oldDir.exists()) {
+                oldDir.deleteRecursively()
+            }
+        }
+    }
+
     suspend fun loadManifest(context: Context, forceRefresh: Boolean = false): Manifest? = withContext(Dispatchers.IO) {
         if (!forceRefresh) {
             cachedManifest?.let { return@withContext it }
         }
-        val manifestFile = File(context.filesDir, "drivers_manifest.json")
-        val remoteBytes = runCatching {
+
+        // 1. Try Controller API first (includes live freeze/disable status filtering)
+        val controllerManifestBytes = runCatching {
+            val deviceId = ControllerApiClient.getDeviceId(context)
+            val lic = ControllerApiClient.getLicenseKey(context)
+            val apiUrl = "${ControllerApiClient.getBaseApiUrl(context)}/manifest?device_id=$deviceId&license_key=$lic"
+            val conn = (URL(apiUrl).openConnection() as HttpURLConnection).apply {
+                connectTimeout = 3000
+                readTimeout = 4000
+                setRequestProperty("User-Agent", "KernelLoader/6.0")
+            }
+            if (conn.responseCode == 200) {
+                conn.inputStream.use { it.readBytes() }
+            } else if (conn.responseCode == 403) {
+                ControllerApiClient.setAccessRevoked(context, true, "Revoked by controller")
+                null
+            } else null
+        }.getOrNull()
+
+        // 2. Fallback to remote GitHub repository manifest
+        val remoteBytes = controllerManifestBytes ?: runCatching {
             val url = URL(REMOTE_MANIFEST_URL)
             val conn = (url.openConnection() as HttpURLConnection).apply {
                 connectTimeout = 7000
                 readTimeout = 10000
-                setRequestProperty("User-Agent", "KernelLoader/5.8")
+                setRequestProperty("User-Agent", "KernelLoader/6.0")
                 setRequestProperty("X-KernelLoader-Client", "Official")
             }
             if (conn.responseCode == 200) {
@@ -71,16 +104,10 @@ object OtaDriverStore {
             } else null
         }.getOrNull()
 
-        val rawBytes = if (remoteBytes != null && remoteBytes.isNotEmpty()) {
-            runCatching { manifestFile.writeBytes(remoteBytes) }
-            remoteBytes
-        } else if (manifestFile.exists() && manifestFile.length() > 0) {
-            runCatching { manifestFile.readBytes() }.getOrNull()
-        } else {
-            runCatching {
-                context.assets.open(EMBEDDED_MANIFEST_ASSET).use { it.readBytes() }
-            }.getOrNull()
-        } ?: return@withContext null
+        // 3. Fallback to embedded asset
+        val rawBytes = remoteBytes ?: runCatching {
+            context.assets.open(EMBEDDED_MANIFEST_ASSET).use { it.readBytes() }
+        }.getOrNull() ?: return@withContext null
 
         val decryptedBytes = runCatching {
             DriverCrypto.decrypt(rawBytes, context)
@@ -97,57 +124,94 @@ object OtaDriverStore {
         entry: DriverEntry,
         onProgress: (String) -> Unit = {}
     ): File? = withContext(Dispatchers.IO) {
-        val driversDir = File(context.filesDir, "drivers").apply { mkdirs() }
-        val safeName = entry.file.substringAfterLast('/')
-        val targetFile = File(driversDir, safeName)
-
-        if (targetFile.exists()) {
-            if (targetFile.length() > 0L && (entry.size <= 0L || targetFile.length() == entry.size)) {
-                if (entry.sha256.isBlank() || computeSha256(targetFile).equals(entry.sha256, ignoreCase = true)) {
-                    onProgress("Found cached driver: $safeName (${targetFile.length()} bytes)")
-                    return@withContext targetFile
-                }
-            }
-            targetFile.delete()
+        // Enforce license check before download
+        if (ControllerApiClient.isAccessRevoked(context)) {
+            onProgress(ControllerApiClient.REVOKED_POPUP_MESSAGE)
+            return@withContext null
         }
 
-        val remoteUrl = "$REMOTE_DRIVER_BASE_URL${entry.file}"
-        onProgress("Downloading driver: ${entry.stem()} (${entry.file})...")
-        val tempFile = File(driversDir, "$safeName.tmp")
+        // Use temporary app-private storage and avoid persistent copies or backups
+        val tempDir = File(context.cacheDir, "temp_drivers").apply { mkdirs() }
+        val safeName = entry.file.substringAfterLast('/')
+        val targetFile = File(tempDir, safeName)
+        val tempFile = File(tempDir, "$safeName.tmp")
+
+        // Wipe any previous stale files in temporary storage
+        if (targetFile.exists()) targetFile.delete()
         if (tempFile.exists()) tempFile.delete()
 
+        onProgress("Downloading driver directly: ${entry.stem()} (${entry.file})...")
+
         var downloadedOk = false
+
+        // Attempt 1: Download from Controller API
         try {
-            val conn = (URL(remoteUrl).openConnection() as HttpURLConnection).apply {
-                connectTimeout = 15000
-                readTimeout = 30000
+            val deviceId = ControllerApiClient.getDeviceId(context)
+            val lic = ControllerApiClient.getLicenseKey(context)
+            val controllerDlUrl = "${ControllerApiClient.getBaseApiUrl(context)}/drivers/download/${entry.file}?license_key=$lic&device_id=$deviceId"
+            val conn = (URL(controllerDlUrl).openConnection() as HttpURLConnection).apply {
+                connectTimeout = 4000
+                readTimeout = 15000
                 instanceFollowRedirects = true
-                setRequestProperty("User-Agent", "KernelLoader/5.8")
-                setRequestProperty("X-KernelLoader-Client", "Official")
+                setRequestProperty("User-Agent", "KernelLoader/6.0")
             }
             val code = conn.responseCode
             if (code == 200) {
                 conn.inputStream.use { input ->
                     tempFile.outputStream().use { output ->
-                        val buf = ByteArray(8192)
-                        var r: Int
-                        while (input.read(buf).also { r = it } != -1) {
-                            output.write(buf, 0, r)
-                        }
-                        output.flush()
+                        input.copyTo(output)
                     }
                 }
                 downloadedOk = tempFile.exists() && tempFile.length() > 0L
-            } else {
-                onProgress("HTTP $code error while downloading ${entry.file}")
+                if (downloadedOk) {
+                    onProgress("Downloaded from Controller API (${tempFile.length()} bytes)")
+                }
+            } else if (code == 403) {
+                ControllerApiClient.setAccessRevoked(context, true, "Revoked by controller")
+                onProgress(ControllerApiClient.REVOKED_POPUP_MESSAGE)
+                tempFile.delete()
+                return@withContext null
+            } else if (code == 423) {
+                onProgress("Driver is frozen by administrator and cannot be downloaded.")
+                tempFile.delete()
+                return@withContext null
             }
-        } catch (e: Exception) {
-            onProgress("Network download error: ${e.message}")
+        } catch (_: Exception) {
+            // Controller not available or offline; proceed to direct database repository
         }
 
+        // Attempt 2: Download from direct repository database if controller was offline
+        if (!downloadedOk) {
+            val remoteUrl = "$REMOTE_DRIVER_BASE_URL${entry.file}"
+            try {
+                val conn = (URL(remoteUrl).openConnection() as HttpURLConnection).apply {
+                    connectTimeout = 15000
+                    readTimeout = 30000
+                    instanceFollowRedirects = true
+                    setRequestProperty("User-Agent", "KernelLoader/6.0")
+                    setRequestProperty("X-KernelLoader-Client", "Official")
+                }
+                val code = conn.responseCode
+                if (code == 200) {
+                    conn.inputStream.use { input ->
+                        tempFile.outputStream().use { output ->
+                            input.copyTo(output)
+                        }
+                    }
+                    downloadedOk = tempFile.exists() && tempFile.length() > 0L
+                } else {
+                    onProgress("HTTP $code error while downloading ${entry.file}")
+                }
+            } catch (e: Exception) {
+                onProgress("Network download error: ${e.message}")
+            }
+        }
+
+        // Attempt 3: Root fallback via curl/wget
         if (!downloadedOk) {
             onProgress("Attempting root download fallback...")
             try {
+                val remoteUrl = "$REMOTE_DRIVER_BASE_URL${entry.file}"
                 val dlCmd = "curl -k -sL -o '${tempFile.absolutePath}' '$remoteUrl' || wget --no-check-certificate -q -O '${tempFile.absolutePath}' '$remoteUrl'"
                 val p = ProcessBuilder("su", "-c", dlCmd).start()
                 p.waitFor()
@@ -162,6 +226,7 @@ object OtaDriverStore {
             return@withContext null
         }
 
+        // Verify SHA256 integrity if present
         if (entry.sha256.isNotBlank()) {
             val actualSha = computeSha256(tempFile)
             if (!actualSha.equals(entry.sha256, ignoreCase = true)) {
@@ -176,7 +241,7 @@ object OtaDriverStore {
             tempFile.copyTo(targetFile, overwrite = true)
             tempFile.delete()
         }
-        onProgress("Driver downloaded successfully (${targetFile.length()} bytes)")
+        onProgress("Driver staged in temporary storage (${targetFile.length()} bytes)")
         targetFile
     }
 

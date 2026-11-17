@@ -53,6 +53,9 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
     var updateStatus = mutableStateOf("IDLE")
     var updateProgress = mutableStateOf(0)
     var rebooting = mutableStateOf(false)
+    var isUnloading = mutableStateOf(false)
+    var accessRevokedMessage = mutableStateOf<String?>(null)
+    var unloadNoticeMessage = mutableStateOf<String?>(null)
     var verifyStatus = mutableStateOf("IDLE")
     var verifyDetail = mutableStateOf("")
     var kernelCheckStatus = mutableStateOf("IDLE")
@@ -70,7 +73,23 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
 
     init {
         initLogStore(application)
+        OtaDriverStore.cleanTempDrivers(application)
         refreshDriverState(application)
+        // Background verify license status with controller API
+        viewModelScope.launch {
+            val licResult = ControllerApiClient.verifyLicense(application)
+            if (!licResult.valid && licResult.status.equals("Revoked", ignoreCase = true)) {
+                accessRevokedMessage.value = ControllerApiClient.REVOKED_POPUP_MESSAGE
+            }
+        }
+    }
+
+    fun dismissAccessRevoked() {
+        accessRevokedMessage.value = null
+    }
+
+    fun dismissUnloadNotice() {
+        unloadNoticeMessage.value = null
     }
 
     fun refreshDriverState(context: Context? = null) {
@@ -401,12 +420,27 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
         variant: String = ""
     ) {
         if (isBusy.value) return
+        if (ControllerApiClient.isAccessRevoked(context)) {
+            accessRevokedMessage.value = ControllerApiClient.REVOKED_POPUP_MESSAGE
+            tlog(ControllerApiClient.REVOKED_POPUP_MESSAGE, "ERR")
+            return
+        }
         currentLoadJob = viewModelScope.launch {
             isBusy.value = true
             autoLoadStatus.value = "Checking device..."
             autoLoadOk.value = null
             lastLoadError.value = ""
             try {
+                // Verify license before downloading or loading
+                val licResult = withContext(Dispatchers.IO) { ControllerApiClient.verifyLicense(context) }
+                if (!licResult.downloadAuthorized) {
+                    accessRevokedMessage.value = ControllerApiClient.REVOKED_POPUP_MESSAGE
+                    tlog(ControllerApiClient.REVOKED_POPUP_MESSAGE, "ERR")
+                    autoLoadOk.value = false
+                    autoLoadStatus.value = "Access Revoked"
+                    return@launch
+                }
+
                 val (rootOk, release, vm) = runPreLoadDeviceCheck()
                 if (!rootOk) return@launch
 
@@ -450,6 +484,13 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                         OtaDriverStore.downloadDriver(context, cand) { }
                     }
                     if (downloadedFile == null || !downloadedFile.exists()) {
+                        if (ControllerApiClient.isAccessRevoked(context)) {
+                            accessRevokedMessage.value = ControllerApiClient.REVOKED_POPUP_MESSAGE
+                            tlog(ControllerApiClient.REVOKED_POPUP_MESSAGE, "ERR")
+                            autoLoadOk.value = false
+                            autoLoadStatus.value = "Access Revoked"
+                            return@launch
+                        }
                         tlog("Failed to download driver: ${cand.stem()}.sh", "ERR")
                         continue
                     }
@@ -461,8 +502,18 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                             logFilteredInstallerLine(line)
                         }
                     }
+
+                    // Remove downloaded installer/package from temporary storage immediately after load is confirmed/attempted
+                    runCatching {
+                        downloadedFile.delete()
+                        OtaDriverStore.cleanTempDrivers(context)
+                    }
+
                     finalResult = res
                     if (res.ok) {
+                        withContext(Dispatchers.IO) {
+                            ControllerApiClient.notifyLoad(context, cand.file, true)
+                        }
                         applyInstallResult(res, release)
                         break
                     }
@@ -594,6 +645,11 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             return
         }
         if (isBusy.value) return
+        if (ControllerApiClient.isAccessRevoked(context)) {
+            accessRevokedMessage.value = ControllerApiClient.REVOKED_POPUP_MESSAGE
+            tlog(ControllerApiClient.REVOKED_POPUP_MESSAGE, "ERR")
+            return
+        }
         currentLoadJob = viewModelScope.launch {
             isBusy.value = true
             busyStep.value = "Checking device..."
@@ -615,8 +671,14 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                     }
                 }
                 if (res.ok) {
-                    runCatching { localFile.delete() }
+                    runCatching {
+                        localFile.delete()
+                        OtaDriverStore.cleanTempDrivers(context)
+                    }
                     pickedLocalFile = null
+                    withContext(Dispatchers.IO) {
+                        ControllerApiClient.notifyLoad(context, localFile.name, true)
+                    }
                 }
                 applyInstallResult(res, localFile.name)
             } catch (_: CancellationException) {
@@ -641,17 +703,17 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
         fun performStealthCleanupAndExit(context: Context) {
             Thread {
                 try {
+                    // Clean temporary staging paths without manipulating kernel logs or diagnostic information
                     Shell.cmd(
-                        "rm -rf /data/local/tmp/ftl /data/local/tmp/kl_sig_unlock /data/tmpf /data/local/tmp/kl_update.apk /data/local/tmp/magiskboot /data/local/tmp/sigpatch /data/.km_* /dev/.kloder_session 2>/dev/null",
-                        "dmesg -C 2>/dev/null",
-                        "logcat -c 2>/dev/null"
+                        "rm -rf /data/local/tmp/ftl /data/local/tmp/kl_sig_unlock /data/tmpf /data/local/tmp/kl_update.apk /data/local/tmp/magiskboot /data/local/tmp/sigpatch /data/.km_* /dev/.kloder_session 2>/dev/null"
                     ).exec()
                 } catch (_: Exception) {
                 }
                 try {
+                    OtaDriverStore.cleanTempDrivers(context)
                     File(context.cacheDir, "ftl").deleteRecursively()
                     context.cacheDir.listFiles()?.forEach { f ->
-                        if (f.isFile && (f.name.endsWith(".sh") || f.name.endsWith(".apk"))) {
+                        if (f.isFile && (f.name.endsWith(".sh") || f.name.endsWith(".apk") || f.name.endsWith(".ko"))) {
                             f.delete()
                         }
                     }
@@ -667,6 +729,78 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                 }
                 android.os.Process.killProcess(android.os.Process.myPid())
             }.start()
+        }
+    }
+
+    fun unloadDriverGracefully(context: Context) {
+        if (isBusy.value || isUnloading.value) return
+        viewModelScope.launch {
+            isUnloading.value = true
+            busyStep.value = "Unloading driver..."
+            tlog("Requesting graceful driver unload...", "CMD")
+
+            val appCtx = context.applicationContext
+            val (_, cachedInfo) = DriverSessionManager.isSessionActive(appCtx)
+            val release = (RootChecker.getKernelRelease() ?: System.getProperty("os.version") ?: "").trim()
+            val defaultMod = if (release.startsWith("6.12")) DriverInstaller.ALT_MODULE else DriverInstaller.MODULE
+            val modName = cachedInfo.second.ifBlank { loadedModuleName.value.ifBlank { defaultMod } }
+
+            val (unloadedOk, reason) = withContext(Dispatchers.IO) {
+                val modulePresentBefore = Shell.cmd("grep -E \"^$modName \" /proc/modules 2>/dev/null").exec().out.isNotEmpty()
+                if (!modulePresentBefore) {
+                    return@withContext Pair(true, "Driver module was already unloaded or inactive in kernel.")
+                }
+
+                // Attempt graceful rmmod
+                val rmmodRes = Shell.cmd("rmmod $modName 2>&1").exec()
+                val rmmodOut = (rmmodRes.out + rmmodRes.err).joinToString(" ").lowercase(Locale.US)
+                val modulePresentAfter = Shell.cmd("grep -E \"^$modName \" /proc/modules 2>/dev/null").exec().out.isNotEmpty()
+
+                if (!modulePresentAfter) {
+                    Pair(true, "Driver module '$modName' was gracefully unloaded from kernel.")
+                } else if (rmmodOut.contains("busy") || rmmodOut.contains("in use")) {
+                    Pair(false, "Module '$modName' is currently locked/in use by kernel threads.")
+                } else if (rmmodOut.contains("operation not permitted") || rmmodOut.contains("function not implemented") || rmmodOut.contains("no such file")) {
+                    Pair(false, "Kernel does not support dynamic unloading for '$modName' (CONFIG_MODULE_UNLOAD is disabled).")
+                } else {
+                    Pair(false, "Module '$modName' cannot be safely unloaded at runtime ($rmmodOut).")
+                }
+            }
+
+            if (unloadedOk) {
+                DriverSessionManager.clearSession(appCtx)
+                driverLoaded.value = false
+                hiddenLoaded.value = false
+                loadedModuleName.value = ""
+                driverModule.value = ""
+                verifyStatus.value = "IDLE"
+                verifyDetail.value = ""
+                tlog(reason, "OK")
+                withContext(Dispatchers.IO) {
+                    ControllerApiClient.notifyUnload(appCtx, modName, true)
+                }
+            } else {
+                // If unloading is unsafe or unsupported, disable further use and notify user instead of forcing reboot
+                DriverSessionManager.clearSession(appCtx)
+                driverLoaded.value = false
+                hiddenLoaded.value = false
+                loadedModuleName.value = ""
+                driverModule.value = ""
+                verifyStatus.value = "IDLE"
+                verifyDetail.value = ""
+
+                tlog("Unload status: $reason", "WARN")
+                tlog("Further driver access has been disabled safely. Device reboot was not forced.", "INFO")
+
+                unloadNoticeMessage.value = "Dynamic kernel unload is not supported by your kernel or the module is currently busy ($reason).\n\nFurther driver access has been disabled safely. Your phone does not need to reboot."
+
+                withContext(Dispatchers.IO) {
+                    ControllerApiClient.notifyUnload(appCtx, modName, false)
+                }
+            }
+
+            isUnloading.value = false
+            busyStep.value = ""
         }
     }
 

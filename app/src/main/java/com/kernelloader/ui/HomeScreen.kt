@@ -68,6 +68,7 @@ import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -81,6 +82,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import com.kernelloader.driver.SupportContact
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -387,8 +389,8 @@ fun HomeScreen(
                         visible = toUnload,
                         moduleName = loadedModule,
                         enabled = loaded && !busy && rootAvailable,
-                        busy = rebooting,
-                        onUnload = { viewModel.rebootDevice(context) }
+                        busy = viewModel.isUnloading.value || rebooting,
+                        onUnload = { viewModel.unloadDriverGracefully(context) }
                     )
                 }
 
@@ -487,6 +489,72 @@ fun HomeScreen(
             info = errorInfo,
             onDismiss = { viewModel.dismissErrorDialog() },
             onCopyLog = { viewModel.copyTerminalToClipboard(context) }
+        )
+    }
+
+    val revokedMsg = viewModel.accessRevokedMessage.value
+    if (revokedMsg != null) {
+        AlertDialog(
+            onDismissRequest = { viewModel.dismissAccessRevoked() },
+            title = {
+                Text(
+                    text = "Access Revoked",
+                    fontWeight = FontWeight.Bold,
+                    color = AccentRed
+                )
+            },
+            text = {
+                Text(
+                    text = revokedMsg,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = TextPrimary
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.dismissAccessRevoked()
+                        SupportContact.openTelegram(context)
+                    }
+                ) {
+                    Text("Contact Support", color = BrandCyan)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.dismissAccessRevoked() }) {
+                    Text("OK", color = TextSecondary)
+                }
+            },
+            containerColor = Surface1,
+            textContentColor = TextPrimary
+        )
+    }
+
+    val unloadNotice = viewModel.unloadNoticeMessage.value
+    if (unloadNotice != null) {
+        AlertDialog(
+            onDismissRequest = { viewModel.dismissUnloadNotice() },
+            title = {
+                Text(
+                    text = "Driver Unload Notice",
+                    fontWeight = FontWeight.Bold,
+                    color = BrandCyan
+                )
+            },
+            text = {
+                Text(
+                    text = unloadNotice,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = TextPrimary
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { viewModel.dismissUnloadNotice() }) {
+                    Text("Got It", color = BrandCyan)
+                }
+            },
+            containerColor = Surface1,
+            textContentColor = TextPrimary
         )
     }
 
@@ -2996,7 +3064,7 @@ private fun UnloadPanel(
             }
             Spacer(Modifier.height(5.dp))
             Text(
-                text = if (busy) strings.rebootingBtn else strings.restartBtn,
+                text = if (busy) "UNLOADING..." else "UNLOAD DRIVER",
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold,
                 color = if (hot) TextPrimary else TextDisabled
@@ -3005,9 +3073,9 @@ private fun UnloadPanel(
         Spacer(Modifier.height(6.dp))
         Text(
             text = when {
-                busy -> "Restarting phone to unload kernel module..."
-                moduleName.isNotBlank() -> "Reboots device to unload $moduleName"
-                else -> "Reboots device to unload active driver"
+                busy -> "Gracefully unloading kernel module..."
+                moduleName.isNotBlank() -> "Gracefully unloads $moduleName without reboot"
+                else -> "Gracefully unloads active driver without reboot"
             },
             style = MonoTiny,
             color = AccentRed,
