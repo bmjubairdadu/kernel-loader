@@ -217,8 +217,7 @@ object OtaDriverStore {
                     }
                 }
                 if (tempFile.exists() && tempFile.length() > 0L) {
-                    val actualSha = computeSha256(tempFile)
-                    if (entry.sha256.isBlank() || actualSha.equals(entry.sha256, ignoreCase = true)) {
+                    if (matchesDriverSha(tempFile, entry.sha256, context)) {
                         downloadedOk = true
                         onProgress("Downloaded from Controller API (${tempFile.length()} bytes)")
                     } else {
@@ -264,8 +263,7 @@ object OtaDriverStore {
                             }
                         }
                         if (tempFile.exists() && tempFile.length() > 0L) {
-                            val actualSha = computeSha256(tempFile)
-                            if (entry.sha256.isBlank() || actualSha.equals(entry.sha256, ignoreCase = true)) {
+                            if (matchesDriverSha(tempFile, entry.sha256, context)) {
                                 downloadedOk = true
                                 onProgress("Downloaded from Cloud CDN (${tempFile.length()} bytes)")
                                 break
@@ -292,8 +290,7 @@ object OtaDriverStore {
                     val p = ProcessBuilder("su", "-c", dlCmd).start()
                     p.waitFor()
                     if (tempFile.exists() && tempFile.length() > 0L) {
-                        val actualSha = computeSha256(tempFile)
-                        if (entry.sha256.isBlank() || actualSha.equals(entry.sha256, ignoreCase = true)) {
+                        if (matchesDriverSha(tempFile, entry.sha256, context)) {
                             downloadedOk = true
                             break
                         }
@@ -310,8 +307,8 @@ object OtaDriverStore {
         }
 
         if (entry.sha256.isNotBlank()) {
-            val actualSha = computeSha256(tempFile)
-            if (!actualSha.equals(entry.sha256, ignoreCase = true)) {
+            if (!matchesDriverSha(tempFile, entry.sha256, context)) {
+                val actualSha = computeSha256(tempFile)
                 onProgress("SHA256 mismatch! Expected: ${entry.sha256.take(8)}... Got: ${actualSha.take(8)}...")
                 tempFile.delete()
                 return@withContext null
@@ -325,6 +322,27 @@ object OtaDriverStore {
         }
         onProgress("Driver staged in temporary storage (${targetFile.length()} bytes)")
         targetFile
+    }
+
+    private fun matchesDriverSha(file: File, expectedSha: String, context: Context): Boolean {
+        if (expectedSha.isBlank()) return true
+        val rawBytes = runCatching { file.readBytes() }.getOrNull() ?: return false
+        if (rawBytes.isEmpty()) return false
+        val rawSha = computeSha256Bytes(rawBytes)
+        if (rawSha.equals(expectedSha, ignoreCase = true)) return true
+        val decBytes = runCatching { DriverCrypto.decrypt(rawBytes, context) }.getOrNull()
+        if (decBytes != null && decBytes.isNotEmpty()) {
+            val decSha = computeSha256Bytes(decBytes)
+            if (decSha.equals(expectedSha, ignoreCase = true)) return true
+        }
+        return false
+    }
+
+    private fun computeSha256Bytes(bytes: ByteArray): String = try {
+        val md = MessageDigest.getInstance("SHA-256")
+        md.digest(bytes).joinToString("") { "%02x".format(it) }
+    } catch (_: Exception) {
+        ""
     }
 
     private fun computeSha256(file: File): String = try {
