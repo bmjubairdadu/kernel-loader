@@ -2,8 +2,17 @@
   "schema": 1,
   "count": 19,
   "generated_at": "2026-11-14T09:26:15Z",
-  "updated": "2026-11-17T03:59:16Z",
+  "updated": "2026-11-17T07:03:30Z",
   "drivers": [
+    {
+      "kernel": "4.19.325-cip136-st20-Sakayori",
+      "vermagic": "4.19.325-cip136-st20-Sakayori SMP preempt mod_unload modversions aarch64",
+      "variant": "rt",
+      "label": "4.19.325",
+      "file": "RT/4.19.325.sh",
+      "sha256": "fc344ea915abeb3e18689d6cef0558088295d6625be896c415e292a1b4b3cf09",
+      "size": 23572
+    },
     {
       "kernel": "4.9.337-DaisyForGaming",
       "vermagic": "4.9.337-DaisyForGaming SMP preempt mod_unload modversions aarch64",
@@ -21,15 +30,6 @@
       "file": "RT/4.14.186.sh",
       "sha256": "f82d7626afa11dd13320a18adf0ae1cd43ab9155afa89b4d657e357dc3d5317e",
       "size": 307274
-    },
-    {
-      "kernel": "4.19.325-cip136-st20-Kuroha",
-      "vermagic": "4.19.325-cip136-st20-Kuroha SMP preempt mod_unload modversions aarch64",
-      "variant": "rt",
-      "label": "4.19.325",
-      "file": "RT/4.19.325.sh",
-      "sha256": "be7f93eb1b41b4a582c342e97ad28514c79128acd1200ef8b01e1243830fdcfa",
-      "size": 320786
     },
     {
       "kernel": "6.12.58-android16-6-g32fc8147b5dc-4k",
