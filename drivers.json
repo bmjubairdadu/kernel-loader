@@ -1,8 +1,8 @@
 {
   "schema": 1,
-  "count": 17,
+  "count": 18,
   "generated_at": "2026-11-17T21:41:30Z",
-  "updated": "2026-11-17T22:08:13Z",
+  "updated": "2026-11-17T22:11:51Z",
   "drivers": [
     {
       "kernel": "4.14.186-perf-g14b9756acb79",
@@ -16,6 +16,24 @@
       "model": "",
       "status": "Active",
       "upload_date": "2026-11-17T21:58:22Z",
+      "download_count": 0,
+      "load_success_count": 0,
+      "last_accessed": null,
+      "note": "",
+      "reboot_required": false
+    },
+    {
+      "kernel": "4.14.186-g7c18952d3c68",
+      "vermagic": "4.14.186-g7c18952d3c68 SMP preempt mod_unload modversions aarch64",
+      "variant": "rt",
+      "label": "4.14.186a",
+      "file": "RT/4.14.186a.sh",
+      "sha256": "8ace38608fb373a6c728cd67cc141ca1ae97a417c2e5f844c3bfebccf0ee5423",
+      "size": 341333,
+      "device": "",
+      "model": "",
+      "status": "Active",
+      "upload_date": "2026-11-17T22:11:51Z",
       "download_count": 0,
       "load_success_count": 0,
       "last_accessed": null,
