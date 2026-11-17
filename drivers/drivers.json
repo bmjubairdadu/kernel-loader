@@ -1,9 +1,27 @@
 {
   "schema": 1,
-  "count": 16,
-  "generated_at": "2026-11-17T18:55:53Z",
-  "updated": "2026-11-17T18:55:53Z",
+  "count": 17,
+  "generated_at": "2026-11-17T19:30:48Z",
+  "updated": "2026-11-17T19:30:48Z",
   "drivers": [
+    {
+      "kernel": "4.19.191-perf-g3e5cdb36e3e4",
+      "vermagic": "4.19.191-perf-g3e5cdb36e3e4 SMP preempt mod_unload modversions aarch64",
+      "variant": "rt",
+      "label": "4.19.191-perf-g3e5cdb36e3e4",
+      "file": "RT/4.19.191.sh",
+      "sha256": "f83663561ddd738b93e0a49bb3c0aab1aa5a1d216ebc57c488ca0f2a2b6c5f83",
+      "size": 24996,
+      "device": "",
+      "model": "",
+      "status": "Active",
+      "upload_date": "2026-11-17T19:30:48.4558422Z",
+      "download_count": 0,
+      "load_success_count": 0,
+      "last_accessed": null,
+      "note": "",
+      "reboot_required": false
+    },
     {
       "kernel": "6.12.69-android16-6-g37a7d8c11197-4k",
       "vermagic": "6.12.69-android16-6-g37a7d8c11197-4k SMP preempt mod_unload modversions aarch64",
