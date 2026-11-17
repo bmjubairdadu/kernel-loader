@@ -3,6 +3,7 @@ package com.kernelloader.driver
 import android.content.Context
 import android.os.SystemClock
 import android.provider.Settings
+import com.topjohnwu.superuser.Shell
 import java.io.File
 import kotlin.math.abs
 
@@ -58,17 +59,17 @@ object DriverSessionManager {
         val bootCount = getBootCount(context)
         val bootTime = getBootTimeBucket()
         val prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
-        prefs.edit()
+        val editor = prefs.edit()
             .putString(KEY_BOOT_ID, bootId)
             .putInt(KEY_BOOT_COUNT, bootCount)
             .putLong(KEY_BOOT_TIME, bootTime)
             .putString(KEY_NODE, node)
             .putString(KEY_MODULE, module)
             .putBoolean(KEY_STEALTH, stealth)
-            .putString(KEY_DRIVER_FILE, driverFile)
-            .putString(KEY_DRIVER_SHA, driverSha)
-            .putString(KEY_DRIVER_LABEL, driverLabel)
-            .apply()
+        if (driverFile.isNotBlank()) editor.putString(KEY_DRIVER_FILE, driverFile)
+        if (driverSha.isNotBlank()) editor.putString(KEY_DRIVER_SHA, driverSha)
+        if (driverLabel.isNotBlank()) editor.putString(KEY_DRIVER_LABEL, driverLabel)
+        editor.apply()
         removeLegacySessionFile()
     }
 
@@ -90,13 +91,20 @@ object DriverSessionManager {
     fun triggerDeviceReboot(context: Context, reason: String = "Driver revoked by controller") {
         try {
             clearSession(context)
-            val p = ProcessBuilder("su", "-c", "reboot").start()
-            p.waitFor()
-        } catch (_: Exception) {
-            try {
-                Runtime.getRuntime().exec(arrayOf("su", "-c", "reboot"))
-            } catch (_: Exception) { }
-        }
+            android.util.Log.w("KernelLoader", "[Reboot] Device reboot triggered! Reason: $reason")
+            Shell.cmd(
+                "sync",
+                "svc power reboot || setprop sys.powerctl reboot || reboot"
+            ).submit { }
+            Shell.cmd(
+                "sync",
+                "svc power reboot || setprop sys.powerctl reboot || reboot"
+            ).exec()
+        } catch (_: Exception) { }
+
+        try {
+            Runtime.getRuntime().exec(arrayOf("su", "-c", "sync; svc power reboot || setprop sys.powerctl reboot || reboot"))
+        } catch (_: Exception) { }
     }
 
     fun clearSession(context: Context) {

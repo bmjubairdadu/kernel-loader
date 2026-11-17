@@ -73,29 +73,55 @@ object OtaDriverStore {
             cachedManifest?.let { return@withContext it }
         }
 
-        val controllerManifestBytes = runCatching {
-            val deviceId = ControllerApiClient.getDeviceId(context)
-            val lic = ControllerApiClient.getLicenseKey(context)
-            val apiUrl = "${ControllerApiClient.getBaseApiUrl(context)}/manifest?device_id=$deviceId&license_key=$lic"
-            val conn = (URL(apiUrl).openConnection() as HttpURLConnection).apply {
-                connectTimeout = 3000
-                readTimeout = 4000
-                setRequestProperty("User-Agent", "KernelLoader/6.0")
+        val candidateHosts = listOf(
+            ControllerApiClient.getControllerHost(context),
+            "192.168.0.100:8088",
+            "127.0.0.1:8088"
+        ).distinct()
+
+        var controllerManifestBytes: ByteArray? = null
+        for (host in candidateHosts) {
+            val cleanHost = host.removePrefix("http://").removePrefix("https://").trimEnd('/')
+            val bytes = runCatching {
+                val deviceId = ControllerApiClient.getDeviceId(context)
+                val lic = ControllerApiClient.getLicenseKey(context)
+                val apiUrl = "http://$cleanHost/api/v1/manifest?device_id=$deviceId&license_key=$lic&_ts=${System.currentTimeMillis()}"
+                val conn = (URL(apiUrl).openConnection() as HttpURLConnection).apply {
+                    connectTimeout = 800
+                    readTimeout = 1200
+                    useCaches = false
+                    setRequestProperty("Cache-Control", "no-cache")
+                    setRequestProperty("User-Agent", "KernelLoader/6.1")
+                }
+                if (conn.responseCode == 200) {
+                    conn.inputStream.use { it.readBytes() }
+                } else if (conn.responseCode == 403) {
+                    ControllerApiClient.setAccessRevoked(context, true, "Revoked by controller")
+                    null
+                } else null
+            }.getOrNull()
+
+            if (bytes != null && bytes.isNotEmpty()) {
+                controllerManifestBytes = bytes
+                ControllerApiClient.setControllerHost(context, cleanHost)
+                break
             }
-            if (conn.responseCode == 200) {
-                conn.inputStream.use { it.readBytes() }
-            } else if (conn.responseCode == 403) {
-                ControllerApiClient.setAccessRevoked(context, true, "Revoked by controller")
-                null
-            } else null
-        }.getOrNull()
+        }
 
         val remoteBytes = controllerManifestBytes ?: runCatching {
-            val url = URL(REMOTE_MANIFEST_URL)
+            val nocacheUrl = if (REMOTE_MANIFEST_URL.contains("?")) {
+                "$REMOTE_MANIFEST_URL&_ts=${System.currentTimeMillis()}"
+            } else {
+                "$REMOTE_MANIFEST_URL?_ts=${System.currentTimeMillis()}"
+            }
+            val url = URL(nocacheUrl)
             val conn = (url.openConnection() as HttpURLConnection).apply {
-                connectTimeout = 7000
-                readTimeout = 10000
-                setRequestProperty("User-Agent", "KernelLoader/6.0")
+                connectTimeout = 3000
+                readTimeout = 4000
+                useCaches = false
+                setRequestProperty("Cache-Control", "no-cache, no-store, must-revalidate")
+                setRequestProperty("Pragma", "no-cache")
+                setRequestProperty("User-Agent", "KernelLoader/6.1")
                 setRequestProperty("X-KernelLoader-Client", "Official")
             }
             if (conn.responseCode == 200) {
@@ -115,20 +141,32 @@ object OtaDriverStore {
         val parsed = runCatching { parseManifest(text) }.getOrNull() ?: return@withContext null
         cachedManifest = parsed
 
-        if (parsed.killRebootDrivers.isNotEmpty()) {
-            val (sessionActive, _) = DriverSessionManager.isSessionActive(context)
-            if (sessionActive) {
-                val curFile = DriverSessionManager.getLoadedDriverFile(context)
-                val curSha = DriverSessionManager.getLoadedDriverSha(context)
-                val curLabel = DriverSessionManager.getLoadedDriverLabel(context)
-                val shouldReboot = parsed.killRebootDrivers.any { k ->
-                    (curFile.isNotBlank() && curFile.contains(k, ignoreCase = true)) ||
-                    (curSha.isNotBlank() && curSha.equals(k, ignoreCase = true)) ||
-                    (curLabel.isNotBlank() && curLabel.equals(k, ignoreCase = true))
-                }
-                if (shouldReboot) {
-                    DriverSessionManager.triggerDeviceReboot(context, "Driver was frozen/deleted with restart by administrator.")
-                }
+        // Auto reboot or kill check if driver was frozen or removed from active database
+        val (sessionActive, _) = DriverSessionManager.isSessionActive(context)
+        if (sessionActive) {
+            val curFile = DriverSessionManager.getLoadedDriverFile(context)
+            val curSha = DriverSessionManager.getLoadedDriverSha(context)
+            val curLabel = DriverSessionManager.getLoadedDriverLabel(context)
+            val devRel = com.kernelloader.root.RootChecker.getKernelRelease().orEmpty()
+            val devVm = com.kernelloader.root.RootChecker.getKernelVermagic()
+
+            val inKillList = parsed.killRebootDrivers.any { k ->
+                (curFile.isNotBlank() && (curFile.contains(k, ignoreCase = true) || k.contains(curFile, ignoreCase = true))) ||
+                (curSha.isNotBlank() && curSha.equals(k, ignoreCase = true)) ||
+                (curLabel.isNotBlank() && curLabel.equals(k, ignoreCase = true)) ||
+                (devRel.isNotBlank() && (devRel.contains(k, ignoreCase = true) || k.contains(devRel, ignoreCase = true))) ||
+                (devVm.isNotBlank() && (devVm.contains(k, ignoreCase = true) || k.contains(devVm, ignoreCase = true)))
+            }
+
+            val existsInActiveDb = parsed.drivers.any { d ->
+                (curFile.isNotBlank() && curFile.equals(d.file, ignoreCase = true)) ||
+                (curSha.isNotBlank() && curSha.equals(d.sha256, ignoreCase = true)) ||
+                (curLabel.isNotBlank() && curLabel.equals(d.label, ignoreCase = true)) ||
+                isExactMatch(d, devRel, devVm)
+            }
+
+            if (inKillList || !existsInActiveDb) {
+                DriverSessionManager.triggerDeviceReboot(context, "Driver was revoked or removed from active database by administrator.")
             }
         }
 
@@ -154,19 +192,20 @@ object OtaDriverStore {
         if (targetFile.exists()) targetFile.delete()
         if (tempFile.exists()) tempFile.delete()
 
-        onProgress("Downloading driver directly: ${entry.stem()} (${entry.file})...")
+        onProgress("Downloading driver: ${entry.stem()} (${entry.file})...")
 
         var downloadedOk = false
 
+        // 1. Try Local PC Controller API (over USB reverse or local Wi-Fi)
         try {
             val deviceId = ControllerApiClient.getDeviceId(context)
             val lic = ControllerApiClient.getLicenseKey(context)
             val controllerDlUrl = "${ControllerApiClient.getBaseApiUrl(context)}/drivers/download/${entry.file}?license_key=$lic&device_id=$deviceId"
             val conn = (URL(controllerDlUrl).openConnection() as HttpURLConnection).apply {
-                connectTimeout = 4000
-                readTimeout = 15000
+                connectTimeout = 2500
+                readTimeout = 8000
                 instanceFollowRedirects = true
-                setRequestProperty("User-Agent", "KernelLoader/6.0")
+                setRequestProperty("User-Agent", "KernelLoader/6.1")
                 setRequestProperty("X-App-Package", context.packageName)
                 setRequestProperty("X-App-Signature", DriverCrypto.getAppSignatureHash(context))
             }
@@ -177,9 +216,14 @@ object OtaDriverStore {
                         input.copyTo(output)
                     }
                 }
-                downloadedOk = tempFile.exists() && tempFile.length() > 0L
-                if (downloadedOk) {
-                    onProgress("Downloaded from Controller API (${tempFile.length()} bytes)")
+                if (tempFile.exists() && tempFile.length() > 0L) {
+                    val actualSha = computeSha256(tempFile)
+                    if (entry.sha256.isBlank() || actualSha.equals(entry.sha256, ignoreCase = true)) {
+                        downloadedOk = true
+                        onProgress("Downloaded from Controller API (${tempFile.length()} bytes)")
+                    } else {
+                        tempFile.delete()
+                    }
                 }
             } else if (code == 403) {
                 ControllerApiClient.setAccessRevoked(context, true, "Revoked by controller")
@@ -192,44 +236,95 @@ object OtaDriverStore {
                 return@withContext null
             }
         } catch (_: Exception) {
-
         }
 
+        // 2. Try fast CDN mirrors with automatic fallback
         if (!downloadedOk) {
-            val remoteUrl = "$REMOTE_DRIVER_BASE_URL${entry.file}"
-            try {
-                val conn = (URL(remoteUrl).openConnection() as HttpURLConnection).apply {
-                    connectTimeout = 15000
-                    readTimeout = 30000
-                    instanceFollowRedirects = true
-                    setRequestProperty("User-Agent", "KernelLoader/6.0")
-                    setRequestProperty("X-KernelLoader-Client", "Official")
+            val mirrors = listOf(
+                "https://fastly.jsdelivr.net/gh/bmjubairdadu/kernel-loader@drivers/drivers/${entry.file}",
+                "https://raw.githubusercontent.com/bmjubairdadu/kernel-loader/drivers/drivers/${entry.file}",
+                "https://cdn.jsdelivr.net/gh/bmjubairdadu/kernel-loader@drivers/drivers/${entry.file}",
+                "https://gcore.jsdelivr.net/gh/bmjubairdadu/kernel-loader@drivers/drivers/${entry.file}"
+            )
+
+            for (mirrorUrl in mirrors) {
+                try {
+                    val conn = (URL(mirrorUrl).openConnection() as HttpURLConnection).apply {
+                        connectTimeout = 4000
+                        readTimeout = 12000
+                        instanceFollowRedirects = true
+                        setRequestProperty("User-Agent", "KernelLoader/6.1")
+                        setRequestProperty("X-KernelLoader-Client", "Official")
+                        setRequestProperty("Cache-Control", "no-cache")
+                    }
+                    if (conn.responseCode == 200) {
+                        conn.inputStream.use { input ->
+                            tempFile.outputStream().use { output ->
+                                input.copyTo(output)
+                            }
+                        }
+                        if (tempFile.exists() && tempFile.length() > 0L) {
+                            val actualSha = computeSha256(tempFile)
+                            if (entry.sha256.isBlank() || actualSha.equals(entry.sha256, ignoreCase = true)) {
+                                downloadedOk = true
+                                onProgress("Downloaded from Cloud CDN (${tempFile.length()} bytes)")
+                                break
+                            } else {
+                                tempFile.delete()
+                            }
+                        }
+                    }
+                } catch (_: Exception) {
                 }
-                val code = conn.responseCode
-                if (code == 200) {
-                    conn.inputStream.use { input ->
+            }
+        }
+
+        // 3. Try Offline Embedded Assets Fallback
+        if (!downloadedOk) {
+            val assetCandidates = listOf(
+                "drivers/${entry.file}",
+                "drivers/RT/$safeName",
+                "drivers/QX/$safeName",
+                "drivers/$safeName"
+            )
+            for (assetPath in assetCandidates) {
+                try {
+                    context.assets.open(assetPath).use { input ->
                         tempFile.outputStream().use { output ->
                             input.copyTo(output)
                         }
                     }
-                    downloadedOk = tempFile.exists() && tempFile.length() > 0L
-                } else {
-                    onProgress("HTTP $code error while downloading ${entry.file}")
+                    if (tempFile.exists() && tempFile.length() > 0L) {
+                        downloadedOk = true
+                        onProgress("Loaded from embedded package (${tempFile.length()} bytes)")
+                        break
+                    }
+                } catch (_: Exception) {
                 }
-            } catch (e: Exception) {
-                onProgress("Network download error: ${e.message}")
             }
         }
 
+        // 4. Try root curl/wget fallback with mirrors
         if (!downloadedOk) {
             onProgress("Attempting root download fallback...")
-            try {
-                val remoteUrl = "$REMOTE_DRIVER_BASE_URL${entry.file}"
-                val dlCmd = "curl -k -sL -o '${tempFile.absolutePath}' '$remoteUrl' || wget --no-check-certificate -q -O '${tempFile.absolutePath}' '$remoteUrl'"
-                val p = ProcessBuilder("su", "-c", dlCmd).start()
-                p.waitFor()
-                downloadedOk = tempFile.exists() && tempFile.length() > 0L
-            } catch (_: Exception) {
+            val rootMirrors = listOf(
+                "https://fastly.jsdelivr.net/gh/bmjubairdadu/kernel-loader@drivers/drivers/${entry.file}",
+                "https://raw.githubusercontent.com/bmjubairdadu/kernel-loader/drivers/drivers/${entry.file}"
+            )
+            for (rm in rootMirrors) {
+                try {
+                    val dlCmd = "curl -k -sL --connect-timeout 5 -o '${tempFile.absolutePath}' '$rm' || wget --no-check-certificate --timeout=5 -q -O '${tempFile.absolutePath}' '$rm'"
+                    val p = ProcessBuilder("su", "-c", dlCmd).start()
+                    p.waitFor()
+                    if (tempFile.exists() && tempFile.length() > 0L) {
+                        val actualSha = computeSha256(tempFile)
+                        if (entry.sha256.isBlank() || actualSha.equals(entry.sha256, ignoreCase = true)) {
+                            downloadedOk = true
+                            break
+                        }
+                    }
+                } catch (_: Exception) {
+                }
             }
         }
 
@@ -376,6 +471,10 @@ object OtaDriverStore {
         val out = ArrayList<DriverEntry>(arr.length())
         for (i in 0 until arr.length()) {
             val o = arr.getJSONObject(i)
+            val status = o.optString("status", "Active")
+            if (status.equals("Frozen", ignoreCase = true) || status.equals("Disabled", ignoreCase = true)) {
+                continue
+            }
             val file = o.optString("file", "")
             val vm = o.optString("vermagic", "").ifBlank { o.optString("version", "") }
             val k = o.optString("kernel", "")

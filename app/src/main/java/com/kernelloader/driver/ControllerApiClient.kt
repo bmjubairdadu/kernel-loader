@@ -79,15 +79,6 @@ object ControllerApiClient {
     }
 
     suspend fun verifyLicense(context: Context): LicenseVerifyResult = withContext(Dispatchers.IO) {
-        if (isAccessRevoked(context)) {
-            return@withContext LicenseVerifyResult(
-                valid = false,
-                status = "Revoked",
-                message = REVOKED_POPUP_MESSAGE,
-                downloadAuthorized = false
-            )
-        }
-
         val deviceId = getDeviceId(context)
         val licenseKey = getLicenseKey(context)
         val kernelRelease = Build.VERSION.RELEASE
@@ -100,7 +91,7 @@ object ControllerApiClient {
                 readTimeout = 4000
                 doOutput = true
                 setRequestProperty("Content-Type", "application/json")
-                setRequestProperty("User-Agent", "KernelLoader/6.0")
+                setRequestProperty("User-Agent", "KernelLoader/6.1")
                 setRequestProperty("X-App-Package", context.packageName)
                 setRequestProperty("X-App-Signature", DriverCrypto.getAppSignatureHash(context))
             }
@@ -150,6 +141,10 @@ object ControllerApiClient {
                 )
             }
 
+            if (code == 200 && auth) {
+                setAccessRevoked(context, false)
+            }
+
             LicenseVerifyResult(
                 valid = code == 200 && auth,
                 status = status,
@@ -158,7 +153,6 @@ object ControllerApiClient {
                 tier = tier
             )
         } catch (_: Exception) {
-
             LicenseVerifyResult(
                 valid = !isAccessRevoked(context),
                 status = if (isAccessRevoked(context)) "Revoked" else "Offline",
@@ -177,7 +171,7 @@ object ControllerApiClient {
                 readTimeout = 3000
                 doOutput = true
                 setRequestProperty("Content-Type", "application/json")
-                setRequestProperty("User-Agent", "KernelLoader/6.0")
+                setRequestProperty("User-Agent", "KernelLoader/6.1")
                 setRequestProperty("X-App-Package", context.packageName)
                 setRequestProperty("X-App-Signature", DriverCrypto.getAppSignatureHash(context))
             }
@@ -201,7 +195,7 @@ object ControllerApiClient {
                 readTimeout = 3000
                 doOutput = true
                 setRequestProperty("Content-Type", "application/json")
-                setRequestProperty("User-Agent", "KernelLoader/6.0")
+                setRequestProperty("User-Agent", "KernelLoader/6.1")
                 setRequestProperty("X-App-Package", context.packageName)
                 setRequestProperty("X-App-Signature", DriverCrypto.getAppSignatureHash(context))
             }
@@ -217,32 +211,51 @@ object ControllerApiClient {
     }
 
     suspend fun checkActiveDriverStatus(context: Context, loadedDriver: String, loadedSha: String) = withContext(Dispatchers.IO) {
-        runCatching {
-            val url = URL("${getBaseApiUrl(context)}/telemetry/heartbeat")
-            val conn = (url.openConnection() as HttpURLConnection).apply {
-                requestMethod = "POST"
-                connectTimeout = 3000
-                readTimeout = 4000
-                doOutput = true
-                setRequestProperty("Content-Type", "application/json")
-                setRequestProperty("User-Agent", "KernelLoader/6.0")
-                setRequestProperty("X-App-Package", context.packageName)
-                setRequestProperty("X-App-Signature", DriverCrypto.getAppSignatureHash(context))
-            }
-            val body = JSONObject().apply {
-                put("device_id", getDeviceId(context))
-                put("license_key", getLicenseKey(context))
-                put("loaded_driver", loadedDriver)
-                put("loaded_sha", loadedSha)
-            }
-            OutputStreamWriter(conn.outputStream).use { it.write(body.toString()) }
-            if (conn.responseCode == 200) {
-                val resp = conn.inputStream.bufferedReader().use { it.readText() }
-                val json = JSONObject(resp)
-                val rebootReq = json.optBoolean("reboot_required", false)
-                if (rebootReq) {
-                    DriverSessionManager.triggerDeviceReboot(context, "Driver was frozen/deleted with restart directive by administrator.")
+        val candidateHosts = listOf(
+            getControllerHost(context),
+            DEFAULT_HOST,
+            "192.168.0.100:8088"
+        ).distinct()
+
+        for (host in candidateHosts) {
+            val cleanHost = host.removePrefix("http://").removePrefix("https://").trimEnd('/')
+            val endpoint = "http://$cleanHost/api/v1/telemetry/heartbeat"
+            val success = runCatching {
+                val url = URL(endpoint)
+                val conn = (url.openConnection() as HttpURLConnection).apply {
+                    requestMethod = "POST"
+                    connectTimeout = 2500
+                    readTimeout = 3000
+                    doOutput = true
+                    setRequestProperty("Content-Type", "application/json")
+                    setRequestProperty("User-Agent", "KernelLoader/6.1")
+                    setRequestProperty("X-App-Package", context.packageName)
+                    setRequestProperty("X-App-Signature", DriverCrypto.getAppSignatureHash(context))
                 }
+                val body = JSONObject().apply {
+                    put("device_id", getDeviceId(context))
+                    put("license_key", getLicenseKey(context))
+                    put("loaded_driver", loadedDriver)
+                    put("loaded_sha", loadedSha)
+                }
+                OutputStreamWriter(conn.outputStream).use { it.write(body.toString()) }
+                val code = conn.responseCode
+                if (code == 200) {
+                    val resp = conn.inputStream.bufferedReader().use { it.readText() }
+                    android.util.Log.i("KernelLoader", "[Heartbeat] Success from $cleanHost: $resp")
+                    val json = JSONObject(resp)
+                    val rebootReq = json.optBoolean("reboot_required", false)
+                    if (rebootReq) {
+                        android.util.Log.w("KernelLoader", "[Heartbeat] REBOOT REQUIRED! Rebooting device immediately...")
+                        DriverSessionManager.triggerDeviceReboot(context, "Driver was frozen/deleted with restart directive by administrator.")
+                    }
+                    true
+                } else false
+            }.getOrDefault(false)
+
+            if (success) {
+                setControllerHost(context, cleanHost)
+                break
             }
         }
     }

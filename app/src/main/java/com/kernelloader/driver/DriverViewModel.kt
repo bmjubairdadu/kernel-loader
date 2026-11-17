@@ -84,15 +84,26 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
 
         viewModelScope.launch(Dispatchers.IO) {
             while (isActive) {
-                kotlinx.coroutines.delay(10000)
-                val (active, _) = DriverSessionManager.isSessionActive(application)
-                if (active) {
-                    val curFile = DriverSessionManager.getLoadedDriverFile(application)
-                    val curSha = DriverSessionManager.getLoadedDriverSha(application)
-                    if (curFile.isNotBlank() || curSha.isNotBlank()) {
+                kotlinx.coroutines.delay(1200)
+                try {
+                    val freshManifest = OtaDriverStore.loadManifest(application, forceRefresh = true)
+                    if (freshManifest != null) {
+                        withContext(Dispatchers.Main) {
+                            remoteManifest.value = freshManifest
+                            manifestStatus.value = "OK"
+                        }
+                    }
+
+                    val (active, _) = DriverSessionManager.isSessionActive(application)
+                    if (active || driverLoaded.value) {
+                        val curFile = DriverSessionManager.getLoadedDriverFile(application).ifBlank {
+                            val devRel = com.kernelloader.root.RootChecker.getKernelRelease().orEmpty()
+                            "RT/$devRel.sh"
+                        }
+                        val curSha = DriverSessionManager.getLoadedDriverSha(application)
                         ControllerApiClient.checkActiveDriverStatus(application, curFile, curSha)
                     }
-                }
+                } catch (_: Exception) { }
             }
         }
     }
@@ -205,7 +216,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch {
             com.kernelloader.ui.IpLanguageManager.detectIpAndLanguage(context)
             runUpdateCheckSuspend(manual = false)
-            runManifestRefreshSuspend(forceRefresh = false)
+            runManifestRefreshSuspend(forceRefresh = true)
         }
     }
 
@@ -464,23 +475,10 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                 } else emptyList()
 
                 if (candidates.isEmpty()) {
-                    val localCandidates = withContext(Dispatchers.IO) { installer.candidates(release) }
-                    if (localCandidates.isEmpty()) {
-                        lastBundleTried.value = "none"
-                        tlog("No matching driver found in database for kernel $release", "WARN")
-                        tlog("Use Custom Script to load a local .sh driver", "INFO")
-                        applyInstallResult(DriverInstaller.Result(ok = false, error = "no_driver_for_$release"), release)
-                        return@launch
-                    }
-                    lastBundleTried.value = localCandidates.joinToString(", ")
-                    tlog("Loading driver: ${lastBundleTried.value}...", "CMD")
-                    busyStep.value = "Loading ${lastBundleTried.value}..."
-                    val res = withContext(Dispatchers.IO) {
-                        installer.installBest(release) { line ->
-                            logFilteredInstallerLine(line)
-                        }
-                    }
-                    applyInstallResult(res, release, driverFile = lastBundleTried.value)
+                    lastBundleTried.value = "none"
+                    tlog("No matching driver found in database for kernel $release (Supported: NO)", "WARN")
+                    tlog("Driver is deleted or not available in the active database.", "ERR")
+                    applyInstallResult(DriverInstaller.Result(ok = false, error = "no_driver_in_database"), release)
                     return@launch
                 }
 
