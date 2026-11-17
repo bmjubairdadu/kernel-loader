@@ -20,7 +20,7 @@ object ControllerApiClient {
     private const val KEY_ACCESS_REVOKED = "access_revoked"
     private const val KEY_REVOKED_REASON = "revoked_reason"
 
-    private const val DEFAULT_HOST = "10.0.2.2:8088"
+    private const val DEFAULT_HOST = "127.0.0.1:8088"
     private const val DEFAULT_LICENSE_KEY = "LIC-TRIAL-0001"
 
     data class LicenseVerifyResult(
@@ -50,7 +50,8 @@ object ControllerApiClient {
 
     fun getControllerHost(context: Context): String {
         val prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
-        return prefs.getString(KEY_CONTROLLER_HOST, DEFAULT_HOST) ?: DEFAULT_HOST
+        val h = prefs.getString(KEY_CONTROLLER_HOST, DEFAULT_HOST) ?: DEFAULT_HOST
+        return if (h == "10.0.2.2:8088") DEFAULT_HOST else h
     }
 
     fun setControllerHost(context: Context, host: String) {
