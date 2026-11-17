@@ -1,14 +1,21 @@
 package com.kernelloader.driver
 
 import android.content.Context
+import android.content.pm.PackageManager
+import android.content.pm.Signature
+import android.os.Build
+import java.security.MessageDigest
 import java.security.SecureRandom
 import javax.crypto.Cipher
+import javax.crypto.Mac
 import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.SecretKeySpec
 
 object DriverCrypto {
 
     private val MAGIC = byteArrayOf(0x4B, 0x4C, 0x45, 0x4E, 0x43, 0x30, 0x30, 0x31)
+    const val AUTHORIZED_PACKAGE_NAME = "com.kernelloader"
+    const val AUTHORIZED_SIGNATURE_SHA256 = "abf2d7a42765af2a7edbb9633ea96092fb7228454b2ac3599e04daee611782cd"
 
     private val M1 = byteArrayOf(
         (-94).toByte(), (-17).toByte(), (-88).toByte(), (126).toByte(),
@@ -32,9 +39,53 @@ object DriverCrypto {
         (9).toByte(), (48).toByte(), (73).toByte(), (-67).toByte()
     )
 
+    fun getAppSignatureHash(context: Context): String = try {
+        val pm = context.packageManager
+        val signatures: Array<Signature>? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            val pi = pm.getPackageInfo(context.packageName, PackageManager.GET_SIGNING_CERTIFICATES)
+            pi.signingInfo?.apkContentsSigners ?: pi.signingInfo?.signingCertificateHistory
+        } else {
+            @Suppress("DEPRECATION")
+            val pi = pm.getPackageInfo(context.packageName, PackageManager.GET_SIGNATURES)
+            @Suppress("DEPRECATION")
+            pi.signatures
+        }
+        if (!signatures.isNullOrEmpty()) {
+            val md = MessageDigest.getInstance("SHA-256")
+            val digest = md.digest(signatures[0].toByteArray())
+            digest.joinToString("") { "%02x".format(it) }
+        } else ""
+    } catch (_: Exception) {
+        ""
+    }
+
+    fun isAuthorizedCaller(context: Context?): Boolean {
+        if (context == null) return false
+        if (context.packageName != AUTHORIZED_PACKAGE_NAME) return false
+        val sigHash = getAppSignatureHash(context)
+        return sigHash.equals(AUTHORIZED_SIGNATURE_SHA256, ignoreCase = true)
+    }
+
+    fun generateDriverLoadAuthToken(context: Context): String {
+        if (!isAuthorizedCaller(context)) {
+            throw SecurityException("Unauthorized caller application")
+        }
+        val uid = context.applicationInfo.uid
+        val pid = android.os.Process.myPid()
+        val ts = System.currentTimeMillis() / 1000
+        val expiry = ts + 60
+        val payload = "$AUTHORIZED_PACKAGE_NAME:$uid:$pid:$expiry"
+        val master = getMasterKey(context)
+        val mac = Mac.getInstance("HmacSHA256")
+        mac.init(SecretKeySpec(master, "HmacSHA256"))
+        val sig = mac.doFinal(payload.toByteArray(Charsets.UTF_8))
+        val sigHex = sig.joinToString("") { "%02x".format(it) }
+        return "$payload:$sigHex"
+    }
+
     private fun getMasterKey(context: Context? = null): ByteArray {
-        if (context != null && context.packageName != "com.kernelloader") {
-            throw SecurityException("Unauthorized caller package: ${context.packageName}")
+        if (context == null || !isAuthorizedCaller(context)) {
+            throw SecurityException("Unauthorized caller package: Driver loading is exclusively locked to official Kernel Loader app.")
         }
         val key = ByteArray(32)
         for (i in 0 until 32) {

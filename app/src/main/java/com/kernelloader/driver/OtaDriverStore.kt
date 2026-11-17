@@ -148,6 +148,8 @@ object OtaDriverStore {
                 readTimeout = 15000
                 instanceFollowRedirects = true
                 setRequestProperty("User-Agent", "KernelLoader/6.0")
+                setRequestProperty("X-App-Package", context.packageName)
+                setRequestProperty("X-App-Signature", DriverCrypto.getAppSignatureHash(context))
             }
             val code = conn.responseCode
             if (code == 200) {

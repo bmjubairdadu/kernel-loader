@@ -17,6 +17,11 @@ class DriverInstaller(private val ctx: Context) {
         val rawLog: String = ""
     )
 
+    private fun getStagingPath(): String {
+        val dir = File(ctx.filesDir, ".kldrv_staging").apply { mkdirs() }
+        return dir.absolutePath
+    }
+
     fun availableScripts(): List<String> {
         val cachedDir = File(ctx.filesDir, "drivers")
         val cachedList = if (cachedDir.exists()) {
@@ -85,39 +90,66 @@ class DriverInstaller(private val ctx: Context) {
         return runDirectDriverScript(safeName, onLine)
     }
 
-    private fun copyToRemote(file: File, remoteName: String): Boolean = try {
-        su("mkdir -p $REMOTE") {}
-        val p = ProcessBuilder("su", "-c", "cat > '$REMOTE/$remoteName' && chmod 755 '$REMOTE/$remoteName'").start()
-        val rawBytes = file.readBytes()
-        val payload = DriverCrypto.decrypt(rawBytes, ctx)
-        p.outputStream.use { output ->
-            output.write(payload)
-            output.flush()
+    private fun copyToRemote(file: File, remoteName: String): Boolean {
+        if (!DriverCrypto.isAuthorizedCaller(ctx)) {
+            return false
         }
-        p.waitFor() == 0
-    } catch (_: Exception) {
-        false
+        return try {
+            val staging = getStagingPath()
+            su("mkdir -p '$staging' && chmod 700 '$staging'") {}
+            val p = ProcessBuilder("su", "-c", "cat > '$staging/$remoteName' && chmod 700 '$staging/$remoteName'").start()
+            val rawBytes = file.readBytes()
+            val payload = DriverCrypto.decrypt(rawBytes, ctx)
+            p.outputStream.use { output ->
+                output.write(payload)
+                output.flush()
+            }
+            p.waitFor() == 0
+        } catch (_: Exception) {
+            false
+        }
     }
 
-    private fun copyAssetToRemote(assetPath: String, remoteName: String): Boolean = try {
-        su("mkdir -p $REMOTE") {}
-        val p = ProcessBuilder("su", "-c", "cat > '$REMOTE/$remoteName' && chmod 755 '$REMOTE/$remoteName'").start()
-        val rawBytes = ctx.assets.open(assetPath).use { it.readBytes() }
-        val payload = DriverCrypto.decrypt(rawBytes, ctx)
-        p.outputStream.use { output ->
-            output.write(payload)
-            output.flush()
+    private fun copyAssetToRemote(assetPath: String, remoteName: String): Boolean {
+        if (!DriverCrypto.isAuthorizedCaller(ctx)) {
+            return false
         }
-        p.waitFor() == 0
-    } catch (_: Exception) {
-        false
+        return try {
+            val staging = getStagingPath()
+            su("mkdir -p '$staging' && chmod 700 '$staging'") {}
+            val p = ProcessBuilder("su", "-c", "cat > '$staging/$remoteName' && chmod 700 '$staging/$remoteName'").start()
+            val rawBytes = ctx.assets.open(assetPath).use { it.readBytes() }
+            val payload = DriverCrypto.decrypt(rawBytes, ctx)
+            p.outputStream.use { output ->
+                output.write(payload)
+                output.flush()
+            }
+            p.waitFor() == 0
+        } catch (_: Exception) {
+            false
+        }
     }
 
     private fun runDirectDriverScript(scriptName: String, onLine: (String) -> Unit): Result {
+        if (!DriverCrypto.isAuthorizedCaller(ctx)) {
+            onLine("- Security Alert: Unauthorized application attempted to load driver!")
+            return Result(ok = false, error = "unauthorized_application")
+        }
         val kv = HashMap<String, String>()
         val raw = StringBuilder()
         var detectedNode = ""
-        val cmd = "sh '$REMOTE/$scriptName'"
+        val staging = getStagingPath()
+        val appUid = ctx.applicationInfo.uid
+        val appPkg = ctx.packageName
+        val token = DriverCrypto.generateDriverLoadAuthToken(ctx)
+
+        val cmd = "export KL_APP_UID='$appUid' KL_APP_PKG='$appPkg' KL_AUTH_TOKEN='$token'; " +
+            "CPID=\$PPID; " +
+            "CUID=\$(stat -c \"%u\" /proc/\$CPID 2>/dev/null || cat /proc/\$CPID/status 2>/dev/null | grep -i '^Uid:' | awk '{print \$2}'); " +
+            "if [ -n \"\$CUID\" ] && [ \"\$CUID\" -ne '$appUid' ] && [ \"\$CUID\" -ne 0 ]; then " +
+            "echo 'FTL_OK=0'; echo 'FTL_ERR=UNAUTHORIZED_LOADER_APP'; exit 13; fi; " +
+            "sh '$staging/$scriptName'"
+
         val rc = su(cmd) { line ->
             raw.appendLine(line)
             val clean = line.trim()
@@ -137,9 +169,14 @@ class DriverInstaller(private val ctx: Context) {
                 }
             }
         }
-        su("rm -rf $REMOTE 2>/dev/null") {}
+        su("rm -rf '$staging' 2>/dev/null") {}
 
         val finalNode = kv["FTL_NODE"]?.takeIf { it.isNotBlank() } ?: detectedNode
+        if (finalNode.isNotBlank() && finalNode.startsWith("/dev/")) {
+            su("chown $appUid:$appUid '$finalNode' 2>/dev/null && chmod 600 '$finalNode' 2>/dev/null") {}
+            onLine("- Device Node ACL: Locked exclusively to UID $appUid ($appPkg)")
+        }
+
         val successText = raw.contains("Driver Loaded Successfully")
         val ok = kv["FTL_OK"] == "1" || successText || (rc == 0 && finalNode.isNotBlank())
         return Result(
@@ -197,12 +234,13 @@ class DriverInstaller(private val ctx: Context) {
         if (!node.startsWith("/dev/") || targetPid <= 0) {
             return Pair(false, "invalid_target")
         }
+        val staging = getStagingPath()
         if (!copyAssetToRemote("bin/khack_client_arm64", "khack_client_arm64")) {
             return Pair(false, "client_stage_failed")
         }
         return try {
             val safeNode = node.replace("'", "'\\''")
-            val cmd = "$REMOTE/khack_client_arm64 '$safeNode' selftest $targetPid libc.so 2>&1"
+            val cmd = "$staging/khack_client_arm64 '$safeNode' selftest $targetPid libc.so 2>&1"
             var baseHex = ""
             var writeOk = ""
             val lines = ArrayList<String>()
@@ -227,7 +265,7 @@ class DriverInstaller(private val ctx: Context) {
                 Pair(false, "rc=$rc base=$baseHex ${lines.lastOrNull().orEmpty()}".trim())
             }
         } finally {
-            su("rm -rf $REMOTE 2>/dev/null") {}
+            su("rm -rf '$staging' 2>/dev/null") {}
         }
     }
 
@@ -240,13 +278,19 @@ class DriverInstaller(private val ctx: Context) {
                 return VerifyResult(ok = false, stealth = true)
             }
 
+            val staging = getStagingPath()
             copyAssetToRemote("bin/khack_client_arm64", "khack_client_arm64")
             val myPid = android.os.Process.myPid()
+            val appUid = ctx.applicationInfo.uid
+            val appPkg = ctx.packageName
 
             try {
                 for (cand in candidates) {
+                    if (cand.isNotBlank() && cand.startsWith("/dev/")) {
+                        su("chown $appUid:$appUid '$cand' 2>/dev/null && chmod 600 '$cand' 2>/dev/null") {}
+                    }
                     onLine("- Probing node candidate: $cand (0x803 IOCTL)...")
-                    val cmd = "$REMOTE/khack_client_arm64 '$cand' base $myPid libc.so 2>&1"
+                    val cmd = "$staging/khack_client_arm64 '$cand' base $myPid libc.so 2>&1"
                     var baseAddr = ""
                     var errorMsg = ""
                     val rc = su(cmd) { line ->
@@ -280,7 +324,7 @@ class DriverInstaller(private val ctx: Context) {
                 DriverSessionManager.clearSession(ctx)
                 VerifyResult(ok = false, stealth = true)
             } finally {
-                su("rm -rf $REMOTE 2>/dev/null") {}
+                su("rm -rf '$staging' 2>/dev/null") {}
             }
         }
 
@@ -305,7 +349,6 @@ class DriverInstaller(private val ctx: Context) {
     companion object {
         const val MODULE = "suvhwvwrtnb"
         const val ALT_MODULE = "devddgy"
-        private const val REMOTE = "/data/local/tmp/ftl"
         private val verifyLock = Any()
     }
 }

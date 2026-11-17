@@ -100,6 +100,8 @@ object ControllerApiClient {
                 doOutput = true
                 setRequestProperty("Content-Type", "application/json")
                 setRequestProperty("User-Agent", "KernelLoader/6.0")
+                setRequestProperty("X-App-Package", context.packageName)
+                setRequestProperty("X-App-Signature", DriverCrypto.getAppSignatureHash(context))
             }
 
             val body = JSONObject().apply {
@@ -174,6 +176,9 @@ object ControllerApiClient {
                 readTimeout = 3000
                 doOutput = true
                 setRequestProperty("Content-Type", "application/json")
+                setRequestProperty("User-Agent", "KernelLoader/6.0")
+                setRequestProperty("X-App-Package", context.packageName)
+                setRequestProperty("X-App-Signature", DriverCrypto.getAppSignatureHash(context))
             }
             val body = JSONObject().apply {
                 put("device_id", getDeviceId(context))
@@ -195,6 +200,9 @@ object ControllerApiClient {
                 readTimeout = 3000
                 doOutput = true
                 setRequestProperty("Content-Type", "application/json")
+                setRequestProperty("User-Agent", "KernelLoader/6.0")
+                setRequestProperty("X-App-Package", context.packageName)
+                setRequestProperty("X-App-Signature", DriverCrypto.getAppSignatureHash(context))
             }
             val body = JSONObject().apply {
                 put("device_id", getDeviceId(context))
