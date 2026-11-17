@@ -82,7 +82,6 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import com.kernelloader.driver.SupportContact
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -517,7 +516,7 @@ fun HomeScreen(
                         SupportContact.openWhatsApp(context)
                     }
                 ) {
-                    Text("Contact Support", color = BrandCyan)
+                    Text("Contact Support", color = LogoPink)
                 }
             },
             dismissButton = {
