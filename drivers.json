@@ -2,8 +2,17 @@
   "schema": 1,
   "count": 20,
   "generated_at": "2026-11-14T09:26:15Z",
-  "updated": "2026-11-17T10:42:57Z",
+  "updated": "2026-11-17T10:46:12Z",
   "drivers": [
+    {
+      "kernel": "4.19.191-perf-g41be13074ee9",
+      "vermagic": "4.19.191-perf-g41be13074ee9 SMP preempt mod_unload modversions aarch64",
+      "variant": "qx",
+      "label": "4.19.191c",
+      "file": "QX/4.19.191c.ko.sh",
+      "sha256": "f905e1c937948fb94ec10f08f995583b465c7ff3abd254a5b43b5ca30b25e5e0",
+      "size": 18658
+    },
     {
       "kernel": "6.12.69-android16-6-g37a7d8c11197-4k",
       "vermagic": "6.12.69-android16-6-g37a7d8c11197-4k SMP preempt mod_unload modversions aarch64",
@@ -48,15 +57,6 @@
       "file": "RT/6.12.58.sh",
       "sha256": "a19836b6d1a625e74c5ec452d33df7b92910fcb457acd8cd0705f48ad7529b73",
       "size": 356640
-    },
-    {
-      "kernel": "4.19.191-perf-g41be13074ee9",
-      "vermagic": "4.19.191-perf-g41be13074ee9 SMP preempt mod_unload modversions aarch64",
-      "variant": "rt",
-      "label": "4.19.191c",
-      "file": "RT/4.19.191c.sh",
-      "sha256": "b6f3995b879615c5c35c0c3b5a29a9ce1a229d4c68202a12fa875a9e583b8b43",
-      "size": 295448
     },
     {
       "kernel": "4.9.117+",
