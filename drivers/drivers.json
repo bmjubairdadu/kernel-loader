@@ -2,8 +2,17 @@
   "schema": 1,
   "count": 18,
   "generated_at": "2026-11-17T21:41:30Z",
-  "updated": "2026-11-17T22:11:51Z",
+  "updated": "2026-11-17T17:50:50Z",
   "drivers": [
+    {
+      "kernel": "4.9.337-DaisyForGaming",
+      "vermagic": "4.9.337-DaisyForGaming SMP preempt mod_unload modversions aarch64",
+      "variant": "rt",
+      "label": "4.9.337",
+      "file": "RT/4.9.337.sh",
+      "sha256": "c61fa9f6160e6c875aaf3f4e70ecf8df104e77c8cdbdc4b5537eb16b0599a55f",
+      "size": 26495
+    },
     {
       "kernel": "4.14.186-perf-g14b9756acb79",
       "vermagic": "4.14.186-perf-g14b9756acb79 SMP preempt mod_unload modversions aarch64",
@@ -11,16 +20,7 @@
       "label": "4.14.186",
       "file": "RT/4.14.186.sh",
       "sha256": "0924145f6b325c55748cc25ef94a5d7974e5508d62aed50fb24c3b8d716b3816",
-      "size": 22500,
-      "device": "",
-      "model": "",
-      "status": "Active",
-      "upload_date": "2026-11-17T21:58:22Z",
-      "download_count": 0,
-      "load_success_count": 0,
-      "last_accessed": null,
-      "note": "",
-      "reboot_required": false
+      "size": 22500
     },
     {
       "kernel": "4.14.186-g7c18952d3c68",
@@ -29,16 +29,7 @@
       "label": "4.14.186a",
       "file": "RT/4.14.186a.sh",
       "sha256": "8ace38608fb373a6c728cd67cc141ca1ae97a417c2e5f844c3bfebccf0ee5423",
-      "size": 341333,
-      "device": "",
-      "model": "",
-      "status": "Active",
-      "upload_date": "2026-11-17T22:11:51Z",
-      "download_count": 0,
-      "load_success_count": 0,
-      "last_accessed": null,
-      "note": "",
-      "reboot_required": false
+      "size": 341333
     },
     {
       "kernel": "4.19.191-perf-g3e5cdb36e3e4",
@@ -47,16 +38,7 @@
       "label": "4.19.191-perf-g3e5cdb36e3e4",
       "file": "RT/4.19.191.sh",
       "sha256": "9ab65aa1f5bb6c49169072c224e477220648a5e2486e6e6d06a789f1646e2cbc",
-      "size": 24996,
-      "device": "",
-      "model": "",
-      "status": "Active",
-      "upload_date": "2026-11-17T21:40:54.987533Z",
-      "download_count": 0,
-      "load_success_count": 0,
-      "last_accessed": null,
-      "note": "[FROZEN by Administrator: Administrative freeze]",
-      "reboot_required": false
+      "size": 24996
     },
     {
       "kernel": "6.12.69-android16-6-g37a7d8c11197-4k",
@@ -65,34 +47,7 @@
       "label": "6.12.69",
       "file": "RT/6.12.69.sh",
       "sha256": "aa997c34337e97818702704c655004b2cee768719400c96c147b025521f412bf",
-      "size": 34048,
-      "device": "",
-      "model": "",
-      "status": "Active",
-      "upload_date": "2026-11-17T21:40:54.9875419Z",
-      "download_count": 1,
-      "load_success_count": 0,
-      "last_accessed": "2026-11-17T18:46:04.7115852Z",
-      "note": "",
-      "reboot_required": false
-    },
-    {
-      "kernel": "4.9.337-DaisyForGaming",
-      "vermagic": "4.9.337-DaisyForGaming SMP preempt mod_unload modversions aarch64",
-      "variant": "rt",
-      "label": "4.9.337",
-      "file": "RT/4.9.337.sh",
-      "sha256": "8de504b8090f2a14961a5e56c69f817eb676454b36834c9e798f4bd6fc48ced0",
-      "size": 25364,
-      "device": "",
-      "model": "",
-      "status": "Active",
-      "upload_date": "2026-11-17T21:40:54.9875464Z",
-      "download_count": 3,
-      "load_success_count": 0,
-      "last_accessed": "2026-11-17T18:46:04.7425513Z",
-      "note": "[FROZEN by Administrator: Administrative freeze]",
-      "reboot_required": false
+      "size": 34048
     },
     {
       "kernel": "6.12.58-android16-6-g32fc8147b5dc-4k",
@@ -101,16 +56,7 @@
       "label": "6.12.58",
       "file": "RT/6.12.58.sh",
       "sha256": "a19836b6d1a625e74c5ec452d33df7b92910fcb457acd8cd0705f48ad7529b73",
-      "size": 356604,
-      "device": "",
-      "model": "",
-      "status": "Active",
-      "upload_date": "2026-11-17T21:40:54.9875503Z",
-      "download_count": 1,
-      "load_success_count": 0,
-      "last_accessed": "2026-11-17T18:46:04.994927Z",
-      "note": "",
-      "reboot_required": false
+      "size": 356604
     },
     {
       "kernel": "4.9.117+",
@@ -119,16 +65,7 @@
       "label": "4.9.117",
       "file": "RT/4.9.117.sh",
       "sha256": "d424d75e92b40dec67cec6e968d6828c120b74fa00696abb9a7584e69a0fd7d0",
-      "size": 393021,
-      "device": "",
-      "model": "",
-      "status": "Active",
-      "upload_date": "2026-11-17T21:40:54.9875546Z",
-      "download_count": 1,
-      "load_success_count": 0,
-      "last_accessed": "2026-11-17T18:46:05.2608773Z",
-      "note": "",
-      "reboot_required": false
+      "size": 393021
     },
     {
       "kernel": "4.19.157-perf-g2edc659ca5d4",
@@ -137,16 +74,7 @@
       "label": "4.19.157c",
       "file": "RT/4.19.157c.sh",
       "sha256": "362a420025f5c70e82a15400dbd451fdcddc7844a6f63b53b89b4ff9025c93d1",
-      "size": 282386,
-      "device": "",
-      "model": "",
-      "status": "Active",
-      "upload_date": "2026-11-17T21:40:54.9875585Z",
-      "download_count": 1,
-      "load_success_count": 0,
-      "last_accessed": "2026-11-17T18:46:05.5020902Z",
-      "note": "",
-      "reboot_required": false
+      "size": 282386
     },
     {
       "kernel": "5.4.210-android12-9-667269-g856cdf2f247e-ab665",
@@ -155,16 +83,7 @@
       "label": "5.4.210",
       "file": "RT/5.4.210.sh",
       "sha256": "c0444aee73efa9b5e154095707220aece4edef99559f16c89285d66b3ba85833",
-      "size": 382939,
-      "device": "",
-      "model": "",
-      "status": "Active",
-      "upload_date": "2026-11-17T21:40:54.9875624Z",
-      "download_count": 1,
-      "load_success_count": 0,
-      "last_accessed": "2026-11-17T18:46:05.6954745Z",
-      "note": "",
-      "reboot_required": false
+      "size": 382939
     },
     {
       "kernel": "4.19.157-perf-g1a6087bc0325-dirty",
@@ -173,16 +92,7 @@
       "label": "4.19.157a",
       "file": "RT/4.19.157a.sh",
       "sha256": "b5ae424cf1cfd353c945b36411965679641f28fd31041edf6f41acac8b8ae68a",
-      "size": 293274,
-      "device": "",
-      "model": "",
-      "status": "Active",
-      "upload_date": "2026-11-17T21:40:54.9875663Z",
-      "download_count": 1,
-      "load_success_count": 0,
-      "last_accessed": "2026-11-17T18:46:05.9941196Z",
-      "note": "",
-      "reboot_required": false
+      "size": 293274
     },
     {
       "kernel": "4.19.191-g5048da07dcbc-dirty",
@@ -191,16 +101,7 @@
       "label": "4.19.191a",
       "file": "RT/4.19.191a.sh",
       "sha256": "6ea1009e41a88cb63cd148f4c6a25e35a942af73d3abf1f837f5b6f92c34b8e3",
-      "size": 279722,
-      "device": "",
-      "model": "",
-      "status": "Active",
-      "upload_date": "2026-11-17T21:40:54.9875759Z",
-      "download_count": 1,
-      "load_success_count": 0,
-      "last_accessed": "2026-11-17T18:46:06.1829423Z",
-      "note": "",
-      "reboot_required": false
+      "size": 279722
     },
     {
       "kernel": "4.19.127-perf-g2943feabd86f",
@@ -209,16 +110,7 @@
       "label": "4.19.127",
       "file": "RT/4.19.127.sh",
       "sha256": "6b2fb2c0b03297c02019597ff3b9a274e17875a457b9afcfac99f408be713c82",
-      "size": 375361,
-      "device": "",
-      "model": "",
-      "status": "Active",
-      "upload_date": "2026-11-17T21:40:54.9875799Z",
-      "download_count": 1,
-      "load_success_count": 0,
-      "last_accessed": "2026-11-17T18:46:06.3752043Z",
-      "note": "",
-      "reboot_required": false
+      "size": 375361
     },
     {
       "kernel": "4.19.157-perf+",
@@ -227,16 +119,7 @@
       "label": "4.19.157b",
       "file": "RT/4.19.157b.sh",
       "sha256": "27aa671bca0817a103845c289e8d5c96c3fe42b55a1ee430243d40c3023d9aeb",
-      "size": 328946,
-      "device": "",
-      "model": "",
-      "status": "Active",
-      "upload_date": "2026-11-17T21:40:54.9875837Z",
-      "download_count": 1,
-      "load_success_count": 0,
-      "last_accessed": "2026-11-17T18:46:06.7355867Z",
-      "note": "",
-      "reboot_required": false
+      "size": 328946
     },
     {
       "kernel": "4.19.275-niigo-enanan-yoka-ks32386",
@@ -245,16 +128,7 @@
       "label": "4.19.275",
       "file": "RT/4.19.275.sh",
       "sha256": "f11ec5046d29700d97f1f2f5ceb347c572f851b07c327d752903f4d4dbf042db",
-      "size": 294954,
-      "device": "",
-      "model": "",
-      "status": "Active",
-      "upload_date": "2026-11-17T21:40:54.9875874Z",
-      "download_count": 1,
-      "load_success_count": 0,
-      "last_accessed": "2026-11-17T18:46:07.7169033Z",
-      "note": "",
-      "reboot_required": false
+      "size": 294954
     },
     {
       "kernel": "4.9.309-Chidori-Kernel",
@@ -263,16 +137,7 @@
       "label": "4.9.309",
       "file": "RT/4.9.309.sh",
       "sha256": "d04781f8035699cdf401a3e405a948d1f3a59d64eb0fade905f677b86797c802",
-      "size": 370834,
-      "device": "",
-      "model": "",
-      "status": "Active",
-      "upload_date": "2026-11-17T21:40:54.9875913Z",
-      "download_count": 1,
-      "load_success_count": 0,
-      "last_accessed": "2026-11-17T18:46:07.9296352Z",
-      "note": "",
-      "reboot_required": false
+      "size": 370834
     },
     {
       "kernel": "4.19.157-perf-27940246-abA235FXXS4DXA5",
@@ -281,16 +146,7 @@
       "label": "4.19.157",
       "file": "RT/4.19.157.sh",
       "sha256": "cd9f6c064b20e3f0297c8a61fd6cc1b632a5ce20eab752a26ff6b046adde76d0",
-      "size": 414548,
-      "device": "",
-      "model": "",
-      "status": "Active",
-      "upload_date": "2026-11-17T21:40:54.9875951Z",
-      "download_count": 1,
-      "load_success_count": 0,
-      "last_accessed": "2026-11-17T18:46:08.192954Z",
-      "note": "",
-      "reboot_required": false
+      "size": 414548
     },
     {
       "kernel": "4.14.113-25741605",
@@ -299,16 +155,7 @@
       "label": "4.14.113a",
       "file": "RT/4.14.113a.sh",
       "sha256": "4b9535f01e8bfa5c284bc34a64537e99d890a1bd9197808d52a58e3041c59b3b",
-      "size": 357948,
-      "device": "",
-      "model": "",
-      "status": "Active",
-      "upload_date": "2026-11-17T21:40:54.9875989Z",
-      "download_count": 1,
-      "load_success_count": 0,
-      "last_accessed": "2026-11-17T18:46:08.4872331Z",
-      "note": "",
-      "reboot_required": false
+      "size": 357948
     },
     {
       "kernel": "4.14.113-25741823",
@@ -317,16 +164,7 @@
       "label": "4.14.113",
       "file": "RT/4.14.113.sh",
       "sha256": "76f9602caf07996671d6875f2d3de24a3df27bc0c12caf9154cd2aa27f9320e2",
-      "size": 357620,
-      "device": "",
-      "model": "",
-      "status": "Active",
-      "upload_date": "2026-11-17T21:40:54.9876026Z",
-      "download_count": 1,
-      "load_success_count": 0,
-      "last_accessed": "2026-11-17T18:46:08.7276619Z",
-      "note": "",
-      "reboot_required": false
+      "size": 357620
     }
   ],
   "kill_reboot_drivers": []
