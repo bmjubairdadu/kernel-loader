@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "count": 17,
-  "generated_at": "2026-11-17T18:17:55Z",
-  "updated": "2026-11-17T18:17:55Z",
+  "generated_at": "2026-11-17T18:18:08Z",
+  "updated": "2026-11-17T18:18:08Z",
   "drivers": [
     {
       "kernel": "4.19.191-perf-g3e5cdb36e3e4",
@@ -14,13 +14,13 @@
       "size": 24960,
       "device": "",
       "model": "",
-      "status": "Frozen",
+      "status": "Active",
       "upload_date": "2026-11-17T18:03:43.6643218Z",
       "download_count": 0,
       "load_success_count": 0,
       "last_accessed": null,
       "note": "[FROZEN by Administrator: Administrative freeze]",
-      "reboot_required": true
+      "reboot_required": false
     },
     {
       "kernel": "6.12.69-android16-6-g37a7d8c11197-4k",
@@ -311,10 +311,5 @@
       "reboot_required": false
     }
   ],
-  "kill_reboot_drivers": [
-    "RT/4.19.191.sh",
-    "4.19.191",
-    "40f4cf237f14c398dd43e34866e84cef74e0940feef008d42cb03514481ebae2",
-    "4.19.191-perf-g3e5cdb36e3e4"
-  ]
+  "kill_reboot_drivers": []
 }
