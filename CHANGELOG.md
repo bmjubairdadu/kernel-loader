@@ -4,6 +4,16 @@ All notable changes are documented here.
 
 ---
 
+## [6.2] — 2026-11-17 (tag `v6.2` / `versionCode 62`)
+- **Bulletproof On-Demand Driver Download Engine:** Upgraded OTA driver download pipeline with cryptographic AES-256-GCM authentication verification and dual-hash validation. Eliminates download failures and hash mismatches across all kernel variants (including 4.14.186 and 4.19.191).
+- **HTTP Redirect & Multi-Mirror Failover:** Enhanced cloud mirrors with automatic 301/302/307 redirect resolution and multi-CDN failover (Fastly, GitHub Raw, jsDelivr, GCore).
+- **Zero Driver Binaries in APK (100% Remote Security):** Strictly 0 driver binaries bundled inside APK assets. Drivers are fetched securely from remote database, injected directly into kernel memory, and unlinked instantly from disk with zero persistence.
+- **Military-Grade Anti-Crack Shield:** Certificate SHA-256 validation, anti-debug watcher, anti-Frida/Xposed dynamic hook scanner, and anti-virtual sandbox containment.
+
+## [6.1] — 2026-11-17 (tag `v6.1` / `versionCode 61`)
+- **SecurityShield Runtime Hardening:** Comprehensive anti-tamper and anti-crack protections.
+- **Remote On-Demand Driver Storage:** Transitioned to pure encrypted remote driver downloads with instant disk erasure.
+
 ## [6.0] — 2026-11-15 (tag `v6.0` / `versionCode 60`)
 - **Deep Kernel & Node Auto-Creation Audit:** Audits whether `CONFIG_DEVTMPFS=y` is active for synchronous kernel-level device node creation or if asynchronous `ueventd` daemon handling is required.
 - **ARM64 Module PLT Kernel Audit:** Inspects `CONFIG_ARM64_MODULE_PLTS=y` to verify kernel relocations and module PLT memory layout compatibility.

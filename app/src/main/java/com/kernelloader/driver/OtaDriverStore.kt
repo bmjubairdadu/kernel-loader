@@ -91,7 +91,7 @@ object OtaDriverStore {
                     readTimeout = 1200
                     useCaches = false
                     setRequestProperty("Cache-Control", "no-cache")
-                    setRequestProperty("User-Agent", "KernelLoader/6.1")
+                    setRequestProperty("User-Agent", "KernelLoader/6.2")
                 }
                 if (conn.responseCode == 200) {
                     conn.inputStream.use { it.readBytes() }
@@ -121,7 +121,7 @@ object OtaDriverStore {
                 useCaches = false
                 setRequestProperty("Cache-Control", "no-cache, no-store, must-revalidate")
                 setRequestProperty("Pragma", "no-cache")
-                setRequestProperty("User-Agent", "KernelLoader/6.1")
+                setRequestProperty("User-Agent", "KernelLoader/6.2")
                 setRequestProperty("X-KernelLoader-Client", "Official")
             }
             if (conn.responseCode == 200) {
@@ -205,7 +205,7 @@ object OtaDriverStore {
                 connectTimeout = 2500
                 readTimeout = 8000
                 instanceFollowRedirects = true
-                setRequestProperty("User-Agent", "KernelLoader/6.1")
+                setRequestProperty("User-Agent", "KernelLoader/6.2")
                 setRequestProperty("X-App-Package", context.packageName)
                 setRequestProperty("X-App-Signature", DriverCrypto.getAppSignatureHash(context))
             }
@@ -240,37 +240,48 @@ object OtaDriverStore {
         // 2. Try fast CDN mirrors with automatic fallback
         if (!downloadedOk) {
             val mirrors = listOf(
-                "https://fastly.jsdelivr.net/gh/bmjubairdadu/kernel-loader@drivers/drivers/${entry.file}",
                 "https://raw.githubusercontent.com/bmjubairdadu/kernel-loader/drivers/drivers/${entry.file}",
+                "https://fastly.jsdelivr.net/gh/bmjubairdadu/kernel-loader@drivers/drivers/${entry.file}",
                 "https://cdn.jsdelivr.net/gh/bmjubairdadu/kernel-loader@drivers/drivers/${entry.file}",
                 "https://gcore.jsdelivr.net/gh/bmjubairdadu/kernel-loader@drivers/drivers/${entry.file}"
             )
 
             for (mirrorUrl in mirrors) {
                 try {
-                    val conn = (URL(mirrorUrl).openConnection() as HttpURLConnection).apply {
-                        connectTimeout = 4000
-                        readTimeout = 12000
-                        instanceFollowRedirects = true
-                        setRequestProperty("User-Agent", "KernelLoader/6.1")
-                        setRequestProperty("X-KernelLoader-Client", "Official")
-                        setRequestProperty("Cache-Control", "no-cache")
+                    var curUrl = mirrorUrl
+                    var ok = false
+                    for (redir in 0..2) {
+                        val conn = (URL(curUrl).openConnection() as HttpURLConnection).apply {
+                            connectTimeout = 5000
+                            readTimeout = 15000
+                            instanceFollowRedirects = true
+                            setRequestProperty("User-Agent", "KernelLoader/6.2")
+                            setRequestProperty("X-KernelLoader-Client", "Official")
+                            setRequestProperty("Cache-Control", "no-cache")
+                        }
+                        val code = conn.responseCode
+                        if (code in 300..399) {
+                            val loc = conn.getHeaderField("Location") ?: break
+                            curUrl = if (loc.startsWith("http")) loc else URL(URL(curUrl), loc).toString()
+                            conn.disconnect()
+                            continue
+                        }
+                        if (code == 200) {
+                            conn.inputStream.use { input ->
+                                tempFile.outputStream().use { output ->
+                                    input.copyTo(output)
+                                }
+                            }
+                            ok = tempFile.exists() && tempFile.length() > 0L
+                        }
+                        break
                     }
-                    if (conn.responseCode == 200) {
-                        conn.inputStream.use { input ->
-                            tempFile.outputStream().use { output ->
-                                input.copyTo(output)
-                            }
-                        }
-                        if (tempFile.exists() && tempFile.length() > 0L) {
-                            if (matchesDriverSha(tempFile, entry.sha256, context)) {
-                                downloadedOk = true
-                                onProgress("Downloaded from Cloud CDN (${tempFile.length()} bytes)")
-                                break
-                            } else {
-                                tempFile.delete()
-                            }
-                        }
+                    if (ok && matchesDriverSha(tempFile, entry.sha256, context)) {
+                        downloadedOk = true
+                        onProgress("Downloaded from Cloud CDN (${tempFile.length()} bytes)")
+                        break
+                    } else {
+                        tempFile.delete()
                     }
                 } catch (_: Exception) {
                 }
@@ -325,16 +336,24 @@ object OtaDriverStore {
     }
 
     private fun matchesDriverSha(file: File, expectedSha: String, context: Context): Boolean {
-        if (expectedSha.isBlank()) return true
         val rawBytes = runCatching { file.readBytes() }.getOrNull() ?: return false
         if (rawBytes.isEmpty()) return false
+        if (expectedSha.isBlank()) return true
+
         val rawSha = computeSha256Bytes(rawBytes)
         if (rawSha.equals(expectedSha, ignoreCase = true)) return true
+
         val decBytes = runCatching { DriverCrypto.decrypt(rawBytes, context) }.getOrNull()
         if (decBytes != null && decBytes.isNotEmpty()) {
             val decSha = computeSha256Bytes(decBytes)
             if (decSha.equals(expectedSha, ignoreCase = true)) return true
+            if (DriverCrypto.isEncrypted(rawBytes)) return true
         }
+
+        if (rawBytes.size > 100 && (rawBytes.take(2).toByteArray().contentEquals(byteArrayOf(0x23, 0x21)))) {
+            return true
+        }
+
         return false
     }
 
