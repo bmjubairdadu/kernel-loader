@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "count": 17,
-  "generated_at": "2026-11-17T18:45:32Z",
-  "updated": "2026-11-17T18:45:32Z",
+  "generated_at": "2026-11-17T18:45:48Z",
+  "updated": "2026-11-17T18:45:48Z",
   "drivers": [
     {
       "kernel": "4.19.191-perf-g3e5cdb36e3e4",
@@ -52,9 +52,9 @@
       "model": "",
       "status": "Active",
       "upload_date": "2026-11-17T18:45:24.8137643Z",
-      "download_count": 1,
+      "download_count": 2,
       "load_success_count": 0,
-      "last_accessed": "2026-11-17T18:04:53.8960866Z",
+      "last_accessed": "2026-11-17T18:45:48.1445079Z",
       "note": "[FROZEN by Administrator: Administrative freeze]",
       "reboot_required": false
     },
