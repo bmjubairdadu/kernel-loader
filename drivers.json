@@ -2,7 +2,7 @@
   "schema": 1,
   "count": 18,
   "generated_at": "2026-11-17T21:41:30Z",
-  "updated": "2026-11-17T21:58:22Z",
+  "updated": "2026-11-17T22:06:10Z",
   "drivers": [
     {
       "kernel": "4.14.186-perf-g14b9756acb79",
@@ -10,8 +10,8 @@
       "variant": "rt",
       "label": "4.14.186",
       "file": "RT/4.14.186.sh",
-      "sha256": "302412b9c1a24a1c5a8f2cdcaedadc90364b436f13b90cf5e319a7f02e5b0427",
-      "size": 356759,
+      "sha256": "0924145f6b325c55748cc25ef94a5d7974e5508d62aed50fb24c3b8d716b3816",
+      "size": 22500,
       "device": "",
       "model": "",
       "status": "Active",
