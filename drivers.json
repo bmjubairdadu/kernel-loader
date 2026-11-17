@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "count": 17,
-  "generated_at": "2026-11-17T18:46:04Z",
-  "updated": "2026-11-17T18:46:04Z",
+  "generated_at": "2026-11-17T18:46:05Z",
+  "updated": "2026-11-17T18:46:05Z",
   "drivers": [
     {
       "kernel": "4.19.191-perf-g3e5cdb36e3e4",
@@ -106,9 +106,9 @@
       "model": "",
       "status": "Active",
       "upload_date": "2026-11-17T18:45:24.8137771Z",
-      "download_count": 0,
+      "download_count": 1,
       "load_success_count": 0,
-      "last_accessed": null,
+      "last_accessed": "2026-11-17T18:46:05.2608773Z",
       "note": "",
       "reboot_required": false
     },
