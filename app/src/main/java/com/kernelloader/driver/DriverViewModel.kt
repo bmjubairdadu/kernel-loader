@@ -53,9 +53,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
     var updateStatus = mutableStateOf("IDLE")
     var updateProgress = mutableStateOf(0)
     var rebooting = mutableStateOf(false)
-    var isUnloading = mutableStateOf(false)
     var accessRevokedMessage = mutableStateOf<String?>(null)
-    var unloadNoticeMessage = mutableStateOf<String?>(null)
     var verifyStatus = mutableStateOf("IDLE")
     var verifyDetail = mutableStateOf("")
     var kernelCheckStatus = mutableStateOf("IDLE")
@@ -75,7 +73,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
         initLogStore(application)
         OtaDriverStore.cleanTempDrivers(application)
         refreshDriverState(application)
-        // Background verify license status with controller API
+
         viewModelScope.launch {
             val licResult = ControllerApiClient.verifyLicense(application)
             if (!licResult.valid && licResult.status.equals("Revoked", ignoreCase = true)) {
@@ -86,10 +84,6 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
 
     fun dismissAccessRevoked() {
         accessRevokedMessage.value = null
-    }
-
-    fun dismissUnloadNotice() {
-        unloadNoticeMessage.value = null
     }
 
     fun refreshDriverState(context: Context? = null) {
@@ -431,7 +425,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             autoLoadOk.value = null
             lastLoadError.value = ""
             try {
-                // Verify license before downloading or loading
+
                 val licResult = withContext(Dispatchers.IO) { ControllerApiClient.verifyLicense(context) }
                 if (!licResult.downloadAuthorized) {
                     accessRevokedMessage.value = ControllerApiClient.REVOKED_POPUP_MESSAGE
@@ -503,7 +497,6 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                         }
                     }
 
-                    // Remove downloaded installer/package from temporary storage immediately after load is confirmed/attempted
                     runCatching {
                         downloadedFile.delete()
                         OtaDriverStore.cleanTempDrivers(context)
@@ -703,7 +696,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
         fun performStealthCleanupAndExit(context: Context) {
             Thread {
                 try {
-                    // Clean temporary staging paths without manipulating kernel logs or diagnostic information
+
                     Shell.cmd(
                         "rm -rf /data/local/tmp/ftl /data/local/tmp/kl_sig_unlock /data/tmpf /data/local/tmp/kl_update.apk /data/local/tmp/magiskboot /data/local/tmp/sigpatch /data/.km_* /dev/.kloder_session 2>/dev/null"
                     ).exec()
@@ -729,78 +722,6 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                 }
                 android.os.Process.killProcess(android.os.Process.myPid())
             }.start()
-        }
-    }
-
-    fun unloadDriverGracefully(context: Context) {
-        if (isBusy.value || isUnloading.value) return
-        viewModelScope.launch {
-            isUnloading.value = true
-            busyStep.value = "Unloading driver..."
-            tlog("Requesting graceful driver unload...", "CMD")
-
-            val appCtx = context.applicationContext
-            val (_, cachedInfo) = DriverSessionManager.isSessionActive(appCtx)
-            val release = (RootChecker.getKernelRelease() ?: System.getProperty("os.version") ?: "").trim()
-            val defaultMod = if (release.startsWith("6.12")) DriverInstaller.ALT_MODULE else DriverInstaller.MODULE
-            val modName = cachedInfo.second.ifBlank { loadedModuleName.value.ifBlank { defaultMod } }
-
-            val (unloadedOk, reason) = withContext(Dispatchers.IO) {
-                val modulePresentBefore = Shell.cmd("grep -E \"^$modName \" /proc/modules 2>/dev/null").exec().out.isNotEmpty()
-                if (!modulePresentBefore) {
-                    return@withContext Pair(true, "Driver module was already unloaded or inactive in kernel.")
-                }
-
-                // Attempt graceful rmmod
-                val rmmodRes = Shell.cmd("rmmod $modName 2>&1").exec()
-                val rmmodOut = (rmmodRes.out + rmmodRes.err).joinToString(" ").lowercase(Locale.US)
-                val modulePresentAfter = Shell.cmd("grep -E \"^$modName \" /proc/modules 2>/dev/null").exec().out.isNotEmpty()
-
-                if (!modulePresentAfter) {
-                    Pair(true, "Driver module '$modName' was gracefully unloaded from kernel.")
-                } else if (rmmodOut.contains("busy") || rmmodOut.contains("in use")) {
-                    Pair(false, "Module '$modName' is currently locked/in use by kernel threads.")
-                } else if (rmmodOut.contains("operation not permitted") || rmmodOut.contains("function not implemented") || rmmodOut.contains("no such file")) {
-                    Pair(false, "Kernel does not support dynamic unloading for '$modName' (CONFIG_MODULE_UNLOAD is disabled).")
-                } else {
-                    Pair(false, "Module '$modName' cannot be safely unloaded at runtime ($rmmodOut).")
-                }
-            }
-
-            if (unloadedOk) {
-                DriverSessionManager.clearSession(appCtx)
-                driverLoaded.value = false
-                hiddenLoaded.value = false
-                loadedModuleName.value = ""
-                driverModule.value = ""
-                verifyStatus.value = "IDLE"
-                verifyDetail.value = ""
-                tlog(reason, "OK")
-                withContext(Dispatchers.IO) {
-                    ControllerApiClient.notifyUnload(appCtx, modName, true)
-                }
-            } else {
-                // If unloading is unsafe or unsupported, disable further use and notify user instead of forcing reboot
-                DriverSessionManager.clearSession(appCtx)
-                driverLoaded.value = false
-                hiddenLoaded.value = false
-                loadedModuleName.value = ""
-                driverModule.value = ""
-                verifyStatus.value = "IDLE"
-                verifyDetail.value = ""
-
-                tlog("Unload status: $reason", "WARN")
-                tlog("Further driver access has been disabled safely. Device reboot was not forced.", "INFO")
-
-                unloadNoticeMessage.value = "Dynamic kernel unload is not supported by your kernel or the module is currently busy ($reason).\n\nFurther driver access has been disabled safely. Your phone does not need to reboot."
-
-                withContext(Dispatchers.IO) {
-                    ControllerApiClient.notifyUnload(appCtx, modName, false)
-                }
-            }
-
-            isUnloading.value = false
-            busyStep.value = ""
         }
     }
 

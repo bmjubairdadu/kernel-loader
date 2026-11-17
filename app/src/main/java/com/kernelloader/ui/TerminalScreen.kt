@@ -323,12 +323,12 @@ fun ConsoleScreen(
                     modifier = Modifier.weight(1.2f)
                 ) { viewModel.checkDriverActivity(context) }
                 ActionChip(
-                    label = "UNLOAD",
+                    label = "REBOOT",
                     gradientColors = listOf(Color(0xFF7C2D12), Color(0xFF9F1239)),
                     borderTint = Color(0xFFFB7185),
-                    enabled = !viewModel.isBusy.value && !viewModel.isUnloading.value && rootAvailable,
+                    enabled = !viewModel.isBusy.value && rootAvailable,
                     modifier = Modifier.weight(1f)
-                ) { viewModel.unloadDriverGracefully(context) }
+                ) { viewModel.rebootDevice(context) }
                 if (viewModel.isBusy.value) {
                     ActionChip(
                         label = "STOP",

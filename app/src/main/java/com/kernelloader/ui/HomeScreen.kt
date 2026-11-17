@@ -389,8 +389,8 @@ fun HomeScreen(
                         visible = toUnload,
                         moduleName = loadedModule,
                         enabled = loaded && !busy && rootAvailable,
-                        busy = viewModel.isUnloading.value || rebooting,
-                        onUnload = { viewModel.unloadDriverGracefully(context) }
+                        busy = rebooting,
+                        onUnload = { viewModel.rebootDevice(context) }
                     )
                 }
 
@@ -523,34 +523,6 @@ fun HomeScreen(
             dismissButton = {
                 TextButton(onClick = { viewModel.dismissAccessRevoked() }) {
                     Text("OK", color = TextSecondary)
-                }
-            },
-            containerColor = Surface1,
-            textContentColor = TextPrimary
-        )
-    }
-
-    val unloadNotice = viewModel.unloadNoticeMessage.value
-    if (unloadNotice != null) {
-        AlertDialog(
-            onDismissRequest = { viewModel.dismissUnloadNotice() },
-            title = {
-                Text(
-                    text = "Driver Unload Notice",
-                    fontWeight = FontWeight.Bold,
-                    color = BrandCyan
-                )
-            },
-            text = {
-                Text(
-                    text = unloadNotice,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = TextPrimary
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = { viewModel.dismissUnloadNotice() }) {
-                    Text("Got It", color = BrandCyan)
                 }
             },
             containerColor = Surface1,
@@ -3064,7 +3036,7 @@ private fun UnloadPanel(
             }
             Spacer(Modifier.height(5.dp))
             Text(
-                text = if (busy) "UNLOADING..." else "UNLOAD DRIVER",
+                text = if (busy) strings.rebootingBtn else strings.restartBtn,
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold,
                 color = if (hot) TextPrimary else TextDisabled
@@ -3073,9 +3045,9 @@ private fun UnloadPanel(
         Spacer(Modifier.height(6.dp))
         Text(
             text = when {
-                busy -> "Gracefully unloading kernel module..."
-                moduleName.isNotBlank() -> "Gracefully unloads $moduleName without reboot"
-                else -> "Gracefully unloads active driver without reboot"
+                busy -> "Restarting phone to unload kernel module..."
+                moduleName.isNotBlank() -> "Reboots device to unload $moduleName"
+                else -> "Reboots device to unload active driver"
             },
             style = MonoTiny,
             color = AccentRed,

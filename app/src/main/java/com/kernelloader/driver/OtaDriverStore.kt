@@ -59,7 +59,7 @@ object OtaDriverStore {
             if (tempDir.exists()) {
                 tempDir.listFiles()?.forEach { it.delete() }
             }
-            // Also clean legacy directories if any exist
+
             val oldDir = File(context.filesDir, "drivers")
             if (oldDir.exists()) {
                 oldDir.deleteRecursively()
@@ -72,7 +72,6 @@ object OtaDriverStore {
             cachedManifest?.let { return@withContext it }
         }
 
-        // 1. Try Controller API first (includes live freeze/disable status filtering)
         val controllerManifestBytes = runCatching {
             val deviceId = ControllerApiClient.getDeviceId(context)
             val lic = ControllerApiClient.getLicenseKey(context)
@@ -90,7 +89,6 @@ object OtaDriverStore {
             } else null
         }.getOrNull()
 
-        // 2. Fallback to remote GitHub repository manifest
         val remoteBytes = controllerManifestBytes ?: runCatching {
             val url = URL(REMOTE_MANIFEST_URL)
             val conn = (url.openConnection() as HttpURLConnection).apply {
@@ -104,7 +102,6 @@ object OtaDriverStore {
             } else null
         }.getOrNull()
 
-        // 3. Fallback to embedded asset
         val rawBytes = remoteBytes ?: runCatching {
             context.assets.open(EMBEDDED_MANIFEST_ASSET).use { it.readBytes() }
         }.getOrNull() ?: return@withContext null
@@ -124,19 +121,17 @@ object OtaDriverStore {
         entry: DriverEntry,
         onProgress: (String) -> Unit = {}
     ): File? = withContext(Dispatchers.IO) {
-        // Enforce license check before download
+
         if (ControllerApiClient.isAccessRevoked(context)) {
             onProgress(ControllerApiClient.REVOKED_POPUP_MESSAGE)
             return@withContext null
         }
 
-        // Use temporary app-private storage and avoid persistent copies or backups
         val tempDir = File(context.cacheDir, "temp_drivers").apply { mkdirs() }
         val safeName = entry.file.substringAfterLast('/')
         val targetFile = File(tempDir, safeName)
         val tempFile = File(tempDir, "$safeName.tmp")
 
-        // Wipe any previous stale files in temporary storage
         if (targetFile.exists()) targetFile.delete()
         if (tempFile.exists()) tempFile.delete()
 
@@ -144,7 +139,6 @@ object OtaDriverStore {
 
         var downloadedOk = false
 
-        // Attempt 1: Download from Controller API
         try {
             val deviceId = ControllerApiClient.getDeviceId(context)
             val lic = ControllerApiClient.getLicenseKey(context)
@@ -177,10 +171,9 @@ object OtaDriverStore {
                 return@withContext null
             }
         } catch (_: Exception) {
-            // Controller not available or offline; proceed to direct database repository
+
         }
 
-        // Attempt 2: Download from direct repository database if controller was offline
         if (!downloadedOk) {
             val remoteUrl = "$REMOTE_DRIVER_BASE_URL${entry.file}"
             try {
@@ -207,7 +200,6 @@ object OtaDriverStore {
             }
         }
 
-        // Attempt 3: Root fallback via curl/wget
         if (!downloadedOk) {
             onProgress("Attempting root download fallback...")
             try {
@@ -226,7 +218,6 @@ object OtaDriverStore {
             return@withContext null
         }
 
-        // Verify SHA256 integrity if present
         if (entry.sha256.isNotBlank()) {
             val actualSha = computeSha256(tempFile)
             if (!actualSha.equals(entry.sha256, ignoreCase = true)) {

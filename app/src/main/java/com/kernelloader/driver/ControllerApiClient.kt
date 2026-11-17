@@ -20,7 +20,7 @@ object ControllerApiClient {
     private const val KEY_ACCESS_REVOKED = "access_revoked"
     private const val KEY_REVOKED_REASON = "revoked_reason"
 
-    private const val DEFAULT_HOST = "10.0.2.2:8088" // Standard Android emulator host bridge
+    private const val DEFAULT_HOST = "10.0.2.2:8088"
     private const val DEFAULT_LICENSE_KEY = "LIC-TRIAL-0001"
 
     data class LicenseVerifyResult(
@@ -155,7 +155,7 @@ object ControllerApiClient {
                 tier = tier
             )
         } catch (_: Exception) {
-            // Offline fallback: if license was not previously revoked, allow local operation
+
             LicenseVerifyResult(
                 valid = !isAccessRevoked(context),
                 status = if (isAccessRevoked(context)) "Revoked" else "Offline",

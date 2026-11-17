@@ -111,7 +111,7 @@ object AppUpdateChecker {
             .findAll(assetsBody)
             .firstOrNull()?.groupValues?.get(1)
             ?: return null
-        val apkUrl = if (apkHref.startsWith("/")) "https://github.com$apkHref" else apkHref
+        val apkUrl = if (apkHref.startsWith("/")) "https:
 
         val resolvedName = resolveVersionName(tag, assetsBody)
         val resolvedCode = resolveVersionCode(tag, assetsBody, currentVersionCode, resolvedName)
