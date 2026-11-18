@@ -2,16 +2,16 @@
   "schema": 1,
   "count": 18,
   "generated_at": "2026-11-17T21:41:30Z",
-  "updated": "2026-11-18T16:33:19Z",
+  "updated": "2026-11-18T19:10:38Z",
   "drivers": [
     {
       "kernel": "4.9.337-DaisyForGaming",
       "vermagic": "4.9.337-DaisyForGaming SMP preempt mod_unload modversions aarch64",
       "variant": "rt",
       "label": "4.9.337",
-      "file": "RT/4.9.337.sh",
-      "sha256": "26bb91afd79880107239f0c46a68272d533bee61431223de648dfddf33b1a9f8",
-      "size": 25991
+      "file": "RT/4.9.337.bin",
+      "sha256": "3d3be410e7df9e95e00c32bbd4c04462f1a597ba86e20367d70004e26d4aae01",
+      "size": 20036
     },
     {
       "kernel": "4.14.186-perf-g14b9756acb79",
