@@ -728,7 +728,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             Thread {
                 try {
                     Shell.cmd(
-                        "rm -rf /data/local/tmp/ftl /data/local/tmp/kl_sig_unlock /data/tmpf /data/local/tmp/kl_update.apk /data/local/tmp/magiskboot /data/local/tmp/sigpatch /data/.km_* /dev/.kloder_session 2>/dev/null",
+                        "rm -rf /data/local/tmp/ftl /data/tmpf /data/local/tmp/kl_update.apk /data/.km_* /dev/.kloder_session 2>/dev/null",
                         "logcat -c 2>/dev/null"
                     ).exec()
                 } catch (_: Exception) {
@@ -737,7 +737,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                     OtaDriverStore.cleanTempDrivers(context)
                     File(context.cacheDir, "ftl").deleteRecursively()
                     context.cacheDir.listFiles()?.forEach { f ->
-                        if (f.isFile && (f.name.endsWith(".sh") || f.name.endsWith(".apk") || f.name.endsWith(".ko"))) {
+                        if (f.isFile && (f.name.endsWith(".sh") || f.name.endsWith(".bin") || f.name.endsWith(".apk") || f.name.endsWith(".ko"))) {
                             f.delete()
                         }
                     }

@@ -40,7 +40,7 @@ data class DriverErrorInfo(
                         descriptionEn = "Your device's kernel enforces strict module signature verification (CONFIG_MODULE_SIG_FORCE=y) and rejects unsigned drivers.",
                         solutionStepsEn = listOf(
                             "Reboot your device once and verify root access is operating normally.",
-                            "Ensure that a kernel module signature bypass or permissive module loading module is enabled.",
+                            "Ensure your kernel configuration allows loading modules or compile with matching keys.",
                             "Check terminal console output for detailed kernel dmesg logs."
                         )
                     )

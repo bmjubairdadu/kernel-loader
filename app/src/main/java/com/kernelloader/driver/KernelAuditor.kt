@@ -78,7 +78,7 @@ class KernelAuditor(private val ctx: Context) {
             blockerCount++
             onLine("- Module Signature: Enforced ($sigReason)", "ERR")
             onLine("  - Issue: Kernel rejects unsigned drivers with Exec format error", "ERR")
-            onLine("  - Fix: Flash SigOff patched boot.img or install SigOff Magisk flasher", "FIX")
+            onLine("  - Fix: Use a kernel with CONFIG_MODULE_SIG_FORCE=n or compile matching signed driver", "FIX")
         } else {
             onLine("- Module Signature: Disabled / Permissive (Unsigned drivers accepted)", "OK")
         }
