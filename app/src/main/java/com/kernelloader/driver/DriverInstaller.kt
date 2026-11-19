@@ -279,7 +279,7 @@ class DriverInstaller(private val ctx: Context) {
         }
     }
 
-    fun verifyLoadDetailed(module: String = MODULE, onLine: (String) -> Unit = {}): VerifyResult =
+    fun verifyLoadDetailed(module: String = DEFAULT_MODULE, onLine: (String) -> Unit = {}): VerifyResult =
         synchronized(verifyLock) {
             val candidates = findCandidateNodes()
             if (candidates.isEmpty()) {
@@ -355,8 +355,7 @@ class DriverInstaller(private val ctx: Context) {
     }
 
     companion object {
-        const val MODULE = "suvhwvwrtnb"
-        const val ALT_MODULE = "devddgy"
+        const val DEFAULT_MODULE = "driver"
         private val verifyLock = Any()
     }
 }

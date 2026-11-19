@@ -117,7 +117,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
         val (active, info) = DriverSessionManager.isSessionActive(appCtx)
         if (active) {
             val (node, mod, stealth) = info
-            val displayLabel = if (stealth) "Stealth" else mod.ifBlank { DriverInstaller.MODULE }
+            val displayLabel = if (stealth) "Stealth" else mod.ifBlank { DriverInstaller.DEFAULT_MODULE }
             driverLoaded.value = true
             hiddenLoaded.value = stealth
             loadedModuleName.value = displayLabel
@@ -569,7 +569,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
         driverLabel: String = ""
     ) {
         if (res.ok) {
-            val mod = res.module.ifBlank { DriverInstaller.MODULE }
+            val mod = res.module.ifBlank { DriverInstaller.DEFAULT_MODULE }
             val node = res.node.trim()
             val isStealth = res.rawLog.contains("STEALTH=1") || res.rawLog.contains("stealth")
             val displayLabel = if (isStealth) "Stealth" else mod
@@ -817,7 +817,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                 val (_, cachedInfo) = DriverSessionManager.isSessionActive(appCtx)
                 val installer = DriverInstaller(appCtx)
                 val release = (RootChecker.getKernelRelease() ?: System.getProperty("os.version") ?: "").trim()
-                val defaultMod = if (release.startsWith("6.12")) DriverInstaller.ALT_MODULE else DriverInstaller.MODULE
+                val defaultMod = DriverInstaller.DEFAULT_MODULE
                 val targetMod = cachedInfo.second.ifBlank { defaultMod }
                 val vr = installer.verifyLoadDetailed(targetMod) { line ->
                     formatVerifyLine(line)?.let { (msg, type) -> tlog(msg, type) }
@@ -908,7 +908,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                     val installer = DriverInstaller(app)
                     val (_, cachedInfo) = DriverSessionManager.isSessionActive(app)
                     val release = (RootChecker.getKernelRelease() ?: System.getProperty("os.version") ?: "").trim()
-                    val defaultMod = if (release.startsWith("6.12")) DriverInstaller.ALT_MODULE else DriverInstaller.MODULE
+                    val defaultMod = DriverInstaller.DEFAULT_MODULE
                     val targetMod = cachedInfo.second.ifBlank { defaultMod }
                     val vr = installer.verifyLoadDetailed(targetMod) { line ->
                         formatVerifyLine(line)?.let { (msg, type) -> tlog(msg, type) }
