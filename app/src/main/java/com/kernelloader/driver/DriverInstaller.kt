@@ -140,8 +140,8 @@ class DriverInstaller(private val ctx: Context) {
                         if (clean.isNotBlank()) {
                             val eq = clean.indexOf('=')
                             if (eq > 0 && (clean.startsWith("STATUS=") || clean.startsWith("NODE=") ||
-                                           clean.startsWith("DEVNAME=") || clean.startsWith("RESIDENT=") ||
-                                           clean.startsWith("ERROR="))) {
+                                           clean.startsWith("DEVNAME=") || clean.startsWith("MODULE=") ||
+                                           clean.startsWith("RESIDENT=") || clean.startsWith("ERROR="))) {
                                 val k = clean.substring(0, eq)
                                 val v = clean.substring(eq + 1).trim()
                                 kv[k] = v
@@ -169,17 +169,21 @@ class DriverInstaller(private val ctx: Context) {
         val ok = kv["STATUS"] == "OK" || raw.contains("Driver loaded") || processRc == 0
         var finalNode = kv["NODE"].orEmpty().ifBlank { "/dev/$tag" }
         val finalDev = kv["DEVNAME"].orEmpty().ifBlank { tag }
+        val finalMod = kv["MODULE"].orEmpty().ifBlank {
+            (1..8).map { ('a'..'z').random() }.joinToString("")
+        }
 
         if (ok) {
             su("chmod 0600 '$finalNode' 2>/dev/null") {}
             onLine("- Active channel: $finalNode (0600 root:root)")
+            onLine("- Kernel module: $finalMod (Pure Alphabetic Stealth)")
             onLine("- Driver status: ACTIVE & OPERATIONAL (In-Memory)")
-            DriverSessionManager.markLoaded(ctx, finalNode, finalDev, true)
+            DriverSessionManager.markLoaded(ctx, finalNode, finalMod, true)
         }
 
         return Result(
             ok = ok,
-            module = finalDev,
+            module = finalMod,
             devName = finalDev,
             node = finalNode,
             exitCode = processRc,

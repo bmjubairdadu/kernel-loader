@@ -423,6 +423,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             clean.startsWith("RESULT:") ||
             clean.startsWith("NODE=") ||
             clean.startsWith("DEVNAME=") ||
+            clean.startsWith("MODULE=") ||
             clean.startsWith("RESIDENT=") ||
             clean.startsWith("ERROR=") ||
             clean.startsWith("STEALTH=") ||
