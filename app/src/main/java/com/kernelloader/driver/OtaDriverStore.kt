@@ -75,7 +75,6 @@ object OtaDriverStore {
 
         val candidateHosts = listOf(
             ControllerApiClient.getControllerHost(context),
-            "192.168.0.100:8088",
             "127.0.0.1:8088"
         ).distinct()
 

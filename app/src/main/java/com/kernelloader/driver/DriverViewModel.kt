@@ -98,7 +98,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                     if (active || driverLoaded.value) {
                         val curFile = DriverSessionManager.getLoadedDriverFile(application).ifBlank {
                             val devRel = com.kernelloader.root.RootChecker.getKernelRelease().orEmpty()
-                            "RT/$devRel.sh"
+                            "RT/$devRel.bin"
                         }
                         val curSha = DriverSessionManager.getLoadedDriverSha(application)
                         ControllerApiClient.checkActiveDriverStatus(application, curFile, curSha)
@@ -416,12 +416,15 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
         val clean = stripAnsi(rawLine).trim()
         if (clean.isBlank()) return
         if (
-            clean.startsWith("FTL_") ||
+            clean.startsWith("STATUS=") ||
             clean.startsWith("###") ||
             clean.startsWith("===") ||
             clean.startsWith("---") ||
             clean.startsWith("RESULT:") ||
             clean.startsWith("NODE=") ||
+            clean.startsWith("DEVNAME=") ||
+            clean.startsWith("RESIDENT=") ||
+            clean.startsWith("ERROR=") ||
             clean.startsWith("STEALTH=") ||
             clean.startsWith("IN_USE=") ||
             clean.startsWith("OWNER_PID=") ||
@@ -567,7 +570,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
         if (res.ok) {
             val mod = res.module.ifBlank { DriverInstaller.MODULE }
             val node = res.node.trim()
-            val isStealth = res.rawLog.contains("FTL_STEALTH=1") || res.rawLog.contains("stealth")
+            val isStealth = res.rawLog.contains("STEALTH=1") || res.rawLog.contains("stealth")
             val displayLabel = if (isStealth) "Stealth" else mod
             driverLoaded.value = true
             hiddenLoaded.value = isStealth

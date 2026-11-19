@@ -115,20 +115,21 @@ class DriverInstaller(private val ctx: Context) {
         }
 
         val injectorBin = File(ctx.filesDir, "direct_inject_arm64")
-        if (!injectorBin.exists() || injectorBin.length() == 0L) {
-            try {
-                ctx.assets.open("bin/direct_inject_arm64").use { input ->
-                    injectorBin.outputStream().use { output -> input.copyTo(output) }
-                }
-                su("chmod 700 '${injectorBin.absolutePath}'") {}
-            } catch (e: Exception) {
+        try {
+            ctx.assets.open("bin/direct_inject_arm64").use { input ->
+                injectorBin.outputStream().use { output -> input.copyTo(output) }
+            }
+            su("chmod 700 '${injectorBin.absolutePath}'") {}
+        } catch (e: Exception) {
+            if (!injectorBin.exists() || injectorBin.length() == 0L) {
                 onLine("- Error staging injector tool: ${e.message}")
                 return Result(ok = false, error = "injector_stage_failed")
             }
         }
 
-        val tag = "k" + (100000 + (Math.random() * 899999).toInt())
-        onLine("- Kernel node identifier: $tag (Target: /proc/$tag)")
+        val chars = ('A'..'Z') + ('a'..'z') + ('0'..'9')
+        val tag = (0..9).random().toString() + (1..5).map { chars.random() }.joinToString("")
+        onLine("- Stealth device identifier: $tag (Target: /dev/$tag)")
 
         val kv = HashMap<String, String>()
         val raw = StringBuilder()
@@ -143,8 +144,12 @@ class DriverInstaller(private val ctx: Context) {
                         val clean = line.trim()
                         if (clean.isNotBlank()) {
                             val eq = clean.indexOf('=')
-                            if (clean.startsWith("FTL_") && eq > 0) {
-                                kv[clean.substring(0, eq)] = clean.substring(eq + 1).trim()
+                            if (eq > 0 && (clean.startsWith("STATUS=") || clean.startsWith("NODE=") ||
+                                           clean.startsWith("DEVNAME=") || clean.startsWith("RESIDENT=") ||
+                                           clean.startsWith("ERROR="))) {
+                                val k = clean.substring(0, eq)
+                                val v = clean.substring(eq + 1).trim()
+                                kv[k] = v
                             } else {
                                 onLine(clean)
                             }
@@ -166,9 +171,9 @@ class DriverInstaller(private val ctx: Context) {
             return Result(ok = false, error = t.message.orEmpty())
         }
 
-        val ok = kv["FTL_OK"] == "1" || raw.contains("Driver Loaded Successfully") || processRc == 0
-        val finalNode = kv["FTL_NODE"].orEmpty().ifBlank { "/proc/$tag" }
-        val finalDev = kv["FTL_DEVNAME"].orEmpty().ifBlank { tag }
+        val ok = kv["STATUS"] == "OK" || raw.contains("Driver loaded") || processRc == 0
+        var finalNode = kv["NODE"].orEmpty().ifBlank { "/dev/$tag" }
+        val finalDev = kv["DEVNAME"].orEmpty().ifBlank { tag }
 
         if (ok) {
             su("chmod 0600 '$finalNode' 2>/dev/null") {}
@@ -183,8 +188,8 @@ class DriverInstaller(private val ctx: Context) {
             devName = finalDev,
             node = finalNode,
             exitCode = processRc,
-            alreadyLoaded = kv["FTL_RESIDENT"] == "1",
-            error = kv["FTL_ERR"].orEmpty(),
+            alreadyLoaded = kv["RESIDENT"] == "1",
+            error = kv["ERROR"].orEmpty(),
             rawLog = raw.toString()
         )
     }
@@ -220,7 +225,7 @@ class DriverInstaller(private val ctx: Context) {
             "CPID=\$PPID; " +
             "CUID=\$(stat -c \"%u\" /proc/\$CPID 2>/dev/null || cat /proc/\$CPID/status 2>/dev/null | grep -i '^Uid:' | awk '{print \$2}'); " +
             "if [ -n \"\$CUID\" ] && [ \"\$CUID\" -ne '$appUid' ] && [ \"\$CUID\" -ne 0 ]; then " +
-            "echo 'FTL_OK=0'; echo 'FTL_ERR=UNAUTHORIZED_LOADER_APP'; exit 13; fi; " +
+            "echo 'STATUS=FAILED'; echo 'ERROR=UNAUTHORIZED_LOADER_APP'; exit 13; fi; " +
             "sh '$staging/$safeName'"
 
         val rc = su(cmd) { line ->
@@ -228,7 +233,8 @@ class DriverInstaller(private val ctx: Context) {
             val clean = line.trim()
             if (clean.isNotBlank()) {
                 val eq = clean.indexOf('=')
-                if (clean.startsWith("FTL_") && eq > 0) {
+                if (eq > 0 && (clean.startsWith("STATUS=") || clean.startsWith("NODE=") ||
+                               clean.startsWith("DEVNAME=") || clean.startsWith("ERROR="))) {
                     kv[clean.substring(0, eq)] = clean.substring(eq + 1).trim()
                 } else {
                     onLine(clean)
@@ -244,22 +250,22 @@ class DriverInstaller(private val ctx: Context) {
         }
         su("rm -rf '$staging' 2>/dev/null") {}
 
-        val finalNode = kv["FTL_NODE"]?.takeIf { it.isNotBlank() } ?: detectedNode
+        val finalNode = kv["NODE"]?.takeIf { it.isNotBlank() } ?: detectedNode
         if (finalNode.isNotBlank()) {
             su("chown $appUid:$appUid '$finalNode' 2>/dev/null && chmod 600 '$finalNode' 2>/dev/null") {}
         }
 
-        val successText = raw.contains("Driver Loaded Successfully")
-        val ok = kv["FTL_OK"] == "1" || successText || (rc == 0 && finalNode.isNotBlank())
+        val successText = raw.contains("Driver Loaded Successfully") || raw.contains("Driver loaded")
+        val ok = kv["STATUS"] == "OK" || successText || (rc == 0 && finalNode.isNotBlank())
         return Result(
             ok = ok,
-            module = kv["FTL_MODULE"].orEmpty().ifBlank { MODULE },
-            devName = kv["FTL_DEVNAME"].orEmpty().ifBlank { finalNode.substringAfterLast('/') },
-            major = kv["FTL_MAJOR"]?.toIntOrNull() ?: 0,
+            module = kv["MODULE"].orEmpty().ifBlank { MODULE },
+            devName = kv["DEVNAME"].orEmpty().ifBlank { finalNode.substringAfterLast('/') },
+            major = kv["MAJOR"]?.toIntOrNull() ?: 0,
             node = finalNode,
-            exitCode = kv["FTL_EXIT"]?.toIntOrNull() ?: rc,
-            alreadyLoaded = kv["FTL_ALREADY"] == "1" || raw.contains("already resident in Linux kernel"),
-            error = kv["FTL_ERROR"].orEmpty(),
+            exitCode = kv["EXIT"]?.toIntOrNull() ?: rc,
+            alreadyLoaded = kv["ALREADY"] == "1" || raw.contains("already resident in Linux kernel"),
+            error = kv["ERROR"].orEmpty(),
             rawLog = raw.toString()
         )
     }
@@ -274,14 +280,15 @@ class DriverInstaller(private val ctx: Context) {
 
     private fun getOrStageClientBin(): String {
         val clientBin = File(ctx.filesDir, "khack_client_arm64")
-        if (!clientBin.exists() || clientBin.length() == 0L) {
-            try {
+        try {
+            val assetSize = ctx.assets.open("bin/khack_client_arm64").use { it.available().toLong() }
+            if (!clientBin.exists() || clientBin.length() != assetSize) {
                 ctx.assets.open("bin/khack_client_arm64").use { input ->
                     clientBin.outputStream().use { output -> input.copyTo(output) }
                 }
                 su("chmod 700 '${clientBin.absolutePath}'") {}
-            } catch (_: Exception) {}
-        }
+            }
+        } catch (_: Exception) {}
         return clientBin.absolutePath
     }
 
@@ -292,13 +299,13 @@ class DriverInstaller(private val ctx: Context) {
             candidates.add(sessionNode)
         }
 
-        val cmd = "for p in /proc/k[0-9A-Za-z][0-9A-Za-z][0-9A-Za-z][0-9A-Za-z][0-9A-Za-z][0-9A-Za-z]; do " +
-            "[ -e \"\$p\" ] && echo \"\$p\"; " +
-            "done; " +
-            "for d in /dev/[0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9]; do " +
+        val cmd = "for d in /dev/[0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9]; do " +
             "[ -c \"\$d\" ] && echo \"\$d\"; " +
             "done; " +
-            "for d in /sys/class/[0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9]/; do " +
+            "for p in /proc/k[0-9A-Za-z][0-9A-Za-z][0-9A-Za-z][0-9A-Za-z][0-9A-Za-z][0-9A-Za-z]; do " +
+            "[ -e \"\$p\" ] && echo \"\$p\"; " +
+            "done; " +
+            "for d in /sys/class/misc/[0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9] /sys/class/[0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9]; do " +
             "[ -d \"\$d\" ] || continue; " +
             "c=\$(basename \"\$d\"); " +
             "[ -c \"/dev/\$c\" ] && echo \"/dev/\$c\"; " +
@@ -421,7 +428,7 @@ class DriverInstaller(private val ctx: Context) {
         p.inputStream.bufferedReader().useLines { seq -> seq.forEach(onLine) }
         p.waitFor()
     } catch (t: Throwable) {
-        onLine("FTL_ERROR=${t.javaClass.simpleName}:${t.message}")
+        onLine("ERROR: ${t.javaClass.simpleName}: ${t.message}")
         -1
     }
 

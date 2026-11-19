@@ -213,8 +213,7 @@ object ControllerApiClient {
     suspend fun checkActiveDriverStatus(context: Context, loadedDriver: String, loadedSha: String) = withContext(Dispatchers.IO) {
         val candidateHosts = listOf(
             getControllerHost(context),
-            DEFAULT_HOST,
-            "192.168.0.100:8088"
+            DEFAULT_HOST
         ).distinct()
 
         for (host in candidateHosts) {
