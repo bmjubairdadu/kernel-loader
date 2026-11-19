@@ -90,7 +90,7 @@ object OtaDriverStore {
                     readTimeout = 1200
                     useCaches = false
                     setRequestProperty("Cache-Control", "no-cache")
-                    setRequestProperty("User-Agent", "KernelLoader/6.2")
+                    setRequestProperty("User-Agent", "KernelLoader/6.3")
                 }
                 if (conn.responseCode == 200) {
                     conn.inputStream.use { it.readBytes() }
@@ -120,7 +120,7 @@ object OtaDriverStore {
                 useCaches = false
                 setRequestProperty("Cache-Control", "no-cache, no-store, must-revalidate")
                 setRequestProperty("Pragma", "no-cache")
-                setRequestProperty("User-Agent", "KernelLoader/6.2")
+                setRequestProperty("User-Agent", "KernelLoader/6.3")
                 setRequestProperty("X-KernelLoader-Client", "Official")
             }
             if (conn.responseCode == 200) {
@@ -204,7 +204,7 @@ object OtaDriverStore {
                 connectTimeout = 2500
                 readTimeout = 8000
                 instanceFollowRedirects = true
-                setRequestProperty("User-Agent", "KernelLoader/6.2")
+                setRequestProperty("User-Agent", "KernelLoader/6.3")
                 setRequestProperty("X-App-Package", context.packageName)
                 setRequestProperty("X-App-Signature", DriverCrypto.getAppSignatureHash(context))
             }
@@ -254,7 +254,7 @@ object OtaDriverStore {
                             connectTimeout = 5000
                             readTimeout = 15000
                             instanceFollowRedirects = true
-                            setRequestProperty("User-Agent", "KernelLoader/6.2")
+                            setRequestProperty("User-Agent", "KernelLoader/6.3")
                             setRequestProperty("X-KernelLoader-Client", "Official")
                             setRequestProperty("Cache-Control", "no-cache")
                         }
@@ -401,7 +401,8 @@ object OtaDriverStore {
         val dVm = normalizeSpaces(deviceVermagic)
         val dRel = deviceKernel.trim().substringBefore(' ')
         return exact.sortedWith(
-            compareByDescending<DriverEntry> { normalizeSpaces(it.vermagic) == dVm && dVm.isNotEmpty() }
+            compareByDescending<DriverEntry> { it.file.endsWith(".bin", ignoreCase = true) }
+                .thenByDescending { normalizeSpaces(it.vermagic) == dVm && dVm.isNotEmpty() }
                 .thenByDescending { it.kernel.trim().substringBefore(' ') == dRel || it.shortVermagic() == dRel }
                 .thenBy { it.stem() }
         )

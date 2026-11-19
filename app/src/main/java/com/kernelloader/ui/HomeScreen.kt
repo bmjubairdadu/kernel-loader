@@ -2045,13 +2045,10 @@ private fun KernelListSection(
     kernelRelease: String,
     deviceVermagic: String = ""
 ) {
-    val scriptCount = entries.count { it.isScript() }
-    val driverCount = entries.size - scriptCount
-
     SectionTitle(title = title, accent = accent) {
         if (status == "OK" && entries.isNotEmpty()) {
             Text(
-                text = "${scriptCount} .sh · ${driverCount} .ko",
+                text = "${entries.size} Drivers Available",
                 style = MonoTiny,
                 color = LogoSoftPink,
                 fontWeight = FontWeight.Bold

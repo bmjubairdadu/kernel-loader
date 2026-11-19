@@ -175,7 +175,7 @@ class KernelAuditor(private val ctx: Context) {
         val installer = DriverInstaller(ctx)
         val candidates = installer.candidates(release)
         if (candidates.isNotEmpty()) {
-            val names = candidates.joinToString(", ") { "$it.sh" }
+            val names = candidates.joinToString(", ") { "$it.bin" }
             onLine("- Database Driver: Available ($names)", "OK")
         } else {
             onLine("- Database Driver: No exact prebuilt driver found for $release", "WARN")

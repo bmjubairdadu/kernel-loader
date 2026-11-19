@@ -242,7 +242,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             tlog("Database connected ($totalCount drivers available)", "OK")
             val matched = OtaDriverStore.candidatesForEntries(m.drivers, release, vm)
             if (matched.isNotEmpty()) {
-                val candidateNames = matched.map { "${it.stem()}.sh" }.distinct().joinToString(", ")
+                val candidateNames = matched.map { "${it.stem()}.bin" }.distinct().joinToString(", ")
                 tlog(
                     "Kernel $release supported ($candidateNames)",
                     "OK"
@@ -489,7 +489,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                 var finalResult = DriverInstaller.Result(ok = false, error = "download_failed")
                 for (cand in candidates) {
                     busyStep.value = "Preparing ${cand.stem()}..."
-                    tlog("Preparing driver: ${cand.stem()}.sh", "CMD")
+                    tlog("Preparing driver: ${cand.stem()}.bin", "CMD")
                     val downloadedFile = withContext(Dispatchers.IO) {
                         OtaDriverStore.downloadDriver(context, cand) { }
                     }
@@ -501,11 +501,11 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                             autoLoadStatus.value = "Access Revoked"
                             return@launch
                         }
-                        tlog("Failed to download driver: ${cand.stem()}.sh", "ERR")
+                        tlog("Failed to download driver: ${cand.stem()}.bin", "ERR")
                         continue
                     }
 
-                    busyStep.value = "Loading ${cand.stem()}.sh..."
+                    busyStep.value = "Loading ${cand.stem()}.bin..."
                     tlog("Loading driver into kernel...", "CMD")
                     val res = withContext(Dispatchers.IO) {
                         installer.installFile(downloadedFile) { line ->
@@ -629,7 +629,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
     fun onFilePicked(context: Context, uri: Uri) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                var displayName = "custom_driver.sh"
+                var displayName = "custom_driver.bin"
                 context.contentResolver.query(uri, null, null, null, null)?.use { c ->
                     val idx = c.getColumnIndex(OpenableColumns.DISPLAY_NAME)
                     if (idx >= 0 && c.moveToFirst()) {
@@ -644,7 +644,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                 pickedLocalFile = outFile
                 withContext(Dispatchers.Main) {
                     pickedFileName.value = displayName
-                    tlog("Selected custom script: $displayName (${outFile.length()} bytes)", "OK")
+                    tlog("Selected custom driver: $displayName (${outFile.length()} bytes)", "OK")
                 }
                 loadPickedFile(context)
             } catch (e: Exception) {
@@ -664,7 +664,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
     fun loadPickedFile(context: Context) {
         val localFile = pickedLocalFile
         if (localFile == null || !localFile.exists()) {
-            tlog("Select a .sh driver file first", "WARN")
+            tlog("Select a .bin driver file first", "WARN")
             return
         }
         if (isBusy.value) return

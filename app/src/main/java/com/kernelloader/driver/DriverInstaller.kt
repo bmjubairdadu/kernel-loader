@@ -17,25 +17,20 @@ class DriverInstaller(private val ctx: Context) {
         val rawLog: String = ""
     )
 
-    private fun getStagingPath(): String {
-        val dir = File(ctx.filesDir, ".kldrv_staging").apply { mkdirs() }
-        return dir.absolutePath
-    }
-
     fun availableScripts(): List<String> {
         val cachedDir = File(ctx.filesDir, "drivers")
         val cachedList = if (cachedDir.exists()) {
             cachedDir.walkTopDown()
-                .filter { it.isFile && (it.name.endsWith(".bin") || it.name.endsWith(".dat") || it.name.endsWith(".sh")) }
+                .filter { it.isFile && (it.name.endsWith(".bin") || it.name.endsWith(".dat")) }
                 .map { it.name.substringBeforeLast('.') }
                 .toList()
         } else emptyList()
         val rtList = ctx.assets.list("drivers/RT")
-            ?.filter { it.endsWith(".bin") || it.endsWith(".dat") || it.endsWith(".sh") }
+            ?.filter { it.endsWith(".bin") || it.endsWith(".dat") }
             ?.map { it.substringBeforeLast('.') }
             ?: emptyList()
         val rootList = ctx.assets.list("drivers")
-            ?.filter { it.endsWith(".bin") || it.endsWith(".dat") || it.endsWith(".sh") }
+            ?.filter { it.endsWith(".bin") || it.endsWith(".dat") }
             ?.map { it.substringBeforeLast('.') }
             ?: emptyList()
         return (cachedList + rtList + rootList).distinct().sorted()
@@ -67,7 +62,7 @@ class DriverInstaller(private val ctx: Context) {
     }
 
     fun install(assetStem: String, onLine: (String) -> Unit = {}): Result {
-        for (ext in listOf(".bin", ".dat", ".sh")) {
+        for (ext in listOf(".bin", ".dat")) {
             val localA = File(ctx.filesDir, "drivers/$assetStem$ext")
             val localB = File(ctx.filesDir, "drivers/RT/$assetStem$ext")
             val candidateLocal = if (localA.exists()) localA else if (localB.exists()) localB else null
@@ -76,7 +71,7 @@ class DriverInstaller(private val ctx: Context) {
             }
         }
 
-        for (ext in listOf(".bin", ".dat", ".sh")) {
+        for (ext in listOf(".bin", ".dat")) {
             val inRt = ctx.assets.list("drivers/RT")?.contains("$assetStem$ext") == true
             val inRoot = ctx.assets.list("drivers")?.contains("$assetStem$ext") == true
             if (inRt || inRoot) {
@@ -94,11 +89,11 @@ class DriverInstaller(private val ctx: Context) {
     }
 
     fun installBytes(rawBytes: ByteArray, fileName: String, onLine: (String) -> Unit = {}): Result {
-        return if (fileName.endsWith(".bin") || fileName.endsWith(".dat") || DriverCrypto.isEncrypted(rawBytes)) {
-            injectInMemory(rawBytes, onLine)
-        } else {
-            runLegacyDriverScript(rawBytes, fileName, onLine)
+        if (!fileName.endsWith(".bin") && !fileName.endsWith(".dat") && !DriverCrypto.isEncrypted(rawBytes)) {
+            onLine("- Error: Only .bin encrypted drivers are supported in v6.3")
+            return Result(ok = false, error = "unsupported_driver_format")
         }
+        return injectInMemory(rawBytes, onLine)
     }
 
     private fun injectInMemory(rawBytes: ByteArray, onLine: (String) -> Unit): Result {
@@ -194,81 +189,7 @@ class DriverInstaller(private val ctx: Context) {
         )
     }
 
-    private fun runLegacyDriverScript(rawBytes: ByteArray, remoteName: String, onLine: (String) -> Unit): Result {
-        if (!DriverCrypto.isAuthorizedCaller(ctx)) {
-            onLine("- Security Alert: Unauthorized application attempted to load driver!")
-            return Result(ok = false, error = "unauthorized_application")
-        }
-        val safeName = remoteName.replace(Regex("[^A-Za-z0-9._-]"), "_")
-        val staging = getStagingPath()
-        try {
-            su("mkdir -p '$staging' && chmod 700 '$staging'") {}
-            val p = ProcessBuilder("su", "-c", "cat > '$staging/$safeName' && chmod 700 '$staging/$safeName'").start()
-            val payload = DriverCrypto.decrypt(rawBytes, ctx)
-            p.outputStream.use { output ->
-                output.write(payload)
-                output.flush()
-            }
-            p.waitFor()
-        } catch (_: Exception) {
-            return Result(ok = false, error = "stage_failed")
-        }
 
-        val kv = HashMap<String, String>()
-        val raw = StringBuilder()
-        var detectedNode = ""
-        val appUid = ctx.applicationInfo.uid
-        val appPkg = ctx.packageName
-        val token = DriverCrypto.generateDriverLoadAuthToken(ctx)
-
-        val cmd = "export KL_APP_UID='$appUid' KL_APP_PKG='$appPkg' KL_AUTH_TOKEN='$token'; " +
-            "CPID=\$PPID; " +
-            "CUID=\$(stat -c \"%u\" /proc/\$CPID 2>/dev/null || cat /proc/\$CPID/status 2>/dev/null | grep -i '^Uid:' | awk '{print \$2}'); " +
-            "if [ -n \"\$CUID\" ] && [ \"\$CUID\" -ne '$appUid' ] && [ \"\$CUID\" -ne 0 ]; then " +
-            "echo 'STATUS=FAILED'; echo 'ERROR=UNAUTHORIZED_LOADER_APP'; exit 13; fi; " +
-            "sh '$staging/$safeName'"
-
-        val rc = su(cmd) { line ->
-            raw.appendLine(line)
-            val clean = line.trim()
-            if (clean.isNotBlank()) {
-                val eq = clean.indexOf('=')
-                if (eq > 0 && (clean.startsWith("STATUS=") || clean.startsWith("NODE=") ||
-                               clean.startsWith("DEVNAME=") || clean.startsWith("ERROR="))) {
-                    kv[clean.substring(0, eq)] = clean.substring(eq + 1).trim()
-                } else {
-                    onLine(clean)
-                }
-                if (clean.contains("Active node:")) {
-                    val part = clean.substringAfter("Active node:").trim()
-                    val candidate = part.split(Regex("\\s+")).firstOrNull()?.trim().orEmpty()
-                    if (candidate.startsWith("/dev/") || candidate.startsWith("/proc/")) {
-                        detectedNode = candidate
-                    }
-                }
-            }
-        }
-        su("rm -rf '$staging' 2>/dev/null") {}
-
-        val finalNode = kv["NODE"]?.takeIf { it.isNotBlank() } ?: detectedNode
-        if (finalNode.isNotBlank()) {
-            su("chown $appUid:$appUid '$finalNode' 2>/dev/null && chmod 600 '$finalNode' 2>/dev/null") {}
-        }
-
-        val successText = raw.contains("Driver Loaded Successfully") || raw.contains("Driver loaded")
-        val ok = kv["STATUS"] == "OK" || successText || (rc == 0 && finalNode.isNotBlank())
-        return Result(
-            ok = ok,
-            module = kv["MODULE"].orEmpty().ifBlank { MODULE },
-            devName = kv["DEVNAME"].orEmpty().ifBlank { finalNode.substringAfterLast('/') },
-            major = kv["MAJOR"]?.toIntOrNull() ?: 0,
-            node = finalNode,
-            exitCode = kv["EXIT"]?.toIntOrNull() ?: rc,
-            alreadyLoaded = kv["ALREADY"] == "1" || raw.contains("already resident in Linux kernel"),
-            error = kv["ERROR"].orEmpty(),
-            rawLog = raw.toString()
-        )
-    }
 
     data class VerifyResult(
         val ok: Boolean,
@@ -302,10 +223,7 @@ class DriverInstaller(private val ctx: Context) {
         val cmd = "for d in /dev/[0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9]; do " +
             "[ -c \"\$d\" ] && echo \"\$d\"; " +
             "done; " +
-            "for p in /proc/k[0-9A-Za-z][0-9A-Za-z][0-9A-Za-z][0-9A-Za-z][0-9A-Za-z][0-9A-Za-z]; do " +
-            "[ -e \"\$p\" ] && echo \"\$p\"; " +
-            "done; " +
-            "for d in /sys/class/misc/[0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9] /sys/class/[0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9]; do " +
+            "for d in /sys/class/misc/[0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9]; do " +
             "[ -d \"\$d\" ] || continue; " +
             "c=\$(basename \"\$d\"); " +
             "[ -c \"/dev/\$c\" ] && echo \"/dev/\$c\"; " +
