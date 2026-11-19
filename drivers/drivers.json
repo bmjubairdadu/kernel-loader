@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "count": 3,
-  "generated_at": "2026-11-19T18:36:17Z",
-  "updated": "2026-11-19T18:36:17Z",
+  "generated_at": "2026-11-19T18:36:32Z",
+  "updated": "2026-11-19T18:36:32Z",
   "drivers": [
     {
       "kernel": "4.14.186-perf-g14b9756acb79",
@@ -50,7 +50,7 @@
       "size": 19596,
       "device": "",
       "model": "",
-      "status": "Frozen",
+      "status": "Active",
       "upload_date": "2026-11-19T18:36:07.0989374Z",
       "download_count": 0,
       "load_success_count": 0,
