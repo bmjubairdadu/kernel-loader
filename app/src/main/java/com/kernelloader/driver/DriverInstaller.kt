@@ -283,7 +283,7 @@ class DriverInstaller(private val ctx: Context) {
         synchronized(verifyLock) {
             val candidates = findCandidateNodes()
             if (candidates.isEmpty()) {
-                onLine("- Verification: No candidate driver nodes detected in /proc or /dev")
+                onLine("- Verification: No candidate driver nodes detected in /dev")
                 DriverSessionManager.clearSession(ctx)
                 return VerifyResult(ok = false, stealth = true)
             }

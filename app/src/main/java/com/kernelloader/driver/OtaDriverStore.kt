@@ -27,11 +27,12 @@ object OtaDriverStore {
         val device: String = "",
         val model: String = ""
     ) {
+        fun isBin(): Boolean = file.endsWith(".bin", ignoreCase = true)
         fun isScript(): Boolean = file.endsWith(".sh", ignoreCase = true)
 
         fun stem(): String =
             if (label.isNotBlank()) label
-            else file.substringAfterLast('/').removeSuffix(".sh").removeSuffix(".ko")
+            else file.substringAfterLast('/').removeSuffix(".bin").removeSuffix(".dat").removeSuffix(".sh").removeSuffix(".ko")
 
         fun coreVersion(): String = stem().trimEnd { it in 'a'..'z' }
 

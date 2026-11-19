@@ -2137,8 +2137,8 @@ private fun KernelListSection(
                                     )
                                     Spacer(Modifier.width(6.dp))
                                     DeviceBadge(
-                                        text = if (isSh) scriptBadge else driverBadge,
-                                        color = if (isSh) LogoPink else LogoPurple
+                                        text = if (e.isBin()) scriptBadge else "LEGACY .sh",
+                                        color = if (e.isBin()) StatusOk else TextMuted
                                     )
                                     if (isThis) {
                                         Spacer(Modifier.width(5.dp))

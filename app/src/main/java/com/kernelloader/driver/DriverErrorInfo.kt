@@ -93,7 +93,7 @@ data class DriverErrorInfo(
                         solutionStepsEn = listOf(
                             "Check your running kernel version and vermagic in the Status Console.",
                             "Make sure the driver was built against your phone's exact Module.symvers symbol table.",
-                            "Do not use generic or incompatible .ko modules from other phone models."
+                            "Do not use generic or incompatible drivers from other phone models."
                         )
                     )
                 }
