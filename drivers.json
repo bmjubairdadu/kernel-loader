@@ -1,8 +1,8 @@
 {
   "schema": 1,
-  "count": 2,
-  "generated_at": "2026-11-19T20:51:02Z",
-  "updated": "2026-11-19T20:51:02Z",
+  "count": 3,
+  "generated_at": "2026-11-19T21:01:07Z",
+  "updated": "2026-11-19T21:01:07Z",
   "drivers": [
     {
       "kernel": "4.14.186-perf-g14b9756acb79",
@@ -39,12 +39,25 @@
       "last_accessed": null,
       "note": "",
       "reboot_required": false
+    },
+    {
+      "kernel": "4.9.337-DaisyForGaming",
+      "vermagic": "4.9.337-DaisyForGaming SMP preempt mod_unload modversions aarch64",
+      "variant": "rt",
+      "label": "4.9.337",
+      "file": "RT/4.9.337.bin",
+      "sha256": "63bbbd84bc200f813c8c28acf0e5dba7c9debd88632d00beb0e1f4fc48278b45",
+      "size": 19596,
+      "device": "",
+      "model": "",
+      "status": "Active",
+      "upload_date": "2026-11-19T18:36:07.0989374Z",
+      "download_count": 1,
+      "load_success_count": 0,
+      "last_accessed": "2026-11-19T20:50:59.871756Z",
+      "note": "",
+      "reboot_required": false
     }
   ],
-  "kill_reboot_drivers": [
-    "RT/4.9.337.bin",
-    "4.9.337",
-    "63bbbd84bc200f813c8c28acf0e5dba7c9debd88632d00beb0e1f4fc48278b45",
-    "4.9.337-DaisyForGaming"
-  ]
+  "kill_reboot_drivers": []
 }
