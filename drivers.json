@@ -1,9 +1,18 @@
 {
   "schema": 1,
-  "count": 1,
+  "count": 2,
   "generated_at": "2026-11-19T15:20:00Z",
-  "updated": "2026-11-19T15:20:00Z",
+  "updated": "2026-11-19T16:35:07Z",
   "drivers": [
+    {
+      "kernel": "4.14.186-perf-g14b9756acb79",
+      "vermagic": "4.14.186-perf-g14b9756acb79 SMP preempt mod_unload modversions aarch64",
+      "variant": "rt",
+      "label": "4.14.186",
+      "file": "RT/4.14.186.bin",
+      "sha256": "fdff143c69373cef0dab3e93a87f73a23695589500b249180f3b55123e8a5104",
+      "size": 18420
+    },
     {
       "kernel": "4.9.337-DaisyForGaming",
       "vermagic": "4.9.337-DaisyForGaming SMP preempt mod_unload modversions aarch64",
@@ -11,9 +20,7 @@
       "label": "4.9.337",
       "file": "RT/4.9.337.bin",
       "sha256": "63bbbd84bc200f813c8c28acf0e5dba7c9debd88632d00beb0e1f4fc48278b45",
-      "size": 19596,
-      "device": "coral",
-      "model": "Mi A2 Lite"
+      "size": 19596
     }
   ],
   "kill_reboot_drivers": []
