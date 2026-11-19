@@ -19,8 +19,6 @@ import java.util.zip.ZipOutputStream
 
 object ReportPackBuilder {
 
-    const val DEFAULT_ZIP_NAME = "device_dump.zip"
-
     data class ReportPack(
         val zipFile: File?,
         val zipName: String,

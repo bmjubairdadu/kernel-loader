@@ -43,11 +43,6 @@ object ControllerApiClient {
         return prefs.getString(KEY_LICENSE_KEY, DEFAULT_LICENSE_KEY) ?: DEFAULT_LICENSE_KEY
     }
 
-    fun setLicenseKey(context: Context, key: String) {
-        val prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
-        prefs.edit().putString(KEY_LICENSE_KEY, key.trim()).apply()
-    }
-
     fun getControllerHost(context: Context): String {
         val prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
         val h = prefs.getString(KEY_CONTROLLER_HOST, DEFAULT_HOST) ?: DEFAULT_HOST
@@ -180,30 +175,6 @@ object ControllerApiClient {
                 put("license_key", getLicenseKey(context))
                 put("driver_file", driverFile)
                 put("success", success)
-            }
-            OutputStreamWriter(conn.outputStream).use { it.write(body.toString()) }
-            conn.responseCode
-        }
-    }
-
-    suspend fun notifyUnload(context: Context, moduleName: String, graceful: Boolean) = withContext(Dispatchers.IO) {
-        runCatching {
-            val url = URL("${getBaseApiUrl(context)}/telemetry/unload")
-            val conn = (url.openConnection() as HttpURLConnection).apply {
-                requestMethod = "POST"
-                connectTimeout = 2500
-                readTimeout = 3000
-                doOutput = true
-                setRequestProperty("Content-Type", "application/json")
-                setRequestProperty("User-Agent", "KernelLoader/6.1")
-                setRequestProperty("X-App-Package", context.packageName)
-                setRequestProperty("X-App-Signature", DriverCrypto.getAppSignatureHash(context))
-            }
-            val body = JSONObject().apply {
-                put("device_id", getDeviceId(context))
-                put("license_key", getLicenseKey(context))
-                put("module_name", moduleName)
-                put("graceful", graceful)
             }
             OutputStreamWriter(conn.outputStream).use { it.write(body.toString()) }
             conn.responseCode

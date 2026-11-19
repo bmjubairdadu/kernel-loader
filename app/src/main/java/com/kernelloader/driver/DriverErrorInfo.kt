@@ -13,12 +13,9 @@ enum class DriverErrorType {
 data class DriverErrorInfo(
     val errorType: DriverErrorType,
     val titleEn: String,
-    val titleBn: String = titleEn,
     val rawError: String,
     val descriptionEn: String,
-    val descriptionBn: String = descriptionEn,
     val solutionStepsEn: List<String>,
-    val solutionStepsBn: List<String> = solutionStepsEn,
     val canReboot: Boolean = false
 ) {
     companion object {

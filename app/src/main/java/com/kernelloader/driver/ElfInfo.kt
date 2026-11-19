@@ -1,7 +1,5 @@
 package com.kernelloader.driver
 
-import java.io.File
-
 object ElfInfo {
 
     data class Section(
@@ -36,13 +34,6 @@ object ElfInfo {
     ) {
         val modversions: Boolean get() = versions.isNotEmpty()
         val moduleLayoutCrc: Long? get() = versions["module_layout"]
-    }
-
-    fun parse(file: File): Info? = try {
-        if (!file.isFile || file.length() < 64L || file.length() > 64L * 1024 * 1024) null
-        else parse(file.readBytes())
-    } catch (_: Exception) {
-        null
     }
 
     fun parse(bytes: ByteArray): Info? {

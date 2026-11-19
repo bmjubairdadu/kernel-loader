@@ -5,9 +5,7 @@ import android.content.pm.PackageManager
 import android.content.pm.Signature
 import android.os.Build
 import java.security.MessageDigest
-import java.security.SecureRandom
 import javax.crypto.Cipher
-import javax.crypto.Mac
 import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.SecretKeySpec
 
@@ -66,23 +64,6 @@ object DriverCrypto {
         return sigHash.equals(AUTHORIZED_SIGNATURE_SHA256, ignoreCase = true)
     }
 
-    fun generateDriverLoadAuthToken(context: Context): String {
-        if (!isAuthorizedCaller(context)) {
-            throw SecurityException("Unauthorized caller application")
-        }
-        val uid = context.applicationInfo.uid
-        val pid = android.os.Process.myPid()
-        val ts = System.currentTimeMillis() / 1000
-        val expiry = ts + 60
-        val payload = "$AUTHORIZED_PACKAGE_NAME:$uid:$pid:$expiry"
-        val master = getMasterKey(context)
-        val mac = Mac.getInstance("HmacSHA256")
-        mac.init(SecretKeySpec(master, "HmacSHA256"))
-        val sig = mac.doFinal(payload.toByteArray(Charsets.UTF_8))
-        val sigHex = sig.joinToString("") { "%02x".format(it) }
-        return "$payload:$sigHex"
-    }
-
     private fun getMasterKey(context: Context? = null): ByteArray {
         if (context == null || !isAuthorizedCaller(context)) {
             throw SecurityException("Unauthorized caller package: Driver loading is exclusively locked to official Kernel Loader app.")
@@ -116,19 +97,5 @@ object DriverCrypto {
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
         cipher.init(Cipher.DECRYPT_MODE, SecretKeySpec(key, "AES"), GCMParameterSpec(128, nonce))
         return cipher.doFinal(ct)
-    }
-
-    fun encrypt(data: ByteArray, context: Context? = null): ByteArray {
-        val nonce = ByteArray(12)
-        SecureRandom().nextBytes(nonce)
-        val key = getMasterKey(context)
-        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-        cipher.init(Cipher.ENCRYPT_MODE, SecretKeySpec(key, "AES"), GCMParameterSpec(128, nonce))
-        val ct = cipher.doFinal(data)
-        val out = ByteArray(8 + 12 + ct.size)
-        System.arraycopy(MAGIC, 0, out, 0, 8)
-        System.arraycopy(nonce, 0, out, 8, 12)
-        System.arraycopy(ct, 0, out, 20, ct.size)
-        return out
     }
 }

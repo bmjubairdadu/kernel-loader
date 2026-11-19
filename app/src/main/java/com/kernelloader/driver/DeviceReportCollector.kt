@@ -50,12 +50,6 @@ object DeviceReportCollector {
         val selinuxMode: String = "",
         val btfInfo: String = ""
     ) {
-        private val kernelShort: String =
-            Regex("""\d+\.\d+\.\d+""").find(kernelRelease)?.value ?: "unknown"
-
-        val kernelCaption: String =
-            Regex("""\d+\.\d+\.\d+(?:-[A-Za-z0-9._]+)?""").find(kernelRelease)?.value ?: kernelShort
-
         val deviceLine: String get() = "$manufacturer $model".trim()
 
         fun buildText(

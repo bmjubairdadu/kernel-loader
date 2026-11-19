@@ -26,7 +26,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Icon
@@ -37,7 +36,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -57,7 +55,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kernelloader.driver.DriverViewModel
-import com.kernelloader.driver.OtaDriverStore
 import com.kernelloader.driver.TerminalLine
 import com.kernelloader.root.RootChecker
 import com.kernelloader.ui.theme.AccentAmber
@@ -70,7 +67,6 @@ import com.kernelloader.ui.theme.LogFix
 import com.kernelloader.ui.theme.LogInfo
 import com.kernelloader.ui.theme.LogOk
 import com.kernelloader.ui.theme.LogOut
-import com.kernelloader.ui.theme.LogTimestamp
 import com.kernelloader.ui.theme.LogWarn
 import com.kernelloader.ui.theme.MonoSmall
 import com.kernelloader.ui.theme.MonoTiny
@@ -78,7 +74,6 @@ import com.kernelloader.ui.theme.Surface2
 import com.kernelloader.ui.theme.Surface3
 import com.kernelloader.ui.theme.SurfaceInset
 import com.kernelloader.ui.theme.TextMuted
-import com.kernelloader.ui.theme.TextOnAccent
 import com.kernelloader.ui.theme.TextPrimary
 import com.kernelloader.ui.theme.TextSecondary
 

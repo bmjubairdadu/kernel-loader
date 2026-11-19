@@ -3,7 +3,6 @@ package com.kernelloader.ui
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
@@ -13,8 +12,6 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
@@ -56,12 +53,10 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Security
-import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.SystemUpdate
@@ -78,7 +73,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -898,114 +892,6 @@ private fun PremiumHomeHeader(
 }
 
 @Composable
-private fun AnimatedHeaderLogo(busy: Boolean) {
-    Box(
-        modifier = Modifier.size(48.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        val transition = rememberInfiniteTransition(label = "headerLogoAnim")
-        val spinCw by transition.animateFloat(
-            initialValue = 0f,
-            targetValue = 360f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(if (busy) 1100 else 5500, easing = LinearEasing)
-            ),
-            label = "headerSpinCw"
-        )
-        val spinCcw by transition.animateFloat(
-            initialValue = 360f,
-            targetValue = 0f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(if (busy) 1600 else 8000, easing = LinearEasing)
-            ),
-            label = "headerSpinCcw"
-        )
-        val breathe by transition.animateFloat(
-            initialValue = 0.93f,
-            targetValue = 1.06f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(if (busy) 700 else 1900, easing = FastOutSlowInEasing),
-                repeatMode = RepeatMode.Reverse
-            ),
-            label = "headerBreathe"
-        )
-
-        Canvas(
-            modifier = Modifier
-                .fillMaxSize()
-                .graphicsLayer { rotationZ = spinCw }
-        ) {
-            val stroke = Stroke(width = 2.2.dp.toPx(), cap = StrokeCap.Round)
-            val glow = Stroke(width = 6.dp.toPx(), cap = StrokeCap.Round)
-            val diameter = size.minDimension - stroke.width
-            val topLeft = Offset((size.width - diameter) / 2f, (size.height - diameter) / 2f)
-            val arcSize = Size(diameter, diameter)
-            val brush = Brush.sweepGradient(
-                listOf(LogoPink, LogoMagenta, LogoPurple, Color.Transparent, LogoPink)
-            )
-            drawArc(
-                brush = brush,
-                startAngle = 0f,
-                sweepAngle = 270f,
-                useCenter = false,
-                topLeft = topLeft,
-                size = arcSize,
-                style = glow,
-                alpha = 0.25f
-            )
-            drawArc(
-                brush = brush,
-                startAngle = 0f,
-                sweepAngle = 270f,
-                useCenter = false,
-                topLeft = topLeft,
-                size = arcSize,
-                style = stroke,
-                alpha = 0.95f
-            )
-        }
-
-        Canvas(
-            modifier = Modifier
-                .size(41.dp)
-                .graphicsLayer { rotationZ = spinCcw }
-        ) {
-            val stroke = Stroke(width = 1.4.dp.toPx(), cap = StrokeCap.Round)
-            val diameter = size.minDimension - stroke.width
-            val topLeft = Offset((size.width - diameter) / 2f, (size.height - diameter) / 2f)
-            drawArc(
-                brush = Brush.sweepGradient(listOf(LogoPurple, LogoPink, Color.Transparent)),
-                startAngle = 90f,
-                sweepAngle = 180f,
-                useCenter = false,
-                topLeft = topLeft,
-                size = Size(diameter, diameter),
-                style = stroke,
-                alpha = 0.75f
-            )
-        }
-
-        Image(
-            painter = painterResource(id = R.drawable.app_logo),
-            contentDescription = "Animated Kernel Loader Logo",
-            contentScale = ContentScale.Crop,
-            modifier = Modifier
-                .size(34.dp)
-                .graphicsLayer {
-                    scaleX = breathe
-                    scaleY = breathe
-                }
-                .clip(CircleShape)
-                .border(
-                    1.5.dp,
-                    Brush.linearGradient(listOf(LogoPink, LogoPurple)),
-                    CircleShape
-                )
-        )
-    }
-}
-
-@Composable
 private fun StatusBoxesSection(
     strings: UiStrings,
     rootAvailable: Boolean,
@@ -1345,7 +1231,6 @@ private fun DriverStatusSummaryCard(
     onVerify: () -> Unit
 ) {
     val activeDisplay = loaded || verifyStatus == "PASS"
-    val stateColor = if (activeDisplay) StatusOk else AccentRed
     val isChecking = verifyStatus == "CHECKING"
 
     Card(
@@ -2105,7 +1990,6 @@ private fun KernelListSection(
                         itemsIndexed(entries) { idx, e ->
                             val shortVm = e.shortVermagic()
                             val isThis = OtaDriverStore.isExactMatch(e, kernelRelease, deviceVermagic)
-                            val isSh = e.isScript()
 
                             Column(
                                 modifier = Modifier

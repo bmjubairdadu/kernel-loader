@@ -26,7 +26,6 @@ import com.kernelloader.ui.theme.LogoPink
 import com.kernelloader.ui.theme.LogoPurple
 import com.kernelloader.ui.theme.Surface0
 import com.kernelloader.ui.theme.Surface1
-import com.kernelloader.ui.theme.Surface2
 import com.kernelloader.ui.theme.SurfaceDeep
 
 @Composable

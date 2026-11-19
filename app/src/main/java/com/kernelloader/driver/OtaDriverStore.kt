@@ -28,7 +28,6 @@ object OtaDriverStore {
         val model: String = ""
     ) {
         fun isBin(): Boolean = file.endsWith(".bin", ignoreCase = true)
-        fun isScript(): Boolean = file.endsWith(".sh", ignoreCase = true)
 
         fun stem(): String =
             if (label.isNotBlank()) label

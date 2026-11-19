@@ -1,6 +1,5 @@
 package com.kernelloader.ui.theme
 
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 
 val SurfaceDeep = Color(0xFF080411)
@@ -20,11 +19,8 @@ val TextDisabled = Color(0xFF6B5385)
 val TextOnAccent = Color(0xFF180326)
 
 val LogoPink = Color(0xFFFF62CA)
-val LogoHotPink = Color(0xFFFF47B8)
 val LogoMagenta = Color(0xFFD946EF)
 val LogoPurple = Color(0xFFA855F7)
-val LogoDeepViolet = Color(0xFF7E22CE)
-val LogoDeepMagenta = Color(0xFFC2009C)
 val LogoSoftPink = Color(0xFFFFA6E2)
 
 val AccentGreen = Color(0xFF00E676)
@@ -32,47 +28,20 @@ val AccentBlue = Color(0xFFC084FC)
 val AccentAmber = Color(0xFFFFBE0B)
 val AccentRed = Color(0xFFFF2E54)
 val AccentViolet = Color(0xFFA855F7)
-val AccentEmerald = Color(0xFF00E676)
 
 val StatusOk = Color(0xFF00E676)
-val StatusWarn = AccentAmber
-val StatusError = AccentRed
-val StatusIdle = TextMuted
 
 val FamilyRt = LogoPink
 val FamilyRtDeep = Color(0xFF59125E)
-val FamilyQx = LogoPurple
-val FamilyQxDeep = Color(0xFF3B1266)
 
 val GridLine = Color(0x0EFF62CA)
-val TopGlow = Color(0xFFE040FB)
 
-val GradientGreenStart = Color(0xFFFF62CA)
-val GradientGreenEnd = Color(0xFFA855F7)
 val GradientRtStart = Color(0xFFFF62CA)
-val GradientRtEnd = Color(0xFFD946EF)
-val GradientQxStart = Color(0xFFD946EF)
 val GradientQxEnd = Color(0xFF9333EA)
 val GradientRedStart = Color(0xFFFF4D6D)
 val GradientRedEnd = Color(0xFFD90429)
 val GradientAmberStart = Color(0xFFFFD479)
 val GradientAmberEnd = Color(0xFFFF7A45)
-
-val LogoBrushHorizontal = Brush.horizontalGradient(
-    listOf(LogoPink, LogoMagenta, LogoPurple)
-)
-
-val LogoBrushLinear = Brush.linearGradient(
-    listOf(LogoPink, LogoMagenta, LogoPurple)
-)
-
-val LogoBrushSubtle = Brush.linearGradient(
-    listOf(
-        LogoPink.copy(alpha = 0.22f),
-        LogoMagenta.copy(alpha = 0.14f),
-        LogoPurple.copy(alpha = 0.22f)
-    )
-)
 
 val LogCmd = Color(0xFFFF85DC)
 val LogOut = Color(0xFFEDE0F7)

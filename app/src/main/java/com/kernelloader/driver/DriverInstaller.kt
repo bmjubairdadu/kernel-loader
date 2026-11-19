@@ -47,42 +47,6 @@ class DriverInstaller(private val ctx: Context) {
         return scored.filter { it.second.length == best }.map { it.first }.sorted()
     }
 
-    fun installBest(release: String, onLine: (String) -> Unit = {}): Result {
-        val list = candidates(release)
-        if (list.isEmpty()) {
-            return Result(ok = false, error = "no_driver_for_$release")
-        }
-        var last = Result(ok = false)
-        for (stem in list) {
-            onLine("### trying $stem for $release")
-            last = install(stem, onLine)
-            if (last.ok) return last
-        }
-        return last
-    }
-
-    fun install(assetStem: String, onLine: (String) -> Unit = {}): Result {
-        for (ext in listOf(".bin", ".dat")) {
-            val localA = File(ctx.filesDir, "drivers/$assetStem$ext")
-            val localB = File(ctx.filesDir, "drivers/RT/$assetStem$ext")
-            val candidateLocal = if (localA.exists()) localA else if (localB.exists()) localB else null
-            if (candidateLocal != null) {
-                return installFile(candidateLocal, onLine)
-            }
-        }
-
-        for (ext in listOf(".bin", ".dat")) {
-            val inRt = ctx.assets.list("drivers/RT")?.contains("$assetStem$ext") == true
-            val inRoot = ctx.assets.list("drivers")?.contains("$assetStem$ext") == true
-            if (inRt || inRoot) {
-                val scriptPath = if (inRt) "drivers/RT/$assetStem$ext" else "drivers/$assetStem$ext"
-                val rawBytes = ctx.assets.open(scriptPath).use { it.readBytes() }
-                return installBytes(rawBytes, "$assetStem$ext", onLine)
-            }
-        }
-        return Result(ok = false, error = "driver_not_found")
-    }
-
     fun installFile(sourceFile: File, onLine: (String) -> Unit = {}): Result {
         val rawBytes = sourceFile.readBytes()
         return installBytes(rawBytes, sourceFile.name, onLine)
@@ -290,7 +254,6 @@ class DriverInstaller(private val ctx: Context) {
 
             val clientPath = getOrStageClientBin()
             val myPid = android.os.Process.myPid()
-            val appUid = ctx.applicationInfo.uid
 
             try {
                 for (cand in candidates) {
