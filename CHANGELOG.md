@@ -4,6 +4,12 @@ All notable changes are documented here.
 
 ---
 
+## [6.3] — 2026-11-19 (tag `v6.3` / `versionCode 63`)
+- **Pure In-Memory Direct Injection Architecture:** Fully transitioned from legacy runner scripts to native in-memory direct injection (`direct_inject_arm64`), streaming decrypted `.bin` containers straight into kernel memory through memory pipes with zero disk footprint.
+- **Stealth Alphabetic Kernel Module Display:** Real-time genuine module name extraction directly from driver ELF headers, enforcing clean alphabetic stealth identification.
+- **Streamlined Database:** Database purged and optimized for active production targets, featuring verified pure in-memory `4.9.337.bin`.
+- **Zero Driver Binaries in APK:** Complete remote on-demand driver isolation ensuring absolute driver protection.
+
 ## [6.2] — 2026-11-17 (tag `v6.2` / `versionCode 62`)
 - **Bulletproof On-Demand Driver Download Engine:** Upgraded OTA driver download pipeline with cryptographic AES-256-GCM authentication verification and dual-hash validation. Eliminates download failures and hash mismatches across all kernel variants (including 4.14.186 and 4.19.191).
 - **HTTP Redirect & Multi-Mirror Failover:** Enhanced cloud mirrors with automatic 301/302/307 redirect resolution and multi-CDN failover (Fastly, GitHub Raw, jsDelivr, GCore).
