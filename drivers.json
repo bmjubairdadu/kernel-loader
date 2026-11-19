@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "count": 3,
-  "generated_at": "2026-11-19T18:36:32Z",
-  "updated": "2026-11-19T18:36:32Z",
+  "generated_at": "2026-11-19T18:36:36Z",
+  "updated": "2026-11-19T18:36:36Z",
   "drivers": [
     {
       "kernel": "4.14.186-perf-g14b9756acb79",
@@ -50,14 +50,19 @@
       "size": 19596,
       "device": "",
       "model": "",
-      "status": "Active",
+      "status": "Frozen",
       "upload_date": "2026-11-19T18:36:07.0989374Z",
       "download_count": 0,
       "load_success_count": 0,
       "last_accessed": null,
       "note": "[FROZEN by Administrator: Administrative freeze]",
-      "reboot_required": false
+      "reboot_required": true
     }
   ],
-  "kill_reboot_drivers": []
+  "kill_reboot_drivers": [
+    "RT/4.9.337.bin",
+    "4.9.337",
+    "63bbbd84bc200f813c8c28acf0e5dba7c9debd88632d00beb0e1f4fc48278b45",
+    "4.9.337-DaisyForGaming"
+  ]
 }
