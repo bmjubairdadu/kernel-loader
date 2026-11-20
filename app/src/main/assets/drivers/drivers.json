@@ -1,19 +1,44 @@
 {
   "schema": 1,
-  "count": 1,
-  "generated_at": "2026-11-19T15:20:00Z",
-  "updated": "2026-11-19T15:20:00Z",
+  "count": 4,
+  "generated_at": "2026-11-20T06:30:37Z",
+  "updated": "2026-11-20T16:30:57Z",
   "drivers": [
     {
       "kernel": "4.9.337-DaisyForGaming",
       "vermagic": "4.9.337-DaisyForGaming SMP preempt mod_unload modversions aarch64",
       "variant": "rt",
       "label": "4.9.337",
-      "file": "RT/4.9.337.bin",
-      "sha256": "63bbbd84bc200f813c8c28acf0e5dba7c9debd88632d00beb0e1f4fc48278b45",
-      "size": 19596,
-      "device": "coral",
-      "model": "Mi A2 Lite"
+      "file": "RT/4.9.337.ko",
+      "sha256": "87b876a7b0168358297dcdc5f77b729c6ff19158f50a027910aa1ab08153e462",
+      "size": 19904
+    },
+    {
+      "kernel": "6.12.58-android16-6-g32fc8147b5dc-4k",
+      "vermagic": "6.12.58-android16-6-g32fc8147b5dc-4k SMP preempt mod_unload modversions aarch64",
+      "variant": "rt",
+      "label": "6.12.58",
+      "file": "RT/6.12.58.bin",
+      "sha256": "6f8bbcee5870b3727ab93e796658c16484d7f14fc73c7c7fcdefbf9280711bd5",
+      "size": 31260
+    },
+    {
+      "kernel": "4.14.186-perf-g14b9756acb79",
+      "vermagic": "4.14.186-perf-g14b9756acb79 SMP preempt mod_unload modversions aarch64",
+      "variant": "rt",
+      "label": "4.14.186",
+      "file": "RT/4.14.186.bin",
+      "sha256": "84980526ae6157c2091016854ac7fcdc0e7a112f06b79e68f7c22be18eff3a18",
+      "size": 18420
+    },
+    {
+      "kernel": "4.14.186-g7c18952d3c68",
+      "vermagic": "4.14.186-g7c18952d3c68 SMP preempt mod_unload modversions aarch64",
+      "variant": "rt",
+      "label": "4.14.186a",
+      "file": "RT/4.14.186a.bin",
+      "sha256": "8a6803fcd81066be74be62e098ed8697c3f0d1e7b00ec01a3a6fd30a5f8685d1",
+      "size": 18428
     }
   ],
   "kill_reboot_drivers": []

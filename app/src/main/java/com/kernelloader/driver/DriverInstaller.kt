@@ -53,8 +53,8 @@ class DriverInstaller(private val ctx: Context) {
     }
 
     fun installBytes(rawBytes: ByteArray, fileName: String, onLine: (String) -> Unit = {}): Result {
-        if (!fileName.endsWith(".bin") && !fileName.endsWith(".dat") && !DriverCrypto.isEncrypted(rawBytes)) {
-            onLine("- Error: Only .bin encrypted drivers are supported in v6.3")
+        if (!fileName.endsWith(".bin") && !fileName.endsWith(".dat") && !fileName.endsWith(".ko") && !DriverCrypto.isEncrypted(rawBytes)) {
+            onLine("- Error: Only .bin, .dat, or .ko drivers are supported")
             return Result(ok = false, error = "unsupported_driver_format")
         }
         return injectInMemory(rawBytes, onLine)

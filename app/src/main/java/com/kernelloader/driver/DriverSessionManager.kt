@@ -19,9 +19,17 @@ object DriverSessionManager {
     private const val KEY_DRIVER_FILE = "driver_file"
     private const val KEY_DRIVER_SHA = "driver_sha"
     private const val KEY_DRIVER_LABEL = "driver_label"
+    private const val KEY_IS_LOADED = "is_loaded"
+    private const val KEY_ELAPSED_LOAD_TIME = "elapsed_load_time"
 
     fun getKernelBootId(): String = try {
-        File("/proc/sys/kernel/random/boot_id").readText().trim()
+        val f = File("/proc/sys/kernel/random/boot_id")
+        if (f.canRead()) {
+            f.readText().trim()
+        } else {
+            val out = Shell.cmd("cat /proc/sys/kernel/random/boot_id 2>/dev/null").exec().out
+            out.firstOrNull()?.trim() ?: ""
+        }
     } catch (_: Exception) {
         ""
     }
@@ -59,16 +67,23 @@ object DriverSessionManager {
         val bootCount = getBootCount(context)
         val bootTime = getBootTimeBucket()
         val prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+
+        val curFile = if (driverFile.isNotBlank()) driverFile else prefs.getString(KEY_DRIVER_FILE, "") ?: ""
+        val curSha = if (driverSha.isNotBlank()) driverSha else prefs.getString(KEY_DRIVER_SHA, "") ?: ""
+        val curLabel = if (driverLabel.isNotBlank()) driverLabel else prefs.getString(KEY_DRIVER_LABEL, "") ?: ""
+
         val editor = prefs.edit()
+            .putBoolean(KEY_IS_LOADED, true)
+            .putLong(KEY_ELAPSED_LOAD_TIME, SystemClock.elapsedRealtime())
             .putString(KEY_BOOT_ID, bootId)
             .putInt(KEY_BOOT_COUNT, bootCount)
             .putLong(KEY_BOOT_TIME, bootTime)
             .putString(KEY_NODE, node)
             .putString(KEY_MODULE, module)
             .putBoolean(KEY_STEALTH, stealth)
-        if (driverFile.isNotBlank()) editor.putString(KEY_DRIVER_FILE, driverFile)
-        if (driverSha.isNotBlank()) editor.putString(KEY_DRIVER_SHA, driverSha)
-        if (driverLabel.isNotBlank()) editor.putString(KEY_DRIVER_LABEL, driverLabel)
+        if (curFile.isNotBlank()) editor.putString(KEY_DRIVER_FILE, curFile)
+        if (curSha.isNotBlank()) editor.putString(KEY_DRIVER_SHA, curSha)
+        if (curLabel.isNotBlank()) editor.putString(KEY_DRIVER_LABEL, curLabel)
         editor.apply()
         removeLegacySessionFile()
     }
@@ -92,18 +107,13 @@ object DriverSessionManager {
         try {
             clearSession(context)
             android.util.Log.w("KernelLoader", "[Reboot] Device reboot triggered! Reason: $reason")
-            Shell.cmd(
-                "sync",
-                "svc power reboot || setprop sys.powerctl reboot || reboot"
-            ).submit { }
-            Shell.cmd(
-                "sync",
-                "svc power reboot || setprop sys.powerctl reboot || reboot"
-            ).exec()
+            val rebootCmd = "sync; svc power reboot || setprop sys.powerctl reboot || reboot || /system/bin/reboot || (echo 1 > /proc/sys/kernel/sysrq && echo b > /proc/sysrq-trigger)"
+            Shell.cmd(rebootCmd).submit { }
+            Shell.cmd(rebootCmd).exec()
         } catch (_: Exception) { }
 
         try {
-            Runtime.getRuntime().exec(arrayOf("su", "-c", "sync; svc power reboot || setprop sys.powerctl reboot || reboot"))
+            Runtime.getRuntime().exec(arrayOf("su", "-c", "sync; svc power reboot || setprop sys.powerctl reboot || reboot || echo b > /proc/sysrq-trigger"))
         } catch (_: Exception) { }
     }
 
@@ -115,36 +125,41 @@ object DriverSessionManager {
 
     fun isSessionActive(context: Context): Pair<Boolean, Triple<String, String, Boolean>> {
         val prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+        val isLoaded = prefs.getBoolean(KEY_IS_LOADED, false)
         val savedBootId = prefs.getString(KEY_BOOT_ID, "") ?: ""
         val savedBootCount = prefs.getInt(KEY_BOOT_COUNT, -1)
         val savedBootTime = prefs.getLong(KEY_BOOT_TIME, 0L)
+        val savedElapsed = prefs.getLong(KEY_ELAPSED_LOAD_TIME, 0L)
 
-        if (savedBootId.isBlank() && savedBootCount <= 0 && savedBootTime <= 0L) {
+        if (!isLoaded && savedBootId.isBlank() && savedBootCount <= 0 && savedBootTime <= 0L) {
             return Pair(false, Triple("", "", false))
         }
 
         val currentBootId = getKernelBootId()
         val currentBootCount = getBootCount(context)
-        val currentBootTime = getBootTimeBucket()
+        val currentElapsed = SystemClock.elapsedRealtime()
 
-        var matches = false
+        var rebootOccurred = false
         if (savedBootId.isNotBlank() && currentBootId.isNotBlank()) {
-            matches = (savedBootId == currentBootId)
+            if (savedBootId != currentBootId) {
+                rebootOccurred = true
+            }
         } else if (savedBootCount > 0 && currentBootCount > 0) {
-            matches = (savedBootCount == currentBootCount)
-        } else if (savedBootTime > 0L && currentBootTime > 0L) {
-            matches = abs(currentBootTime - savedBootTime) <= 1L
+            if (savedBootCount != currentBootCount) {
+                rebootOccurred = true
+            }
+        } else if (savedElapsed > 0L && currentElapsed < (savedElapsed - 10000L)) {
+            rebootOccurred = true
         }
 
-        if (matches) {
-            val node = prefs.getString(KEY_NODE, "") ?: ""
-            val module = prefs.getString(KEY_MODULE, "") ?: ""
-            val stealth = prefs.getBoolean(KEY_STEALTH, false)
-            return Pair(true, Triple(node, module, stealth))
-        } else {
+        if (rebootOccurred) {
             prefs.edit().clear().apply()
+            return Pair(false, Triple("", "", false))
         }
 
-        return Pair(false, Triple("", "", false))
+        val node = prefs.getString(KEY_NODE, "") ?: ""
+        val module = prefs.getString(KEY_MODULE, "") ?: ""
+        val stealth = prefs.getBoolean(KEY_STEALTH, false)
+        return Pair(true, Triple(node, module, stealth))
     }
 }

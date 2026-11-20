@@ -75,16 +75,8 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
         OtaDriverStore.cleanTempDrivers(application)
         refreshDriverState(application)
 
-        viewModelScope.launch {
-            val licResult = ControllerApiClient.verifyLicense(application)
-            if (!licResult.valid && licResult.status.equals("Revoked", ignoreCase = true)) {
-                accessRevokedMessage.value = ControllerApiClient.REVOKED_POPUP_MESSAGE
-            }
-        }
-
         viewModelScope.launch(Dispatchers.IO) {
             while (isActive) {
-                kotlinx.coroutines.delay(1200)
                 try {
                     val freshManifest = OtaDriverStore.loadManifest(application, forceRefresh = true)
                     if (freshManifest != null) {
@@ -93,17 +85,8 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                             manifestStatus.value = "OK"
                         }
                     }
-
-                    val (active, _) = DriverSessionManager.isSessionActive(application)
-                    if (active || driverLoaded.value) {
-                        val curFile = DriverSessionManager.getLoadedDriverFile(application).ifBlank {
-                            val devRel = com.kernelloader.root.RootChecker.getKernelRelease().orEmpty()
-                            "RT/$devRel.bin"
-                        }
-                        val curSha = DriverSessionManager.getLoadedDriverSha(application)
-                        ControllerApiClient.checkActiveDriverStatus(application, curFile, curSha)
-                    }
                 } catch (_: Exception) { }
+                kotlinx.coroutines.delay(1000)
             }
         }
     }
@@ -214,8 +197,8 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
         if (startupStarted) return
         startupStarted = true
         viewModelScope.launch {
-            com.kernelloader.ui.IpLanguageManager.detectIpAndLanguage(context)
-            runUpdateCheckSuspend(manual = false)
+            launch { com.kernelloader.ui.IpLanguageManager.detectIpAndLanguage(context) }
+            launch { runUpdateCheckSuspend(manual = false) }
             runManifestRefreshSuspend(forceRefresh = true)
         }
     }
@@ -455,16 +438,6 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             autoLoadOk.value = null
             lastLoadError.value = ""
             try {
-
-                val licResult = withContext(Dispatchers.IO) { ControllerApiClient.verifyLicense(context) }
-                if (!licResult.downloadAuthorized) {
-                    accessRevokedMessage.value = ControllerApiClient.REVOKED_POPUP_MESSAGE
-                    tlog(ControllerApiClient.REVOKED_POPUP_MESSAGE, "ERR")
-                    autoLoadOk.value = false
-                    autoLoadStatus.value = "Access Revoked"
-                    return@launch
-                }
-
                 val (rootOk, release, vm) = runPreLoadDeviceCheck()
                 if (!rootOk) return@launch
 
@@ -495,13 +468,6 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                         OtaDriverStore.downloadDriver(context, cand) { }
                     }
                     if (downloadedFile == null || !downloadedFile.exists()) {
-                        if (ControllerApiClient.isAccessRevoked(context)) {
-                            accessRevokedMessage.value = ControllerApiClient.REVOKED_POPUP_MESSAGE
-                            tlog(ControllerApiClient.REVOKED_POPUP_MESSAGE, "ERR")
-                            autoLoadOk.value = false
-                            autoLoadStatus.value = "Access Revoked"
-                            return@launch
-                        }
                         tlog("Failed to download driver: ${cand.stem()}.bin", "ERR")
                         continue
                     }
@@ -521,9 +487,6 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
 
                     finalResult = res
                     if (res.ok) {
-                        withContext(Dispatchers.IO) {
-                            ControllerApiClient.notifyLoad(context, cand.file, true)
-                        }
                         applyInstallResult(res, release, driverFile = cand.file, driverSha = cand.sha256, driverLabel = cand.label)
                         break
                     }
@@ -700,9 +663,6 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                         OtaDriverStore.cleanTempDrivers(context)
                     }
                     pickedLocalFile = null
-                    withContext(Dispatchers.IO) {
-                        ControllerApiClient.notifyLoad(context, localFile.name, true)
-                    }
                 }
                 applyInstallResult(res, localFile.name, driverFile = localFile.name)
             } catch (_: CancellationException) {

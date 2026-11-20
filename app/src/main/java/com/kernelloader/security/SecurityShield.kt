@@ -27,10 +27,8 @@ object SecurityShield {
     private var watchdogStarted = false
 
     fun protect(context: Context) {
-        // 1. Instant check on launch
         verifyIntegrityAndEnvironment(context)
 
-        // 2. Continuous background watchdog thread (Anti-Attach / Anti-Hook)
         if (!watchdogStarted) {
             watchdogStarted = true
             val watchdogThread = Thread({
@@ -51,27 +49,22 @@ object SecurityShield {
     }
 
     fun verifyIntegrityAndEnvironment(context: Context) {
-        // A. Package & Signature Check (Anti-Crack / Anti-Resign)
         if (!isSignatureValid(context)) {
             killSilently()
         }
 
-        // B. Anti-Debuggable Check
         if ((context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0) {
             killSilently()
         }
 
-        // C. Debugger / Ptrace Check
         if (Debug.isDebuggerConnected() || Debug.waitingForDebugger()) {
             killSilently()
         }
 
-        // D. Frida / Hooking / Tracer Check
         if (isDebuggerOrHookAttached()) {
             killSilently()
         }
 
-        // E. Anti-Virtual App Sandbox Check
         if (isVirtualAppEnvironment(context)) {
             killSilently()
         }
@@ -106,7 +99,6 @@ object SecurityShield {
                 return true
             }
 
-            // 1. TracerPid Check
             val statusFile = File("/proc/self/status")
             if (statusFile.exists()) {
                 BufferedReader(FileReader(statusFile)).use { reader ->
@@ -121,7 +113,6 @@ object SecurityShield {
                 }
             }
 
-            // 2. Memory Maps Hook Engine Detection
             val mapsFile = File("/proc/self/maps")
             if (mapsFile.exists()) {
                 BufferedReader(FileReader(mapsFile)).use { reader ->
@@ -147,7 +138,6 @@ object SecurityShield {
                 }
             }
 
-            // 3. Frida Worker Threads Detection
             val taskDir = File("/proc/self/task")
             if (taskDir.exists() && taskDir.isDirectory) {
                 taskDir.listFiles()?.forEach { task ->
@@ -165,7 +155,6 @@ object SecurityShield {
                 }
             }
 
-            // 4. Hook Framework Class Detection
             val hookClasses = arrayOf(
                 "de.robv.android.xposed.XposedBridge",
                 "de.robv.android.xposed.XposedHelpers",
@@ -180,7 +169,6 @@ object SecurityShield {
                 }
             }
 
-            // 5. Frida Server Port Check (27042, 27043)
             val fridaPorts = intArrayOf(27042, 27043)
             for (port in fridaPorts) {
                 try {

@@ -154,6 +154,7 @@ fun HomeScreen(
         val obs = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 viewModel.refreshDriverState(context)
+                viewModel.refreshManifest(forceRefresh = true)
                 screenScope.launch(Dispatchers.IO) {
                     val root = RootChecker.isRootAvailable()
                     val kVer = RootChecker.getKernelVersion()
