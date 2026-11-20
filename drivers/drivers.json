@@ -2,7 +2,7 @@
   "schema": 1,
   "count": 4,
   "generated_at": "2026-11-20T06:30:37Z",
-  "updated": "2026-11-20T20:29:41Z",
+  "updated": "2026-11-20T20:43:51Z",
   "drivers": [
     {
       "kernel": "4.9.337-DaisyForGaming",
@@ -10,8 +10,8 @@
       "variant": "rt",
       "label": "4.9.337",
       "file": "RT/4.9.337.ko",
-      "sha256": "3b4563685eaaa2597ffcf4ff46300fd7f10a5936613093b46a10f55f5bcfd8eb",
-      "size": 19520
+      "sha256": "a18001a7ae6c43582de14d04a10351c435faf2ea0c4d30df7aeaa7c1c2ead081",
+      "size": 19664
     },
     {
       "kernel": "6.12.58-android16-6-g32fc8147b5dc-4k",
