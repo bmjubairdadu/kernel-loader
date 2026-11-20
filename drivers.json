@@ -2,16 +2,16 @@
   "schema": 1,
   "count": 4,
   "generated_at": "2026-11-20T06:30:37Z",
-  "updated": "2026-11-20T14:49:44Z",
+  "updated": "2026-11-20T14:58:29Z",
   "drivers": [
     {
       "kernel": "4.9.337-DaisyForGaming",
       "vermagic": "4.9.337-DaisyForGaming SMP preempt mod_unload modversions aarch64",
       "variant": "rt",
       "label": "4.9.337",
-      "file": "RT/4.9.337.bin",
-      "sha256": "1ef6556ba2aaa04fcbaf6bdce8cc0735520e8714341cf883c5623d629608889a",
-      "size": 16892
+      "file": "RT/4.9.337.ko",
+      "sha256": "90ec619d906852dd070ec7e3784439bf2bbf94de2b302765b96a0b36d374c030",
+      "size": 16856
     },
     {
       "kernel": "6.12.58-android16-6-g32fc8147b5dc-4k",
