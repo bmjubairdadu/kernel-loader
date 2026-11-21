@@ -1,18 +1,14 @@
 {
   "schema": 1,
-  "count": 1,
-  "generated_at": "2026-11-21T14:55:03Z",
-  "updated": "2026-11-21T14:55:03Z",
-  "drivers": [
-    {
-      "kernel": "4.9.337-DaisyForGaming",
-      "vermagic": "4.9.337-DaisyForGaming SMP preempt mod_unload modversions aarch64",
-      "variant": "rt",
-      "label": "4.9.337",
-      "file": "RT/4.9.337.ko",
-      "sha256": "4ca8e7f9be5353d5df77d3d09a2954cc2b4b3cebe14688864c6695a5bff0d1ff",
-      "size": 19864
-    }
-  ],
-  "kill_reboot_drivers": []
+  "count": 0,
+  "generated_at": "2026-11-21T14:56:53Z",
+  "updated": "2026-11-21T14:56:53Z",
+  "drivers": [],
+  "kill_reboot_drivers": [
+    "RT/4.9.337.ko",
+    "4.9.337",
+    "4ca8e7f9be5353d5df77d3d09a2954cc2b4b3cebe14688864c6695a5bff0d1ff",
+    "4.9.337-DaisyForGaming",
+    "4.9.337.ko"
+  ]
 }
