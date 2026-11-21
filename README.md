@@ -2,16 +2,17 @@
 
 <img src="app/src/main/res/mipmap-xxxhdpi/ic_launcher.png" width="76" alt="Kernel Loader" onerror="this.style.display='none'"/>
 
-# Kernel Loader (v6.0)
+# Kernel Loader (v6.4)
 
 ### Enterprise-Grade Kernel Driver Engine & Diagnostic Suite for Android
-**Adaptive UI · AES-256-GCM Driver Security · Live Verification · SELinux Audit · OTA Updates**
+**Adaptive UI · Direct .ko In-Memory Injection · 0600 Root Security · Real-Time Post-Load Cleansing · OTA Updates**
 
 [![Release](https://img.shields.io/github/v/release/bmjubairdadu/kernel-loader?color=blue&style=flat-square)](https://github.com/bmjubairdadu/kernel-loader/releases/latest)
 [![Platform](https://img.shields.io/badge/platform-Android%209%2B%20arm64-green?style=flat-square)](#requirements)
 [![Root](https://img.shields.io/badge/root-Magisk%20%7C%20KernelSU%20%7C%20APatch-red?style=flat-square)](#requirements)
-[![Security](https://img.shields.io/badge/database-AES--256--GCM%20KLENC-purple?style=flat-square)](#security--driver-database-protection)
-[![Languages](https://img.shields.io/badge/languages-28%20Global%20Locales-orange?style=flat-square)](https://github.com/bmjubairdadu/kernel-loader#internationalization-28-languages)
+[![Driver Format](https://img.shields.io/badge/driver-Direct%20.ko%20ELF-purple?style=flat-square)](#driver-architecture--stealth-pipeline)
+[![Node Security](https://img.shields.io/badge/node-0600%20root%3Aroot-success?style=flat-square)](#node-security--anti-cheat-cloaking)
+[![Languages](https://img.shields.io/badge/languages-28%20Global%20Locales-orange?style=flat-square)](#internationalization-28-languages)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat-square)](CONTRIBUTING.md)
 [![Contributors](https://img.shields.io/github/contributors/bmjubairdadu/kernel-loader?style=flat-square)](https://github.com/bmjubairdadu/kernel-loader/graphs/contributors)
 [![License: GPL-3.0](https://img.shields.io/badge/license-GPL%20v3-blue?style=flat-square)](LICENSE)
@@ -20,28 +21,34 @@
 
 ---
 
-**Kernel Loader** is a powerful root-driven Android application engineered to inspect, verify, and load stealth Linux kernel drivers and polyglot `.sh` installer scripts across Android Linux kernels **4.9 through 6.12**. Built with modern Jetpack Compose, an adaptive universal layout engine, and military-grade AES-256-GCM payload encryption, Kernel Loader guarantees safe, authenticated, and seamless driver operation across all device form factors.
+**Kernel Loader** is a powerful root-driven Android application engineered to inspect, verify, and load stealth Linux kernel drivers across Android Linux kernels **4.9 through 6.12+**. Built with modern Jetpack Compose, an adaptive universal layout engine, pure in-memory direct injection (`init_module`), and automated multi-stage post-load memory & log cleansing, Kernel Loader guarantees safe, authenticated, and 100% trace-free driver deployment.
 
 ---
 
-## ✨ What's New in v6.0
+## ✨ What's New in v6.4
 
-- **Deep Kernel & Node Creation Audit:** Inspects `CONFIG_DEVTMPFS=y` in kernel config to determine whether `/dev` device nodes are created synchronously inside the kernel or asynchronously by `ueventd`.
-- **ARM64 Module PLT Audit:** Analyzes `CONFIG_ARM64_MODULE_PLTS=y` to verify kernel relocation model compatibility.
-- **Adaptive Dynamic Sysfs & Node Polling:** Scans for character device nodes with instant completion the moment the node appears, eliminating fixed waiting delays.
-- **Hardened Node Security (0600 root:root):** Locks character device nodes in `/dev` to `0600` root permissions so unprivileged user apps and anti-cheat scanners cannot probe the node.
-- **Clean Hyphenated Diagnostics Log:** Purged legacy verbose tags (`FTL_*`), presenting clean `- Step` diagnostic reporting directly in the terminal interface.
-- **Robust Driver Parsing Engine:** Added fallback pattern matching for dynamic stealth nodes and kernel memory status, ensuring robust driver detection even with stripped logs.
-- **Universal Proportional Layout Engine:** Automatically normalizes screen density to a 392dp baseline across 720p budget devices, 1080p standards, 2K flagships, foldables, and tablets without text truncation.
-- **AES-256-GCM Encrypted Driver Security (`KLENC001`):** Complete remote driver database protection preventing unauthorized extraction, tampering, or third-party database theft.
-- **Zero-Trace In-Memory Execution:** OTA drivers decrypt directly in memory and stream to the root process pipe; temporary execution buffers are wiped from disk instantly.
-- **Always-Accessible Live Driver Verification:** One-click on-demand verification of active character nodes and stealth modules in `/dev`.
+- **Direct .ko Kernel Module Loading:** Fully deprecated legacy `.bin` containers in favor of direct, raw ARM64 ELF kernel objects (`.ko`) injected straight into kernel memory.
+- **Immediate Post-Load Log & Artifact Cleansing:**
+  - Automated `dmesg -c` execution flushes the Linux kernel ring buffer instantly after driver activation, preventing game anti-cheat scanners from inspecting kernel module logs.
+  - Automatic `logcat -c` flushes Android userspace system logs.
+  - Complete disk sanitization wipes temporary injector tools and any `/data/local/tmp/` traces immediately upon insmod.
+- **Enforced 0600 (`crw------- root:root`) Device Node Mode:** Device character nodes created by the driver in `/dev` are strictly locked to `0600 root:root`, ensuring only root client daemons can interact with the communication channel.
+- **Optimized & Pruned Production Database:** Cleared all legacy multi-kernel entries; remote OTA database serves strictly verified, ready-to-inject production drivers (starting with kernel `4.9.337`).
+- **Zero Disk Footprint In-Memory Syscall Engine:** ELF module bytes stream directly into the kernel via `direct_inject_arm64` through standard input pipes, leaving zero `.ko` files saved on public storage or cache.
 
 ---
 
 ## 🚀 Key Features
 
-### 1. Universal Adaptive UI
+### 1. Driver Architecture & Stealth Pipeline
+- **Page Table Walk Memory Engine:** In-kernel physical address translation via ARM64 page table walk (`mm->pgd` -> `PUD` -> `PMD` -> `PTE`), eliminating `get_user_pages_remote` artifacts and preserving page reference counts.
+- **Kernel Stealth Cloaking:**
+  - Taint eradication (`tainted_mask = 0`).
+  - Sysfs & module list unlink (`list_del_init(&THIS_MODULE->list)` and `kobject_del`).
+  - `vmap_area` concealment blinding `/proc/vmallocinfo`.
+  - Directory hiding via kprobe hooks blinding `/dev` directory scans.
+
+### 2. Universal Adaptive UI
 - Proportional density scaling guarantees that cards, symmetric status boxes (`ROOT PERMISSION`, `DATABASE`), vermagic badges, and action buttons render with identical aesthetics on every screen size.
 - Resilient font-scaling normalization prevents layout deformation from system accessibility font magnification.
 - Tablet and foldable-aware containers (`widthIn(max = 580.dp)`) ensure balanced centered proportions.
@@ -91,7 +98,7 @@ cd kernel-loader
 ```
 
 Built release APK:
-`app/build/outputs/apk/release/Kernel-Loader-v6.0.apk`
+`app/build/outputs/apk/release/Kernel-Loader-v6.4.apk`
 
 ---
 

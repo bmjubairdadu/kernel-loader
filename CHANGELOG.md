@@ -4,7 +4,14 @@ All notable changes are documented here.
 
 ---
 
-## [6.3] — 2026-11-19 (tag `v6.3` / `versionCode 63`)
+## [6.4] — 2026-11-21 (tag `v6.4` / `versionCode 64`)
+- **Direct Raw .ko Kernel Object Architecture:** Completely phased out legacy encrypted `.bin` container pipelines in favor of direct ARM64 ELF kernel objects (`.ko`), streamed straight into memory without persistent disk presence.
+- **Automated Post-Load Trace Sanitization:**
+  - Automated `dmesg -c` clearing immediately upon module activation to blind kernel ring buffer inspection by anti-cheat scanners.
+  - Userspace logcat buffer flushing (`logcat -c`) and automated erasure of `/data/local/tmp/` staging binaries and script leftovers.
+  - Immediate in-app deletion of `direct_inject_arm64` helper tool after execution.
+- **Hardened 0600 (`crw------- root:root`) Device Node Enforcement:** Strictly enforces `0600 root:root` permissions across all dynamic `/dev/` nodes, preventing unprivileged applications from probing or opening the communication channel.
+- **Optimized & Pruned Production Database:** Streamlined database to strictly verified, active production targets (including kernel `4.9.337.ko`), dropping unneeded legacy builds.
 - **Pure In-Memory Direct Injection Architecture:** Fully transitioned from legacy runner scripts to native in-memory direct injection (`direct_inject_arm64`), streaming decrypted `.bin` containers straight into kernel memory through memory pipes with zero disk footprint.
 - **Stealth Alphabetic Kernel Module Display:** Real-time genuine module name extraction directly from driver ELF headers, enforcing clean alphabetic stealth identification.
 - **Streamlined Database:** Database purged and optimized for active production targets, featuring verified pure in-memory `4.9.337.bin`.
