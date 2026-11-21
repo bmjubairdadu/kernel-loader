@@ -2021,9 +2021,11 @@ private fun KernelListSection(
                                         modifier = Modifier.weight(1f)
                                     )
                                     Spacer(Modifier.width(6.dp))
+                                    val fileExt = e.file.substringAfterLast('.', "").lowercase()
+                                    val badgeLabel = if (fileExt.isNotEmpty()) ".$fileExt" else e.file.substringAfterLast('/')
                                     DeviceBadge(
-                                        text = if (e.isBin()) scriptBadge else "LEGACY .sh",
-                                        color = if (e.isBin()) StatusOk else TextMuted
+                                        text = badgeLabel,
+                                        color = StatusOk
                                     )
                                     if (isThis) {
                                         Spacer(Modifier.width(5.dp))

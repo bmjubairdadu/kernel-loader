@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "count": 1,
-  "generated_at": "2026-11-21T15:07:42Z",
-  "updated": "2026-11-21T15:07:42Z",
+  "generated_at": "2026-11-21T15:20:43Z",
+  "updated": "2026-11-21T15:20:43Z",
   "drivers": [
     {
       "kernel": "4.9.337-DaisyForGaming",
@@ -11,7 +11,16 @@
       "label": "4.9.337",
       "file": "RT/4.9.337.ko",
       "sha256": "1a43bae3a5a5d08d220c9a5e4c0e7bfcb7d86477f59718505c26cbdf69e68131",
-      "size": 18480
+      "size": 18480,
+      "device": "Xiaomi Mi A2 Lite",
+      "model": "daisy",
+      "status": "Active",
+      "upload_date": "2026-11-21T13:55:24Z",
+      "download_count": 0,
+      "load_success_count": 0,
+      "last_accessed": null,
+      "note": "",
+      "reboot_required": false
     }
   ],
   "kill_reboot_drivers": []

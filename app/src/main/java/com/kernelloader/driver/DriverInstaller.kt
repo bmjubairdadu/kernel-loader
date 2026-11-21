@@ -17,6 +17,34 @@ class DriverInstaller(private val ctx: Context) {
         val rawLog: String = ""
     )
 
+    fun availableFiles(): List<String> {
+        val cachedDir = File(ctx.filesDir, "drivers")
+        val cachedList = if (cachedDir.exists()) {
+            cachedDir.walkTopDown()
+                .filter { it.isFile && (it.name.endsWith(".ko") || it.name.endsWith(".bin") || it.name.endsWith(".dat") || it.name.endsWith(".sh")) }
+                .map { it.name }
+                .toList()
+        } else emptyList()
+        val rtList = ctx.assets.list("drivers/RT")
+            ?.filter { it.endsWith(".ko") || it.endsWith(".bin") || it.endsWith(".dat") || it.endsWith(".sh") }
+            ?: emptyList()
+        val rootList = ctx.assets.list("drivers")
+            ?.filter { it.endsWith(".ko") || it.endsWith(".bin") || it.endsWith(".dat") || it.endsWith(".sh") }
+            ?: emptyList()
+        return (cachedList + rtList + rootList).distinct().sorted()
+    }
+
+    fun candidateFiles(release: String): List<String> {
+        val v = release.substringBefore('-').trim()
+        if (v.isEmpty()) return emptyList()
+        val scored = availableFiles()
+            .map { file -> file to file.substringBeforeLast('.').trimEnd { c -> c in 'a'..'z' } }
+            .filter { (_, core) -> v == core || v.startsWith("$core.") }
+        if (scored.isEmpty()) return emptyList()
+        val best = scored.maxOf { it.second.length }
+        return scored.filter { it.second.length == best }.map { it.first }.sorted()
+    }
+
     fun availableScripts(): List<String> {
         val cachedDir = File(ctx.filesDir, "drivers")
         val cachedList = if (cachedDir.exists()) {
@@ -138,10 +166,10 @@ class DriverInstaller(private val ctx: Context) {
         }
 
         if (ok) {
-            su("chmod 0600 '$finalNode' 2>/dev/null && dmesg -c >/dev/null 2>&1 && logcat -c 2>/dev/null") {}
+            su("chmod 0666 '$finalNode' 2>/dev/null && dmesg -c >/dev/null 2>&1 && logcat -c 2>/dev/null") {}
             injectorBin.delete()
             su("rm -f '${injectorBin.absolutePath}' /data/local/tmp/kloader* /data/local/tmp/*.ko /data/local/tmp/*.bin 2>/dev/null") {}
-            onLine("- Active channel: $finalNode (0600 root:root)")
+            onLine("- Active channel: $finalNode (0666 public)")
             onLine("- Kernel module: $finalMod (Pure Alphabetic Stealth)")
             onLine("- Driver status: ACTIVE & OPERATIONAL (In-Memory)")
             onLine("- Stealth Audit: Traces, logs & temporary binaries cleared")
