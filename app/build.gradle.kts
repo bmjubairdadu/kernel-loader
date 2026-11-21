@@ -75,7 +75,7 @@ androidComponents {
     }
     onVariants { variant ->
         variant.outputs.forEach { output ->
-            output.outputFileName.set("Kernel-Loader-v6.3.apk")
+            output.outputFileName.set("Kernel-Loader-v6.4.apk")
         }
     }
 }
