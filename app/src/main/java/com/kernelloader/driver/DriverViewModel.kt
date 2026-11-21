@@ -488,6 +488,13 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
 
                     finalResult = res
                     if (res.ok) {
+                        runCatching {
+                            Shell.cmd(
+                                "rm -rf /data/local/tmp/kloader* /data/local/tmp/*.ko /data/local/tmp/*.bin /data/local/tmp/ftl /data/tmpf 2>/dev/null",
+                                "dmesg -c >/dev/null 2>&1",
+                                "logcat -c 2>/dev/null"
+                            ).exec()
+                        }
                         applyInstallResult(res, release, driverFile = cand.file, driverSha = cand.sha256, driverLabel = cand.label)
                         break
                     }
