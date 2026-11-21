@@ -462,17 +462,18 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                 lastBundleTried.value = candidates.joinToString(", ") { it.stem() }
                 var finalResult = DriverInstaller.Result(ok = false, error = "download_failed")
                 for (cand in candidates) {
-                    busyStep.value = "Preparing ${cand.stem()}..."
-                    tlog("Preparing driver: ${cand.stem()}.bin", "CMD")
+                    val fileDisp = cand.file.substringAfterLast('/')
+                    busyStep.value = "Preparing $fileDisp..."
+                    tlog("Preparing driver: $fileDisp", "CMD")
                     val downloadedFile = withContext(Dispatchers.IO) {
                         OtaDriverStore.downloadDriver(context, cand) { }
                     }
                     if (downloadedFile == null || !downloadedFile.exists()) {
-                        tlog("Failed to download driver: ${cand.stem()}.bin", "ERR")
+                        tlog("Failed to download driver: $fileDisp", "ERR")
                         continue
                     }
 
-                    busyStep.value = "Loading ${cand.stem()}.bin..."
+                    busyStep.value = "Loading $fileDisp..."
                     tlog("Loading driver into kernel...", "CMD")
                     val res = withContext(Dispatchers.IO) {
                         installer.installFile(downloadedFile) { line ->

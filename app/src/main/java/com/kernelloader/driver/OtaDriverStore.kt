@@ -447,7 +447,7 @@ object OtaDriverStore {
         val dVm = normalizeSpaces(deviceVermagic)
         val dRel = deviceKernel.trim().substringBefore(' ')
         return exact.sortedWith(
-            compareByDescending<DriverEntry> { it.file.endsWith(".bin", ignoreCase = true) }
+            compareByDescending<DriverEntry> { it.file.endsWith(".ko", ignoreCase = true) || it.file.endsWith(".bin", ignoreCase = true) }
                 .thenByDescending { normalizeSpaces(it.vermagic) == dVm && dVm.isNotEmpty() }
                 .thenByDescending { it.kernel.trim().substringBefore(' ') == dRel || it.shortVermagic() == dRel }
                 .thenBy { it.stem() }

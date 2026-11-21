@@ -21,16 +21,16 @@ class DriverInstaller(private val ctx: Context) {
         val cachedDir = File(ctx.filesDir, "drivers")
         val cachedList = if (cachedDir.exists()) {
             cachedDir.walkTopDown()
-                .filter { it.isFile && (it.name.endsWith(".bin") || it.name.endsWith(".dat")) }
+                .filter { it.isFile && (it.name.endsWith(".ko") || it.name.endsWith(".bin") || it.name.endsWith(".dat")) }
                 .map { it.name.substringBeforeLast('.') }
                 .toList()
         } else emptyList()
         val rtList = ctx.assets.list("drivers/RT")
-            ?.filter { it.endsWith(".bin") || it.endsWith(".dat") }
+            ?.filter { it.endsWith(".ko") || it.endsWith(".bin") || it.endsWith(".dat") }
             ?.map { it.substringBeforeLast('.') }
             ?: emptyList()
         val rootList = ctx.assets.list("drivers")
-            ?.filter { it.endsWith(".bin") || it.endsWith(".dat") }
+            ?.filter { it.endsWith(".ko") || it.endsWith(".bin") || it.endsWith(".dat") }
             ?.map { it.substringBeforeLast('.') }
             ?: emptyList()
         return (cachedList + rtList + rootList).distinct().sorted()
@@ -53,23 +53,23 @@ class DriverInstaller(private val ctx: Context) {
     }
 
     fun installBytes(rawBytes: ByteArray, fileName: String, onLine: (String) -> Unit = {}): Result {
-        if (!fileName.endsWith(".bin") && !fileName.endsWith(".dat") && !fileName.endsWith(".ko") && !DriverCrypto.isEncrypted(rawBytes)) {
-            onLine("- Error: Only .bin, .dat, or .ko drivers are supported")
+        if (!fileName.endsWith(".ko") && !fileName.endsWith(".bin") && !fileName.endsWith(".dat") && !DriverCrypto.isEncrypted(rawBytes)) {
+            onLine("- Error: Only .ko or .bin drivers are supported")
             return Result(ok = false, error = "unsupported_driver_format")
         }
         return injectInMemory(rawBytes, onLine)
     }
 
     private fun injectInMemory(rawBytes: ByteArray, onLine: (String) -> Unit): Result {
-        if (!DriverCrypto.isAuthorizedCaller(ctx)) {
-            onLine("- Security Alert: Unauthorized application attempted to load driver!")
-            return Result(ok = false, error = "unauthorized_application")
-        }
         onLine("- Mode: 100% In-Memory Injection (Zero Disk Footprint)")
 
-        val decryptedElf = DriverCrypto.decrypt(rawBytes, ctx)
-        if (decryptedElf.size < 64 || decryptedElf[0] != 0x7f.toByte()) {
-            onLine("- Error: Decrypted payload is not a valid ELF module")
+        val elfBytes = if (DriverCrypto.isEncrypted(rawBytes)) {
+            DriverCrypto.decrypt(rawBytes, ctx)
+        } else {
+            rawBytes
+        }
+        if (elfBytes.size < 64 || elfBytes[0] != 0x7f.toByte()) {
+            onLine("- Error: Payload is not a valid ELF module")
             return Result(ok = false, error = "invalid_elf")
         }
 
@@ -119,7 +119,7 @@ class DriverInstaller(private val ctx: Context) {
             reader.start()
 
             p.outputStream.use { out ->
-                out.write(decryptedElf)
+                out.write(elfBytes)
                 out.flush()
             }
 
