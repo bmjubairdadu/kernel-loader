@@ -166,7 +166,7 @@ class DriverInstaller(private val ctx: Context) {
         }
 
         if (ok) {
-            su("chmod 0666 '$finalNode' 2>/dev/null && dmesg -c >/dev/null 2>&1 && logcat -c 2>/dev/null") {}
+            su("chmod 0600 '$finalNode' 2>/dev/null && dmesg -c >/dev/null 2>&1 && logcat -c 2>/dev/null") {}
             injectorBin.delete()
             su("rm -f '${injectorBin.absolutePath}' /data/local/tmp/kloader* /data/local/tmp/*.ko /data/local/tmp/*.bin 2>/dev/null") {}
             onLine("- Active channel: $finalNode (0666 public)")
