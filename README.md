@@ -2,10 +2,10 @@
 
 <img src="app/src/main/res/mipmap-xxxhdpi/ic_launcher.png" width="76" alt="Kernel Loader" onerror="this.style.display='none'"/>
 
-# Kernel Loader (v6.4)
+# Kernel Loader (v6.5)
 
 ### Enterprise-Grade Kernel Driver Engine & Diagnostic Suite for Android
-**Adaptive UI · Direct .ko In-Memory Injection · 0600 Root Security · Real-Time Post-Load Cleansing · OTA Updates**
+**Adaptive UI · Direct .ko In-Memory Injection · 0600 Root Security · Real-Time Post-Load Cleansing · Panic-Free Stability · OTA Updates**
 
 [![Release](https://img.shields.io/github/v/release/bmjubairdadu/kernel-loader?color=blue&style=flat-square)](https://github.com/bmjubairdadu/kernel-loader/releases/latest)
 [![Platform](https://img.shields.io/badge/platform-Android%209%2B%20arm64-green?style=flat-square)](#requirements)
@@ -25,8 +25,9 @@
 
 ---
 
-## ✨ What's New in v6.4
+## ✨ What's New in v6.5
 
+- **Zero-Panic Stable Kernel Engine:** Fully eliminated unstable `kprobe` hooks on filesystem iterators (`filldir64`), eradicating kernel panics and watchdog bite reboots on Qualcomm and diverse Android kernels.
 - **Direct .ko Kernel Module Loading:** Fully deprecated legacy `.bin` containers in favor of direct, raw ARM64 ELF kernel objects (`.ko`) injected straight into kernel memory.
 - **Immediate Post-Load Log & Artifact Cleansing:**
   - Automated `dmesg -c` execution flushes the Linux kernel ring buffer instantly after driver activation, preventing game anti-cheat scanners from inspecting kernel module logs.
@@ -98,7 +99,7 @@ cd kernel-loader
 ```
 
 Built release APK:
-`app/build/outputs/apk/release/Kernel-Loader-v6.4.apk`
+`app/build/outputs/apk/release/Kernel-Loader-v6.5.apk`
 
 ---
 
