@@ -1,44 +1,17 @@
 {
   "schema": 1,
-  "count": 4,
-  "generated_at": "2026-11-20T06:30:37Z",
-  "updated": "2026-11-21T09:00:45Z",
+  "count": 1,
+  "generated_at": "2026-11-21T13:53:35Z",
+  "updated": "2026-11-21T13:53:35Z",
   "drivers": [
     {
       "kernel": "4.9.337-DaisyForGaming",
       "vermagic": "4.9.337-DaisyForGaming SMP preempt mod_unload modversions aarch64",
       "variant": "rt",
       "label": "4.9.337",
-      "file": "RT/4.9.337.ko",
-      "sha256": "895b13ce7a6e8ee49345792c563496c6009adfa17c08fde45421c24ca2f012b3",
-      "size": 24328
-    },
-    {
-      "kernel": "6.12.58-android16-6-g32fc8147b5dc-4k",
-      "vermagic": "6.12.58-android16-6-g32fc8147b5dc-4k SMP preempt mod_unload modversions aarch64",
-      "variant": "rt",
-      "label": "6.12.58",
-      "file": "RT/6.12.58.bin",
-      "sha256": "6f8bbcee5870b3727ab93e796658c16484d7f14fc73c7c7fcdefbf9280711bd5",
-      "size": 31260
-    },
-    {
-      "kernel": "4.14.186-perf-g14b9756acb79",
-      "vermagic": "4.14.186-perf-g14b9756acb79 SMP preempt mod_unload modversions aarch64",
-      "variant": "rt",
-      "label": "4.14.186",
-      "file": "RT/4.14.186.bin",
-      "sha256": "84980526ae6157c2091016854ac7fcdc0e7a112f06b79e68f7c22be18eff3a18",
-      "size": 18420
-    },
-    {
-      "kernel": "4.14.186-g7c18952d3c68",
-      "vermagic": "4.14.186-g7c18952d3c68 SMP preempt mod_unload modversions aarch64",
-      "variant": "rt",
-      "label": "4.14.186a",
-      "file": "RT/4.14.186a.bin",
-      "sha256": "8a6803fcd81066be74be62e098ed8697c3f0d1e7b00ec01a3a6fd30a5f8685d1",
-      "size": 18428
+      "file": "RT/4.9.337.bin",
+      "sha256": "8706fa2ef4978ddcbb1601f94cafa3e04d8e178c8bb2c068ea8504c31a468e00",
+      "size": 19900
     }
   ],
   "kill_reboot_drivers": []
