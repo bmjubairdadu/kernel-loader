@@ -4,6 +4,15 @@ All notable changes are documented here.
 
 ---
 
+## [6.7] — 2026-11-24 (tag `v6.7` / `versionCode 67`)
+- **Phonotactic Syllable Dynamic Node Engine:** Implemented systematic 6-character pronounceable system-style device nodes (`C-V-C-C-V-C` pattern in pure lowercase `[a-z]`, zero underscores, zero uppercase, zero numbers) generating over 1.6 million authentic system-like identifiers.
+- **Universal Multi-Kernel Stealth Architecture:**
+  - Automated `tainted_mask` reset to 0 with kprobe fallback for Kernel 5.7+ GKI kernels.
+  - Complete sysfs unlink: `class_destroy()` and device kobject unlink to leave 0 sysfs trace.
+  - Complete module list decoupling: `list_del_init(&mod->list)` removing all presence from `/proc/modules` and `lsmod`.
+- **Pure Physical Page Table Engine:** Direct hardware MMU page table traversal with `TASK_SIZE` boundary protection.
+- **Reboot-to-Unload Model:** Driver remains resident with maximum stealth until device reboot.
+
 ## [6.5] — 2026-11-21 (tag `v6.5` / `versionCode 65`)
 - **Kernel Panic Elimination (Zero Crash Engine):** Completely removed unstable filesystem iterator kprobe hooks (`filldir64`), resolving Snapdragon watchdog bite crashes and kernel panics permanently. Driver verified 100% rock-solid and stable.
 - **Direct Raw .ko Kernel Object Architecture:** Completely phased out legacy encrypted `.bin` container pipelines in favor of direct ARM64 ELF kernel objects (`.ko`), streamed straight into memory without persistent disk presence.

@@ -2,7 +2,7 @@
 
 <img src="app/src/main/res/mipmap-xxxhdpi/ic_launcher.png" width="76" alt="Kernel Loader" onerror="this.style.display='none'"/>
 
-# Kernel Loader (v6.5)
+# Kernel Loader (v6.7)
 
 ### Enterprise-Grade Kernel Driver Engine & Diagnostic Suite for Android
 **Adaptive UI · Direct .ko In-Memory Injection · 0600 Root Security · Real-Time Post-Load Cleansing · Panic-Free Stability · OTA Updates**

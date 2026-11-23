@@ -114,8 +114,10 @@ class DriverInstaller(private val ctx: Context) {
             }
         }
 
-        val chars = ('A'..'Z') + ('a'..'z') + ('0'..'9')
-        val tag = (0..9).random().toString() + (1..5).map { chars.random() }.joinToString("")
+        val cList = listOf('b', 'c', 'd', 'f', 'g', 'k', 'l', 'm', 'n', 'p', 'r', 's', 't', 'v', 'w', 'z')
+        val vList = listOf('a', 'e', 'i', 'o', 'u')
+        val cMidList = listOf('c', 'd', 'f', 'k', 'l', 'm', 'n', 'p', 'r', 's', 't', 'v', 'x', 'b', 'g', 'z')
+        val tag = "" + cList.random() + vList.random() + cMidList.random() + cMidList.random() + vList.random() + cMidList.random()
         onLine("- Stealth device identifier: $tag (Target: /dev/$tag)")
 
         val kv = HashMap<String, String>()
@@ -222,13 +224,8 @@ class DriverInstaller(private val ctx: Context) {
             candidates.add(sessionNode)
         }
 
-        val cmd = "for d in /dev/[0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9]; do " +
+        val cmd = "for d in /dev/[b-z][aeiou][a-z][a-z][aeiou][a-z]; do " +
             "[ -c \"\$d\" ] && echo \"\$d\"; " +
-            "done; " +
-            "for d in /sys/class/misc/[0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9]; do " +
-            "[ -d \"\$d\" ] || continue; " +
-            "c=\$(basename \"\$d\"); " +
-            "[ -c \"/dev/\$c\" ] && echo \"/dev/\$c\"; " +
             "done"
         su(cmd) { line ->
             val s = line.trim()
