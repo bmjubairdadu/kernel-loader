@@ -125,6 +125,7 @@ class DriverInstaller(private val ctx: Context) {
         var processRc = -1
 
         try {
+            su("rmmod unified_driver 2>/dev/null") {}
             val p = ProcessBuilder("su", "-c", "'${injectorBin.absolutePath}' - tag=$tag").start()
             val reader = Thread {
                 p.inputStream.bufferedReader().useLines { seq ->
@@ -160,11 +161,21 @@ class DriverInstaller(private val ctx: Context) {
             return Result(ok = false, error = t.message.orEmpty())
         }
 
-        val ok = kv["STATUS"] == "OK" || raw.contains("Driver loaded") || processRc == 0
+        var ok = kv["STATUS"] == "OK" || raw.contains("Driver loaded") || processRc == 0
         var finalNode = kv["NODE"].orEmpty().ifBlank { "/dev/$tag" }
         val finalDev = kv["DEVNAME"].orEmpty().ifBlank { tag }
         val finalMod = kv["MODULE"].orEmpty().ifBlank {
             (1..8).map { ('a'..'z').random() }.joinToString("")
+        }
+
+        if (!ok && kv["RESIDENT"] == "1") {
+            val candidates = findCandidateNodes()
+            val candidate = candidates.firstOrNull()
+            if (candidate != null) {
+                finalNode = candidate
+                ok = true
+                onLine("[*] Reconnected to active resident node: $finalNode")
+            }
         }
 
         if (ok) {
