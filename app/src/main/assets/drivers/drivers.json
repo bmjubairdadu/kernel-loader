@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "count": 6,
-  "generated_at": "2026-11-24T14:07:12Z",
-  "updated": "2026-11-24T14:07:12Z",
+  "generated_at": "2026-11-25T05:53:00Z",
+  "updated": "2026-11-25T05:53:00Z",
   "drivers": [
     {
       "kernel": "4.9.337-DaisyForGaming",
@@ -55,8 +55,8 @@
       "variant": "rt",
       "label": "4.14.186-X6891",
       "file": "RT/4.14.186.ko",
-      "sha256": "86bfc7403a0e18e4dff63348eb89dd597fa0f0c48d5e1c7ebbac7e05ffd59dc1",
-      "size": 15768
+      "sha256": "c42eda32929c13d22398b76998ceff7cba19befb39455b566cdf06170aac0624",
+      "size": 15968
     }
   ],
   "kill_reboot_drivers": []
