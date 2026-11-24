@@ -125,7 +125,6 @@ class DriverInstaller(private val ctx: Context) {
         var processRc = -1
 
         try {
-            su("rmmod unified_driver 2>/dev/null") {}
             val p = ProcessBuilder("su", "-c", "'${injectorBin.absolutePath}' - tag=$tag").start()
             val reader = Thread {
                 p.inputStream.bufferedReader().useLines { seq ->
