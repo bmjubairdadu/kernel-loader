@@ -55,8 +55,8 @@
       "variant": "rt",
       "label": "4.14.186-X6891",
       "file": "RT/4.14.186.ko",
-      "sha256": "ce6609292976c3efdfb848fa8095bf6af94161c3e1a84f20f633a397def0d376",
-      "size": 15064
+      "sha256": "0c805051c387e8a6b4437193ab0689d5fdb66ecc4dde8484503800eba923bc85",
+      "size": 15264
     }
   ],
   "kill_reboot_drivers": []
