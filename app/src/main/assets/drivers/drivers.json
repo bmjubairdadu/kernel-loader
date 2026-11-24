@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "count": 6,
-  "generated_at": "2026-11-24T14:03:01Z",
-  "updated": "2026-11-24T14:03:01Z",
+  "generated_at": "2026-11-24T14:07:12Z",
+  "updated": "2026-11-24T14:07:12Z",
   "drivers": [
     {
       "kernel": "4.9.337-DaisyForGaming",
@@ -55,7 +55,7 @@
       "variant": "rt",
       "label": "4.14.186-X6891",
       "file": "RT/4.14.186.ko",
-      "sha256": "ffb95aed3b8d932daaa308b21d275029662c1845988a68a1325fe355791e0977",
+      "sha256": "ce6609292976c3efdfb848fa8095bf6af94161c3e1a84f20f633a397def0d376",
       "size": 15064
     }
   ],
