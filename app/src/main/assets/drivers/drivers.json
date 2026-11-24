@@ -1,8 +1,8 @@
 {
   "schema": 1,
-  "count": 5,
-  "generated_at": "2026-11-24T10:32:00Z",
-  "updated": "2026-11-24T10:32:00Z",
+  "count": 6,
+  "generated_at": "2026-11-24T11:45:00Z",
+  "updated": "2026-11-24T11:45:00Z",
   "drivers": [
     {
       "kernel": "4.9.337-DaisyForGaming",
@@ -48,6 +48,15 @@
       "file": "RT/4.19.157.ko",
       "sha256": "e68c4000bec68501e80826fffdec550de95b1538b5c33af9b50121c2f6b6d293",
       "size": 16184
+    },
+    {
+      "kernel": "4.14.186-perf-g14b9756acb79",
+      "vermagic": "4.14.186-perf-g14b9756acb79 SMP preempt mod_unload modversions aarch64",
+      "variant": "rt",
+      "label": "4.14.186-X6891",
+      "file": "RT/4.14.186.ko",
+      "sha256": "7dc95ca380c5f5e5e65e8b99842fedf1ce641a58abb89afbd1d5121f42407fbb",
+      "size": 15912
     }
   ],
   "kill_reboot_drivers": []
