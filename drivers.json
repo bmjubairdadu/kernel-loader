@@ -1,65 +1,72 @@
 {
-    "schema":  1,
-    "count":  6,
-    "generated_at":  "2026-11-25T13:06:30Z",
-    "updated":  "2026-11-25T13:06:30Z",
-    "drivers":  [
-                    {
-                        "kernel":  "4.9.337-DaisyForGaming",
-                        "vermagic":  "4.9.337-DaisyForGaming SMP preempt mod_unload modversions aarch64",
-                        "variant":  "rt",
-                        "label":  "4.9.337",
-                        "file":  "RT/4.9.337.ko",
-                        "sha256":  "606d16a0014cff22afe1cf11176bdc06df15101faa209bb2dfcbbc9d3ea650cd",
-                        "size":  19664
-                    },
-                    {
-                        "kernel":  "4.19.325-cip136-st20-Kuroha",
-                        "vermagic":  "4.19.325-cip136-st20-Kuroha SMP preempt mod_unload modversions aarch64",
-                        "variant":  "rt",
-                        "label":  "4.19.325",
-                        "file":  "RT/4.19.325.ko",
-                        "sha256":  "4d1ee9e1d8d6ab95d8fe94efed4cf8181b82a9cc28f8b37b6a2c420eff6dce18",
-                        "size":  18864
-                    },
-                    {
-                        "kernel":  "4.19.191-g216400aba14e-dirty",
-                        "vermagic":  "4.19.191-g216400aba14e-dirty SMP preempt mod_unload modversions aarch64",
-                        "variant":  "rt",
-                        "label":  "4.19.191",
-                        "file":  "RT/4.19.191.ko",
-                        "sha256":  "ad9569efeb4adddd20bcee07b343f046eafc368fdb3c7a712d11df3bb2f2d741",
-                        "size":  18008
-                    },
-                    {
-                        "kernel":  "6.12.58-android16-6-g32fc8147b5dc-4k",
-                        "vermagic":  "6.12.58-android16-6-g32fc8147b5dc-4k SMP preempt mod_unload modversions aarch64",
-                        "variant":  "rt",
-                        "label":  "6.12.58",
-                        "file":  "RT/6.12.58.ko",
-                        "sha256":  "30b097343e71450bdc16f789278a9fe3e3b3e38b0546c50feb4f0012aefd964d",
-                        "size":  36584
-                    },
-                    {
-                        "kernel":  "4.19.157-perf-27940246-abA235FXXS4DXA5",
-                        "vermagic":  "4.19.157-perf-27940246-abA235FXXS4DXA5 SMP preempt mod_unload modversions aarch64",
-                        "variant":  "rt",
-                        "label":  "4.19.157-A235F",
-                        "file":  "RT/4.19.157.ko",
-                        "sha256":  "e68c4000bec68501e80826fffdec550de95b1538b5c33af9b50121c2f6b6d293",
-                        "size":  16184
-                    },
-                    {
-                        "kernel":  "4.14.186-perf-g14b9756acb79",
-                        "vermagic":  "4.14.186-perf-g14b9756acb79 SMP preempt mod_unload modversions aarch64",
-                        "variant":  "rt",
-                        "label":  "4.14.186-X6891",
-                        "file":  "RT/4.14.186.ko",
-                        "sha256":  "954e16d54d6afaf7f16026069bbd6f5326640dffcfffc58b66d131f22c4d2260",
-                        "size":  18784
-                    }
-                ],
-    "kill_reboot_drivers":  [
-
-                            ]
+    "schema": 1,
+    "count": 7,
+    "generated_at": "2026-11-25T15:25:48Z",
+    "updated": "2026-11-25T15:25:48Z",
+    "drivers": [
+        {
+            "kernel": "4.9.337-DaisyForGaming",
+            "vermagic": "4.9.337-DaisyForGaming SMP preempt mod_unload modversions aarch64",
+            "variant": "rt",
+            "label": "4.9.337",
+            "file": "RT/4.9.337.ko",
+            "sha256": "606d16a0014cff22afe1cf11176bdc06df15101faa209bb2dfcbbc9d3ea650cd",
+            "size": 19664
+        },
+        {
+            "kernel": "4.19.325-cip136-st20-Kuroha",
+            "vermagic": "4.19.325-cip136-st20-Kuroha SMP preempt mod_unload modversions aarch64",
+            "variant": "rt",
+            "label": "4.19.325",
+            "file": "RT/4.19.325.ko",
+            "sha256": "4d1ee9e1d8d6ab95d8fe94efed4cf8181b82a9cc28f8b37b6a2c420eff6dce18",
+            "size": 18864
+        },
+        {
+            "kernel": "4.19.191-g216400aba14e-dirty",
+            "vermagic": "4.19.191-g216400aba14e-dirty SMP preempt mod_unload modversions aarch64",
+            "variant": "rt",
+            "label": "4.19.191",
+            "file": "RT/4.19.191.ko",
+            "sha256": "ad9569efeb4adddd20bcee07b343f046eafc368fdb3c7a712d11df3bb2f2d741",
+            "size": 18008
+        },
+        {
+            "kernel": "6.12.58-android16-6-g32fc8147b5dc-4k",
+            "vermagic": "6.12.58-android16-6-g32fc8147b5dc-4k SMP preempt mod_unload modversions aarch64",
+            "variant": "rt",
+            "label": "6.12.58",
+            "file": "RT/6.12.58.ko",
+            "sha256": "30b097343e71450bdc16f789278a9fe3e3b3e38b0546c50feb4f0012aefd964d",
+            "size": 36584
+        },
+        {
+            "kernel": "4.19.157-perf-27940246-abA235FXXS4DXA5",
+            "vermagic": "4.19.157-perf-27940246-abA235FXXS4DXA5 SMP preempt mod_unload modversions aarch64",
+            "variant": "rt",
+            "label": "4.19.157-A235F",
+            "file": "RT/4.19.157.ko",
+            "sha256": "e68c4000bec68501e80826fffdec550de95b1538b5c33af9b50121c2f6b6d293",
+            "size": 16184
+        },
+        {
+            "kernel": "4.14.186-perf-g14b9756acb79",
+            "vermagic": "4.14.186-perf-g14b9756acb79 SMP preempt mod_unload modversions aarch64",
+            "variant": "rt",
+            "label": "4.14.186-X6891",
+            "file": "RT/4.14.186.ko",
+            "sha256": "954e16d54d6afaf7f16026069bbd6f5326640dffcfffc58b66d131f22c4d2260",
+            "size": 18784
+        },
+        {
+            "kernel": "4.14.186-g7c18952d3c68",
+            "vermagic": "4.14.186-g7c18952d3c68 SMP preempt mod_unload modversions aarch64",
+            "variant": "rt",
+            "label": "4.14.186a-begonia",
+            "file": "RT/4.14.186a.ko",
+            "sha256": "d45d87c7967bc3de05625685480348f1d5cf050c5d893c7935f31500c11c00b0",
+            "size": 19928
+        }
+    ],
+    "kill_reboot_drivers": []
 }
