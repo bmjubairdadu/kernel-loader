@@ -82,8 +82,8 @@
       "variant": "rt",
       "label": "4.9.309",
       "file": "RT/4.9.309.ko",
-      "sha256": "2d6d0a54e98dc1870cbfd5e3227779f47913b1df33c4ebf3c97dce5157855494",
-      "size": 23200
+      "sha256": "f2587be07a9144f00071a10f7a5f04738c9d74dbfa6f9b6e7ecef886af014743",
+      "size": 23304
     },
     {
       "kernel": "4.19.191+",
