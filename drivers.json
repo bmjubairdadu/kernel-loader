@@ -1,8 +1,8 @@
 {
   "schema": 1,
-  "count": 16,
-  "generated_at": "2026-11-27T21:06:00Z",
-  "updated": "2026-11-27T21:06:00Z",
+  "count": 17,
+  "generated_at": "2026-11-27T19:48:00Z",
+  "updated": "2026-11-27T19:48:00Z",
   "drivers": [
     {
       "kernel": "4.9.337-DaisyForGaming",
@@ -147,6 +147,15 @@
       "file": "RT/4.19.157a.ko",
       "sha256": "b1abff31c692b1c03a27c8b1dcc4d147733d1bd9cb2ea54d6115a54658415fd9",
       "size": 23192
+    },
+    {
+      "kernel": "4.19.127-perf-g7288046673d5",
+      "vermagic": "4.19.127-perf-g7288046673d5 SMP preempt mod_unload modversions aarch64",
+      "variant": "rt",
+      "label": "4.19.127-dandelion",
+      "file": "RT/4.19.127.ko",
+      "sha256": "b1476a3e0db15cfb3bcf48ef1c15561ea0c8d7eecaa5921a82ac82ba998cb7be",
+      "size": 26176
     }
   ],
   "kill_reboot_drivers": []
