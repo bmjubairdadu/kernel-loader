@@ -1,8 +1,8 @@
 {
   "schema": 1,
-  "count": 13,
-  "generated_at": "2026-11-27T01:05:00Z",
-  "updated": "2026-11-27T01:05:00Z",
+  "count": 14,
+  "generated_at": "2026-11-27T11:06:00Z",
+  "updated": "2026-11-27T11:06:00Z",
   "drivers": [
     {
       "kernel": "4.9.337-DaisyForGaming",
@@ -120,6 +120,15 @@
       "file": "RT/5.4.254.ko",
       "sha256": "c45eb69b862bd287f5ea8aa1ac784f3b882e4e007b7077d98395abe330fa2653",
       "size": 42104
+    },
+    {
+      "kernel": "6.6.143-android15-8-gb8513f17292f-4k",
+      "vermagic": "6.6.143-android15-8-gb8513f17292f-4k SMP preempt mod_unload modversions aarch64",
+      "variant": "rt",
+      "label": "6.6.143",
+      "file": "RT/6.6.143.ko",
+      "sha256": "f629971fbdd49f55c175942d7ca2c4e8bc43116794362f987bbb1e4cfa2dba29",
+      "size": 38728
     }
   ],
   "kill_reboot_drivers": []
