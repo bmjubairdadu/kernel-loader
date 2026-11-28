@@ -82,7 +82,7 @@ object OtaDriverStore {
                 useCaches = false
                 setRequestProperty("Cache-Control", "no-cache, no-store, must-revalidate")
                 setRequestProperty("Pragma", "no-cache")
-                setRequestProperty("User-Agent", "KernelLoader/6.8")
+                setRequestProperty("User-Agent", "KernelLoader/6.9")
             }
             if (conn.responseCode == 200) {
                 val text = conn.inputStream.bufferedReader().use { it.readText() }
@@ -132,7 +132,7 @@ object OtaDriverStore {
                 readTimeout = 150
                 useCaches = false
                 setRequestProperty("Cache-Control", "no-cache")
-                setRequestProperty("User-Agent", "KernelLoader/6.8")
+                setRequestProperty("User-Agent", "KernelLoader/6.9")
             }
             if (conn.responseCode == 200) {
                 conn.inputStream.use { it.readBytes() }
@@ -154,7 +154,7 @@ object OtaDriverStore {
                         useCaches = false
                         setRequestProperty("Cache-Control", "no-cache, no-store, must-revalidate")
                         setRequestProperty("Pragma", "no-cache")
-                        setRequestProperty("User-Agent", "KernelLoader/6.8")
+                        setRequestProperty("User-Agent", "KernelLoader/6.9")
                     }
                     if (conn.responseCode == 200) {
                         conn.inputStream.use { it.readBytes() }
@@ -185,7 +185,7 @@ object OtaDriverStore {
                         useCaches = false
                         setRequestProperty("Cache-Control", "no-cache, no-store, must-revalidate")
                         setRequestProperty("Pragma", "no-cache")
-                        setRequestProperty("User-Agent", "KernelLoader/6.8")
+                        setRequestProperty("User-Agent", "KernelLoader/6.9")
                         setRequestProperty("X-KernelLoader-Client", "Official")
                     }
                     if (conn.responseCode == 200) {
@@ -264,7 +264,7 @@ object OtaDriverStore {
                 connectTimeout = 300
                 readTimeout = 4000
                 useCaches = false
-                setRequestProperty("User-Agent", "KernelLoader/6.8")
+                setRequestProperty("User-Agent", "KernelLoader/6.9")
             }
             if (conn.responseCode == 200) {
                 val bytes = conn.inputStream.use { it.readBytes() }
@@ -297,7 +297,7 @@ object OtaDriverStore {
                             connectTimeout = 5000
                             readTimeout = 15000
                             instanceFollowRedirects = true
-                            setRequestProperty("User-Agent", "KernelLoader/6.8")
+                            setRequestProperty("User-Agent", "KernelLoader/6.9")
                             setRequestProperty("X-KernelLoader-Client", "Official")
                             setRequestProperty("Cache-Control", "no-cache")
                         }

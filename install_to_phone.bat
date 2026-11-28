@@ -27,7 +27,7 @@ echo [1/3] কানেক্টেড ডিভাইস চেক করা �
 "%ADB_BIN%" devices
 echo.
 
-set "APK_FILE=%~dp0app\build\outputs\apk\release\Kernel-Loader-v6.8.apk"
+set "APK_FILE=%~dp0app\build\outputs\apk\release\Kernel-Loader-v6.9.apk"
 if not exist "%APK_FILE%" (
     for /f "delims=" %%F in ('dir /b /s /o-d "%~dp0app\build\outputs\apk\release\Kernel-Loader-*.apk" 2^>nul') do (
         set "APK_FILE=%%F"
