@@ -92,13 +92,10 @@ class DriverInstaller(private val ctx: Context) {
                 }
             }
 
-            val cList = listOf('b', 'c', 'd', 'f', 'g', 'k', 'l', 'm', 'n', 'p', 'r', 's', 't', 'v', 'w', 'z')
-            val vList = listOf('a', 'e', 'i', 'o', 'u')
-            val cMidList = listOf('c', 'd', 'f', 'k', 'l', 'm', 'n', 'p', 'r', 's', 't', 'v', 'x', 'b', 'g', 'z')
-            val tag = "" + cList.random() + vList.random() + cMidList.random() + cMidList.random() + vList.random() + cMidList.random()
-            onLine("- Stealth device identifier: $tag (Target: /dev/$tag)")
+            val beforeNodes = findCandidateNodes().toSet()
+            onLine("- Node mode: In-Kernel Random Node Generation")
 
-            val p = ProcessBuilder("su", "-c", "'${injectorBin.absolutePath}' - tag=$tag").start()
+            val p = ProcessBuilder("su", "-c", "'${injectorBin.absolutePath}' -").start()
             val reader = Thread {
                 p.inputStream.bufferedReader().useLines { seq ->
                     seq.forEach { line ->
@@ -130,19 +127,19 @@ class DriverInstaller(private val ctx: Context) {
             reader.join()
 
             ok = kv["STATUS"] == "OK" || raw.contains("Driver loaded") || processRc == 0
-            finalNode = kv["NODE"].orEmpty().ifBlank { "/dev/$tag" }
-            finalDev = kv["DEVNAME"].orEmpty().ifBlank { tag }
+            finalNode = kv["NODE"].orEmpty()
+            if (finalNode.isBlank() || !ok) {
+                val afterNodes = findCandidateNodes()
+                val detected = afterNodes.firstOrNull { it !in beforeNodes }
+                    ?: if (kv["RESIDENT"] == "1" || raw.contains("init_module completed successfully")) afterNodes.firstOrNull() else null
+                if (!detected.isNullOrBlank()) {
+                    finalNode = detected
+                    ok = true
+                }
+            }
+            finalDev = kv["DEVNAME"].orEmpty().ifBlank { finalNode.substringAfterLast('/') }
             finalMod = kv["MODULE"].orEmpty().ifBlank {
                 (1..8).map { ('a'..'z').random() }.joinToString("")
-            }
-
-            if (!ok && kv["RESIDENT"] == "1") {
-                val candidate = findCandidateNodes().firstOrNull()
-                if (candidate != null) {
-                    finalNode = candidate
-                    ok = true
-                    onLine("[*] Reconnected to active resident node: $finalNode")
-                }
             }
 
             if (ok) {
