@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "count": 17,
-  "generated_at": "2026-11-27T19:48:00Z",
+  "generated_at": "2026-11-28T05:20:50Z",
   "updated": "2026-11-27T19:48:00Z",
   "drivers": [
     {
@@ -154,8 +154,8 @@
       "variant": "rt",
       "label": "4.19.127-dandelion",
       "file": "RT/4.19.127.ko",
-      "sha256": "b1476a3e0db15cfb3bcf48ef1c15561ea0c8d7eecaa5921a82ac82ba998cb7be",
-      "size": 26176
+      "sha256": "c4fc72305a7185d3af01ad96d1efac3129b1d0bc9e780bddf73908083aeddca9",
+      "size": 24984
     }
   ],
   "kill_reboot_drivers": []
