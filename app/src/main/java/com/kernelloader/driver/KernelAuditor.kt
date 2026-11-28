@@ -172,10 +172,9 @@ class KernelAuditor(private val ctx: Context) {
             onLine("  - Fix: Set 'Mount Namespace Mode' to 'Global Namespace' in Magisk", "FIX")
         }
 
-        val installer = DriverInstaller(ctx)
-        val candidates = installer.candidateFiles(release)
+        val candidates = OtaDriverStore.cachedCandidates(release, vermagic)
         if (candidates.isNotEmpty()) {
-            val names = candidates.joinToString(", ")
+            val names = candidates.joinToString(", ") { it.file.substringAfterLast('/') }
             onLine("- Database Driver: Available ($names)", "OK")
         } else {
             onLine("- Database Driver: No exact prebuilt driver found for $release", "WARN")

@@ -12,7 +12,6 @@ import java.security.MessageDigest
 
 object OtaDriverStore {
 
-    private const val EMBEDDED_MANIFEST_ASSET = "drivers/drivers.json"
     private const val REMOTE_MANIFEST_URL = "https://raw.githubusercontent.com/bmjubairdadu/kernel-loader/drivers/drivers/drivers.json"
     private const val REMOTE_DRIVER_BASE_URL = "https://raw.githubusercontent.com/bmjubairdadu/kernel-loader/drivers/drivers/"
 
@@ -27,11 +26,9 @@ object OtaDriverStore {
         val device: String = "",
         val model: String = ""
     ) {
-        fun isBin(): Boolean = file.endsWith(".bin", ignoreCase = true)
-
         fun stem(): String =
             if (label.isNotBlank()) label
-            else file.substringAfterLast('/').removeSuffix(".bin").removeSuffix(".dat").removeSuffix(".sh").removeSuffix(".ko")
+            else file.substringAfterLast('/').removeSuffix(".ko")
 
         fun coreVersion(): String = stem().trimEnd { it in 'a'..'z' }
 
@@ -85,7 +82,7 @@ object OtaDriverStore {
                 useCaches = false
                 setRequestProperty("Cache-Control", "no-cache, no-store, must-revalidate")
                 setRequestProperty("Pragma", "no-cache")
-                setRequestProperty("User-Agent", "KernelLoader/6.5")
+                setRequestProperty("User-Agent", "KernelLoader/6.8")
             }
             if (conn.responseCode == 200) {
                 val text = conn.inputStream.bufferedReader().use { it.readText() }
@@ -97,14 +94,26 @@ object OtaDriverStore {
 
     fun cleanTempDrivers(context: Context) {
         runCatching {
-            val tempDir = File(context.cacheDir, "temp_drivers")
-            if (tempDir.exists()) {
-                tempDir.listFiles()?.forEach { it.delete() }
+            File(context.cacheDir, "temp_drivers").deleteRecursively()
+            File(context.filesDir, "drivers").deleteRecursively()
+            File(context.cacheDir, "ftl").deleteRecursively()
+            context.cacheDir.listFiles()?.forEach { f ->
+                if (f.isFile && (f.name.endsWith(".ko", ignoreCase = true) ||
+                        f.name.endsWith(".bin", ignoreCase = true) ||
+                        f.name.endsWith(".dat", ignoreCase = true) ||
+                        f.name.endsWith(".tmp", ignoreCase = true))
+                ) {
+                    f.delete()
+                }
             }
-
-            val oldDir = File(context.filesDir, "drivers")
-            if (oldDir.exists()) {
-                oldDir.deleteRecursively()
+            context.filesDir.listFiles()?.forEach { f ->
+                if (f.isFile && (f.name.endsWith(".ko", ignoreCase = true) ||
+                        f.name.endsWith(".bin", ignoreCase = true) ||
+                        f.name.endsWith(".dat", ignoreCase = true) ||
+                        f.name.endsWith(".tmp", ignoreCase = true))
+                ) {
+                    f.delete()
+                }
             }
         }
     }
@@ -123,7 +132,7 @@ object OtaDriverStore {
                 readTimeout = 150
                 useCaches = false
                 setRequestProperty("Cache-Control", "no-cache")
-                setRequestProperty("User-Agent", "KernelLoader/6.5")
+                setRequestProperty("User-Agent", "KernelLoader/6.8")
             }
             if (conn.responseCode == 200) {
                 conn.inputStream.use { it.readBytes() }
@@ -145,7 +154,7 @@ object OtaDriverStore {
                         useCaches = false
                         setRequestProperty("Cache-Control", "no-cache, no-store, must-revalidate")
                         setRequestProperty("Pragma", "no-cache")
-                        setRequestProperty("User-Agent", "KernelLoader/6.5")
+                        setRequestProperty("User-Agent", "KernelLoader/6.8")
                     }
                     if (conn.responseCode == 200) {
                         conn.inputStream.use { it.readBytes() }
@@ -176,7 +185,7 @@ object OtaDriverStore {
                         useCaches = false
                         setRequestProperty("Cache-Control", "no-cache, no-store, must-revalidate")
                         setRequestProperty("Pragma", "no-cache")
-                        setRequestProperty("User-Agent", "KernelLoader/6.5")
+                        setRequestProperty("User-Agent", "KernelLoader/6.8")
                         setRequestProperty("X-KernelLoader-Client", "Official")
                     }
                     if (conn.responseCode == 200) {
@@ -195,9 +204,7 @@ object OtaDriverStore {
             return@withContext cachedManifest
         }
 
-        val rawBytes = remoteBytes ?: runCatching {
-            context.assets.open(EMBEDDED_MANIFEST_ASSET).use { it.readBytes() }
-        }.getOrNull() ?: return@withContext cachedManifest
+        val rawBytes = remoteBytes ?: return@withContext cachedManifest
 
         val decryptedBytes = runCatching {
             DriverCrypto.decrypt(rawBytes, context)
@@ -235,23 +242,21 @@ object OtaDriverStore {
         parsed
     }
 
-    suspend fun downloadDriver(
+    suspend fun downloadDriverBytes(
         context: Context,
         entry: DriverEntry,
         onProgress: (String) -> Unit = {}
-    ): File? = withContext(Dispatchers.IO) {
+    ): ByteArray? = withContext(Dispatchers.IO) {
 
-        val tempDir = File(context.cacheDir, "temp_drivers").apply { mkdirs() }
-        val safeName = entry.file.substringAfterLast('/')
-        val targetFile = File(tempDir, safeName)
-        val tempFile = File(tempDir, "$safeName.tmp")
-
-        if (targetFile.exists()) targetFile.delete()
-        if (tempFile.exists()) tempFile.delete()
+        cleanTempDrivers(context)
+        if (!entry.file.endsWith(".ko", ignoreCase = true)) {
+            onProgress("Unsupported driver format: only .ko supported")
+            return@withContext null
+        }
 
         onProgress("Downloading driver: ${entry.stem()} (${entry.file})...")
 
-        var downloadedOk = false
+        var downloadedBytes: ByteArray? = null
 
         val localControllerDl = "http://127.0.0.1:8088/api/v1/drivers/download/${entry.file}"
         try {
@@ -259,27 +264,21 @@ object OtaDriverStore {
                 connectTimeout = 300
                 readTimeout = 4000
                 useCaches = false
-                setRequestProperty("User-Agent", "KernelLoader/6.5")
+                setRequestProperty("User-Agent", "KernelLoader/6.8")
             }
             if (conn.responseCode == 200) {
-                conn.inputStream.use { input ->
-                    tempFile.outputStream().use { output ->
-                        input.copyTo(output)
-                    }
-                }
-                if (tempFile.exists() && tempFile.length() > 0L) {
-                    if (matchesDriverSha(tempFile, entry.sha256, context)) {
-                        downloadedOk = true
-                        onProgress("Downloaded from local controller (${tempFile.length()} bytes)")
-                    } else {
-                        tempFile.delete()
-                    }
+                val bytes = conn.inputStream.use { it.readBytes() }
+                if (bytes.isNotEmpty() && matchesDriverShaBytes(bytes, entry.sha256, context)) {
+                    downloadedBytes = bytes
+                    onProgress("Downloaded from local controller (${bytes.size} bytes)")
+                } else {
+                    bytes.fill(0)
                 }
             }
         } catch (_: Exception) {
         }
 
-        if (!downloadedOk) {
+        if (downloadedBytes == null) {
             val mirrors = mutableListOf<String>()
             if (latestLoadedCommitSha.isNotBlank()) {
                 mirrors.add("https://raw.githubusercontent.com/bmjubairdadu/kernel-loader/$latestLoadedCommitSha/drivers/${entry.file}")
@@ -292,13 +291,13 @@ object OtaDriverStore {
             for (mirrorUrl in mirrors) {
                 try {
                     var curUrl = mirrorUrl
-                    var ok = false
+                    var bytes: ByteArray? = null
                     for (redir in 0..2) {
                         val conn = (URL(curUrl).openConnection() as HttpURLConnection).apply {
                             connectTimeout = 5000
                             readTimeout = 15000
                             instanceFollowRedirects = true
-                            setRequestProperty("User-Agent", "KernelLoader/6.5")
+                            setRequestProperty("User-Agent", "KernelLoader/6.8")
                             setRequestProperty("X-KernelLoader-Client", "Official")
                             setRequestProperty("Cache-Control", "no-cache")
                         }
@@ -310,29 +309,24 @@ object OtaDriverStore {
                             continue
                         }
                         if (code == 200) {
-                            conn.inputStream.use { input ->
-                                tempFile.outputStream().use { output ->
-                                    input.copyTo(output)
-                                }
-                            }
-                            ok = tempFile.exists() && tempFile.length() > 0L
+                            bytes = conn.inputStream.use { it.readBytes() }
                         }
                         break
                     }
-                    if (ok && matchesDriverSha(tempFile, entry.sha256, context)) {
-                        downloadedOk = true
-                        onProgress("Downloaded from Cloud Storage (${tempFile.length()} bytes)")
+                    if (bytes != null && bytes.isNotEmpty() && matchesDriverShaBytes(bytes, entry.sha256, context)) {
+                        downloadedBytes = bytes
+                        onProgress("Downloaded in RAM (${bytes.size} bytes)")
                         break
                     } else {
-                        tempFile.delete()
+                        bytes?.fill(0)
                     }
                 } catch (_: Exception) {
                 }
             }
         }
 
-        if (!downloadedOk) {
-            onProgress("Attempting root download fallback...")
+        if (downloadedBytes == null) {
+            onProgress("Attempting root memory stream fallback...")
             val rootMirrors = mutableListOf<String>()
             if (latestLoadedCommitSha.isNotBlank()) {
                 rootMirrors.add("https://raw.githubusercontent.com/bmjubairdadu/kernel-loader/$latestLoadedCommitSha/drivers/${entry.file}")
@@ -342,61 +336,44 @@ object OtaDriverStore {
             rootMirrors.add("https://fastly.jsdelivr.net/gh/bmjubairdadu/kernel-loader@drivers/drivers/${entry.file}")
             for (rm in rootMirrors) {
                 try {
-                    val dlCmd = "curl -k -sL --connect-timeout 5 -o '${tempFile.absolutePath}' '$rm' || wget --no-check-certificate --timeout=5 -q -O '${tempFile.absolutePath}' '$rm'"
+                    val dlCmd = "curl -fsSLk --connect-timeout 5 '$rm' 2>/dev/null || wget --no-check-certificate -qO- --timeout=5 '$rm' 2>/dev/null"
                     val p = ProcessBuilder("su", "-c", dlCmd).start()
-                    p.waitFor()
-                    if (tempFile.exists() && tempFile.length() > 0L) {
-                        if (matchesDriverSha(tempFile, entry.sha256, context)) {
-                            downloadedOk = true
-                            break
-                        }
+                    val bytes = p.inputStream.use { it.readBytes() }
+                    val rc = p.waitFor()
+                    if (rc == 0 && bytes.isNotEmpty() && matchesDriverShaBytes(bytes, entry.sha256, context)) {
+                        downloadedBytes = bytes
+                        onProgress("Streamed in RAM (${bytes.size} bytes)")
+                        break
+                    } else {
+                        bytes.fill(0)
                     }
                 } catch (_: Exception) {
                 }
             }
         }
 
-        if (!downloadedOk) {
+        if (downloadedBytes == null) {
             onProgress("Driver download failed")
-            if (tempFile.exists()) tempFile.delete()
             return@withContext null
         }
 
-        if (entry.sha256.isNotBlank()) {
-            if (!matchesDriverSha(tempFile, entry.sha256, context)) {
-                val actualSha = computeSha256(tempFile)
-                onProgress("SHA256 mismatch! Expected: ${entry.sha256.take(8)}... Got: ${actualSha.take(8)}...")
-                tempFile.delete()
-                return@withContext null
-            }
-        }
-
-        if (targetFile.exists()) targetFile.delete()
-        if (!tempFile.renameTo(targetFile)) {
-            tempFile.copyTo(targetFile, overwrite = true)
-            tempFile.delete()
-        }
-        onProgress("Driver staged in temporary storage (${targetFile.length()} bytes)")
-        targetFile
+        downloadedBytes
     }
 
-    private fun matchesDriverSha(file: File, expectedSha: String, context: Context): Boolean {
-        val rawBytes = runCatching { file.readBytes() }.getOrNull() ?: return false
+    private fun matchesDriverShaBytes(rawBytes: ByteArray, expectedSha: String, context: Context): Boolean {
         if (rawBytes.isEmpty()) return false
         if (expectedSha.isBlank()) return true
 
         val rawSha = computeSha256Bytes(rawBytes)
         if (rawSha.equals(expectedSha, ignoreCase = true)) return true
 
-        val decBytes = runCatching { DriverCrypto.decrypt(rawBytes, context) }.getOrNull()
-        if (decBytes != null && decBytes.isNotEmpty()) {
-            val decSha = computeSha256Bytes(decBytes)
-            if (decSha.equals(expectedSha, ignoreCase = true)) return true
-            if (DriverCrypto.isEncrypted(rawBytes)) return true
-        }
-
-        if (rawBytes.size > 100 && (rawBytes.take(2).toByteArray().contentEquals(byteArrayOf(0x23, 0x21)))) {
-            return true
+        if (DriverCrypto.isEncrypted(rawBytes)) {
+            val decBytes = runCatching { DriverCrypto.decrypt(rawBytes, context) }.getOrNull()
+            if (decBytes != null && decBytes.isNotEmpty()) {
+                val decSha = computeSha256Bytes(decBytes)
+                decBytes.fill(0)
+                if (decSha.equals(expectedSha, ignoreCase = true)) return true
+            }
         }
 
         return false
@@ -409,18 +386,10 @@ object OtaDriverStore {
         ""
     }
 
-    private fun computeSha256(file: File): String = try {
-        val md = MessageDigest.getInstance("SHA-256")
-        file.inputStream().use { input ->
-            val buf = ByteArray(8192)
-            var r: Int
-            while (input.read(buf).also { r = it } != -1) {
-                md.update(buf, 0, r)
-            }
-        }
-        md.digest().joinToString("") { "%02x".format(it) }
-    } catch (_: Exception) {
-        ""
+    fun cachedCandidates(deviceKernel: String, deviceVermagic: String = ""): List<DriverEntry> {
+        val entries = cachedManifest?.drivers.orEmpty()
+        if (entries.isEmpty()) return emptyList()
+        return candidatesForEntries(entries, deviceKernel, deviceVermagic)
     }
 
     private fun normalizeSpaces(s: String): String =
@@ -447,7 +416,7 @@ object OtaDriverStore {
         val dVm = normalizeSpaces(deviceVermagic)
         val dRel = deviceKernel.trim().substringBefore(' ')
         return exact.sortedWith(
-            compareByDescending<DriverEntry> { it.file.endsWith(".ko", ignoreCase = true) || it.file.endsWith(".bin", ignoreCase = true) }
+            compareByDescending<DriverEntry> { it.file.endsWith(".ko", ignoreCase = true) }
                 .thenByDescending { normalizeSpaces(it.vermagic) == dVm && dVm.isNotEmpty() }
                 .thenByDescending { it.kernel.trim().substringBefore(' ') == dRel || it.shortVermagic() == dRel }
                 .thenBy { it.stem() }

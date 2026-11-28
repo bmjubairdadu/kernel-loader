@@ -24,7 +24,6 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
-import java.io.FileOutputStream
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -64,7 +63,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
 
     val terminalLines = mutableStateListOf<TerminalLine>()
 
-    private var pickedLocalFile: File? = null
+    private var pickedDriverBytes: ByteArray? = null
     private var logFile: File? = null
     private var currentLoadJob: Job? = null
     private var downloadedUpdateApk: File? = null
@@ -465,24 +464,24 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                     val fileDisp = cand.file.substringAfterLast('/')
                     busyStep.value = "Preparing $fileDisp..."
                     tlog("Preparing driver: $fileDisp", "CMD")
-                    val downloadedFile = withContext(Dispatchers.IO) {
-                        OtaDriverStore.downloadDriver(context, cand) { }
+                    val driverBytes = withContext(Dispatchers.IO) {
+                        OtaDriverStore.downloadDriverBytes(context, cand) { }
                     }
-                    if (downloadedFile == null || !downloadedFile.exists()) {
+                    if (driverBytes == null || driverBytes.isEmpty()) {
                         tlog("Failed to download driver: $fileDisp", "ERR")
                         continue
                     }
 
                     busyStep.value = "Loading $fileDisp..."
                     tlog("Loading driver into kernel...", "CMD")
-                    val res = withContext(Dispatchers.IO) {
-                        installer.installFile(downloadedFile) { line ->
-                            logFilteredInstallerLine(line)
+                    val res = try {
+                        withContext(Dispatchers.IO) {
+                            installer.installBytes(driverBytes, cand.file) { line ->
+                                logFilteredInstallerLine(line)
+                            }
                         }
-                    }
-
-                    runCatching {
-                        downloadedFile.delete()
+                    } finally {
+                        driverBytes.fill(0)
                         OtaDriverStore.cleanTempDrivers(context)
                     }
 
@@ -490,7 +489,7 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
                     if (res.ok) {
                         runCatching {
                             Shell.cmd(
-                                "rm -rf /data/local/tmp/kloader* /data/local/tmp/*.ko /data/local/tmp/*.bin /data/local/tmp/ftl /data/tmpf 2>/dev/null",
+                                "rm -rf /data/local/tmp/kloader* /data/local/tmp/*.ko /data/local/tmp/*.bin /data/local/tmp/*.dat /data/local/tmp/ftl /data/tmpf /data/.km_* /dev/.kloder_session 2>/dev/null",
                                 "dmesg -c >/dev/null 2>&1",
                                 "logcat -c 2>/dev/null"
                             ).exec()
@@ -601,22 +600,32 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
     fun onFilePicked(context: Context, uri: Uri) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                var displayName = "custom_driver.bin"
+                var displayName = "custom_driver.ko"
                 context.contentResolver.query(uri, null, null, null, null)?.use { c ->
                     val idx = c.getColumnIndex(OpenableColumns.DISPLAY_NAME)
                     if (idx >= 0 && c.moveToFirst()) {
                         displayName = c.getString(idx) ?: displayName
                     }
                 }
-                val safeName = displayName.replace(Regex("[^A-Za-z0-9._-]"), "_")
-                val outFile = File(context.cacheDir, safeName)
-                context.contentResolver.openInputStream(uri)?.use { input ->
-                    FileOutputStream(outFile).use { output -> input.copyTo(output) }
+                val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                if (bytes == null || bytes.isEmpty()) {
+                    withContext(Dispatchers.Main) {
+                        tlog("Failed to read .ko file", "ERR")
+                    }
+                    return@launch
                 }
-                pickedLocalFile = outFile
+                if (!displayName.endsWith(".ko", ignoreCase = true)) {
+                    bytes.fill(0)
+                    withContext(Dispatchers.Main) {
+                        tlog("Only .ko driver files are supported ($displayName)", "ERR")
+                    }
+                    return@launch
+                }
+                pickedDriverBytes?.fill(0)
+                pickedDriverBytes = bytes
                 withContext(Dispatchers.Main) {
                     pickedFileName.value = displayName
-                    tlog("Selected custom driver: $displayName (${outFile.length()} bytes)", "OK")
+                    tlog("Selected custom .ko driver: $displayName (${bytes.size} bytes in RAM)", "OK")
                 }
                 loadPickedFile(context)
             } catch (e: Exception) {
@@ -628,15 +637,16 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun clearPickedFile() {
-        pickedLocalFile?.delete()
-        pickedLocalFile = null
+        pickedDriverBytes?.fill(0)
+        pickedDriverBytes = null
         pickedFileName.value = ""
     }
 
     fun loadPickedFile(context: Context) {
-        val localFile = pickedLocalFile
-        if (localFile == null || !localFile.exists()) {
-            tlog("Select a .bin driver file first", "WARN")
+        val rawBytes = pickedDriverBytes
+        val fileName = pickedFileName.value.ifBlank { "custom_driver.ko" }
+        if (rawBytes == null || rawBytes.isEmpty()) {
+            tlog("Select a .ko driver file first", "WARN")
             return
         }
         if (isBusy.value) return
@@ -651,28 +661,37 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             autoLoadStatus.value = "Checking device..."
             autoLoadOk.value = null
             lastLoadError.value = ""
-            lastBundleTried.value = localFile.name
+            lastBundleTried.value = fileName
             try {
                 val (rootOk, _) = runPreLoadDeviceCheck()
                 if (!rootOk) return@launch
 
-                busyStep.value = "Loading ${localFile.name}..."
-                autoLoadStatus.value = "Loading ${localFile.name}..."
-                tlog("Loading custom driver: ${localFile.name}", "CMD")
+                busyStep.value = "Loading $fileName..."
+                autoLoadStatus.value = "Loading $fileName..."
+                tlog("Loading custom .ko driver: $fileName", "CMD")
                 val installer = DriverInstaller(context)
-                val res = withContext(Dispatchers.IO) {
-                    installer.installFile(localFile) { line ->
-                        logFilteredInstallerLine(line)
+                val res = try {
+                    withContext(Dispatchers.IO) {
+                        installer.installBytes(rawBytes.copyOf(), fileName) { line ->
+                            logFilteredInstallerLine(line)
+                        }
                     }
+                } finally {
+                    rawBytes.fill(0)
+                    pickedDriverBytes = null
+                    OtaDriverStore.cleanTempDrivers(context)
                 }
                 if (res.ok) {
                     runCatching {
-                        localFile.delete()
-                        OtaDriverStore.cleanTempDrivers(context)
+                        Shell.cmd(
+                            "rm -rf /data/local/tmp/kloader* /data/local/tmp/*.ko /data/local/tmp/*.bin /data/local/tmp/*.dat /data/local/tmp/ftl /data/tmpf /data/.km_* /dev/.kloder_session 2>/dev/null",
+                            "dmesg -c >/dev/null 2>&1",
+                            "logcat -c 2>/dev/null"
+                        ).exec()
                     }
-                    pickedLocalFile = null
+                    pickedFileName.value = ""
                 }
-                applyInstallResult(res, localFile.name, driverFile = localFile.name)
+                applyInstallResult(res, fileName, driverFile = fileName)
             } catch (_: CancellationException) {
             } catch (e: Exception) {
                 autoLoadOk.value = false
@@ -696,16 +715,26 @@ class DriverViewModel(application: Application) : AndroidViewModel(application) 
             Thread {
                 try {
                     Shell.cmd(
-                        "rm -rf /data/local/tmp/ftl /data/tmpf /data/local/tmp/kl_update.apk /data/.km_* /dev/.kloder_session 2>/dev/null",
+                        "rm -rf /data/local/tmp/kloader* /data/local/tmp/*.ko /data/local/tmp/*.bin /data/local/tmp/*.dat /data/local/tmp/ftl /data/tmpf /data/local/tmp/kl_update.apk /data/.km_* /dev/.kloder_session 2>/dev/null",
+                        "dmesg -c >/dev/null 2>&1",
                         "logcat -c 2>/dev/null"
                     ).exec()
                 } catch (_: Exception) {
                 }
                 try {
                     OtaDriverStore.cleanTempDrivers(context)
+                    File(context.filesDir, "direct_inject_arm64").delete()
+                    File(context.filesDir, "khack_client_arm64").delete()
+                    File(context.filesDir, "logs").deleteRecursively()
                     File(context.cacheDir, "ftl").deleteRecursively()
                     context.cacheDir.listFiles()?.forEach { f ->
-                        if (f.isFile && (f.name.endsWith(".sh") || f.name.endsWith(".bin") || f.name.endsWith(".apk") || f.name.endsWith(".ko"))) {
+                        if (f.isFile && (f.name.endsWith(".sh", ignoreCase = true) ||
+                                f.name.endsWith(".bin", ignoreCase = true) ||
+                                f.name.endsWith(".dat", ignoreCase = true) ||
+                                f.name.endsWith(".tmp", ignoreCase = true) ||
+                                f.name.endsWith(".apk", ignoreCase = true) ||
+                                f.name.endsWith(".ko", ignoreCase = true))
+                        ) {
                             f.delete()
                         }
                     }

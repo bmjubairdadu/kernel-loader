@@ -17,114 +17,87 @@ class DriverInstaller(private val ctx: Context) {
         val rawLog: String = ""
     )
 
-    fun availableFiles(): List<String> {
-        val cachedDir = File(ctx.filesDir, "drivers")
-        val cachedList = if (cachedDir.exists()) {
-            cachedDir.walkTopDown()
-                .filter { it.isFile && (it.name.endsWith(".ko") || it.name.endsWith(".bin") || it.name.endsWith(".dat") || it.name.endsWith(".sh")) }
-                .map { it.name }
-                .toList()
-        } else emptyList()
-        val rtList = ctx.assets.list("drivers/RT")
-            ?.filter { it.endsWith(".ko") || it.endsWith(".bin") || it.endsWith(".dat") || it.endsWith(".sh") }
-            ?: emptyList()
-        val rootList = ctx.assets.list("drivers")
-            ?.filter { it.endsWith(".ko") || it.endsWith(".bin") || it.endsWith(".dat") || it.endsWith(".sh") }
-            ?: emptyList()
-        return (cachedList + rtList + rootList).distinct().sorted()
-    }
-
-    fun candidateFiles(release: String): List<String> {
-        val v = release.substringBefore('-').trim()
-        if (v.isEmpty()) return emptyList()
-        val scored = availableFiles()
-            .map { file -> file to file.substringBeforeLast('.').trimEnd { c -> c in 'a'..'z' } }
-            .filter { (_, core) -> v == core || v.startsWith("$core.") }
-        if (scored.isEmpty()) return emptyList()
-        val best = scored.maxOf { it.second.length }
-        return scored.filter { it.second.length == best }.map { it.first }.sorted()
-    }
-
-    fun availableScripts(): List<String> {
-        val cachedDir = File(ctx.filesDir, "drivers")
-        val cachedList = if (cachedDir.exists()) {
-            cachedDir.walkTopDown()
-                .filter { it.isFile && (it.name.endsWith(".ko") || it.name.endsWith(".bin") || it.name.endsWith(".dat")) }
-                .map { it.name.substringBeforeLast('.') }
-                .toList()
-        } else emptyList()
-        val rtList = ctx.assets.list("drivers/RT")
-            ?.filter { it.endsWith(".ko") || it.endsWith(".bin") || it.endsWith(".dat") }
-            ?.map { it.substringBeforeLast('.') }
-            ?: emptyList()
-        val rootList = ctx.assets.list("drivers")
-            ?.filter { it.endsWith(".ko") || it.endsWith(".bin") || it.endsWith(".dat") }
-            ?.map { it.substringBeforeLast('.') }
-            ?: emptyList()
-        return (cachedList + rtList + rootList).distinct().sorted()
-    }
-
-    fun candidates(release: String): List<String> {
-        val v = release.substringBefore('-').trim()
-        if (v.isEmpty()) return emptyList()
-        val scored = availableScripts()
-            .map { it to it.trimEnd { c -> c in 'a'..'z' } }
-            .filter { (_, core) -> v == core || v.startsWith("$core.") }
-        if (scored.isEmpty()) return emptyList()
-        val best = scored.maxOf { it.second.length }
-        return scored.filter { it.second.length == best }.map { it.first }.sorted()
-    }
-
-    fun installFile(sourceFile: File, onLine: (String) -> Unit = {}): Result {
-        val rawBytes = sourceFile.readBytes()
-        return installBytes(rawBytes, sourceFile.name, onLine)
-    }
-
     fun installBytes(rawBytes: ByteArray, fileName: String, onLine: (String) -> Unit = {}): Result {
-        if (!fileName.endsWith(".ko") && !fileName.endsWith(".bin") && !fileName.endsWith(".dat") && !DriverCrypto.isEncrypted(rawBytes)) {
-            onLine("- Error: Only .ko or .bin drivers are supported")
+        if (!fileName.endsWith(".ko", ignoreCase = true)) {
+            onLine("- Error: Only .ko drivers are supported")
             return Result(ok = false, error = "unsupported_driver_format")
         }
         return injectInMemory(rawBytes, onLine)
     }
 
+    private fun isValidElf(bytes: ByteArray): Boolean =
+        bytes.size >= 64 &&
+            bytes[0] == 0x7f.toByte() &&
+            bytes[1] == 'E'.code.toByte() &&
+            bytes[2] == 'L'.code.toByte() &&
+            bytes[3] == 'F'.code.toByte()
+
+    private fun cleanupRuntimeTraces(finalNode: String = "", clearKernelLogs: Boolean = false) {
+        val injectorBin = File(ctx.filesDir, "direct_inject_arm64")
+        val clientBin = File(ctx.filesDir, "khack_client_arm64")
+        runCatching { injectorBin.delete() }
+        runCatching { clientBin.delete() }
+        OtaDriverStore.cleanTempDrivers(ctx)
+
+        val cmd = buildString {
+            if (clearKernelLogs && finalNode.isNotBlank()) {
+                append("chmod 0600 '$finalNode' 2>/dev/null; ")
+            }
+            append(
+                "rm -rf '${injectorBin.absolutePath}' '${clientBin.absolutePath}' " +
+                    "/data/local/tmp/kloader* /data/local/tmp/*.ko /data/local/tmp/*.bin " +
+                    "/data/local/tmp/*.dat /data/local/tmp/ftl /data/tmpf /data/.km_* /dev/.kloder_session 2>/dev/null"
+            )
+            if (clearKernelLogs) {
+                append("; dmesg -c >/dev/null 2>&1; logcat -c 2>/dev/null")
+            }
+        }
+        su(cmd) {}
+    }
+
     private fun injectInMemory(rawBytes: ByteArray, onLine: (String) -> Unit): Result {
         onLine("- Mode: 100% In-Memory Injection (Zero Disk Footprint)")
 
-        val elfBytes = if (DriverCrypto.isEncrypted(rawBytes)) {
-            DriverCrypto.decrypt(rawBytes, ctx)
-        } else {
-            rawBytes
-        }
-        if (elfBytes.size < 64 || elfBytes[0] != 0x7f.toByte()) {
-            onLine("- Error: Payload is not a valid ELF module")
-            return Result(ok = false, error = "invalid_elf")
-        }
-
+        var elfBytes = rawBytes
         val injectorBin = File(ctx.filesDir, "direct_inject_arm64")
-        try {
-            ctx.assets.open("bin/direct_inject_arm64").use { input ->
-                injectorBin.outputStream().use { output -> input.copyTo(output) }
-            }
-            su("chmod 700 '${injectorBin.absolutePath}'") {}
-        } catch (e: Exception) {
-            if (!injectorBin.exists() || injectorBin.length() == 0L) {
-                onLine("- Error staging injector tool: ${e.message}")
-                return Result(ok = false, error = "injector_stage_failed")
-            }
-        }
-
-        val cList = listOf('b', 'c', 'd', 'f', 'g', 'k', 'l', 'm', 'n', 'p', 'r', 's', 't', 'v', 'w', 'z')
-        val vList = listOf('a', 'e', 'i', 'o', 'u')
-        val cMidList = listOf('c', 'd', 'f', 'k', 'l', 'm', 'n', 'p', 'r', 's', 't', 'v', 'x', 'b', 'g', 'z')
-        val tag = "" + cList.random() + vList.random() + cMidList.random() + cMidList.random() + vList.random() + cMidList.random()
-        onLine("- Stealth device identifier: $tag (Target: /dev/$tag)")
 
         val kv = HashMap<String, String>()
         val raw = StringBuilder()
         var processRc = -1
+        var ok = false
+        var finalNode = ""
+        var finalDev = ""
+        var finalMod = ""
 
         try {
+            elfBytes = if (DriverCrypto.isEncrypted(rawBytes)) {
+                DriverCrypto.decrypt(rawBytes, ctx)
+            } else {
+                rawBytes
+            }
+            if (!isValidElf(elfBytes)) {
+                onLine("- Error: Payload is not a valid ELF .ko module")
+                return Result(ok = false, error = "invalid_elf")
+            }
+
+            try {
+                ctx.assets.open("bin/direct_inject_arm64").use { input ->
+                    injectorBin.outputStream().use { output -> input.copyTo(output) }
+                }
+                su("chmod 700 '${injectorBin.absolutePath}'") {}
+            } catch (e: Exception) {
+                if (!injectorBin.exists() || injectorBin.length() == 0L) {
+                    onLine("- Error staging injector tool: ${e.message}")
+                    return Result(ok = false, error = "injector_stage_failed")
+                }
+            }
+
+            val cList = listOf('b', 'c', 'd', 'f', 'g', 'k', 'l', 'm', 'n', 'p', 'r', 's', 't', 'v', 'w', 'z')
+            val vList = listOf('a', 'e', 'i', 'o', 'u')
+            val cMidList = listOf('c', 'd', 'f', 'k', 'l', 'm', 'n', 'p', 'r', 's', 't', 'v', 'x', 'b', 'g', 'z')
+            val tag = "" + cList.random() + vList.random() + cMidList.random() + cMidList.random() + vList.random() + cMidList.random()
+            onLine("- Stealth device identifier: $tag (Target: /dev/$tag)")
+
             val p = ProcessBuilder("su", "-c", "'${injectorBin.absolutePath}' - tag=$tag").start()
             val reader = Thread {
                 p.inputStream.bufferedReader().useLines { seq ->
@@ -155,40 +128,39 @@ class DriverInstaller(private val ctx: Context) {
 
             processRc = p.waitFor()
             reader.join()
+
+            ok = kv["STATUS"] == "OK" || raw.contains("Driver loaded") || processRc == 0
+            finalNode = kv["NODE"].orEmpty().ifBlank { "/dev/$tag" }
+            finalDev = kv["DEVNAME"].orEmpty().ifBlank { tag }
+            finalMod = kv["MODULE"].orEmpty().ifBlank {
+                (1..8).map { ('a'..'z').random() }.joinToString("")
+            }
+
+            if (!ok && kv["RESIDENT"] == "1") {
+                val candidate = findCandidateNodes().firstOrNull()
+                if (candidate != null) {
+                    finalNode = candidate
+                    ok = true
+                    onLine("[*] Reconnected to active resident node: $finalNode")
+                }
+            }
+
+            if (ok) {
+                onLine("- Active channel: $finalNode (0600 root:root)")
+                onLine("- Kernel module: $finalMod (Pure Alphabetic Stealth)")
+                onLine("- Driver status: ACTIVE & OPERATIONAL (In-Memory)")
+                onLine("- Stealth Audit: Traces, logs & temporary binaries cleared")
+                DriverSessionManager.markLoaded(ctx, finalNode, finalMod, true)
+            }
         } catch (t: Throwable) {
             onLine("- Injection error: ${t.message}")
             return Result(ok = false, error = t.message.orEmpty())
-        }
-
-        var ok = kv["STATUS"] == "OK" || raw.contains("Driver loaded") || processRc == 0
-        var finalNode = kv["NODE"].orEmpty().ifBlank { "/dev/$tag" }
-        val finalDev = kv["DEVNAME"].orEmpty().ifBlank { tag }
-        val finalMod = kv["MODULE"].orEmpty().ifBlank {
-            (1..8).map { ('a'..'z').random() }.joinToString("")
-        }
-
-        if (!ok && kv["RESIDENT"] == "1") {
-            val candidates = findCandidateNodes()
-            val candidate = candidates.firstOrNull()
-            if (candidate != null) {
-                finalNode = candidate
-                ok = true
-                onLine("[*] Reconnected to active resident node: $finalNode")
+        } finally {
+            rawBytes.fill(0)
+            if (elfBytes !== rawBytes) {
+                elfBytes.fill(0)
             }
-        }
-
-        if (ok) {
-            su("chmod 0600 '$finalNode' 2>/dev/null && dmesg -c >/dev/null 2>&1 && logcat -c 2>/dev/null") {}
-            injectorBin.delete()
-            su("rm -f '${injectorBin.absolutePath}' /data/local/tmp/kloader* /data/local/tmp/*.ko /data/local/tmp/*.bin 2>/dev/null") {}
-            onLine("- Active channel: $finalNode (0600 root:root)")
-            onLine("- Kernel module: $finalMod (Pure Alphabetic Stealth)")
-            onLine("- Driver status: ACTIVE & OPERATIONAL (In-Memory)")
-            onLine("- Stealth Audit: Traces, logs & temporary binaries cleared")
-            DriverSessionManager.markLoaded(ctx, finalNode, finalMod, true)
-        } else {
-            injectorBin.delete()
-            su("rm -f '${injectorBin.absolutePath}' /data/local/tmp/kloader* /data/local/tmp/*.ko /data/local/tmp/*.bin 2>/dev/null") {}
+            cleanupRuntimeTraces(finalNode = if (ok) finalNode else "", clearKernelLogs = ok)
         }
 
         return Result(
@@ -203,8 +175,6 @@ class DriverInstaller(private val ctx: Context) {
         )
     }
 
-
-
     data class VerifyResult(
         val ok: Boolean,
         val node: String? = null,
@@ -213,18 +183,18 @@ class DriverInstaller(private val ctx: Context) {
         val ownerPid: Int = 0
     )
 
-    private fun getOrStageClientBin(): String {
+    private inline fun <T> withClientBin(block: (String) -> T): T {
         val clientBin = File(ctx.filesDir, "khack_client_arm64")
-        try {
-            val assetSize = ctx.assets.open("bin/khack_client_arm64").use { it.available().toLong() }
-            if (!clientBin.exists() || clientBin.length() != assetSize) {
-                ctx.assets.open("bin/khack_client_arm64").use { input ->
-                    clientBin.outputStream().use { output -> input.copyTo(output) }
-                }
-                su("chmod 700 '${clientBin.absolutePath}'") {}
+        return try {
+            ctx.assets.open("bin/khack_client_arm64").use { input ->
+                clientBin.outputStream().use { output -> input.copyTo(output) }
             }
-        } catch (_: Exception) {}
-        return clientBin.absolutePath
+            su("chmod 700 '${clientBin.absolutePath}'") {}
+            block(clientBin.absolutePath)
+        } finally {
+            runCatching { clientBin.delete() }
+            su("rm -f '${clientBin.absolutePath}' 2>/dev/null") {}
+        }
     }
 
     fun findCandidateNodes(): List<String> {
@@ -252,32 +222,33 @@ class DriverInstaller(private val ctx: Context) {
         if ((!node.startsWith("/dev/") && !node.startsWith("/proc/")) || targetPid <= 0) {
             return Pair(false, "invalid_target")
         }
-        val clientPath = getOrStageClientBin()
         return try {
-            val safeNode = node.replace("'", "'\\''")
-            val cmd = "'$clientPath' '$safeNode' selftest $targetPid libc.so 2>&1"
-            var baseHex = ""
-            var writeOk = ""
-            val lines = ArrayList<String>()
-            val rc = su(cmd) { line ->
-                val t = line.trim()
-                if (t.isNotBlank()) {
-                    if (t.startsWith("BASE=")) {
-                        baseHex = t.substringAfter("BASE=").trim()
-                    } else if (t.startsWith("WRITE_OK=")) {
-                        writeOk = t.substringAfter("WRITE_OK=").trim()
-                    } else {
-                        lines += t
+            withClientBin { clientPath ->
+                val safeNode = node.replace("'", "'\\''")
+                val cmd = "'$clientPath' '$safeNode' selftest $targetPid libc.so 2>&1"
+                var baseHex = ""
+                var writeOk = ""
+                val lines = ArrayList<String>()
+                val rc = su(cmd) { line ->
+                    val t = line.trim()
+                    if (t.isNotBlank()) {
+                        if (t.startsWith("BASE=")) {
+                            baseHex = t.substringAfter("BASE=").trim()
+                        } else if (t.startsWith("WRITE_OK=")) {
+                            writeOk = t.substringAfter("WRITE_OK=").trim()
+                        } else {
+                            lines += t
+                        }
+                        onLine(t)
                     }
-                    onLine(t)
                 }
-            }
-            val dump = lines.joinToString("\n").lowercase()
-            val hasElfMagic = dump.contains("7f 45 4c 46")
-            if (rc == 0 && baseHex.startsWith("0x") && baseHex != "0x0" && hasElfMagic && writeOk.isNotBlank()) {
-                Pair(true, "libc.so=$baseHex (ELF + R/W OK)")
-            } else {
-                Pair(false, "rc=$rc base=$baseHex ${lines.lastOrNull().orEmpty()}".trim())
+                val dump = lines.joinToString("\n").lowercase()
+                val hasElfMagic = dump.contains("7f 45 4c 46")
+                if (rc == 0 && baseHex.startsWith("0x") && baseHex != "0x0" && hasElfMagic && writeOk.isNotBlank()) {
+                    Pair(true, "libc.so=$baseHex (ELF + R/W OK)")
+                } else {
+                    Pair(false, "rc=$rc base=$baseHex ${lines.lastOrNull().orEmpty()}".trim())
+                }
             }
         } catch (t: Throwable) {
             Pair(false, t.message.orEmpty())
@@ -293,42 +264,43 @@ class DriverInstaller(private val ctx: Context) {
                 return VerifyResult(ok = false, stealth = true)
             }
 
-            val clientPath = getOrStageClientBin()
             val myPid = android.os.Process.myPid()
 
             try {
-                for (cand in candidates) {
-                    if (cand.isNotBlank()) {
-                        su("chmod 0600 '$cand' 2>/dev/null") {}
-                    }
-                    onLine("- Probing node candidate: $cand (0x803 IOCTL)...")
-                    val cmd = "'$clientPath' '$cand' base $myPid libc.so 2>&1"
-                    var baseAddr = ""
-                    var errorMsg = ""
-                    val rc = su(cmd) { line ->
-                        val t = line.trim()
-                        if (t.isNotBlank()) {
-                            if (t.startsWith("0x") && t != "0x0") {
-                                baseAddr = t
-                            } else if (t.contains("failed") || t.contains("errno") || t.contains("EBUSY") || t.contains("Device or resource busy")) {
-                                errorMsg = t
+                withClientBin { clientPath ->
+                    for (cand in candidates) {
+                        if (cand.isNotBlank()) {
+                            su("chmod 0600 '$cand' 2>/dev/null") {}
+                        }
+                        onLine("- Probing node candidate: $cand (0x803 IOCTL)...")
+                        val cmd = "'$clientPath' '$cand' base $myPid libc.so 2>&1"
+                        var baseAddr = ""
+                        var errorMsg = ""
+                        val rc = su(cmd) { line ->
+                            val t = line.trim()
+                            if (t.isNotBlank()) {
+                                if (t.startsWith("0x") && t != "0x0") {
+                                    baseAddr = t
+                                } else if (t.contains("failed") || t.contains("errno") || t.contains("EBUSY") || t.contains("Device or resource busy")) {
+                                    errorMsg = t
+                                }
                             }
                         }
-                    }
 
-                    if (rc == 0 && baseAddr.isNotBlank()) {
-                        onLine("- Handshake (0x803): SUCCESS on $cand")
-                        onLine("- Kernel Memory Engine: ACTIVE (libc.so base: $baseAddr)")
-                        onLine("- Driver status: 100% OPERATIONAL")
-                        DriverSessionManager.markLoaded(ctx, cand, module, true)
-                        return VerifyResult(ok = true, node = cand, stealth = true, inUse = false)
-                    } else if (errorMsg.contains("errno=16") || errorMsg.contains("EBUSY") || errorMsg.contains("Device or resource busy")) {
-                        onLine("- Handshake (0x803): Node $cand is in exclusive use by client (EBUSY)")
-                        onLine("- Driver status: ACTIVE & ENGAGED")
-                        DriverSessionManager.markLoaded(ctx, cand, module, true)
-                        return VerifyResult(ok = true, node = cand, stealth = true, inUse = true)
-                    } else {
-                        onLine("- Probe $cand: No response to 0x803 IOCTL (${errorMsg.ifBlank { "rc=$rc" }})")
+                        if (rc == 0 && baseAddr.isNotBlank()) {
+                            onLine("- Handshake (0x803): SUCCESS on $cand")
+                            onLine("- Kernel Memory Engine: ACTIVE (libc.so base: $baseAddr)")
+                            onLine("- Driver status: 100% OPERATIONAL")
+                            DriverSessionManager.markLoaded(ctx, cand, module, true)
+                            return VerifyResult(ok = true, node = cand, stealth = true, inUse = false)
+                        } else if (errorMsg.contains("errno=16") || errorMsg.contains("EBUSY") || errorMsg.contains("Device or resource busy")) {
+                            onLine("- Handshake (0x803): Node $cand is in exclusive use by client (EBUSY)")
+                            onLine("- Driver status: ACTIVE & ENGAGED")
+                            DriverSessionManager.markLoaded(ctx, cand, module, true)
+                            return VerifyResult(ok = true, node = cand, stealth = true, inUse = true)
+                        } else {
+                            onLine("- Probe $cand: No response to 0x803 IOCTL (${errorMsg.ifBlank { "rc=$rc" }})")
+                        }
                     }
                 }
 

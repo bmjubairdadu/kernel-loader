@@ -1972,7 +1972,7 @@ private fun KernelListSection(
                 Box(Modifier.size(8.dp).clip(CircleShape).background(LogoPurple))
                 Spacer(Modifier.width(10.dp))
                 Text(
-                    text = "root@kernel-loader:~# ls /db/drivers_and_scripts",
+                    text = "root@kernel-loader:~# ls /db/drivers",
                     style = MonoTiny,
                     color = TextSecondary,
                     modifier = Modifier.weight(1f)
